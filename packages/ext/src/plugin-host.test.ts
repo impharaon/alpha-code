@@ -2911,6 +2911,91 @@ packageIt.live("subagent hooks bind real child identity before its first model a
   expect(JSON.stringify(requests[2])).toContain("finish this child only")
 })))
 
+packageIt.live("real subagents skip main session phases and release transports on completion and parent leave", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const sent: unknown[] = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge: createHubBridge({ postMessage: message => { sent.push(message) }, on: (_, listener) => { listeners.push(listener) } }) }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  let paused: string | undefined
+  let release = () => {}
+  yield* Effect.addFinalizer(() => Effect.sync(() => release()))
+  yield* packageJourney(Effect.gen(function* () {
+    const { sessionMcpHandler } = yield* Effect.promise(() => import("../../core/test/fixture/codepuppy-mcp-session"))
+    const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+    const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
+    const handler = yield* Effect.promise(sessionMcpHandler)
+    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: handler.fetch })
+    yield* Effect.addFinalizer(() => Effect.sync(() => { server.stop(true) }))
+    const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+    const hooks = Object.fromEntries(["SessionStart", "UserPromptSubmit", "SubagentStart", "SubagentStop", "Elicitation"].map(event => [event, source.hooks[event]]))
+    for (const groups of Object.values(hooks) as { matcher?: string; hooks: { command: string; args: string[] }[] }[][]) for (const group of groups) {
+      delete group.matcher
+      for (const hook of group.hooks) {
+        hook.command = process.execPath
+        hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('child-phases.jsonl',JSON.stringify(input)+'\\n')"]
+      }
+    }
+    const monitorTree = yield* Effect.promise(() => captureStandardFixture("claude:convex"))
+    const monitor = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => monitorTree.readFile("monitors/monitors.json"))))[0]
+    delete monitor.when
+    monitor.command = 'printf "unexpected child monitor\\n" >> "${CLAUDE_PROJECT_DIR}/child-always-monitor"'
+    const sample = yield* invocationSample("claude:feature-dev", { "hooks/hooks.json": JSON.stringify({ hooks }), "monitors/monitors.json": JSON.stringify([monitor]) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const target = sample.hostNames["agent:agents/code-reviewer.md"]!
+    yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    writeFileSync(join(location.directory, "child-probe.txt"), "controlled read")
+    const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Subagent resource owner", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const mcp = yield* Mcp.Service
+    yield* mcp.add("child-remote", new ConfigMCP.Remote({ type: "remote", url: server.url.href, oauth: false }))
+    yield* mcp.awaitStartup()
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    const llm = yield* TestLLM.Test
+    for (const leaveParent of [false, true]) {
+      paused = undefined
+      yield* llm.push(TestLLM.toolCall("child_pause_call", "read", { path: "child-probe.txt" }), TestLLM.text("Child complete", "child-complete"))
+      const task = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_child_resource" as never, call: { type: "tool-call", name: "subagent", id: "child_resource", input: { agent: target, description: "Resource lifetime", prompt: "Pause before finishing", background: false } } }).pipe(Effect.forkScoped)
+      yield* ext.finish(Effect.sync(() => paused !== undefined))
+      const child = paused!
+      yield* mcp.callTool({ server: "child-remote", name: "echo", sessionID: child as never })
+      expect(handler.counts).toEqual({ opened: leaveParent ? 3 : 2, closed: leaveParent ? 1 : 0 })
+      const rows = readFileSync(join(location.directory, "child-phases.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+      expect(rows.filter(row => ["SessionStart", "UserPromptSubmit"].includes(row.hook_event_name))).toEqual([])
+      expect(yield* Effect.promise(() => Bun.file(join(location.directory, "child-always-monitor")).exists())).toBe(false)
+      if (leaveParent) {
+        for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 2023, sessionId: parent.id, action: "leave", reason: "clear" } })
+        yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 2023)))
+        expect(handler.counts.closed).toBe(2)
+      }
+      release()
+      yield* Fiber.join(task)
+      yield* ext.finish(Effect.sync(() => handler.counts.closed === (leaveParent ? 2 : 1)))
+      const completed = readFileSync(join(location.directory, "child-phases.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+      expect(completed.filter(row => row.hook_event_name === "SubagentStart")).toHaveLength(leaveParent ? 2 : 1)
+      expect(completed.filter(row => row.hook_event_name === "SubagentStop")).toHaveLength(leaveParent ? 2 : 1)
+    }
+    expect(yield* llm.requests()).toHaveLength(4)
+  }), { id: "child-resource-pause", setup: async context => {
+    await context.tool.transform(editor => editor.update("read", tool => {
+      const execute = tool.execute
+      tool.execute = async (value, frame) => {
+        paused = frame.sessionID
+        await new Promise<void>(resolve => { release = resolve; frame.signal.addEventListener("abort", resolve, { once: true }) })
+        return execute(value, frame)
+      }
+    }))
+  } })
+}))
+
 packageIt.live("a normal session with a parent does not fabricate subagent lifecycle events", () => packageJourney(Effect.gen(function* () {
   yield* subagentHookSample()
   yield* invocationNativeServices

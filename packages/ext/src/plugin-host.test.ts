@@ -1,3 +1,5 @@
+import { LocationServiceMap } from "../../core/src/location-service-map"
+import { SdkPlugins } from "../../core/src/plugin/sdk"
 // `#1665`:ext 在 OpenCode 2 真插件宿主里(plugin-host.harness.ts)—— 每条用例装的是生产的默认导出 `CodePuppyExt`,
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
@@ -1206,6 +1208,11 @@ it.live("权威 · 项目 agent 的 disable(#1700 AC-04):已同意的项目里 e
  * ext 排在 post 段之后的 transform(post-activation-tail.ts)这时才登记。`finish(done)` 翻过来之后等到 `done` 成立。
  */
 const activateExtUntilFinished = Effect.gen(function* () {
+  const current = (yield* (yield* Plugins.Service).list()).find(plugin => plugin.id === CodePuppyExt.id)
+  if (current) return { finish: (done: Effect.Effect<boolean>) => Effect.gen(function* () {
+    for (let waited = 0; waited < 3000 && !(yield* done); waited += 20) yield* Effect.sleep("20 millis")
+    expect(yield* done).toBe(true)
+  }) }
   let finished = false
   const plugins = yield* Plugins.Service
   const policy = { id: "opencode.config.policy", source: { type: "builtin" }, features: { server: true }, state: { status: "active" } }
@@ -1217,6 +1224,7 @@ const activateExtUntilFinished = Effect.gen(function* () {
       Effect.gen(function* () {
         finished = true
         for (let waited = 0; waited < 3000 && !(yield* done); waited += 20) yield* Effect.sleep("20 millis")
+    expect(yield* done).toBe(true)
       }),
   }
 })
@@ -1708,14 +1716,30 @@ const invocationSample = (name: string, changes: Record<string, string | null> =
   writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: converted.package.entries.filter(entry => ["skill", "command", "agent"].includes(entry.kind)).map(entry => entry.kind + "--" + hostNames[entry.id]), scoped: [], mcp: converted.package.entries.filter(entry => entry.kind === "mcp").map(entry => ({ name: hostNames[entry.id], enabled: true })) }))
   return { root, key, live, description: converted.package, hostNames }
 })
+const packageJourney = <A, E, R>(program: Effect.Effect<A, E, R>, before?: Plugin.Plugin) => Effect.gen(function* () {
+  env({})
+  const sdk = yield* SdkPlugins.Service
+  yield* sdk.register(PluginPromise.fromPromise(providerPlugin("test", "https://test.invalid", "picked")))
+  yield* sdk.register(PluginPromise.fromPromise({ id: "package-test-variants", setup: async context => {
+    await context.model.transform(editor => editor.update("test", "picked", model => {
+      model.variants = ["low", "high"].map(id => ({ id: id as never, name: id, settings: { test: { reasoningEffort: id } } }))
+    }))
+  } }))
+  if (before) yield* sdk.register(PluginPromise.fromPromise(before))
+  yield* sdk.register(PluginPromise.fromPromise(CodePuppyExt))
+  const location = yield* Location.Service
+  const locations = yield* LocationServiceMap.Service
+  return yield* program.pipe(Effect.provide(locations.get({ directory: location.directory })))
+})
 const invocationNativeServices = Effect.gen(function* () {
-  yield* activate(providerPlugin("test", "https://test.invalid", "picked"))
-  const plugins = yield* Plugins.Service
-  for (const plugin of [SkillTool.Plugin, SubagentTool.Plugin, ReadTool.Plugin, ConfigCommandPlugin.Plugin])
-    yield* plugin.effect(yield* PluginHost.make(plugins, plugin.id))
+  yield* (yield* Plugins.Service).awaitActivation
+  yield* (yield* Agent.Service).reload()
+  yield* (yield* Skill.Service).reload()
+  yield* (yield* Command.Service).reload()
+  yield* (yield* Tool.Service).reload()
 })
 
-packageIt.live("package agent delegates with its instructions and tool set", () => Effect.gen(function* () {
+packageIt.live("package agent delegates with its instructions and tool set", () => packageJourney(Effect.gen(function* () {
   env({})
   const sample = yield* invocationSample("claude:feature-dev")
   yield* invocationNativeServices
@@ -1725,7 +1749,7 @@ packageIt.live("package agent delegates with its instructions and tool set", () 
   yield* ext.finish(agents.get(target as never).pipe(Effect.map(agent => !!agent)))
   const sessions = yield* Sessions.Service
   const location = yield* Location.Service
-  const parent = yield* sessions.create({ location: { directory: location.directory }, agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
   const registry = yield* Tool.Service
   const snapshot = yield* registry.snapshot()
   const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_package_agent" as never, call: { type: "tool-call", name: "subagent", id: "call_package_agent", input: { agent: target, description: "Review package", prompt: "review source", background: false } } })
@@ -1743,9 +1767,9 @@ packageIt.live("package agent delegates with its instructions and tool set", () 
   const denied = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_package_agent_off" as never, call: { type: "tool-call", name: "subagent", id: "call_package_agent_off", input: { agent: target, description: "Stopped review", prompt: "review", background: false } } }).pipe(Effect.exit)
   expect(Exit.isFailure(denied)).toBe(true)
   expect((yield* sessions.list({ parentID: parent.id })).data).toHaveLength(1)
-}))
+})))
 
-packageIt.live("package commands invoke the source renderer only after an explicit call", () => Effect.gen(function* () {
+packageIt.live("package commands invoke the source renderer only after an explicit call", () => packageJourney(Effect.gen(function* () {
   env({})
   const original = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
   const source = new TextDecoder().decode(yield* Effect.promise(() => original.readFile("commands/feature-dev.md")))
@@ -1759,7 +1783,7 @@ packageIt.live("package commands invoke the source renderer only after an explic
   expect(yield* llm.requests()).toHaveLength(0)
   const sessions = yield* Sessions.Service
   const location = yield* Location.Service
-  const parent = yield* sessions.create({ location: { directory: location.directory }, agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
   yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: '"!`printf VALUE_EXECUTED`"' }, delivery: "queue" } })
   yield* sessions.wait(parent.id)
   const messages = yield* sessions.context(parent.id)
@@ -1769,4 +1793,183 @@ packageIt.live("package commands invoke the source renderer only after an explic
   expect(text).not.toContain("!`printf SOURCE_EXECUTED`")
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
   expect(Exit.isFailure(yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "after disable" }, delivery: "queue" } }).pipe(Effect.exit))).toBe(true)
+})))
+
+packageIt.live("package invocation applies preload memory effort and native turn limits", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:plugin-dev"))
+  const path = "agents/skill-reviewer.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("claude:plugin-dev", { [path]: source.replace("\n---\n", "\nskills: [plugin-structure]\nmemory: project\nmaxTurns: 1\nbackground: false\neffort: max\n---\n") })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const agents = yield* Agent.Service
+  const target = sample.hostNames["agent:" + path]!
+  yield* ext.finish(agents.get(target as never).pipe(Effect.map(agent => agent?.steps === 1)))
+  const location = yield* Location.Service
+  const memory = join(location.directory, ".codepuppy", "agent-memory", sample.key, target, "MEMORY.md")
+  mkdirSync(dirname(memory), { recursive: true })
+  writeFileSync(memory, "REVIEW_MEMORY_FROM_EXISTING_FILE")
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_read_turn", "read", { path: memory }), TestLLM.text("Bounded review", "bounded"))
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_controls" as never, call: { type: "tool-call", name: "subagent", id: "call_controls", input: { agent: target, description: "Review", prompt: "review" } } })
+  const requests = yield* llm.requests()
+  expect(JSON.stringify(requests)).toContain("REVIEW_MEMORY_FROM_EXISTING_FILE")
+  expect(JSON.stringify(requests)).toContain("Plugin Structure for Claude Code")
+  expect(JSON.stringify(requests)).toContain("MAXIMUM STEPS REACHED")
+  expect(JSON.stringify(result)).toContain('"partial":true')
+  expect(JSON.stringify(requests[0]?.providerOptions)).toContain("high")
+  expect((yield* sessions.list({ parentID: parent.id })).data).toHaveLength(1)
+  const explicit = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_explicit_effort" as never, call: { type: "tool-call", name: "subagent", id: "call_explicit_effort", input: { agent: target, description: "Explicit low", prompt: "review", model: "test/picked#low" } } })
+  expect(JSON.stringify(explicit)).not.toContain('"partial":true')
+  const latest = (yield* llm.requests()).at(-1)!
+  expect(JSON.stringify(latest.providerOptions)).not.toContain("high")
+  expect((yield* sessions.list({ parentID: parent.id })).data.some(child => child.model?.variant === "low")).toBe(true)
+})))
+
+packageIt.live("package paths activate on real file access while Temporal manual skills stay explicit", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("codex:temporal"))
+  const path = "skills/temporal-developer/SKILL.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("codex:temporal", { [path]: source.replace("\n---\n", '\npaths: ["src/**"]\n---\n') })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const manual = sample.hostNames["skill:skills/temporal-cloud-setup/SKILL.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === manual))))
+  const skills = (yield* (yield* Skill.Service).list())
+  expect(skills.find(skill => skill.name === manual)?.autoinvoke).toBe(false)
+  const location = yield* Location.Service
+  const file = join(location.directory, "src", "workflow.ts")
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, "export const workflow = 1")
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_path_read", "read", { path: file }), TestLLM.text("Read workflow", "path"))
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* sessions.prompt({ sessionID: parent.id, text: "read the source", resume: true })
+  yield* sessions.wait(parent.id)
+  const requests = yield* llm.requests()
+  const body = source.split("\n---\n")[1]!.trim().slice(0, 100)
+  expect(JSON.stringify(requests[0])).not.toContain(body)
+  expect(JSON.stringify(requests[1])).toContain(body.replace(/\n/g, "\\n"))
+  yield* commands.execute({ name: manual, invocation: { sessionID: parent.id, prompt: { text: "configure" }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("Temporal Cloud")
+})))
+
+packageIt.live("package Claude background agents stop when their package is disabled", () => packageJourney(Effect.gen(function* () {
+  const sample = yield* invocationSample("claude:feature-dev")
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const agents = yield* Agent.Service
+  const target = sample.hostNames["agent:agents/code-reviewer.md"]!
+  yield* ext.finish(agents.get(target as never).pipe(Effect.map(Boolean)))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Background review", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const gate = yield* (yield* TestLLM.Test).gate()
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_background" as never, call: { type: "tool-call", name: "subagent", id: "call_background", input: { agent: target, description: "Review", prompt: "review" } } })
+  expect(JSON.stringify(result)).toContain('"status":"running"')
+  yield* gate.started
+  const child = (yield* sessions.list({ parentID: parent.id })).data[0]!
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  yield* sessions.wait(child.id).pipe(Effect.timeout("3 seconds"))
+  expect(JSON.stringify(yield* sessions.context(child.id))).not.toContain("Package child result")
+  yield* gate.release
+})))
+
+packageIt.live("package YAML dependencies resolve to a real connected MCP tool", () => Effect.gen(function* () {
+  const { echoMcpHandler } = yield* Effect.promise(() => import("../../core/test/fixture/mcp-echo"))
+  const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+  const handler = echoMcpHandler()
+  let calls = 0
+  const server = yield* Effect.acquireRelease(Effect.sync(() => Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: async request => {
+    if (request.method === "POST") {
+      const body = await request.clone().json()
+      if (body.method === "tools/call") calls++
+    }
+    return handler.fetch(request)
+  } })), server => Effect.sync(() => { server.stop(true) }))
+  const path = "skills/build-chatgpt-app/agents/openai.yaml"
+  const capture = yield* Effect.promise(() => captureStandardFixture("codex:openai-developers"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("codex:openai-developers", { [path]: source.replace("https://developers.openai.com/mcp", server.url.href) })
+  const dependency = sample.description.entries.find(entry => entry.kind === "mcp" && entry.sourceName === "openaiDeveloperDocs")!
+  const host = sample.hostNames[dependency.id]!
+  return yield* packageJourney(Effect.gen(function* () {
+  yield* invocationNativeServices
+  const mcp = yield* Mcp.Service
+  yield* mcp.awaitStartup()
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["skill:skills/build-chatgpt-app/SKILL.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === command))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Dependency call", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_dependency", host + "_echo", {}), TestLLM.text("Used dependency", "dependency"))
+  yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "use docs" }, delivery: "queue" } })
+  const permission = yield* Permission.Service
+  yield* ext.finish(permission.list().pipe(Effect.map(list => list.length > 0)))
+  const request = (yield* permission.list())[0]
+  expect(request).toBeDefined()
+  yield* permission.reply({ requestID: request!.id, reply: "once" })
+  yield* sessions.wait(parent.id)
+  expect(calls).toBe(1)
+  expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("called echo")
+  }), { id: "package-test-dependency", setup: async context => {
+    await context.mcp.transform(editor => editor.set(host, { type: "remote", url: server.url.href, oauth: false, codemode: false }))
+    await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "mcp:" + host + ":echo", resource: "*", effect: "ask" })))
+  } })
 }))
+
+packageIt.live("package skill arguments and denies expire at the next user prompt", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:plugin-dev"))
+  const path = "skills/plugin-structure/SKILL.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("claude:plugin-dev", { [path]: source.replace("\n---\n", "\ndisallowed-tools: [Write]\n---\n") + "\nSKILL_ARGUMENT=$0\n" })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const command = sample.hostNames["skill:" + path]!
+  const skills = yield* Skill.Service
+  yield* ext.finish(skills.list().pipe(Effect.map(list => list.some(item => item.name === command))))
+  const skill = (yield* skills.list()).find(item => item.name === command)!
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Skill scope", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const execute = (name: string, input: unknown, id: string) => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_skill_scope" as never, call: { type: "tool-call", name, id, input } })
+  const result = yield* execute("skill", { id: skill!.id, arguments: '"two words"' }, "call_skill_args")
+  expect(JSON.stringify(result)).toContain("SKILL_ARGUMENT=two words")
+  const file = join(location.directory, "scope-output.txt")
+  expect(Exit.isFailure(yield* execute("write", { path: file, content: "not yet" }, "call_skill_denied").pipe(Effect.exit))).toBe(true)
+  expect(yield* Effect.promise(() => Bun.file(file).exists())).toBe(false)
+  yield* sessions.prompt({ sessionID: parent.id, text: "new user turn" })
+  yield* sessions.wait(parent.id)
+  yield* execute("write", { path: file, content: "after user turn" }, "call_skill_cleared")
+  expect(yield* Effect.promise(() => Bun.file(file).text())).toBe("after user turn")
+})))
+
+packageIt.live("package agent Edit remains available when source Write is denied", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const path = "agents/code-reviewer.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("claude:feature-dev", { [path]: source.replace(/^tools:.*$/m, "tools: [Read, Edit, Write]").replace("\n---\n", "\ndisallowed-tools: [Write]\n---\n") })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const target = sample.hostNames["agent:" + path]!
+  yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Edit only", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_edit" as never, call: { type: "tool-call", name: "subagent", id: "call_edit", input: { agent: target, description: "Edit", prompt: "edit", background: false } } })))
+  const requests = yield* (yield* TestLLM.Test).requests()
+  const request = requests.find(request => JSON.stringify(request).includes("expert code reviewer"))!
+  expect(request.tools.map(tool => tool.name)).toContain("edit")
+  expect(request.tools.map(tool => tool.name)).not.toContain("write")
+})))

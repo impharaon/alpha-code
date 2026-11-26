@@ -1685,3 +1685,18 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
 
 void Agent
 void SchemaTool
+
+it.live("package Bash prefix grants cover every parsed command and preserve quoted executable paths", () => Effect.gen(function* () {
+  const { session, registration } = yield* setup({ builtins: ["shell"], rules: [ALLOW_ALL, { action: "builtin::shell", resource: "*", effect: "ask" }] })
+  // ralph-loop's actual allowed-tools form: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/setup-ralph-loop.sh:*).
+  registration!.bindPackageInvocation(session.id, { allowedTools: [{ tool: "Bash", pattern: "/tmp/plugin path/scripts/setup-ralph-loop.sh:*" }], deniedTools: [] }, {}, () => true)
+  expect(Exit.isSuccess(yield* callRaw(session.id, "shell", { command: '"/tmp/plugin path/scripts/setup-ralph-loop.sh" prompt --max-iterations 2' }))).toBe(true)
+  expect(counts.write).toBe(1)
+  const blocked = yield* Effect.forkChild(callRaw(session.id, "shell", { command: '"/tmp/plugin path/scripts/setup-ralph-loop.sh" prompt; touch /tmp/ungranted' }))
+  const permission = yield* Permission.Service
+  const request = (yield* pending)[0]
+  expect(request).toBeDefined()
+  expect(counts.write).toBe(1)
+  yield* permission.reply({ requestID: request!.id, reply: "reject" })
+  expect(Exit.isFailure(yield* E.Fiber.join(blocked))).toBe(true)
+}))

@@ -118,6 +118,7 @@ import { Global } from "../../util/src/global"
 import { Location } from "../../core/src/location"
 import { ShellSelect } from "../../core/src/shell/select"
 import { Job } from "../../core/src/job"
+import { SdkPlugins } from "../../core/src/plugin/sdk"
 import { SubagentJob } from "../../core/src/session/subagent-job"
 import { SessionRunnerModel } from "../../core/src/session/runner/model"
 import { LanguageModel } from "../../ai/src/effect"
@@ -127,7 +128,6 @@ import { Layer } from "effect"
 import { tempGlobalLayer } from "../../core/test/fixture/global"
 import { tempLocationLayer } from "../../core/test/fixture/location"
 import { offlineModels } from "../../core/test/fixture/models"
-import { emptyMcpLayer } from "../../core/test/fixture/mcp"
 
 import { ReadToolFileSystem } from "../../core/src/tool/read-filesystem"
 import { FileAccess } from "../../core/src/file-access"
@@ -136,12 +136,11 @@ import { Environment } from "../../core/src/environment/index"
 import { SkillDiscovery } from "../../core/src/skill/discovery"
 const packageLlm = TestLLM.testLayer({ fallback: TestLLM.text("Package child result", "package-child") })
 export const packageIt = testEffect(Layer.merge(packageLlm, AppNodeBuilder.build(
-  LayerNode.group([PluginHost.requirements, ReadToolFileSystem.node, FileAccess.node, SessionInstructions.node, Environment.node, SkillDiscovery.node, Config.node, Job.node, Plugin.node, SubagentJob.node, ShellSelect.node, AppProcess.node, FSUtil.node]),
+  LayerNode.group([PluginHost.requirements, SdkPlugins.node, ReadToolFileSystem.node, FileAccess.node, SessionInstructions.node, Environment.node, SkillDiscovery.node, Config.node, Job.node, Plugin.node, SubagentJob.node, ShellSelect.node, AppProcess.node, FSUtil.node]),
   [
     Config.node.replace(Config.testLayer([])),
     Global.node.replace(tempGlobalLayer),
     Location.node.replace(tempLocationLayer),
-    Mcp.node.replace(emptyMcpLayer),
     offlineModels,
     LayerNodePlatform.llmClient.replace(packageLlm),
     SessionRunnerModel.node.replace(Layer.succeed(SessionRunnerModel.Service, {

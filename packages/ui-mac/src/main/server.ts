@@ -359,7 +359,7 @@ function planProductionFence(input: ProductionFenceInput): (ProcessFencePlan & {
   if (!info) throw new Error("package manager cache: application environment not initialized")
   const exported = usableExportedPaths({ env: input.sidecarEnv, home: homedir(), log: (line) => getLogger()?.warn(line) })
   const roots = resolveEngineRoots(exported.env, exported.home)
-  const caches = planPackageManagerCaches({ platform: "darwin", home: roots.home, userDataPath: input.userDataPath, configHome: roots.configHome,
+  const caches = planPackageManagerCaches({ platform: "darwin", goInstallBin: null, home: roots.home, userDataPath: input.userDataPath, configHome: roots.configHome,
     appData: electronNs.app.getPath("appData"), localAppData: join(roots.home, "Library", "Caches"), truthPath: writableLocationTruthPath(info.casBaseRoot, info.environment),
     eligibility: { homeDir: roots.home, appStateRoot: info.casBaseRoot, configFenceRoots: () => preplanConfigFenceRoots({ env: input.sidecarEnv, home: roots.home, userDataPath: input.userDataPath, appStateRoot: info.casBaseRoot, codepuppyGlobalRoot: codepuppyGlobalRoot() }), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory() },
   })

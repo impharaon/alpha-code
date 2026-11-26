@@ -153,7 +153,7 @@ describe("planWritableLocations", () => {
 
 describe("package manager cache planning", () => {
   const inputFor = (disk: Parameters<Parameters<typeof withLocationDisk>[0]>[0]) => ({
-    platform: "darwin" as const, home: disk.home, userDataPath: join(disk.root, "userData"), configHome: join(disk.home, ".config"),
+    platform: "darwin" as const, goInstallBin: null, home: disk.home, userDataPath: join(disk.root, "userData"), configHome: join(disk.home, ".config"),
     appData: join(disk.home, "Library", "Application Support"), localAppData: join(disk.home, "Library", "Caches"),
     truthPath: disk.truthPath, eligibility: disk.eligibility,
   })
@@ -172,6 +172,17 @@ describe("package manager cache planning", () => {
       expect(plan.cacheEnv.CARGO_HOME).toBeUndefined()
       for (const entry of plan.locations.filter((entry) => entry.kind === "file")) expect(existsSync(entry.targetPath)).toBe(false)
       expect(planPackageManagerCaches(input)).toEqual(plan)
+    })
+  })
+  test("paired GOBIN survives the cache projection without granting its installation directory", () => {
+    withLocationDisk((disk) => {
+      const input = { ...inputFor(disk), goInstallBin: join(disk.home, "original-go/bin") }
+      mkdirSync(input.userDataPath)
+      const plan = planPackageManagerCaches(input)
+      expect(plan.cacheEnv.GOBIN).toBe(input.goInstallBin)
+      expect(plan.cacheEnv.GOPATH).toBe(join(input.userDataPath, "package-managers/go/gopath"))
+      expect(plan.rules.some((rule) => rule.value === input.goInstallBin)).toBe(false)
+      expect(existsSync(input.goInstallBin)).toBe(false)
     })
   })
   test("rejects an initial cache-root escape before creating anything outside the data anchor", () => {

@@ -216,6 +216,7 @@ export type PackageManagerLocationInput = {
   configHome: string
   appData: string
   localAppData: string
+  goInstallBin: string | null
 }
 export type PackageManagerLocations = {
   env: Readonly<Record<string, string>>
@@ -238,6 +239,7 @@ export function resolvePackageManagerLocations(input: PackageManagerLocationInpu
     PIP_CACHE_DIR: path.join(cache, "pip", "cache"),
     UV_CACHE_DIR: path.join(cache, "uv", "cache"),
     UV_PYTHON_INSTALL_DIR: path.join(cache, "uv", "python"),
+    ...(input.goInstallBin === null ? {} : { GOPATH: path.join(cache, "go", "gopath"), GOBIN: input.goInstallBin }),
     GOMODCACHE: path.join(cache, "go", "mod"),
     GOCACHE: path.join(cache, "go", "build"),
     CARGO_INSTALL_ROOT: path.join(input.home, ".cargo"),
@@ -252,7 +254,7 @@ export function resolvePackageManagerLocations(input: PackageManagerLocationInpu
   add("npm", "cache", "subpath", env.npm_config_cache)
   add("pip", "cache", "subpath", env.PIP_CACHE_DIR)
   add("uv", "cache", "subpath", env.UV_CACHE_DIR, env.UV_PYTHON_INSTALL_DIR)
-  add("go", "cache", "subpath", env.GOMODCACHE, env.GOCACHE)
+  add("go", "cache", "subpath", path.join(cache, "go", "gopath"), env.GOMODCACHE, env.GOCACHE)
   add("cargo", "cache", "subpath", ...["registry", "git"].map((name) => path.join(input.home, ".cargo", name)))
   add("cargo", "cache", "literal", ...[".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-journal"].map((name) => path.join(input.home, ".cargo", name)))
   add("bun", "global-install", "subpath", path.join(input.home, ".bun", "install", "global"), path.join(input.home, ".bun", "bin"))
@@ -316,6 +318,7 @@ function packageManagerPath(input: PackageManagerLocationInput) {
   const path = input.platform === "win32" ? win32 : posix
   for (const key of ["home", "userDataPath", "configHome", "appData", "localAppData"] as const)
     if (typeof input[key] !== "string" || !path.isAbsolute(input[key])) throw new Error(`package manager locations: ${key} must be an absolute path`)
+  if (input.goInstallBin !== null && (typeof input.goInstallBin !== "string" || !path.isAbsolute(input.goInstallBin))) throw new Error("package manager locations: goInstallBin must be an absolute path or null")
   return path
 }
 

@@ -78,6 +78,7 @@ const locationInput = {
   configHome: "/Users/puppy/.config",
   appData: "/Users/puppy/Library/Application Support",
   localAppData: "/Users/puppy/Library/Caches",
+  goInstallBin: null,
 }
 
 describe("package manager locations", () => {
@@ -107,6 +108,18 @@ describe("package manager locations", () => {
     expect(result.writable.some((entry) => entry.purpose === "global-install" && entry.rule.value.startsWith(cache))).toBe(false)
   })
 
+  test("Go cache GOPATH keeps the original queried install target and null stays unresolved", () => {
+    const target = "/Users/puppy/custom-go/bin"
+    const result = resolvePackageManagerLocations({ ...locationInput, goInstallBin: target })
+    expect(result.env.GOPATH).toBe(`${locationInput.userDataPath}/package-managers/go/gopath`)
+    expect(result.env.GOBIN).toBe(target)
+    expect(result.writable).toContainEqual({ manager: "go", purpose: "cache", rule: { kind: "subpath", value: result.env.GOPATH! } })
+    expect(result.writable.some((entry) => entry.purpose === "cache" && entry.rule.value === target)).toBe(false)
+    const absent = resolvePackageManagerLocations(locationInput)
+    expect(absent.env.GOPATH).toBeUndefined()
+    expect(absent.env.GOBIN).toBeUndefined()
+    expect(() => resolvePackageManagerLocations({ ...locationInput, goInstallBin: "relative" })).toThrow("absolute")
+  })
   test("global subtrees and exact metadata do not grant the surrounding tool roots", () => {
     const result = resolvePackageManagerLocations(locationInput)
     for (const [manager, value] of [

@@ -2187,8 +2187,13 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "absent and explicit HTTP retain the same streamable HTTP request"
+        },
+        {
+          "file": "packages/ui-mac/src/main/network-egress-proxy.test.ts",
+          "name": "plugin loopback refused upstream is a named TCP failure with local service copy"
         }
-      ]
+      ],
+      "note": " #1776 r10 A3: the existing client takeover decodes only the main proxy's named TCP refusal, retains that layer before HTTP fallback, and publishes a body-free local-service marker through the existing status prefix. No new failure code, transport, credential or permission authority."
     },
     {
       "id": "plugin-invocation-semantics",

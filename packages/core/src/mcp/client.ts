@@ -34,7 +34,7 @@ import type { Session } from "@opencode/schema/session"
 import { isRecord } from "@opencode/util/record"
 import { McpStdio } from "./stdio.js"
 import { classifyStartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
-import { isCodepuppyFailureCode } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1564)
+import { isCodepuppyFailureCode, parseFailureCode, withFailureCode, EGRESS_DIAL_FAILURE_STATUS, PLUGIN_MCP_SERVICE_UNAVAILABLE } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1564)
 import { governedCredentialFetch, isGovernedMcpEntry } from "@opencode/plugin/alpha-cloud-authority" // codepuppy(#1562)
 import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap" // codepuppy(#1562, #1698)
 
@@ -63,11 +63,19 @@ const describe = (error: unknown) => {
 // failure is its status, a local server that exited is its exit, never the remote body or the server's stderr tail
 // (packages/core/src/mcp/stdio.ts appends it). Errors the client wrapped keep the SDK error as their cause.
 const STDIO_EXIT = /^MCP server process exited(?: with code -?\d+)?/
+function pluginProxyDialFailure(error: unknown) {
+  if (!(error instanceof SdkHttpError) || error.status !== EGRESS_DIAL_FAILURE_STATUS.tcp || typeof error.data.text !== "string") return
+  const failure = parseFailureCode(error.data.text)
+  if (failure?.code === "tcp" && failure.text.startsWith(PLUGIN_MCP_SERVICE_UNAVAILABLE + ": ")) return { code: failure.code, text: PLUGIN_MCP_SERVICE_UNAVAILABLE }
+}
+
 export function safeDescription(error: unknown): string {
   const source =
     error instanceof Error && !(error instanceof SdkError) && !(error instanceof SdkHttpError) && error.cause instanceof Error
       ? error.cause
       : error
+  const proxyFailure = pluginProxyDialFailure(source)
+  if (proxyFailure) return proxyFailure.text
   if (source instanceof SdkHttpError) return `HTTP ${source.status}`
   const exit = source instanceof Error ? STDIO_EXIT.exec(source.message) : null
   if (exit) return exit[0]
@@ -622,7 +630,8 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
 export function startFailure(error: unknown, config: { readonly type: string; readonly url?: string }) {
   const listed = !(error instanceof SdkError) && error instanceof Error && (error.cause instanceof SdkError || error.cause instanceof SdkHttpError) ? error.cause : error
   const cause = listed instanceof SdkError && listed.code === SdkErrorCode.EraNegotiationFailed && listed.cause !== undefined ? listed.cause : listed
-  return classifyStartFailure(cause, config, {
+  const proxyFailure = pluginProxyDialFailure(cause)
+  return classifyStartFailure(proxyFailure ? new Error(withFailureCode(proxyFailure.code, proxyFailure.text)) : cause, config, {
     timedOut: cause instanceof SdkError && cause.code === SdkErrorCode.RequestTimeout,
     httpStatus: cause instanceof SdkHttpError ? cause.status : undefined,
   })

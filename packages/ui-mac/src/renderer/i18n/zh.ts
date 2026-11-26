@@ -518,6 +518,7 @@ export const dict = {
   "codepuppy.ext.mcpFailure.handshakeTimeout": "启动超时",
   "codepuppy.ext.mcpFailure.auth": "需要重新登录",
   "codepuppy.ext.mcpFailure.protocol": "返回的内容无法识别",
+  "codepuppy.ext.mcpFailure.localServiceUnavailable": "本机地址上没有服务在运行",
   "codepuppy.ext.mcpFailure.transport": "连接中断",
   "codepuppy.ext.hubReasonNotLoaded": "还没在这里加载成功",
   "codepuppy.ext.hubReloadNow": "立即生效",

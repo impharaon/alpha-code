@@ -44,7 +44,7 @@ import { pluginMcpLoopback, pluginMcpEndpoint, type McpProxyBinding } from "@ope
 
 import * as http from "node:http"
 import * as net from "node:net"
-import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode/schema/codepuppy-net-failure"
+import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS, withFailureCode, PLUGIN_MCP_SERVICE_UNAVAILABLE } from "@opencode/schema/codepuppy-net-failure"
 import { egressDenialLine, egressDenialDescription, type EgressDenialDetail } from "../shared/egress-denial"
 import { isEgressAuthorizedForSidecar } from "./network-egress-derived"
 import { requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"
@@ -271,7 +271,14 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
       })
       bindStream(capability, upstream)
       bindStream(capability, res)
-      upstream.on("error", () => { if (!res.headersSent) res.writeHead(502); res.end("Plugin MCP service-unavailable") })
+      upstream.on("error", (error: NodeJS.ErrnoException) => {
+        if (res.headersSent) { res.destroy(); return }
+        const status = dialFailureStatus(error)
+        const layer = classifyNetFailure(error, { via: "other" })?.layer ?? "tcp"
+        log({ event: "egress.connect", id: ++seq, at: new Date().toISOString(), method: req.method ?? "", authority: url.host, host: url.hostname, port: Number(url.port || 80), verdict: "deny", reason: "dial-failed", status, detail: error.code })
+        res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" })
+        res.end(withFailureCode(layer, PLUGIN_MCP_SERVICE_UNAVAILABLE + ": " + denialBody("dial-failed", url.host, error.code)))
+      })
       req.once("aborted", () => upstream.destroy())
       res.once("close", () => upstream.destroy())
       req.pipe(upstream)

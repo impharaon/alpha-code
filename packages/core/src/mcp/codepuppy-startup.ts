@@ -66,8 +66,9 @@ export function classifyStartFailure(
     return { code: "spawn_failed", reconnect: false }
   }
   if (hints.httpStatus === 401 || hints.httpStatus === 403) return { code: "auth", reconnect: false }
-  if (hints.httpStatus !== undefined) return { code: "http", reconnect: hints.httpStatus >= 500 }
   const net = classifyNetFailure(error, engineNetFailurePath(config.url, env, egressProxy))
+  if (net && net.layer !== "http") return { code: net.layer, reconnect: RECONNECT_CODES.has(net.layer) }
+  if (hints.httpStatus !== undefined) return { code: "http", reconnect: hints.httpStatus >= 500 }
   if (!net) return { code: "transport", reconnect: true }
   return { code: net.layer, reconnect: RECONNECT_CODES.has(net.layer) || (net.layer === "http" && Number(net.code) >= 500) }
 }

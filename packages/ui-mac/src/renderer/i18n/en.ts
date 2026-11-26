@@ -528,6 +528,7 @@ export const dict = {
   "codepuppy.ext.mcpFailure.handshakeTimeout": "Start timed out",
   "codepuppy.ext.mcpFailure.auth": "Sign in again",
   "codepuppy.ext.mcpFailure.protocol": "Unrecognized response",
+  "codepuppy.ext.mcpFailure.localServiceUnavailable": "No service is running at this local address",
   "codepuppy.ext.mcpFailure.transport": "Connection dropped",
   "codepuppy.ext.hubReasonNotLoaded": "Not loaded here yet",
   "codepuppy.ext.hubReloadNow": "Apply now",

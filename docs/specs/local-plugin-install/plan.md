@@ -954,3 +954,10 @@ A1 完整 engine 文件初次为 6 pass / 2 fail（`/tmp/plugin-standard-r10-A1-
 
 
 A2：4defc86a9f 的原位回归先红 0 pass / 1 fail（`bun test --max-concurrency 2 src/shared/host-extension-package-contract/plugin-conversion.test.ts -t "real skill bodies retain"`，`/tmp/plugin-standard-r10-A2-red.log`）。固定 build-ios-apps 的原 ios-ettrace-performance / ios-memgraph-leaks SKILL.md 逐字比对，仅包路径可绑定；`${RUN_DIR:-}`、`${TMPDIR:-/tmp}` 与普通环境引用保留源文字，环境已设置也不注入正文。现有 pluginText 增加 process/instruction 的域参数，所有指令正文与 prompt handler 选择后者，进程字段的环境算法不改；同一 parser/renderer 仍唯一。完整 converter 文件 41 pass / 0 fail（`/tmp/plugin-standard-r10-A2-green.log`），fast、原位 imports 可追踪；条数表旧 31 同步实际 41。CONTRACT 与生成 converter/artifact 同提交；没有新运行选项、公开模型字段、依赖或 engine takeover。
+
+
+A3：9f4c0cdbed 的真实私有代理＋MCP SDK 回归先红（0 pass / 1 fail，实际 ConnectError HTTP 502；`/tmp/plugin-standard-r10-A3-red.log`）；同提交的原 schema 前缀回归先红 0 pass / 1 fail（`/tmp/plugin-standard-r10-A3-prefix-red.log`）。代理按原 dialFailureStatus/denialBody 与 withFailureCode 输出具名 TCP 拒连，core 原 client 在已接管边界读取该已登记前缀、保留安全固定说明；唯一网络分类器先保留网络层再作 HTTP fallback，renderer 三个既有失败显示点消费同一说明。没有新增失败码、权限来源、网络放行或 DTO；真实 HTTP 502 不变成本机服务失败。
+
+A3 迭代纠正：未提交的 util→schema 导入试改违反实际包依赖，已完全恢复 util 文件，解析留在已有 core client；没有加依赖或相对路径绕过。e4f1576a55 仅将测试类型 guard 从错误的缩写 tag 改为真实 exported ConnectError 类，原行为断言不改。该试改期间排队的 A1 完整回归进入槽而被 import 失败中断（`/tmp/plugin-standard-r10-A1-engine-green-final.log`），不计为产品/基线失败；提交后重跑，不再边排队边改其生产依赖。
+
+A3 最终相关私有代理三例（`bun test --max-concurrency 2 src/main/network-egress-proxy.test.ts -t "plugin loopback|plugin CONNECT"`）3 pass / 0 fail，`/tmp/plugin-standard-r10-A3-green-complete.log`；原 schema 文件 21 pass / 0 fail，`/tmp/plugin-standard-r10-A3-prefix-green.log`。代理文件既有容量/计时场景不在本轮授权，不运行；新增用例位于原文件，imports 可追踪，有限本地 SDK integration。必要同链文件是 schema 的唯一原因解释、core client/既有 startup helper、renderer 现有原因函数和三个调用点以及双语文案；client takeover 增量与具名证据在原 plugin-mcp-transport registry 同提交登记，未新增 takeover 文件。gate-files 旧 24 同步实际 27。

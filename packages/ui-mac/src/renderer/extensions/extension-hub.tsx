@@ -1682,7 +1682,7 @@ export function ExtensionHub(props: {
         const raw = failedReload.stateReason?.detail
         return {
           kind: "error" as const,
-          reason: mcpFailureReason(raw ? parseFailureCode(raw)?.code : undefined),
+          reason: mcpFailureReason(raw ? parseFailureCode(raw)?.code : undefined, raw),
           raw,
         }
       }
@@ -1707,7 +1707,7 @@ export function ExtensionHub(props: {
           row.stateReason?.code === "reload-waiting",
       )
       if (failed && !reloading)
-        return { kind: "error" as const, reason: mcpFailureReason(failed.code), raw: failed.error }
+        return { kind: "error" as const, reason: mcpFailureReason(failed.code, failed.error), raw: failed.error }
       if (
         ext.store.hubRows.some(
           (row) =>
@@ -1925,7 +1925,7 @@ export function ExtensionHub(props: {
     // 一行状态:取最要紧的那一件。
     const line = (): { text: string; err?: boolean; hub?: string; detail?: string } => {
       if (row.type === "mcp" && row.mcp?.error && !row.mcp.pending)
-        return { text: row.mcp.repair === "reinstall-app" ? t("codepuppy.ext.officeRuntimeMissing") : mcpFailureReason(row.mcp.code), err: true, detail: row.mcp.error }
+        return { text: row.mcp.repair === "reinstall-app" ? t("codepuppy.ext.officeRuntimeMissing") : mcpFailureReason(row.mcp.code, row.mcp.error), err: true, detail: row.mcp.error }
       // `#733`:`needs_auth` 不是「未连接」——它是一个用户能自己修好的状态。
       if (row.type === "mcp" && row.mcp?.needsAuth) return { text: t("codepuppy.ext.mcpNeedsAuth") }
       if (rowSessionGrant())

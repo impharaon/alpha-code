@@ -651,18 +651,38 @@ test("REQ-236 AC3:首页斜杠命令的 session.command 请求体 —— 全部�
   bridgeCb!({ status: "recovering", generation: 1, reason: "boot" })
   await waitFor(() => expect(api.sdk()).toBeDefined())
 
+  const sandbox = await import("../src/renderer/codepuppy-ui/sandbox-state")
+  const previousApi = Object.getOwnPropertyDescriptor(window, "api")!
+  const tierInputs: Array<{ tier: string; session: { sessionID: string; generation: number } }> = []
+  Object.assign(window.api, {
+    awaitInitialization: async () => ({ url: serverInfo.baseUrl }),
+    networkEgress: { setTier: async (input: typeof tierInputs[number]) => {
+      expect(commandBodies).toHaveLength(0)
+      tierInputs.push(input)
+      return { ok: true, value: { revision: tierInputs.length } }
+    } },
+  })
+  sandbox.setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+  try {
   const seen: Record<string, unknown> = {}
   for (const perm of ["allow", "ask", "readonly"] as const) {
     commandBodies.splice(0)
     // existingSessionID:跳过建会话,直接走命令分支(与「重试复用孤儿会话」同一条路径)。
     const id = await api.startChat("/repos/alpha-code", "/review HEAD~1", [], { perm, existingSessionID: "ses_1573" })
     expect(id).toBe("ses_1573")
+    expect(tierInputs.at(-1)).toMatchObject({ tier: perm, session: { generation: 1, sessionID: id } })
     expect(commandBodies).toHaveLength(1)
     expect(commandBodies[0]!["command"]).toBe("review")
     expect(commandBodies[0]!["arguments"]).toBe("HEAD~1")
     seen[perm] = "agent" in commandBodies[0]! ? commandBodies[0]!["agent"] : "<absent>"
   }
   expect(seen).toEqual({ allow: "<absent>", ask: "codepuppy-ask", readonly: "codepuppy-readonly" })
+  } finally {
+    sandbox.setSandboxStateForTests(undefined)
+    Reflect.deleteProperty(window.api, "networkEgress")
+    Reflect.deleteProperty(window.api, "awaitInitialization")
+    Object.defineProperty(window, "api", previousApi)
+  }
 })
 
 test("#692 非 Git 会话冷加载与 SSE 新建都进入真实目录项目,且从不实例化或显示根目录", async () => {

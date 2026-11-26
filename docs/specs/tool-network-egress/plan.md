@@ -53,7 +53,7 @@ last_reviewed: 2026-11-26
 | `ui/settings-network-egress.tsx`（新）、`ui/settings.tsx`、`ui/settings-tools.test.ts`、`ui/settings-test-runtime.tsx` | 在现有工具设置区域挂联网清单及直接撤销，复用列表/行内失败样式。独立组件避免改动已有 915 行工具策略组件的判定；后片接入放行聚合内容。 |
 | `renderer/i18n/zh.ts`、`renderer/i18n/en.ts` | 为卡片、记住范围、连接到期、存储失败与撤销补产品文案；模型固定说明仍只由 ext 登记。 |
 | 上述模块已有 `*.test.ts`；新模块的同名 `*.test.ts` | 用例按下文证明表和提交单元归属；旧上限/冷却/精确记住/重启撤销断言同次替换，不保留互相矛盾的两套行为。 |
-| `packages/ui-mac/test-component/{session-workspace,new-session-workspace,session-timeline}.cases.ts` 及各自 runtime/stub | 在现有真实 Solid 宿主覆盖提交绑定、dock 与继续入口；只扩展需要的 preload 边界。 |
+| `packages/ui-mac/test-component/{session-workspace,new-session-workspace,session-timeline,session-second-send,use-projects}.cases.ts`、`preload-stub.ts` 及各自 runtime/stub | 在现有真实 Solid 宿主覆盖提交绑定、dock 与继续入口；只扩展需要的 preload 边界。 |
 | `main/network-egress.engine.cases.ts`（新）、`main/engine-cases.scenario.test.ts` | 为联网模块增加缺少的真引擎/真围栏 scenario 层；复用已有 engine sandbox、生产配置、真实 ext 与本地模型桩，不另建通用 harness。宿主只新增本模块一行。 |
 | `scripts/gate-files.tsv`、`scripts/process-fence-write-sites.tsv` | 仅按实际新增宿主/受托 cases、用例数或写点做机械登记；由本片规则允许的同步覆盖，不改 gate 脚本、选测、阈值或预算。新 main 写者若不在 sidecar 闭包，不虚登记为围栏内可写根。 |
 
@@ -118,6 +118,12 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 步骤 2 验据：U 执行 `bun test src/main/network-egress-activity.test.ts src/main/codepuppy-sidecar-messages.test.ts src/main/hub-view.test.ts src/main/old-name-scan.test.ts`，退出 0，45 pass / 0 fail；E 执行 `bun test src/network-egress.test.ts src/hub-bridge.test.ts src/policy/display.test.ts`，退出 0，22 pass / 0 fail。新增同调用链文件 `main/codepuppy-unattended.ts` 仅给既有 main 在册名单增加只读 `has(sessionID)`，供 N1 排除自动化，避免从工具 metadata 猜身份。
 
 步骤 3 验据：U 执行 `bun test src/main/egress-grant-truth.test.ts src/main/network-egress-grants.test.ts src/main/network-egress-approval.test.ts src/main/network-egress-ipc.test.ts src/main/network-egress-proxy.test.ts src/shared/egress-denial.test.ts src/main/old-name-scan.test.ts`，退出 0，58 pass / 0 fail。真实 CONNECT 经生产审批服务放行后收到回显字节；同一拨号前复核判据拒绝已撤销授权。旧上限/冷却和精确持久化断言已按新行为替换。生产服务由 `main/index.ts` 在 fork 前初始化，`server.ts` 只消费既有代理默认授权出口，避免在代理启动与 IPC 各建一份批准状态。
+
+步骤 4 验据：U 执行 `bun test --max-concurrency 2 src/renderer/codepuppy-ui/network-egress.test.ts src/renderer/codepuppy-ui/network-egress-card.test.ts src/renderer/codepuppy-ui/settings-tools.test.ts src/main/old-name-scan.test.ts`，退出 0，27 pass / 0 fail。`src/renderer/subprocess-cases.test.ts -t '会话内连发三条|use-projects|新对话页工作区选择器'` 的前两宿主通过（内部 11、17 条）；补齐新对话的 N3 夹具后仅重跑该宿主，退出 0，1 pass（内部 64 条）。真实生产入口的定向用例另验证首页 1、会话命令 1、继续 4 条；会话命令在 main 应答前保持零请求。
+
+步骤 4 的同调用链补充为 `test-component/use-projects.cases.ts`、`session-second-send.cases.ts`、`preload-stub.ts`：前两者才是首页真实 startChat 与会话真实 composer 的现有行为宿主，后者必须分类新增 preload 键。renderer 复用现有 `codepuppy-app/src/utils/server-scope.ts` 的纯判定处理本地 sidecar 身份，不复制其映射、不改冻结应用。包级 `bun typecheck`：U/E 均退出 0；U 检查中暴露的本片宿主类型遗漏已修正为消费 `CodePuppySidecarHost` 原类型。
+
+步骤 4 检查边界：时间线与 workspace 两文件合跑曾为 25 pass / 1 fail（时间线宿主 5 秒超时）。按失败处理，只对该宿主在隔离副本的冻结基线 `4948d952f3` 比较：初次副本缺少包级 Babel 依赖，补齐同版本包级依赖目录后，基线单文件 12 pass / 0 fail（6.11 s）；当前单文件相同命令 12 pass / 0 fail（5.77 s）。命令为 `bun test --max-concurrency 2 src/renderer/codepuppy-ui/session-timeline/session-timeline.test.ts`；没有放宽阈值或改宿主。合跑超时仍作为运行组合观察交编排器，不声称已修复。一次测试命令曾误从根目录执行并被既有 root guard 拦下（未执行测试）；此后测试均在包目录执行。
 
 ## 切片二：全部批准通放与系统代理
 

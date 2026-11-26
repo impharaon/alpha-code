@@ -1,3 +1,5 @@
+import { createNetworkEgressActivity } from "../../main/network-egress-activity"
+import { createNetworkEgressApproval } from "../../main/network-egress-approval"
 // REQ-131 / #1130 —— Settings「工具」节的行为闸(真 Solid 渲染,happy-dom;同 settings.test.ts 的
 // vite 运行时构建模式)。判据来自已批设计稿 docs/design/2026-08-25-req131-settings-tool-policy §3/§4:
 //   · 四来源分组、服务展开到工具、每行「生效:状态 · 原因」用 9 型 reason 逐型文案;
@@ -649,4 +651,39 @@ describe("Alpha Settings 「工具」节", () => {
     expect(banner.querySelector("[data-tools-reset]")).not.toBeNull()
     expect(text(q("[data-tools-row-alert]"))).toContain(zh["codepuppy.settings.toolsSaveFailedQuarantined"])
   })
+})
+
+
+test("撤销站点后下一条连接重新询问，当前 main 无需重启；不可用能力隐藏清单", async () => {
+  const activity = createNetworkEgressActivity()
+  activity.attach(1, () => {}, { session: async () => ({}), shell: async () => true })
+  const service = createNetworkEgressApproval({ available: true, activity,
+    store: { read: () => ({ ok: true, absent: false, sites: [{ site: { kind: "domain", value: "example.com" }, at: "2026-11-26T00:00:00.000Z" }] }), write: () => {} }, log: () => {},
+  })
+  const previous = Object.getOwnPropertyDescriptor(window, "api")
+  Object.defineProperty(window, "api", { configurable: true, value: { networkEgress: service.api } })
+  try {
+    await openTools(api())
+    expect(service.authorized("a.example.com", 443)).toBe(true)
+    const row = document.querySelector<HTMLElement>('[data-network-egress-site="example.com"]')!
+    expect(row.textContent).toContain("所有子域")
+    row.querySelector<HTMLButtonElement>("button")!.click()
+    await flush(16)
+    expect(service.authorized("a.example.com", 443)).toBe(false)
+    expect(document.querySelector('[data-network-egress-site="example.com"]')).toBeNull()
+    const controller = new AbortController()
+    const waiting = service.request("a.example.com", 443, controller.signal)
+    controller.abort()
+    expect(await waiting).toBe("approval-unavailable")
+    document.querySelector<HTMLButtonElement>('[data-settings-section="general"]')!.click()
+    await flush()
+    Object.defineProperty(window, "api", { configurable: true, value: { networkEgress: { ...service.api, settings: async () => ({ ok: true, value: { available: false } }) } } })
+    document.querySelector<HTMLButtonElement>('[data-settings-section="tools"]')!.click()
+    await flush(12)
+    expect(document.querySelector("[data-network-egress-settings]")).toBeNull()
+  } finally {
+    service.close()
+    if (previous) Object.defineProperty(window, "api", previous)
+    else Reflect.deleteProperty(window, "api")
+  }
 })

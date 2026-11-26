@@ -1,3 +1,4 @@
+import type { CodePuppySidecarHost } from "./hub-view"
 import { engineClient } from "./engine-client"
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
@@ -149,10 +150,7 @@ type SpawnLocalServerOptions = {
    * REQ-234 `#1529`:parentPort 上 `codepuppy.*` 窄消息的 main 侧接收者(hub-view.ts 的 createCodePuppySidecarHost)。
    * `receive` 与 writeProbes 并列挂在 `child.on("message")` 上;ready 之后 `attach`,子进程退出时调它返回的断开函数。
    */
-  codepuppySidecar?: {
-    receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void): boolean
-    attach(post: (message: CodePuppySidecarOutbound) => void): (reason: string) => void
-  }
+  codepuppySidecar?: CodePuppySidecarHost
   /**
    * DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时(`credentials.unavailable`)或主进程读不出表时,请求既有的 `credential-change` 重启
    * (index.ts 接到 requestSidecarRespawn:既有队列与自愈阶梯,有界)。
@@ -886,7 +884,7 @@ export async function spawnLocalServer(
   })
   // REQ-234 `#1529`:ready 之后接上重载请求的发送口(重发 main 记录里仍在途的 generation)。
   if (!exited) {
-    const client = engineClient({ url: `http://${hostname}:${port}`, password })
+    const client = engineClient({ url: `http://${hostname}:${port}`, username: null, password })
     detachCodePuppy = options.codepuppySidecar?.attach(postCodePuppy, options.generation, {
       session: async (ref) => {
         const info = await client.session.get({ sessionID: ref.sessionID })

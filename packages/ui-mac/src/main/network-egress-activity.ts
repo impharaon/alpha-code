@@ -108,7 +108,7 @@ export function createNetworkEgressActivity() {
         seen.add(next.sessionID)
         const bound = current.tiers.get(sessionRefKey(next))
         if (bound) return bound
-        const parent = await current.inspect.session(next).catch(() => undefined)
+        const parent: Awaited<ReturnType<NetworkInspection["session"]>> = await current.inspect.session(next).catch(() => undefined)
         next = parent?.parentID ? { ...next, sessionID: parent.parentID } : undefined
       }
       return "unknown"

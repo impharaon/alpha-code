@@ -95,7 +95,7 @@ const snapRow = (id: string, pricing = { input: 1, output: 1 }, display?: Catalo
   pricing,
   display: display ?? V3_ROWS.find((row) => row.id === id)!.display,
 })
-/** 把整份 V3 producer 目录写成 LKG 并钉住(一次 fork)—— 平台段 = 12 个模型,display 与 V3 fixture 逐字相同。 */
+/** 把整份 V3 producer 目录写成 LKG 并钉住(一次 fork)—— 平台段 = 整份 producer 目录的模型,display 与 V3 fixture 逐字相同。 */
 const seedPlatform = () => {
   writeCatalogSnapshot(userData, {
     fetchedAt: "2026-10-30T00:00:00Z",
@@ -182,8 +182,8 @@ describe("getModelCatalog", () => {
       })
     }
     const injected = (buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as any).models
-    expect(injected["qwen3.7-max"].name).toBe("Qwen3.7 Max")
-    expect(injected["claude-opus-4.8"].variants).toEqual(V3_ROWS.find((row) => row.id === "claude-opus-4.8")!.display.variants)
+    expect(injected["qwen4-max"].name).toBe("Qwen4 Max")
+    expect(injected["claude-opus-5.5"].variants).toEqual(V3_ROWS.find((row) => row.id === "claude-opus-5.5")!.display.variants)
   })
 })
 
@@ -654,13 +654,13 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
     plantSecret("CODEPUPPY_API_KEY", "jwt")
     seedPlatform()
     const p = buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as any
-    const opus = p.models["claude-opus-4.8"]
+    const opus = p.models["claude-opus-5.5"]
     expect(opus.variants["高"]).toEqual({ reasoning: { effort: "high" } }) // OR 统一 reasoning 对象
-    const mini = p.models["gpt-5.4-mini"]
-    expect(mini.variants["低"]).toEqual({ reasoningEffort: "low" }) // 原生 → reasoning_effort
+    const mini = p.models["gpt-6-luna"]
+    expect(mini.variants["低"]).toEqual({ reasoningEffort: "low" }) // OR 腿的 openai 形状 → reasoning_effort
     // anthropic-wire 不映射 → 诚实不定义(#679 把非规范 id `claude-opus-4.8-direct` 从本地快照
-    // 移除后,同类的取样换成仍在册的 claude-sonnet-5)。
-    expect(p.models["claude-sonnet-5"].variants).toBeUndefined()
+    // 移除后,同类的取样换成仍在册的 claude-sonnet-5.5:anthropic 品牌、快照没给档位)。
+    expect(p.models["claude-sonnet-5.5"].variants).toBeUndefined()
     expect(p.models["deepseek-v4-flash"].variants).toBeUndefined()
   })
 
@@ -697,7 +697,7 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
     writeCatalogSnapshot(userData, {
       ...liveBase,
       fetchedAt: "2026-07-04T00:00:00Z",
-      models: [snapRow("glm-5.2", pair), snapRow("brand-new-model", pair, { name: "Brand New Model", brand: "openai" })],
+      models: [snapRow("glm-5.3", pair), snapRow("brand-new-model", pair, { name: "Brand New Model", brand: "openai" })],
     })
     expect(ids()).toEqual(["deepseek-v4-flash"])
     expect(JSON.parse(fs.readFileSync(appliedCatalogPath(userData), "utf8")).generation).toBe(7)
@@ -706,7 +706,7 @@ describe("buildCodePuppyModelConfig — REQ-001 edition 白名单(catalog LKG)",
     expect(ids()).toEqual([])
 
     pinAppliedCatalog(userData, 8)
-    expect(ids()).toEqual(["brand-new-model", "glm-5.2"])
+    expect(ids()).toEqual(["brand-new-model", "glm-5.3"])
   })
 
   test("缓存损坏 → 视同无缓存(平台段为空,不 throw)", () => {
@@ -747,9 +747,9 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
     keyEverything()
     const p = buildCodePuppyModelConfig(userData, platformInputs)!.provider.codepuppy as { models: Record<string, { reasoning?: boolean }> }
     const flagged = getModelCatalog(userData).platformModels.filter((m) => m.reasoning).map((m) => m.id)
-    // 空集会让下面的逐项断言空转 —— 先钉住集合非空,且含本票实打确认「默认即思考」的 glm-5.2。
+    // 空集会让下面的逐项断言空转 —— 先钉住集合非空,且含 2026-11-21 实打确认「始终思考、不能关」的 glm-5.3。
     expect(flagged.length).toBeGreaterThan(0)
-    expect(flagged).toContain("glm-5.2")
+    expect(flagged).toContain("glm-5.3")
     for (const m of getModelCatalog(userData).platformModels) {
       expect({ id: m.id, reasoning: p.models[m.id]?.reasoning }).toEqual({ id: m.id, reasoning: m.reasoning ? true : undefined })
     }
@@ -795,32 +795,32 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
   })
 
   // `#1556` AC2:BYOK 模型元数据只来自 BYOK 目录,不再借平台同名条目(同一模型经直连与经 OpenRouter 形状不同,
-  // 不得跨腿套用)。把 BYOK 目录里 glm-5.2 的元数据撤掉,而平台快照里同名的 glm-5.2 带着徽标与档位:直连节点必须
+  // 不得跨腿套用)。把 BYOK 目录里 deepseek-v4-pro 的元数据撤掉,而平台快照里同名的 deepseek-v4-pro 带着徽标与档位:直连节点必须
   // 名称回落 id、无徽标、无档 —— picker 行与注入同一份派生。把 byokModelMeta 的平台回落加回来,本条转红。
   test("`#1556` AC2:BYOK 元数据只来自 BYOK 目录 —— 平台同名条目带着徽标与档位,也不借给直连节点", () => {
     keyEverything()
     pinByok((doc) => {
-      const zhipu = doc.providers.find((provider) => provider.id === "zhipuai")!
-      zhipu.models = zhipu.models.map((model) => (model.id === "glm-5.2" ? { id: "glm-5.2", name: "glm-5.2", image_input: false } : model)) as never
+      const deepseek = doc.providers.find((provider) => provider.id === "deepseek")!
+      deepseek.models = deepseek.models.map((model) => (model.id === "deepseek-v4-pro" ? { id: "deepseek-v4-pro", name: "deepseek-v4-pro", image_input: false } : model)) as never
     })
     const catalog = getModelCatalog(userData)
-    const twin = catalog.platformModels.find((model) => model.id === "glm-5.2")!
+    const twin = catalog.platformModels.find((model) => model.id === "deepseek-v4-pro")!
     expect(twin.reasoning).toBe(true)
     expect(twin.variants).toBeDefined()
-    const injected = (buildCodePuppyModelConfig(userData, platformInputs)!.provider["zhipuai-byok"] as any).models["glm-5.2"]
-    expect(injected).toEqual({ name: "glm-5.2", modalities: { input: ["text"] } })
+    const injected = (buildCodePuppyModelConfig(userData, platformInputs)!.provider["deepseek-byok"] as any).models["deepseek-v4-pro"]
+    expect(injected).toEqual({ name: "deepseek-v4-pro", modalities: { input: ["text"] } })
     const rows = buildModelPickerRows({
       catalog: { ...catalog, liveSync: { status: "cache" }, pricingBasisModelId: null, applied: { platformFetchedAt: null, byokVersion: 2 }, downloaded: { platformFetchedAt: null, byokVersion: 2 } },
       models: [],
       listState: "ready",
       keyStatusState: "ready",
-      keyStatus: { zhipuai: { configured: true, source: "keychain" } },
+      keyStatus: { deepseek: { configured: true, source: "keychain" } },
       accountState: "member",
       sessionScoped: false,
       query: "",
     })
-    const row = rows.find((candidate) => candidate.key === "zhipuai:glm-5.2")!
-    expect({ name: row.model.name, reasoning: row.reasoning, variants: row.model.variants }).toEqual({ name: "glm-5.2", reasoning: false, variants: [] })
+    const row = rows.find((candidate) => candidate.key === "deepseek:deepseek-v4-pro")!
+    expect({ name: row.model.name, reasoning: row.reasoning, variants: row.model.variants }).toEqual({ name: "deepseek-v4-pro", reasoning: false, variants: [] })
   })
 
   // REQ-153 #1267:glm-4.5-air 的徽标 / 档位来自 BYOK 目录自己的逐模型元数据(`byokProviders[].modelMeta`)。上游
@@ -865,7 +865,7 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
     // 这里就会分叉。
     writeCatalogSnapshot(userData, {
       ...liveBase,
-      models: [snapRow("glm-5.2", pair), snapRow("deepseek-v4-pro", pair), snapRow("claude-fable-5", pair)],
+      models: [snapRow("glm-5.3", pair), snapRow("deepseek-v4-pro", pair), snapRow("claude-fable-5.2", pair)],
     })
     pinAppliedCatalog(userData, 1) // `#1555`:引擎配置只读 fork 前钉住的已应用目录
     const cfg = buildCodePuppyModelConfig(userData, platformInputs)!
@@ -896,10 +896,10 @@ describe("REQ-153 #1236:目录 `reasoning` 转发进引擎配置,徽标与引擎
 
     expect(badged.length).toBeGreaterThan(0)
     expect(injected).toEqual(badged)
-    // 反例钉死方向:快照里未标 reasoning 的 claude-fable-5 两边都不亮;deepseek BYOK 的 flash 也不亮。
-    expect(badged).not.toContain("codepuppy:claude-fable-5")
+    // 反例钉死方向:快照里未标 reasoning 的 claude-fable-5.2 两边都不亮;deepseek BYOK 的 flash 也不亮。
+    expect(badged).not.toContain("codepuppy:claude-fable-5.2")
     expect(badged).not.toContain("deepseek-byok:deepseek-flash")
-    expect(badged).toContain("codepuppy:glm-5.2")
+    expect(badged).toContain("codepuppy:glm-5.3")
     expect(badged).toContain("zhipuai-byok:glm-5.2")
     // BYOK 目录的元数据也在同一集合里 —— 平台快照收窄不影响它(它根本不从平台派生,`#1556`)。
     expect(badged).toContain("zhipuai-byok:glm-4.5-air")
@@ -928,51 +928,82 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
   type Injected = { provider: Record<string, { models: Record<string, InjectedModel> }> }
   const DOC = "alpha-platform docs/architecture/openai-wire-reasoning-controls.md"
   const REACH = "docs/architecture/2026-09-06-model-variant-reachability.md"
+  const PLATFORM_PIN = "alpha-platform@6f04c6d"
+  const CFG = `${PLATFORM_PIN} packages/gateway/src/models.config.json`
+  const SUM = `${PLATFORM_PIN} docs/verification/2026-11-21-models-599/SUMMARY.md`
   const effort = (...tiers: [string, string][]): Tiers => Object.fromEntries(tiers.map(([label, value]) => [label, { reasoningEffort: value }]))
   const orEffort = (...tiers: [string, string][]): Tiers => Object.fromEntries(tiers.map(([label, value]) => [label, { reasoning: { effort: value } }]))
   const thinking = (...tiers: [string, "enabled" | "disabled"][]): Tiers => Object.fromEntries(tiers.map(([label, type]) => [label, { thinking: { type } }]))
 
   /** 引擎 `<providerID>:<modelID>` → 该腿实打过的档位表(逐字)与出处。改这张表 = 先照 DOC §3 的方法对真实端点打一轮。 */
   const VERIFIED_TIERS: Record<string, { leg: string; variants: Tiers; evidence: string }> = {
-    "codepuppy:claude-opus-4.8": {
-      leg: "openrouter:anthropic/claude-opus-4.8(anthropic-wire;anthropic 直连腿未验 ⇒ 网关剔除)",
-      variants: orEffort(["低", "low"], ["中", "medium"], ["高", "high"]),
-      evidence: `${DOC} §3.5:reasoning.effort 写成 output_config.effort,low/medium/high/xhigh/max → 200,none/minimal/bogus → 400;opus 各档 0 个 thinking 块 —— 受理是事实,效果不可观测(#1266 前已声明,本票不动)`,
-    },
-    "codepuppy:gpt-5.4-mini": {
-      leg: "openrouter:openai/gpt-5.4-mini(openai 直连腿本机 TLS 不可达 ⇒ 未验 ⇒ 网关剔除)",
-      variants: effort(["低", "low"], ["中", "medium"], ["高", "high"]),
-      evidence: `${DOC} §3.4:bogus-value → 400;none=0 / low=36 / medium=51 / high=78 reasoning_tokens(单样本,效果可观测)`,
-    },
-    "codepuppy:gpt-5.4-nano": {
-      leg: "openrouter:openai/gpt-5.4-nano(同上)",
-      variants: effort(["低", "low"], ["中", "medium"], ["高", "high"]),
-      evidence: `${DOC} §3.4:bogus-value → 400;none…high 均 0,xhigh=80 / max=90 —— 受理是事实,低档效果不可观测(#1266 已声明,本票不动)`,
-    },
+    // 平台腿(`codepuppy:*`)的读数来自 alpha-platform 现役清单的记录(2026-11-21 #599 实打,本票不重打):
+    // CFG = 该提交里每条 route 的 reasoningWire.evidence,SUM = 同一提交里 2026-11-21 实打的逐线路摘要。
+    // 证据只写读数支持的部分:受理域与「关」是否真关;档位之间的效果差别这些读数没有测,不写。
     "codepuppy:deepseek-v4-pro": {
-      leg: "deepseek:deepseek-v4-pro + openrouter:deepseek/deepseek-v4-pro(两腿都受理 reasoning_effort 七值)",
+      leg: "deepseek:deepseek-v4-pro + openrouter:deepseek/deepseek-v4-pro-0813(两腿都受理 reasoning_effort 七值)",
       variants: effort(["低", "low"], ["中", "medium"], ["高", "high"], ["最高", "max"]),
-      evidence: `${DOC} §3.3 直连:bogus-value → 400,none → completion=3 无 reasoning 桶(真关);§3.4 OR:bogus → 400,none=0;其余六值单样本无单调差别(#1266 已声明,本票不动)`,
+      evidence: `${SUM}(deepseek 直连 / OR 两行):直连 bogus-value → 422、none → completion 3 且无 reasoning(真关);OR bogus-value → 400、none → reasoning 0;七值受理(${CFG} 两条 route 的 reasoningWire.evidence)`,
     },
-    "codepuppy:glm-5.2": {
-      leg: "zhipu:glm-5.2 + openrouter:z-ai/glm-5.2(两腿都受理 reasoning_effort 七值)",
-      variants: effort(["高", "high"], ["最高", "max"]),
-      evidence: `${DOC} §3.1 直连:bogus-value → 400 code 1210(七值校验),但 none 仍 171 reasoning_tokens、max=307 非单调 —— 受理是事实、效果未证;§3.4 OR:none=0(#1266 已声明,本票不动)`,
+    "codepuppy:glm-5.3": {
+      leg: "zhipu:glm-5.3 + openrouter:z-ai/glm-5.3(直连只受理 low / high / max;OR 受理 minimal…max)",
+      variants: effort(["低", "low"], ["高", "high"], ["最高", "max"]),
+      evidence: `${CFG} glm-5.3 两条 route:直连 low / high / max → 200,none / minimal / medium / xhigh → 400「该模型始终思考,不支持关闭思考」;OR minimal…max 受理、none → 400「Reasoning is mandatory」;三档取两腿共同受理的 low / high / max`,
     },
-    "codepuppy:glm-5-turbo": {
-      leg: "zhipu:glm-5-turbo(models.config.json 首腿;OR 腿不认 thinking 形状 ⇒ 声明档位时被网关剔除,不换路)",
-      variants: thinking(["关", "disabled"], ["开", "enabled"]),
-      evidence: `${DOC} §3.2:thinking.type=disabled → reasoning_tokens 0(非流式 completion=4;流式 4 帧无 reasoning delta),enabled → 182;reasoning_effort 在此腿 accepted-and-ignored(bogus-value → 200,none 仍 224)⇒ 网关拒转 ⇒ 桌面不用它(v1 的形状)`,
+    "codepuppy:glm-5.3-flashx": {
+      leg: "zhipu:glm-5.3-flashx + openrouter:z-ai/glm-5.3-flashx(同 glm-5.3)",
+      variants: effort(["低", "low"], ["高", "high"], ["最高", "max"]),
+      evidence: `${CFG} glm-5.3-flashx 两条 route:与 glm-5.3 同一组读数(直连 low / high / max → 200、none 等 → 400「始终思考」;OR minimal…max 受理、none → 400)`,
     },
-    "codepuppy:qwen3.7-max": {
-      leg: "openrouter:qwen/qwen3.7-max(唯一腿)",
+    "codepuppy:qwen4-max": {
+      leg: "openrouter:qwen/qwen4-max(唯一腿)",
       variants: effort(["关", "none"], ["开", "medium"]),
-      evidence: `${DOC} §3.4 + ${REACH} §8(本票 2026-09-06 复打 N=3,max_tokens 2048,与引擎同发 top_p:1):bogus-value → 400;none → reasoning_tokens 0(3/3);low/medium/high/max 248–308 与 baseline 252–288 无差别 ⇒ 只声明开/关,开取 OR 校验域内的 medium`,
+      evidence: `${CFG} qwen4-max route:OR bogus-value → 400「expected one of max|xhigh|high|medium|low|minimal|none」,none → reasoning 0(真关),七值受理;只声明开 / 关,开取 OR 校验域内的 medium`,
     },
     "codepuppy:qwen3.7-plus": {
       leg: "openrouter:qwen/qwen3.7-plus(唯一腿)",
       variants: effort(["关", "none"], ["开", "medium"]),
-      evidence: `${DOC} §3.4 + ${REACH} §8(同上):bogus-value → 400;none → 0(3/3);low/medium/high/max 268–347 与 baseline 315–340 无差别 ⇒ 只声明开/关`,
+      evidence: `${DOC} §3.4 + ${REACH} §8(N=3 复打,max_tokens 2048,与引擎同发 top_p:1):bogus-value → 400;none → 0(3/3);low/medium/high/max 268–347 与 baseline 315–340 无差别 ⇒ 只声明开/关;${CFG} qwen3.7-plus route 仍引用同一份读数(asOf 2026-09-06)`,
+    },
+    "codepuppy:gpt-6-luna": {
+      leg: "openrouter:openai/gpt-6-luna(唯一腿;openai 直连读数只作记录,不进配置)",
+      variants: effort(["低", "low"], ["中", "medium"], ["高", "high"]),
+      evidence: `${CFG} gpt-6-luna route:OR bogus-value → 400「expected one of max|xhigh|high|medium|low|minimal|none」,none → reasoning 0,七值受理;三档取其中的 low / medium / high,档位间效果未测`,
+    },
+    "codepuppy:gpt-6.1-terra": {
+      leg: "openrouter:openai/gpt-6.1-terra(唯一腿)",
+      variants: effort(["低", "low"], ["中", "medium"], ["高", "high"]),
+      evidence: `${CFG} gpt-6.1-terra route:与 gpt-6-luna 同一组 OR 读数(七值受理,none → reasoning 0)`,
+    },
+    "codepuppy:gpt-6.2-sol": {
+      leg: "openrouter:openai/gpt-6.2-sol(唯一腿)",
+      variants: effort(["低", "low"], ["中", "medium"], ["高", "high"]),
+      evidence: `${CFG} gpt-6.2-sol route:OR minimal…max 受理、none → 400「Reasoning is mandatory for this endpoint and cannot be disabled」;所以没有「关」档,三档取 low / medium / high`,
+    },
+    "codepuppy:gpt-6.2-astra": {
+      leg: "openrouter:openai/gpt-6.2-astra(唯一腿)",
+      variants: effort(["低", "low"], ["中", "medium"], ["高", "high"]),
+      evidence: `${CFG} gpt-6.2-astra route:与 gpt-6.2-sol 同一组 OR 读数(minimal…max 受理,none → 400 mandatory)`,
+    },
+    "codepuppy:claude-opus-5.5": {
+      leg: "openrouter:anthropic/claude-opus-5.5(anthropic-wire;唯一腿)",
+      variants: orEffort(["低", "low"], ["中", "medium"], ["高", "high"]),
+      evidence: `${CFG} claude-opus-5.5 route:写成 output_config.effort,low…max → 200,none / minimal / bogus-value → 400;thinking:{type:disabled} → 400「Reasoning is mandatory」⇒ 受理是事实、档位间效果未测`,
+    },
+    "codepuppy:minimax-m3.1-flash": {
+      leg: "openrouter:minimax/minimax-m3.1-flash(唯一腿)",
+      variants: effort(["低", "low"], ["中", "medium"], ["高", "high"]),
+      evidence: `${CFG} minimax-m3.1-flash route:OR minimal…max 受理、none → 400「Reasoning is mandatory」;所以没有「关」档,三档取 low / medium / high`,
+    },
+    "codepuppy:minimax-m3": {
+      leg: "openrouter:minimax/minimax-m3(唯一腿)",
+      variants: effort(["低", "low"], ["中", "medium"], ["高", "high"]),
+      evidence: `${CFG} minimax-m3 route:OR bogus-value → 400,none → reasoning 0,七值受理;三档取其中的 low / medium / high`,
+    },
+    "codepuppy:kimi-k3.1-pro": {
+      leg: "openrouter:moonshotai/kimi-k3.1-pro(唯一腿)",
+      variants: effort(["低", "low"], ["中", "medium"], ["高", "high"]),
+      evidence: `${CFG} kimi-k3.1-pro route:OR bogus-value → 400,none → reasoning 0,七值受理;三档取其中的 low / medium / high`,
     },
     "deepseek-byok:deepseek-v4-pro": {
       leg: "deepseek 直连(BYOK 目录自带,byokModelMeta)",
@@ -1045,12 +1076,14 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
     // 空表会让上面的判据空转:实打表至少覆盖本票三个模型 + #1266/#1267 已声明的那些。
     expect(Object.keys(VERIFIED_TIERS).length).toBeGreaterThanOrEqual(11)
     const alpha = cfg.provider.codepuppy!.models
-    expect(alpha["glm-5-turbo"]).toEqual({ name: "GLM-5 Turbo", reasoning: true, variants: { 关: { thinking: { type: "disabled" } }, 开: { thinking: { type: "enabled" } } }, modalities: { input: ["text"] } })
-    expect(alpha["qwen3.7-max"]).toEqual({ name: "Qwen3.7 Max", reasoning: true, variants: { 关: { reasoningEffort: "none" }, 开: { reasoningEffort: "medium" } }, modalities: { input: ["text"] } })
+    // glm-4.5-air:智谱直连只认 thinking 开关(BYOK 目录自带,平台清单已没有 thinking 形状的模型)。
+    const zhipu = cfg.provider["zhipuai-byok"]!.models
+    expect(zhipu["glm-4.5-air"]).toEqual({ name: "glm-4.5-air", reasoning: true, variants: { 关: { thinking: { type: "disabled" } }, 开: { thinking: { type: "enabled" } } }, modalities: { input: ["text"] } })
+    expect(alpha["qwen4-max"]).toEqual({ name: "Qwen4 Max", reasoning: true, variants: { 关: { reasoningEffort: "none" }, 开: { reasoningEffort: "medium" } }, modalities: { input: ["text"] } })
     expect(alpha["qwen3.7-plus"]).toEqual({ name: "Qwen3.7 Plus", reasoning: true, variants: { 关: { reasoningEffort: "none" }, 开: { reasoningEffort: "medium" } }, modalities: { input: ["text"] } })
     // 同一模型经不同腿形状不同:GLM 直连只认 thinking,qwen 经 OR 只走 reasoning_effort —— 两者不得互换。
-    expect(Object.keys(alpha["glm-5-turbo"]!.variants!)).toEqual(["关", "开"])
-    expect(Object.keys(alpha["qwen3.7-max"]!.variants!)).toEqual(["关", "开"])
+    expect(Object.keys(zhipu["glm-4.5-air"]!.variants!)).toEqual(["关", "开"])
+    expect(Object.keys(alpha["qwen4-max"]!.variants!)).toEqual(["关", "开"])
   })
 
   test("未实打的直连模型(qwen / kimi / minimax)真的被注入、且无徽标无档 —— 「无档」有被测对象,不是空集", () => {
@@ -1065,7 +1098,7 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
       pinned++
     }
     expect(pinned).toBe(6)
-    // 平台侧 qwen3.7-* 经 OR 有档,直连 alibaba-byok 的是另一组 id(qwen3.8-max / qwen-plus / qwen3-coder-plus),
+    // 平台侧 qwen4-max / qwen3.7-plus 经 OR 有档,直连 alibaba-byok 的是另一组 id(qwen3.8-max / qwen-plus / qwen3-coder-plus),
     // 不存在同名派生;这里钉住「平台的 qwen 档位没有漏进 alibaba 直连节点」这条不变量。
     for (const model of Object.values(cfg.provider["alibaba-byok"]!.models)) expect(model.variants).toBeUndefined()
   })
@@ -1075,9 +1108,9 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
     const base = buildCodePuppyModelConfig(userData, platformInputs)! as unknown as Injected
     expect(judgeTierProvenance(base)).toEqual([])
 
-    const v1 = clone(base) // v1 票面的形状:按 reasoningEffort 给 GLM turbo 声明档位 —— 直连腿 accepted-and-ignored
-    v1.provider.codepuppy!.models["glm-5-turbo"]!.variants = { 高: { reasoningEffort: "high" }, 最高: { reasoningEffort: "max" } }
-    expect(judgeTierProvenance(v1).map((line) => line.split(":").slice(0, 2).join(":"))).toEqual(["codepuppy:glm-5-turbo"])
+    const v1 = clone(base) // v1 票面的形状:按 reasoningEffort 给 GLM(glm-4.5-air)声明档位 —— 直连腿 accepted-and-ignored
+    v1.provider["zhipuai-byok"]!.models["glm-4.5-air"]!.variants = { 高: { reasoningEffort: "high" }, 最高: { reasoningEffort: "max" } }
+    expect(judgeTierProvenance(v1).map((line) => line.split(":").slice(0, 2).join(":"))).toEqual(["zhipuai-byok:glm-4.5-air"])
     expect(judgeTierProvenance(v1)[0]).toContain("≠ 实打表")
 
     const guessed = clone(base) // 照 models.dev 文案给 MiniMax 直连补档
@@ -1088,11 +1121,11 @@ describe("REQ-153 #1237:档位形状逐腿取自实打表;未实打的模型钉�
     expect(guessedFailures.some((line) => line.includes("本机未实打"))).toBe(true)
 
     const typo = clone(base) // 关档值写错:OR 的校验域里没有 "off"(bogus → 400),实打表逐字比对当场红
-    typo.provider.codepuppy!.models["qwen3.7-max"]!.variants = { 关: { reasoningEffort: "off" }, 开: { reasoningEffort: "medium" } }
-    expect(judgeTierProvenance(typo).map((line) => line.split(":").slice(0, 2).join(":"))).toEqual(["codepuppy:qwen3.7-max"])
+    typo.provider.codepuppy!.models["qwen4-max"]!.variants = { 关: { reasoningEffort: "off" }, 开: { reasoningEffort: "medium" } }
+    expect(judgeTierProvenance(typo).map((line) => line.split(":").slice(0, 2).join(":"))).toEqual(["codepuppy:qwen4-max"])
 
     const reordered = clone(base) // 开排第一 ⇒ 标题辅助调用会带 thinking:enabled
-    reordered.provider.codepuppy!.models["glm-5-turbo"]!.variants = { 开: { thinking: { type: "enabled" } }, 关: { thinking: { type: "disabled" } } }
+    reordered.provider["zhipuai-byok"]!.models["glm-4.5-air"]!.variants = { 开: { thinking: { type: "enabled" } }, 关: { thinking: { type: "disabled" } } }
     const reorderedFailures = judgeTierProvenance(reordered)
     expect(reorderedFailures.length).toBe(2) // 逐字不等(顺序也是表的一部分)+ 关档不在第一位
     expect(reorderedFailures.some((line) => line.includes("smallOptions"))).toBe(true)
@@ -1184,7 +1217,7 @@ describe("REQ-228 #1420:直连 / 平台 / 自定义三段的图片输入能力",
       "moonshot-byok/kimi-k2.6",
       "moonshot-byok/kimi-k3",
     ])
-    expect(Object.keys((cfg.provider.codepuppy as { models: Models }).models)).toContain("claude-sonnet-5")
+    expect(Object.keys((cfg.provider.codepuppy as { models: Models }).models)).toContain("claude-sonnet-5.5")
   })
 
   test("注入逐字取已应用 BYOK 目录的 image_input(不回落平台同名条目、不回落 models.dev)", () => {

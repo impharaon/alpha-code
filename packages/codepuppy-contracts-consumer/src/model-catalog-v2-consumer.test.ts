@@ -191,7 +191,7 @@ describe("变异一律整份拒绝(不逐行降级)", () => {
   })
 })
 
-describe("厂商(brand)是开放字符串:1–64 个字符,`^[a-z0-9][a-z0-9-]*$`(alpha-code#1754)", () => {
+describe("厂商(brand)是开放字符串:1–64 个字符,`^[a-z0-9][a-z0-9-]*$`", () => {
   // 样本取上游 producer 字节,只改一行的 brand;平台目录与 BYOK 目录各走自己的真入口。
   const platformWith = async (brand: string) => {
     const value = await producerValue()

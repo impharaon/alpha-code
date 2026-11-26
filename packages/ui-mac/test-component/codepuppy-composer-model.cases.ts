@@ -3899,7 +3899,7 @@ describe("CodePuppyComposer 生产 combobox 无障碍绑定", () => {
   })
 })
 // ── REQ-127 #679:选择器上那两个数字是平台的真值,不是本地编的 ────────────────────────────
-// 用户能看到的变化只在这一票:claude-fable-5 从「标准 ×1」变成「输入 71.4× · 输出 178.6×」。
+// 用户能看到的变化只在这一票:claude-fable 从「标准 ×1」变成真实的双倍数(当时是 claude-fable-5 的「输入 71.4× · 输出 178.6×」;现役清单里是 claude-fable-5.2 的「输入 26.7× · 输出 33.3×」)。
 //
 // 判据一律是**白名单**,不是「不含 × / 不含档位词」那种黑名单。R1 审计用一个 `1x`
 // (拉丁字母 x,不是 `×`)当探针证明过:黑名单对新成员默认放行 —— 一个伪造倍率可以同时出现在
@@ -3907,20 +3907,25 @@ describe("CodePuppyComposer 生产 combobox 无障碍绑定", () => {
 // 整行可见文本的完整拼接、`aria-label` 的完整值。多一个元素、多一个字符都不等。
 describe("#679 生产 picker 呈现平台双倍数 / 不可用两态", () => {
   const BASIS = "deepseek-v4-flash"
-  /** 平台真实倍数(与 producer fixture 一致):最长串出现在 claude-fable-5 上。 */
+  /** 平台真实倍数(与 producer fixture 一致,2026-11-26 随钉版换到现役一代)。 */
   const REMOTE_PRICING: Record<string, { input: number; output: number }> = {
     "deepseek-v4-flash": { input: 1, output: 1 },
-    "deepseek-v4-pro": { input: 3.1, output: 3.1 },
-    "glm-5.2": { input: 5.4, output: 8.5 },
-    "glm-5-turbo": { input: 8.6, output: 14.3 },
-    "qwen3.7-max": { input: 10.5, output: 15.8 },
-    "qwen3.7-plus": { input: 2.3, output: 4.6 },
-    "gpt-5.4-mini": { input: 5.4, output: 16.1 },
-    "gpt-5.4-nano": { input: 1.4, output: 4.5 },
-    "claude-haiku-4.5": { input: 7.1, output: 17.9 },
-    "claude-sonnet-5": { input: 21.4, output: 53.6 },
-    "claude-fable-5": { input: 71.4, output: 178.6 },
-    "claude-opus-4.8": { input: 35.7, output: 89.3 },
+    "deepseek-v4-pro": { input: 4.4, output: 3.3 },
+    "glm-5.3": { input: 4.7, output: 3.7 },
+    "glm-5.3-flashx": { input: 1.2, output: 1 },
+    "qwen4-max": { input: 4.8, output: 3.6 },
+    "qwen3.7-plus": { input: 1.1, output: 1.1 },
+    "gpt-6-luna": { input: 0.7, output: 0.6 },
+    "gpt-6.1-terra": { input: 6.7, output: 6.3 },
+    "gpt-6.2-sol": { input: 13.3, output: 12.5 },
+    "gpt-6.2-astra": { input: 53.3, output: 50 },
+    "claude-haiku-5.5": { input: 1.7, output: 2.1 },
+    "claude-sonnet-5.5": { input: 6.7, output: 8.3 },
+    "claude-opus-5.5": { input: 13.3, output: 16.7 },
+    "claude-fable-5.2": { input: 26.7, output: 33.3 },
+    "minimax-m3.1-flash": { input: 0.5, output: 0.5 },
+    "minimax-m3": { input: 2, output: 2 },
+    "kimi-k3.1-pro": { input: 0.8, output: 7 },
   }
   /** 有效 V2/LKG 的目录视图(= getEffectiveCatalog 在 live 时返回的形状)。 */
   const pricedCatalog = {
@@ -3948,7 +3953,11 @@ describe("#679 生产 picker 呈现平台双倍数 / 不可用两态", () => {
   const rows = (group?: "platform" | "byok") =>
     [...document.body.querySelectorAll<HTMLButtonElement>(group ? `.a-mpp-row[data-group="${group}"]` : ".a-mpp-row")]
   const rowFor = (id: string, group: "platform" | "byok" = "platform") =>
-    rows(group).find((row) => row.querySelector(".a-mpp-name small")?.textContent?.startsWith(id))!
+    // 整个 id 才算命中:`minimax-m3` 不能匹配到 `minimax-m3.1-flash`(现役目录里存在前缀相同的两个 id)。
+    rows(group).find((row) => {
+      const text = row.querySelector(".a-mpp-name small")?.textContent ?? ""
+      return text === id || text.startsWith(`${id} · `)
+    })!
 
   /** 行尾状态元素的**有序完整列表**。生产里它们由同一个 statusParts() 渲染成 .a-pop-desc。 */
   const descTexts = (row: HTMLButtonElement) =>
@@ -4071,7 +4080,7 @@ describe("#679 生产 picker 呈现平台双倍数 / 不可用两态", () => {
     const mounted = await openPicker()
     expectPlatformRows(zh, (id) => [pair(id, zh)])
     // 最长串单独点名一次,免得整表断言绿了却没人看见它长什么样。
-    expect(descTexts(rowFor("claude-fable-5"))).toEqual(["输入 71.4× · 输出 178.6×"])
+    expect(descTexts(rowFor("claude-fable-5.2"))).toEqual(["输入 26.7× · 输出 33.3×"])
     // 基准说明:完整值,基准名取自目录。
     const basis = document.body.querySelector(".a-mpp-basis")!
     expect(basis.textContent).toBe(zh["codepuppy.model.pricingBasisNote"].replace("{{model}}", basisName))
@@ -4144,7 +4153,7 @@ describe("#679 生产 picker 呈现平台双倍数 / 不可用两态", () => {
     const mounted = await openPicker({
       account: async () => ({ ...summary, balanceFen: 0, plan: { ...summary.plan!, status: "expired" } }),
     })
-    await waitFor(() => expect(rowFor("claude-fable-5").textContent).toContain(zh["codepuppy.model.needsCredit"]))
+    await waitFor(() => expect(rowFor("claude-fable-5.2").textContent).toContain(zh["codepuppy.model.needsCredit"]))
     expectPlatformRows(zh, (id) => [zh["codepuppy.model.needsCredit"], pair(id, zh)])
     expectNonPlatformRowsCarryNoPricing(zh)
     mounted.dispose()
@@ -4155,7 +4164,7 @@ describe("#679 生产 picker 呈现平台双倍数 / 不可用两态", () => {
     try {
       const mounted = await openPicker()
       expectPlatformRows(enDict, (id) => [pair(id, enDict)])
-      expect(descTexts(rowFor("claude-fable-5"))).toEqual(["In 71.4× · Out 178.6×"])
+      expect(descTexts(rowFor("claude-fable-5.2"))).toEqual(["In 26.7× · Out 33.3×"])
       expect(document.body.querySelector(".a-mpp-basis")!.textContent).toBe(
         enDict["codepuppy.model.pricingBasisNote"].replace("{{model}}", basisName),
       )
@@ -4214,8 +4223,8 @@ describe("#679 生产 picker 呈现平台双倍数 / 不可用两态", () => {
       ["控制组:有 pricing 的目录,顺序原样", () => pricedCatalog, "deepseek-v4-flash"],
       [
         "声明的默认就是全场最贵那个(价格不参与挑选,贵的照样能当默认)",
-        () => ({ ...pricedCatalog, defaultPlatformModel: "claude-fable-5" }) as EffectiveCatalog,
-        "claude-fable-5",
+        () => ({ ...pricedCatalog, defaultPlatformModel: "gpt-6.2-astra" }) as EffectiveCatalog,
+        "gpt-6.2-astra",
       ],
       [
         "声明的 id 不在生效目录中(被 edition 白名单筛掉)→ 不回落到任何平台模型",
@@ -4895,8 +4904,8 @@ describe("#1558 输入框模型按钮与添加供应商卡按品牌出图", () =
     expect(mounted.host.querySelector('[data-kind="model"] .a-pico')).toBeNull()
 
     const cases: Array<[ComposerModel, string]> = [
-      [{ providerID: catalog.platformProvider.id, id: "qwen3.7-max", name: "Qwen3.7 Max", variants: [] }, "alibaba"],
-      [{ providerID: catalog.platformProvider.id, id: "claude-opus-4.8", name: "Claude Opus 4.8", variants: [] }, "anthropic"],
+      [{ providerID: catalog.platformProvider.id, id: "qwen4-max", name: "Qwen4 Max", variants: [] }, "alibaba"],
+      [{ providerID: catalog.platformProvider.id, id: "claude-opus-5.5", name: "Claude Opus 5.5", variants: [] }, "anthropic"],
       [{ providerID: byokEngineId("moonshot"), id: "kimi-k2", name: "Kimi K2", variants: [] }, "moonshotai"],
       // 自定义节点:名字里带 qwen 也不猜品牌。
       [{ providerID: "office-gateway", id: "qwen2.5-72b-instruct", name: "qwen2.5-72b-instruct", variants: [] }, "synthetic"],

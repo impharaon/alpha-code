@@ -79,7 +79,8 @@ describe("document resources", () => {
     const entries = getConfig("prod").extraResources
     if (!Array.isArray(entries)) throw new Error("missing resources")
     expect(entries.filter((entry) => typeof entry !== "string" && entry.to === "document-assets/")).toEqual([{ from: `${DOCUMENT_ASSET_BUILD_DIR}/`, to: "document-assets/" }])
-    expect(entries.filter((entry) => typeof entry !== "string" && entry.to === "office-runtime/")).toHaveLength(1)
+    const mac = getConfig("prod").mac?.extraResources
+    expect([...entries, ...(Array.isArray(mac) ? mac : [])].filter((entry) => typeof entry !== "string" && entry.to === "office-runtime/")).toHaveLength(1)
   })
 
   test("Windows interpreter layout and PE target use real pinned archive headers", () => {
@@ -110,3 +111,14 @@ function fixture(packaged: boolean) {
   mkdirSync(join(resourcesRoot, "factory-skills", "office-docs"), { recursive: true })
   return { resourcesRoot, packaged, platform: "darwin" as const, node: process.execPath }
 }
+
+
+test("Office runtime copy sources follow the packaging target, including Windows built on a Mac host", async () => {
+  const { getConfig } = await import("../../electron-builder.config")
+  const config = getConfig("prod")
+  const windows = config.win?.extraResources
+  expect(windows).toEqual([{ from: `${OFFICE_RUNTIME_BUILD_DIR}/win32-x64/`, to: "office-runtime/" }])
+  const mac = config.mac?.extraResources
+  expect(Array.isArray(mac) && mac.some((entry) => typeof entry !== "string" && entry.to === "office-runtime/" && !entry.from.includes("win32"))).toBe(true)
+  expect(Array.isArray(config.extraResources) && config.extraResources.some((entry) => typeof entry !== "string" && entry.to === "office-runtime/")).toBe(false)
+})

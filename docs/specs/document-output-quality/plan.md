@@ -608,3 +608,5 @@ A7 green：NOTICE 保留实际四个 nameID 0 的完整 copyright 文本（包�
 A6 authority 核对：alpha-work domestic-cloud-connectivity design §4.11.1:573-574 的当前联合有 ocr-model、无 darwin-x64。既有 util 文档文件添加类型层回归，`bun typecheck` 对 OCR ID 和 no-Intel 断言给两个错误（A6-red.log）；不是用手写数组当运行期校验器。下一提交只同步纯数据联合。
 
 A6 green：仅同步 union 到当前权威，无新下载/校验实现；util typecheck exit 0、文档文件 8 PASS（A6-green.log、util-green.log）。red 输出还包含 expect 对静态 false 的衍生类型错误，核心前提仍是 OCR 不被接受与 Intel 仍被接受。
+
+A10 red：资源配置目标轴的现有 resources 文件新增 Windows/Mac FileSet 断言，target exit 1（A10-red.log）：当前 Win 没有专属入口且全局按 host 选源。原“一份 runtime”断言同提交消费 global+mac 最终合成配置，不保留生产旧布局兼容。下一提交将两平台入口放到 electron-builder 的平台层，并在 Windows workflow 复用仓库已有 setup-uv 固定 action SHA（不触发 workflow/发布）。

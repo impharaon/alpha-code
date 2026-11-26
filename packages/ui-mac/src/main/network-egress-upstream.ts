@@ -97,7 +97,7 @@ function connectSocket(target: Destination, signal: AbortSignal): Promise<Socket
 function httpTunnel(target: Destination, route: Exclude<UpstreamRoute, { kind: "direct" }>, signal: AbortSignal): Promise<Socket> {
   signal.throwIfAborted()
   return new Promise((resolve, reject) => {
-    const request = (route.kind === "https" ? https : http).request({ method: "CONNECT", host: route.host, port: route.port, path: authority(target), headers: { Host: authority(target) }, signal })
+    const request = (route.kind === "https" ? https : http).request({ method: "CONNECT", host: route.host, port: route.port, path: authority(target), headers: { Host: authority(target) }, ...(route.kind === "https" ? { servername: isIP(route.host) ? "" : route.host } : {}), signal })
     request.once("error", (error: NodeJS.ErrnoException) => reject(error.code === "ETIMEDOUT" ? error : failure("EPROXYCONNECT")))
     request.once("connect", (response, socket, head) => {
       socket.on("error", () => {})

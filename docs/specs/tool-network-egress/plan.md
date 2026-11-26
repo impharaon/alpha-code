@@ -263,3 +263,6 @@ U `bun test --max-concurrency 2 src/main/network-egress-grants.test.ts src/main/
 切片二步骤 2：完整非空活动快照的档位解析按 activity revision 核对，待批窗口恢复到全 allow 时继续；通放不写用户授权集合。N5 复用现有环境状态根追加逐次 JSONL，设置按唯一 ID 投影；实际 readonly 文件导致的 append 失败只影响记录状态，真实 CONNECT 仍成功。新增改动范围为 `egress-grant-truth.ts` 的 UTC 判据提取（N4/N5 共用同一时间合同，避免复制校验）；其余均在初始列表。三条旧代理夹具把 loopback 伪装成可批准目标，按设计 §4.2 改为公开形状的测试名映射到本地 TCP peer，原拒绝/批准/迟到断言保持；连接 ID 按 N5 改为运行 UUID + 序号，旧计数断言同步 string。
 
 U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts src/main/network-egress-passes.test.ts src/main/network-egress-proxy.test.ts`：37 pass / 0 fail（`/tmp/egress-s2-step2.log`）；`bun typecheck` 退出 0。初次新 passes 夹具遗漏父目录创建，2 fail，补齐夹具后窄跑 4 pass；这是夹具错误，不记作产品移除臂。新增 N7/passes 测试均为 integration：依赖通过静态 import 可追踪，普通受影响 PR 可选中；真引擎增量仍放已有 scenario 宿主，只由夜间运行，本轮验收按具名用例单次执行。返回前将执行 `affected-tests --list` 报告 scope。
+
+
+步骤 2 的后续窄复核在提交 `0c83296409` 后读到 HTTPS 失败（`/tmp/egress-s2-step2-upstream.log`，1 pass / 1 fail）：Bun https.request 会从新设的 CONNECT Host 头推导 SNI，把目标域名用于代理证书校验。显式将 HTTPS 的 servername 绑定路由代理 host（IP 不发域名 SNI），保持目标 authority 为 CONNECT Host。原测试不改，U `bun test --max-concurrency 2 src/main/network-egress-upstream.test.ts` 转为 6 pass / 0 fail（`/tmp/egress-s2-https-green.log`）。如实记录前一提交的验证缺口，未合并或推送。

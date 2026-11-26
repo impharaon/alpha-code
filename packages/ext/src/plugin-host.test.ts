@@ -5,7 +5,7 @@ import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap, type TestBo
 import { allInstalledPluginSkills } from "./plugin-package-skills"
 import { skillGenerationLiveDirs } from "./gen-skill-paths"
 import { convertPluginTree } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
-import { fixtureRoot, captureWholeFixture } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
+import { fixtureRoot, captureWholeFixture, captureStandardFixture } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
 import { afterEach, beforeAll, expect } from "bun:test"
 import { createHash } from "node:crypto"
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
@@ -35,7 +35,7 @@ import type { Plugin } from "@opencode/plugin"
 import CodePuppyExt, { PROCESS_STATE_KEY } from "./plugin"
 import { codePuppyWebSearchFailureOf } from "./exa-websearch"
 import { buildHubInstallReply, buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
-import { activate, it, recordingMcp } from "./plugin-host.harness"
+import { activate, it, packageIt, recordingMcp } from "./plugin-host.harness"
 import { testEffect } from "../../core/test/lib/effect.ts"
 import { makePluginTestLayer } from "../../core/test/plugin/fixture.ts"
 import { CODEPUPPY_EXPLORE_PROMPT } from "./codepuppy-prompts"
@@ -59,6 +59,12 @@ import { ConfigAgentPlugin } from "../../core/src/config/plugin/agent.ts"
 import { PluginPromise } from "../../core/src/plugin/promise.ts"
 import { Document as ConfigDocument, Info as ConfigInfo } from "../../schema/src/config.ts"
 import { Schema } from "effect"
+import { ConfigCommandPlugin } from "../../core/src/config/plugin/command"
+import { SubagentTool } from "../../core/src/tool/plugin/subagent"
+import { SkillTool } from "../../core/src/tool/plugin/skill"
+import { ReadTool } from "../../core/src/tool/plugin/read"
+import { TestLLM } from "../../ai/src/testing"
+import { dirname } from "node:path"
 
 let scratch = ""
 beforeAll(() => {
@@ -1682,4 +1688,85 @@ it.effect("long plugin MCP aliases execute the original registered tool after mo
   const result = yield* prepared.executeTool({ sessionID: session.id, agent: "build" as never, messageID: "msg_alias" as never, call: { type: "tool-call", id: "call_alias", name: alias, input: {} } })
   expect(result.content).toEqual([{ type: "text", text: "original MCP executor" }])
   expect(executions).toBe(1)
+}))
+
+const invocationSample = (name: string, changes: Record<string, string | null> = {}) => Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture(name, changes))
+  const converted = yield* Effect.promise(() => convertPluginTree(capture))
+  const root = join(scratch, "codepuppy-state", "env", "dev")
+  const key = "bundle--invocation-" + name.replace(/[^a-z0-9-]/gi, "-")
+  const live = join(root, "ext-store", key, "generations", "gen-000001-abcdef")
+  for (const node of capture.nodes) if (node.kind === "file") {
+    const target = join(live, "tree", node.path)
+    mkdirSync(dirname(target), { recursive: true })
+    writeFileSync(target, converted.replacements.get(node.path) ?? (yield* Effect.promise(() => capture.readFile(node.path))))
+  }
+  const hostNames = Object.fromEntries(converted.package.entries.map(entry => [entry.id, entry.kind + "-" + entry.sourceName.replace(/[^a-z0-9-]/gi, "-")]))
+  writeFileSync(join(live, "plugin-package.json"), JSON.stringify({ description: converted.package, hostNames }))
+  writeFileSync(join(root, "ext-store", key, "current.json"), JSON.stringify({ v: 1, generation: "gen-000001-abcdef", txId: "invocation-fixture", switchedAt: "2026-11-27T00:00:00Z" }))
+  writeFileSync(join(root, "ext-store", key, "package-settings.json"), JSON.stringify({ packageId: "local:" + name, dataHome: join(scratch, "data"), values: {}, secretRefs: {}, versions: {}, mcpVersions: {} }))
+  writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: converted.package.entries.filter(entry => ["skill", "command", "agent"].includes(entry.kind)).map(entry => entry.kind + "--" + hostNames[entry.id]), scoped: [], mcp: converted.package.entries.filter(entry => entry.kind === "mcp").map(entry => ({ name: hostNames[entry.id], enabled: true })) }))
+  return { root, key, live, description: converted.package, hostNames }
+})
+const invocationNativeServices = Effect.gen(function* () {
+  yield* activate(providerPlugin("test", "https://test.invalid", "picked"))
+  const plugins = yield* Plugins.Service
+  for (const plugin of [SkillTool.Plugin, SubagentTool.Plugin, ReadTool.Plugin, ConfigCommandPlugin.Plugin])
+    yield* plugin.effect(yield* PluginHost.make(plugins, plugin.id))
+})
+
+packageIt.live("package agent delegates with its instructions and tool set", () => Effect.gen(function* () {
+  env({})
+  const sample = yield* invocationSample("claude:feature-dev")
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const agents = yield* Agent.Service
+  const target = sample.hostNames["agent:agents/code-reviewer.md"]!
+  yield* ext.finish(agents.get(target as never).pipe(Effect.map(agent => !!agent)))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const registry = yield* Tool.Service
+  const snapshot = yield* registry.snapshot()
+  const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_package_agent" as never, call: { type: "tool-call", name: "subagent", id: "call_package_agent", input: { agent: target, description: "Review package", prompt: "review source", background: false } } })
+  expect(JSON.stringify(result)).toContain("Package child result")
+  const children = (yield* sessions.list({ parentID: parent.id })).data
+  expect(children).toHaveLength(1)
+  expect(children[0]?.model).toMatchObject({ providerID: "test", id: "picked" })
+  const requests = yield* (yield* TestLLM.Test).requests()
+  const request = requests.find(request => JSON.stringify(request).includes("expert code reviewer"))
+  expect(request).toBeDefined()
+  expect(JSON.stringify(request)).toContain("high precision")
+  expect(JSON.stringify(request?.tools)).not.toContain('"name":"shell"')
+  expect(JSON.stringify(request?.tools)).toContain('"name":"read"')
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  const denied = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_package_agent_off" as never, call: { type: "tool-call", name: "subagent", id: "call_package_agent_off", input: { agent: target, description: "Stopped review", prompt: "review", background: false } } }).pipe(Effect.exit)
+  expect(Exit.isFailure(denied)).toBe(true)
+  expect((yield* sessions.list({ parentID: parent.id })).data).toHaveLength(1)
+}))
+
+packageIt.live("package commands invoke the source renderer only after an explicit call", () => Effect.gen(function* () {
+  env({})
+  const original = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => original.readFile("commands/feature-dev.md")))
+  const sample = yield* invocationSample("claude:feature-dev", { "commands/feature-dev.md": source + "\nRUNTIME_ARG=$0\n!`printf SOURCE_EXECUTED`\n" })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(commands => commands.some(entry => entry.name === command))))
+  const llm = yield* TestLLM.Test
+  expect(yield* llm.requests()).toHaveLength(0)
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: '"!`printf VALUE_EXECUTED`"' }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  const messages = yield* sessions.context(parent.id)
+  const text = messages.filter(message => message.type === "user").map(message => message.text).join("\n")
+  expect(text).toContain("RUNTIME_ARG=!`printf VALUE_EXECUTED`")
+  expect(text).toContain("SOURCE_EXECUTED")
+  expect(text).not.toContain("!`printf SOURCE_EXECUTED`")
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  expect(Exit.isFailure(yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "after disable" }, delivery: "queue" } }).pipe(Effect.exit))).toBe(true)
 }))

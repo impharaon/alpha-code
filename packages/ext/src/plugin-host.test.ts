@@ -2519,3 +2519,43 @@ packageIt.live("ConfigChange uses active package handlers once per revision and 
   expect(yield* Effect.promise(() => port.beforeConfigChange(change))).toMatchObject({ apply: true })
   expect(events()).toHaveLength(2)
 })))
+
+packageIt.live("PostToolBatch groups native terminal calls before the next request and never replays old batches", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:stripe"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  for (const groups of Object.values(hooks.hooks) as { hooks: { command: string; args?: string[] }[] }[][]) for (const group of groups) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();if(input.hook_event_name==='PostToolBatch'){fs.appendFileSync('batch-hook-events.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PostToolBatch',additionalContext:'BATCH_CONTEXT_BEFORE_REQUEST'}}))}"]
+  }
+  const sample = yield* invocationSample("claude:stripe", { "hooks/hooks.json": JSON.stringify(hooks) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  writeFileSync(join(location.directory, "batch-input.txt"), "batch fixture")
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Terminal batch", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const { LLMEvent } = yield* Effect.promise(() => import("../../ai/src/schema/events"))
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCalls(LLMEvent.toolCall({ id: "batch_read", name: "read", input: { path: "batch-input.txt" } }), LLMEvent.toolCall({ id: "batch_invalid_write", name: "write", input: { path: "invalid-batch.ts" } })), TestLLM.text("Batch done", "batch-done"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Read and attempt invalid write" })
+  yield* sessions.wait(session.id)
+  const events = () => readFileSync(join(location.directory, "batch-hook-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(events()).toHaveLength(1)
+  const calls = events()[0].tool_calls
+  expect(calls.map((call: { tool_use_id: string }) => call.tool_use_id)).toEqual(["batch_read", "batch_invalid_write"])
+  expect(calls[0]).toMatchObject({ tool_name: "Read", tool_input: { file_path: join(location.directory, "batch-input.txt") }, is_error: false })
+  expect(calls[1]).toMatchObject({ tool_name: "Write", is_error: true, is_interrupt: false })
+  expect(calls[1].error).toContain("content")
+  const history = yield* sessions.context(session.id)
+  const assistant = history.find(message => message.type === "assistant" && message.content.some(part => part.type === "tool" && part.id === "batch_read"))!
+  expect(events()[0].assistant_message_id).toBe(assistant.id)
+  const requests = yield* llm.requests()
+  expect(JSON.stringify(requests[0])).not.toContain("BATCH_CONTEXT_BEFORE_REQUEST")
+  expect(JSON.stringify(requests[1])).toContain("BATCH_CONTEXT_BEFORE_REQUEST")
+  yield* llm.push(TestLLM.text("Next turn", "batch-next"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Finish without tools" })
+  yield* sessions.wait(session.id)
+  expect(events()).toHaveLength(1)
+})))

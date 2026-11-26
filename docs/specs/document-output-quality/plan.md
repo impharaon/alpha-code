@@ -666,3 +666,42 @@ A1/A10 消费者同步：原 mac FileSet 用例消费 global+mac，真实 asar f
 计数工具范围缺口：依授权对四个实际变更条数的登记行创建临时 scoped view，执行原 bash scripts/assert-gate-files.sh --update；四个文件均绿（12/19/26/55），但脚本 :312 硬性要求至少 25 个文件，exit 1，all-or-nothing 未写回。finally 已恢复原登记簿全部字节。不扩跑 21 个无关文件，也不改冻结脚本/阈值；需要 gate 拥有者提供已有 scoped-update 入口或授权机械 count 同步。core 行另有禁止本轮跑的时序/容量用例（:265 等），新 trusted Python case 已具名通过，不假造全文件 25 PASS。
 
 release-source 消费者 green：保留六个 release/架构顺序断言，复制真实资源模块并用 Linux 代表不适用平台，原文件 14 PASS（release-consumer-green.log）；UI 其余 17 文件的 264 项此前均绿，当前 18 文件合计 278 项有独立通过证据，没有扩跑无关文件来凑 gate 最低数。UI typecheck 再次 exit 0（ui-mac-types-final.log）。
+
+### r11 返回核对
+
+已核 Codex / GPT-6。各 finding 的 red → green 提交如下；同一文件的 PASS 数只列最终行为证据，不累计中途重复执行。原断言除经实物推翻的 Writer 推断外未放宽；A8 是当前已有行为的新增补证。红臂就是修正前实际失败的命名用例/一次性核对，不把语法错误、错误模板路径或未命中 spy 作为有效 red。
+
+| 项 | red 提交 → 实现/补证提交 | 当前证据 |
+| --- | --- | --- |
+| A1 | fcac66b6e1 → 4f91e7fa5f | resources 14 PASS；真实完整 copier 593 份 + afterPack PASS |
+| A2 | 10a6bdd0e5 → 49b9ff5cfd | fonts 4 PASS；固定 LO 源码证明 Calc 1 / Writer 2 = never |
+| A3 | 1676f656d9 → d217ecc97c | runtime 20 PASS；retry 仅 failed；#1760 action 接线待实现拥有者 |
+| A4 | 952d04a8f9 → 712fa5ff00 | runtime：提取失败/验证失败/取消三红臂转绿 |
+| A5 | 31b7f32e05、85a43b5974 → 6570d922c9 | 以实际命中 rename 的第二探针为有效 red；marker-before-rename 绿 |
+| A6 | ce95f64368 → 73d6522ab3 | util 8 PASS + typecheck 0；联合按现权威同步 |
+| A7 | 0ec245f900 → 5d77da831e | 四份真实字体 nameID 0 对 NOTICE 4/4 PASS |
+| A8 | 75772d661d | 重启 extract=0 / verify=1，原实现已绿 |
+| A9 | bd74623058、ebd2340c51 → 3d622c1225、cd5246cca6、dd870ec76d | 缺 pin failed、坏发布目录重提取一次、渲染不重写 Win 字体已绿；共享 cache 与冻结 §4.10/R13 冲突待裁定 |
+| A10 | 895302766c → cfc8e1fab6 | 双目标 FileSets；Windows workflow 仅固定 uv step；40 项架构用例与 14 项 release fixture 消费者已绿 |
+| B1 | fb9342317c → 26da0188c3 | host 9 PASS，真实 runtime 的启动/Location 订阅补查触发 |
+| B2 | d56d6f6c25 → 0b2d3433e2 | Excel 15 PASS；唯一一次真实 LO 样本证明三个规范化前提 |
+| B3 | 82a1f2b723 → 2c02a31eb4 | plugin-host 55 PASS；投影错误不降级整份 MCP 合并 |
+| B4 | f617347371 → a1cdcab088 | document-tool 3 PASS；失败/超时释放 active |
+| B5 | b7e4b2c8cd → 91c27a6c53 | document-check 4 PASS；合法实际路径别名通过，错误报告守卫保留 |
+| B6 | 748d2c3fe2 → 87858f435f | Excel 模块绿；真实 vendor 入口丢锚点必须红；161 份重生字节不变 |
+| B7 | 3d4b87058f、edc927a42e、c91e99c5c1 → 3d3e2168ac、83e9b40e44、d3fb3761cf | 权限/SIGTERM 两臂、游标一臂、计算失败回执/坏回执/进程异常三臂均由 red 转绿；Excel 15 / stdio 12 / render 9 PASS |
+| B8 | 240cb65861 → a0a0cfa0e0 | 普通 Python 投影不启动 LO，首次文档需要才 query |
+
+同调用链消费者同步提交：96ee204d73 → 3a1b276cc7（真实配置的架构/asar/平台断言）；df12fbfb45 → 53ecb58dfb（真实 release 临时包依赖）。二者未新增/删除用例，仅更换已被本次行为替代的全局资源与 Windows 免检假设。Win 资源已有真实 afterPack 正反两臂，原原生资源/发行检查全部保留。
+
+最终相关命令及去重统计：`ui-related-final.log` 的 18 文件 272 PASS/6 FAIL 后，仅修上述 release fixture，`bun test src/main/release-source.test.ts` 14 PASS（其中先前绿的 8 条不重复计），故这 18 文件当前 278 个唯一用例通过。`bash scripts/assert-gate-files.sh --update` 的 scoped view 真实测得 Office stdio 12、hygiene 19、factory 26、plugin-host 55 PASS；脚本自身因 <25 文件退出，未写回。UI 当前合计 **335** 唯一 PASS。ext 的 `bun test src/document-render.test.ts src/document-tool.test.ts src/document-check.test.ts src/hub-bridge.test.ts -t 'document|Excel|formula|PDF|report|artifact|render|mismatch|pending'` 17 PASS，加 plugin-host 55 为 **72**；该过滤保留相关 runtime bridge 两项，不运行其它 bridge 计时用例。util `bun test src/codepuppy-document.test.ts` **8 PASS**；core 仅 `bun test test/codepuppy-mcp-runtime.test.ts -t 'Office declarations bind|the command main writes|the real server.py'` **3 PASS**。本轮最终具名集合共 **418 个唯一用例 PASS**，不把 FontTools 一次性 4/4、LO 样本和中途重复计入。命令中无 gate run、bin/check、全层/全套或计时/容量变体。
+
+ui-mac/ext/util/core 包目录各自 `bun typecheck` exit 0，UI 在两个 fixture 消费者同步后再次 exit 0；无新依赖或 public engine API。新增 29 个测试变体均在既有 integration 文件（类型回归同时由 util typecheck 约束），依赖可经实际 import、字面 fixture/script 路径追踪，不引入“每个 PR 都全跑”的新 gate 入口。改变的既有测试文件共 13：ui 的 document-resources、document-runtime-fonts、document-runtime、document-host、office-excel、office-mcp、mac-target-arch、release-source；ext 的 document-check、document-render、document-tool、plugin-host；util 的 codepuppy-document。原文件名各在原包路径，不新增 ticket 测试文件。
+
+文档影响仍为本节实现/验证记录，16 个相对链接 PASS；派生 alpha worktree profile 的 docs contract 本 plan findings=0，全仓既有 69 errors/253 warnings 不扩修。`affected-tests --list` exit 2：旧基线缺 `.gate-tests`，无 PR scope line（affected.scope）。`git diff --check` 绿，hooksPath 为 `.githooks`。实际约 36 分钟（始 11:15:48 UTC），低于预计 90 分钟，没有额外 LO 复跑、上传/发布/部署、push/PR/merge；所有本轮前台命令已结束。
+
+返回 **PARTIAL** 的三个具体去向：A3 runtime.retry 已完成，生产 connectorLaunch.retry 实现尚不在本分支，交 #1760 拥有者接线（不是新增 DocumentHost 方法）；A9 共享 cache 需设计拥有者同步冻结 §4.10/R13 的 per-job cache 文字/契约，当前不私改；gate count 同步需工具拥有者允许 scoped update（或授权按以上实测值机械同步四行），不得以扩大到至少 25 文件或禁跑的 core 时序/容量测试兜底。core 唯一新增 trusted-Python case 已具名绿，静态计数 24→25 的整文件证据留夜间/获准范围。本次 scripts/gate-files.tsv 全字节未变，未伪造自动写回成功。
+
+其它已接受外依赖去向仍为 #1760 集成、own-release/relay、Windows 实机与 slice 8；slice 8 AC-13 明确带 `<link rel=preconnect>` 的出网材料。本轮不修改隔离设计或为之增加用户限制。无新 OPTIONAL；未发现需扩修的无关缺陷。
+
+计数行新增用例出处（供获准 scoped 写回时逐项核对）：factory-skills 的 dev/packaged `resources retain discovery, licences and the pinned inventory` 两变体来自片 1 的真实装载/许可证明，片 7 删除原 writer 制作承诺的旧用例，净 25→26；hygiene 24→19 全为片 7 删除原 writer schema/制作能力的五条过期检查，没有削弱七技能/许可的发现证明。plugin-host 52→55 分别是片 5 `shell uses only its Location's document projection and removes inherited host keys`、片 6 `document ready admission uses the real promise plugin Session API and exact queued synthetic retry`、本轮 B3 `an unavailable document projection cannot invalidate a successfully merged MCP ownership`。Office stdio 按片 7 换为真实 reader 样本、移除 writer 旧用例，并保留未广告/不可调用负臂；片 5 的 `Excel stdio reads calculated values/error locations and delegates typed objects without a required describe step`、本轮 B7 的 `read_xlsx resumes the cursor sheet when the next request omits sheet` 均实际执行，当前 12。core 唯一新增为片 5 `Office declarations bind the exact trusted Python environment`（本轮具名 1 PASS）；无其它新增用例来源被计数掩盖。受阻的登记写回不把上述实测改说成脚本成功。

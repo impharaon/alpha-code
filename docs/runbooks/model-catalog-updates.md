@@ -42,7 +42,7 @@ review_after: 2027-02-23
 1. **改 `src/models.config.json`**(模型名只在这里和两份台账里出现):
    - `models.<id>`:`minPlan`(`free` / `member`)、`enabled`、`display`(`name`、`brand`、可选 `reasoning` / `web` / `variants`)、
      `routes[]`(顺序即优先级:原生在前、OpenRouter 兜底)。`brand` 是自由字符串(小写字母、数字、连字符,1 至 64 个字符):
-     平台清单出现新厂商只是改配置,不用发 App;0.2.8 及更早的 App 遇到旧七家以外的厂商会整份拒绝清单,
+     平台清单出现新厂商只是改配置,不用发 App(前提是这一行的 route 仍用已有的 `provider`,如 OpenRouter;目录契约里每行的 `provider` 是封闭枚举 `deepseek` / `openai` / `openrouter` / `anthropic` / `zhipu` / `alibaba`,新增直连 provider 要改契约);0.2.8 及更早的 App 遇到旧七家以外的厂商会整份拒绝清单,
      所以含新厂商的清单要等 0.2.9 发布之后才上线。
    - 每条 route:`provider`、`upstreamModel`、`baseURL`、`wire`、`pricing`(`inUsdPerMtok` / `outUsdPerMtok`,可选
      `cacheReadUsdPerMtok`)、`maxOutputTokens`、`contextWindowTokens`、`capabilityProvenance`(`source`、`asOf`、`reviewAfter`、
@@ -69,7 +69,7 @@ review_after: 2027-02-23
      60 天内到期的,同一次更新里一起续(按第 3 步的同一套核验)。
    - **价格漂移**:部署闸会拿 OpenRouter 实时目录交叉核验。测价到部署之间价格会动:漂的 OpenRouter 行按第 3 步重新核;直连腿的分歧要 owner 原话。
 7. **推送**:只改 `.gate-light` 圈定的文件(上面的配置、两份台账、生成夹具、`docs/verification/**`、`*.md`)时 `gate` 跑 `bin/check-light`,
-   不跑全量门;它对配置改动会跑全量门的每一步外加「零未裁决分歧」。
+   不跑全量门;对只改配置的推送,它跑一次 PR 门 `bin/check`(静态检查、改动触达的 fast 与 integration 测试、输出上限、route 各腿)外加 `bin/verify-openrouter-capability`;scenario 测试只在夜间跑。
 8. **部署**:顺序与命令按 alpha-platform `docs/runbooks/deploy.md`(账户服务先,再网关,再其他 Worker),
    用 `npm run deploy:worker -- --config <wrangler 配置> --message "git:$sha"`,**不要**直接 `wrangler deploy`(前置闸不会跑)。
    `roles` 会被打进非网关 Worker,所以角色变了就要把这些 Worker 都按序重部署。
@@ -127,7 +127,7 @@ review_after: 2027-02-23
 1. 新 BYOK 供应商(新端点 / Key 名 / 协议适配器):加进 `packages/ui-mac/src/main/byok-adapters.ts`(`{ id, compat, baseURL, keyEnv, pico }`),
    同时在 B 发布它的模型。只发目录不发 App,旧 App 会跳过这个 provider。
 2. 新的推理选项键或新的请求协议(超出 `reasoningEffort | reasoning | thinking`、`openai | anthropic` 适配器)。
-3. 新厂商要显示专属图标(`model-picker-core.ts` 的 `BRAND_ICONS` 要加一行,图形取现有图标集已有的)。厂商本身不需要发 App:
+3. 新厂商要显示专属图标(`model-picker-core.ts` 的 `BRAND_ICONS` 要加一行,图形取现有图标集已有的)。厂商本身不需要发 App(前提同 A:route 仍用已有的 `provider`;新增直连 provider 要改契约):
    0.2.9 起表外厂商回落为通用图形;0.2.8 及更早的 App 则整份拒绝含旧七家以外厂商的清单。
 4. 目录 schema 主版本变化(V3→V4、byok v1→v2)。
 5. 平台模型需要客户端新能力(例如看图要开平台聊天入口的图片通道)。

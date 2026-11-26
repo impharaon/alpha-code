@@ -804,3 +804,48 @@ A5 原私有整轨入口在不跑真实模型/容量的约束内没有先行 2 G
 `affected-tests --list` exit 2：本基线仍缺 `.gate-tests`，**无 scope line**；保持 gate 冻结，交 gate owner。#1760 真身份/准备/ready path 与 A8 异步 duration → 原依赖集成；Windows 实机、长视频/真实模型评分与收费结算场景 → orchestrator 的既有验收；本轮不套用本机小样本结果。A4 增加本地 AV1 decoder → 原 designer/编排器，按 r9 明确排除；未增加产品限制。无新增其它 ARCH/OPTIONAL 工作。
 
 本次 canonical docs-contract 核对仍为既有 **69 errors / 253 warnings**，本 plan **0 finding**；未顺修文档基线。`affected-tests --list` 的原输出为 `affected-tests: [Errno 2] No such file or directory: <worktree>/.gate-tests`，未运行 gate。所有前台命令已结束；提交仅在分配的分支，未推送。
+
+## D6 AV1 本机解码
+
+- 依据：规格 v1 AC-06/12/16/17/18；`impharaon/alpha-work:docs/specs/video-understanding/design.md` §4.2、§6、§10 V-d @ `e1a5106f6802600cf802f09fda7181f2a86c8081`（alpha-work#254）；alpha-code#1775 r13。沿既有 source/info/frames/clip 路径消费新组件。
+- 核对：r13 明确授权本节 PLAN 后同轮 IMPLEMENT，无额外设计选择；首个实现提交填入本节计划提交。未有独立计划审查收据，不代写通过记录。
+
+### 改动
+
+| 文件（相对本仓） | 改什么 |
+| --- | --- |
+| `packages/ui-mac/resources/video-runtime/build.lock.json` | 固定 dav1d 1.5.3 源归档的来源、长度、SHA256；固定其必需的 Meson/Ninja/NASM 构建工具源输入。不修改应用依赖或模型版本 |
+| `packages/ui-mac/scripts/build-video-components.ts` | 用既有源码验证器/工具链构建两平台静态 dav1d 并链接 FFmpeg；源代码资产、SOURCE.json、BUILD.sh 带对应源与可重放命令；输出版本独立的两平台 codec/source 归档及 pin，不上传 |
+| `packages/ui-mac/resources/pinned-files.json`、`resources/video-mcp/asset-recipes.ts` | 用实物输出更新两个 ffmpeg pin；配方消费 pin 身份并要求 dav1d 许可，保持原 pinned-file/launcher 准备接缝 |
+| `packages/ui-mac/resources/video-runtime/licenses/dav1d.txt`（新）、`licenses.json`、`resources/NOTICE.txt` | 从固定源归档留存 BSD-2-Clause 全文和署名，更新应用 AC-18 清单及组件内许可 |
+| `packages/ui-mac/resources/office-mcp/tools.json`、既有 `scripts/gen-office-mcp-tools.ts` / `build-video-mcp.ts` 输出链 | 用原生成器同步配方、源码和随包材料摘要，不手改生成摘要；不为 codec 变化重建其它模型引擎 |
+| `packages/ui-mac/src/main/video-assets.fast.test.ts`、`video-assets.test.ts`、`video-runtime-artifacts.test.ts`、`office-mcp-tools-snapshot.test.ts` | 在既有用例中更新/补充两目标 pin、许可与配方要求；保持原 downloader、取消和 manifest 校验。只运行直接相关文件 |
+| `scripts/old-name-exceptions.tsv`、`scripts/gate-files.tsv`（仅实测需要时） | 同步新的正式资产 URL/源 URL 及既有用例精确计数，使用既有扫描器/登记生成脚本，不放宽规则 |
+
+### 顺序
+
+1. 仅提交本节计划。到固定公开源下载 dav1d 与构建工具到临时目录，核对 release 的 SHA256（有发布校验值则逐字比对）并读取原许可。
+2. 扩展既有组件构建，固定工具输入；Meson 只生成静态库，不生成测试/播放器；Darwin 使用现有最低目标，Windows 使用原 llvm-mingw 工具链及 NASM。两平台每次最多两个编译 worker。更新许可，并在原 fast 用例验证许可/配方闭包；先迭代具名用例。
+3. 在临时目录分别生成 darwin-arm64、win32-x64 codec 与对应源材料。以实际 archive 的 bytes/SHA256 更新 pin；同步 source asset 名与 SOURCE.json/BUILD.sh。不发布或联系 relay。
+4. 用可用编码器将本仓已有真实视频转换为小 AV1 MP4；记录原样本来源/哈希、编码器/参数、产物 SHA256。经新 Mac 组件跑 mediaInfo、时间点帧、scene 帧及 clip（输出可解码、时长），记录 `-decoders` 的 libdav1d。用不含 libdav1d 的原 pinned FFmpeg 作移除对照，沿原工具错误出口确认 `format_unsupported`。Windows 交叉产物检查 PE、链接依赖和许可证；无 Windows 执行环境时明确实机未测。
+5. 用原生成器同步 video bundle 与 Office/video 声明。端到端小样本及 native 构建是一次性证据（命令/输出/资产），不塞进 PR 测试。相关文件完整跑一次，再跑一次被导出/枚举变化直接影响的集合、ui-mac `bun typecheck`、`affected-tests --list`；仅复核改动相关的登记行。更新本节实物结果和发布清单后提交。
+
+### 风险
+
+- 本机缺 Meson/Ninja/NASM：工具源码同样经构建锁校验并只展开在临时构建根，不依赖机器上的未锁版本，不增加产品安装步骤。
+- Windows 构建成功不能证明 Windows 系统播放成功；分别报告交叉产物检查和实际执行证据，不能以 Mac 结果代替 AC-17 的 Windows 验收。
+- codec 更换使 frames/media 缓存按既有 pin 身份失效；不改变 transcript 的 speech 身份轴，不迁移旧缓存。
+- 资产首次构建估计 30–60 分钟（不含共享 gate 队列）；两平台归档、源材料及许可需要编排器发布后原 pinned-file 准备链才能下载。AC-15 的 400 MB 算术按实物复核。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-06/12/16 | 真实 AV1 小样本经新组件的 info、时间点帧、scene、clip；无 dav1d 原组件的移除对照；`-decoders` 输出 | 一次性，构建后本机命令/输出，不新增真实构建的常驻 PR 用例 | 移除软件解码器时解码返回 ENOSYS/不支持格式，帧/clip 无法产生有效输出 |
+| AC-15/17 | `video-assets.fast.test.ts` 两平台 pin 唯一、必需文件及完整首用下载量；交叉产物 PE/依赖检查 | fast：受影响 PR/夜间；实际构建/架构检查一次性，Windows 系统播放待实机 | 错目标/漏许可/超过已批准下载量直接失败；Mach-O 不能冒充 PE |
+| AC-18 | `video-runtime-artifacts.test.ts` 全许可目录摘要核验；dav1d 许可目录/编译配置/源码资产实际检查；NOTICE/清单检查 | integration：受影响 PR/夜间；产物检查一次性 | 删除许可或许可不完整时 inventory 失败；固定源的全文与署名缺失可从资产检查指出 |
+| AC-01/14 的既有准备链不退化 | `video-assets.test.ts`、`office-mcp-tools-snapshot.test.ts` | integration：受影响 PR/夜间，静态导入和字面路径可被 selector 跟踪 | 新 pin/配方漏同步时声明或实际准备 ids 不一致；不新增启动下载或云识图路径 |
+
+### 偏离记录
+
+暂无。真实构建/AV1 解码证据和资产发布清单在完成时补入本节；发布由编排器执行。

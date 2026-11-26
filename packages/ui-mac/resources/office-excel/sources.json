@@ -5,7 +5,8 @@
   "adaptations": [
     "Selected operation/schema and static dependency closure; no MCP/HTTP/CSV/VBA entrypoints",
     "Removed non-format file/cell/text/pivot-field quotas rather than increasing caps",
-    "Current-edit formula results and save hook supplied by OfficeExcel; source-hash guard before atomic save"
+    "Current-edit formula results and save hook supplied by OfficeExcel; source-hash guard before atomic save",
+    "Resolve relationship prefixes from local sheet xmlns declarations in package/scan.py"
   ],
   "files": [
     {

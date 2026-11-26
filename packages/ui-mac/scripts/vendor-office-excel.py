@@ -20,6 +20,11 @@ ROOTS = ['workspace', 'operations.pivot_rebuild', 'operations.sorting', 'operati
 HEADER = '# Adapted for Code Puppy, 2026-11-26, from excel-mcp-server 2.3.2 (MIT).\n'
 
 
+def replace_source(text, anchor, replacement):
+    assert text.count(anchor) == 1, 'missing or ambiguous adaptation anchor: ' + anchor
+    return text.replace(anchor, replacement)
+
+
 def module_path(name, names):
     base = name.replace('.', '/')
     return next((p for p in [base + '.py', base + '/__init__.py'] if p in names), None)
@@ -131,14 +136,14 @@ def main(wheel):
             ast.fix_missing_locations(tree)
             text = ast.unparse(tree)
             if path == 'excel_mcp/workspace.py':
-                text = text.replace('budget = CellBudget(self.limits.max_loaded_cells)', 'from codepuppy_office.excel import file_digest, begin_edit, prepare_save\n            original = file_digest(path)\n            budget = CellBudget(self.limits.max_loaded_cells)')
-                text = text.replace('token = _edit_budget.set(budget)', 'begin_edit(workbook, path, original)\n            token = _edit_budget.set(budget)')
-                text = text.replace('save_atomically(workbook, path, self.limits.max_file_bytes, lazy)', 'prepare_save(workbook)\n                save_atomically(workbook, path, self.limits.max_file_bytes, lazy)\n                self._codepuppy_result = workbook._codepuppy_edit["result"]')
-                text = text.replace('write_atomically(path, content)', 'from codepuppy_office.excel import finish_edit\n    finish_edit(workbook, path, content)\n    write_atomically(path, content, workbook._codepuppy_edit["sourceSha256"])')
-                text = text.replace('def write_atomically(path: Path, content: bytes)', 'def write_atomically(path: Path, content: bytes, source_sha256: str)')
-                text = text.replace('temp_path.replace(path)', 'from codepuppy_office.excel import file_digest\n        if file_digest(path) != source_sha256: raise WorkbookError("source-changed: workbook changed before atomic save")\n        temp_path.replace(path)')
+                text = replace_source(text, 'budget = CellBudget(self.limits.max_loaded_cells)', 'from codepuppy_office.excel import file_digest, begin_edit, prepare_save\n            original = file_digest(path)\n            budget = CellBudget(self.limits.max_loaded_cells)')
+                text = replace_source(text, 'token = _edit_budget.set(budget)', 'begin_edit(workbook, path, original)\n            token = _edit_budget.set(budget)')
+                text = replace_source(text, 'save_atomically(workbook, path, self.limits.max_file_bytes, lazy)', 'prepare_save(workbook)\n                save_atomically(workbook, path, self.limits.max_file_bytes, lazy)\n                self._codepuppy_result = workbook._codepuppy_edit["result"]')
+                text = replace_source(text, 'write_atomically(path, content)', 'from codepuppy_office.excel import finish_edit\n    finish_edit(workbook, path, content)\n    write_atomically(path, content, workbook._codepuppy_edit["sourceSha256"])')
+                text = replace_source(text, 'def write_atomically(path: Path, content: bytes)', 'def write_atomically(path: Path, content: bytes, source_sha256: str)')
+                text = replace_source(text, 'temp_path.replace(path)', 'from codepuppy_office.excel import file_digest\n        if file_digest(path) != source_sha256: raise WorkbookError("source-changed: workbook changed before atomic save")\n        temp_path.replace(path)')
             if path == 'excel_mcp/package/scan.py':
-                text = text.replace("prefix = next((p for p, uri in document.namespaces.items() if uri == REL_NS), None)", "scope = {**document.namespaces, **{key[6:]: value for key, value in values.items() if key.startswith('xmlns:')}}\n    prefix = next((p for p, uri in scope.items() if uri == REL_NS), None)")
+                text = replace_source(text, "prefix = next((p for p, uri in document.namespaces.items() if uri == REL_NS), None)", "scope = {**document.namespaces, **{key[6:]: value for key, value in values.items() if key.startswith('xmlns:')}}\n    prefix = next((p for p, uri in scope.items() if uri == REL_NS), None)")
             ast.parse(text)
             adapted = (HEADER + text + '\n').encode()
             target = output / path
@@ -154,7 +159,7 @@ def main(wheel):
             records.append({'path':path,'sourceSha256':hashlib.sha256(source).hexdigest(),'sha256':hashlib.sha256(source).hexdigest()})
         license_path = next(p for p in names if '.dist-info/' in p and p.endswith('/LICENSE'))
         (output/'LICENSE').write_bytes(archive.read(license_path))
-        (output/'sources.json').write_text(json.dumps({'version':'2.3.2','wheelSha256':SHA256,'upstream':'https://github.com/haris-musa/excel-mcp-server','adaptations':['Selected operation/schema and static dependency closure; no MCP/HTTP/CSV/VBA entrypoints','Removed non-format file/cell/text/pivot-field quotas rather than increasing caps','Current-edit formula results and save hook supplied by OfficeExcel; source-hash guard before atomic save'], 'files':sorted(records,key=lambda r:r['path'])},ensure_ascii=False,indent=2)+'\n')
+        (output/'sources.json').write_text(json.dumps({'version':'2.3.2','wheelSha256':SHA256,'upstream':'https://github.com/haris-musa/excel-mcp-server','adaptations':['Selected operation/schema and static dependency closure; no MCP/HTTP/CSV/VBA entrypoints','Removed non-format file/cell/text/pivot-field quotas rather than increasing caps','Current-edit formula results and save hook supplied by OfficeExcel; source-hash guard before atomic save','Resolve relationship prefixes from local sheet xmlns declarations in package/scan.py'], 'files':sorted(records,key=lambda r:r['path'])},ensure_ascii=False,indent=2)+'\n')
         print(f'{len(records)} selected Excel Python sources')
 
 if __name__ == '__main__': main(Path(sys.argv[1]))

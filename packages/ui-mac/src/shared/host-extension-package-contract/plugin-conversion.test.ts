@@ -456,8 +456,28 @@ test("standard hook sources retain command prompt scopes events and monitor trig
   expect(stripe.entries.find(entry => entry.kind === "hook" && entry.hook.event === "PostToolBatch")).toMatchObject({ hook: { type: "command", command: ["node"], args: [expect.any(Array)] } })
   const paypal = (await convert(await captureStandardFixture("claude:paypal"))).package
   expect(paypal.entries.find(entry => entry.kind === "hook")).toMatchObject({ hook: { type: "prompt", event: "PreToolUse", matcher: "Write|Edit", continueOnBlock: false } })
+  const security = (await convert(await captureStandardFixture("claude:claude-security"))).package
+  expect(security.entries.find(entry => entry.kind === "hook" && entry.hook.scope.kind === "skill")).toMatchObject({ sourcePath: "skills/threat-model/SKILL.md", hook: { type: "command", scope: { kind: "skill", entryId: "skill:skills/threat-model/SKILL.md" } } })
+  expect(new Set(security.entries.filter(entry => entry.kind === "hook").map(entry => entry.hook.order)).size).toBe(security.entries.filter(entry => entry.kind === "hook").length)
   const convex = (await convert(await captureStandardFixture("claude:convex"))).package
   expect(convex.entries.filter(entry => entry.kind === "monitor")).toHaveLength(5)
   expect(convex.entries.filter(entry => entry.kind === "monitor" && entry.when.kind === "skill" && entry.when.sourceName === "design")).toHaveLength(2)
   expect(convex.entries.filter(entry => entry.kind === "monitor" && entry.when.kind === "skill" && entry.when.sourceName === "quickstart")).toHaveLength(3)
+})
+
+test("monitor declarations merge portable and provider manifests by source name", async () => {
+  const source = await captureStandardFixture("claude:convex")
+  const manifest = JSON.parse(new TextDecoder().decode(await source.readFile(".claude-plugin/plugin.json")))
+  const monitors = JSON.parse(new TextDecoder().decode(await source.readFile("monitors/monitors.json")))
+  const { pluginText } = await import("./plugin-package")
+  // Controlled variants of the pinned Convex declarations: one conflicting name and one additional entry.
+  const portable = { ...manifest, experimental: { monitors: [{ ...monitors[0], command: "printf portable" }, { ...monitors[0], name: "portable-monitor" }] } }
+  const capture = await captureStandardFixture("claude:convex", { "plugin.json": JSON.stringify(portable) })
+  for (const ecosystem of ["claude", "codex"] as const) {
+    const converted = (await (await converter()).convertPluginTree({ ...capture, source: { ...capture.source, ecosystem } })).package
+    const entries = converted.entries.filter(entry => entry.kind === "monitor")
+    expect(entries).toHaveLength(6)
+    expect(entries.find(entry => entry.sourceName === "convex-runtime-errors")).toMatchObject({ command: ecosystem === "claude" ? pluginText(monitors[0].command) : ["printf portable"] })
+    expect(entries.find(entry => entry.sourceName === "portable-monitor")).toMatchObject({ sourcePath: "plugin.json" })
+  }
 })

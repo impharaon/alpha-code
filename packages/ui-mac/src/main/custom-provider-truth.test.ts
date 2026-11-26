@@ -95,10 +95,10 @@ describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可�
     }
   })
 
-  test("固定行的枚举是完备的:WRITABLE_ROOT_IDS 去掉 W1、X1 与按 R7 输入的 W20 = 手写的 9 个 id(+W3 的 XDG_STATE_HOME 形态仍是 W3)= 渲染出的 profile 里的 id 集合", () => {
+  test("固定行的枚举是完备的:WRITABLE_ROOT_IDS 去掉 W1、X1 与按 R7 输入的 W20/W21 = 手写的 9 个 id(+W3 的 XDG_STATE_HOME 形态仍是 W3)= 渲染出的 profile 里的 id 集合", () => {
     // W1 (start-time union) and X1 (runtime grant class, its own extension line outside the block) are runtime
     // membership, not fixed rows; X1 is registered so the write-site registry can name the probe's root W1+X1.
-    expect(Object.keys(WRITABLE_ROOT_IDS).filter((id) => id !== "W1" && id !== "X1" && id !== "W20").sort()).toEqual([...FIXED_ROW_IDS].sort())
+    expect(Object.keys(WRITABLE_ROOT_IDS).filter((id) => id !== "W1" && id !== "X1" && id !== "W20" && id !== "W21").sort()).toEqual([...FIXED_ROW_IDS].sort())
     for (const stateHome of [USER_DATA, `${HOME}/.local/state`]) {
       const ids = [...new Set(fileWriteRules(profileFor(DEFAULT_STATE_ROOT, "prod", { stateHome })).map((r) => r.id))]
       expect(ids.filter((id) => id !== "W1").sort(), `stateHome=${stateHome}`).toEqual([...FIXED_ROW_IDS].sort())

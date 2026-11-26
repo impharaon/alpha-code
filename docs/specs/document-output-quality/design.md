@@ -16,7 +16,7 @@ last_reviewed: 2026-11-26
 
 # DESIGN-document-output-quality｜助手文档与设计成品质量 技术设计
 
-本文按本次指令采纳独立审查 R1，修正后冻结；仅依赖 darwin-x64 启动器的条款按 §10 标为 pending-seam，其余不受阻。只决定契约、责任和取舍；不包含改动文件清单、实施步骤或测试清单。消费规格中的既有工具卡片与文件预览，不新增页面或绘制体验稿。
+本文采纳独立审查 R1，修正后冻结；按 §10 的 owner 平台范围澄清，仅覆盖 darwin-arm64 与 win32-x64，全部条款冻结。只决定契约、责任和取舍；不包含改动文件清单、实施步骤或测试清单。消费规格中的既有工具卡片与文件预览，不新增页面或绘制体验稿。
 
 ## 1. 基线
 
@@ -24,7 +24,7 @@ last_reviewed: 2026-11-26
 - 代码基线：`9f08c506d9842d319616c7e45c33d3b9c3279e48`。本文以下 main 路径简写相对 `packages/ui-mac/src/main/`，资源路径相对 `packages/ui-mac/resources/`。
 - 背景：协调仓 `docs/intents/discussions/INT-office.md`，读取版本 `86a58c7bbdaad8b7c689d1c9c2845e3ce16db2a9`，重点为 P-01、P-03、P-05、2026-11-25 三次试验及 U-12。本机原始证据根简称 `pilot/`：`~/.cache/alpha-orch/2026-11-25/office-pilot/`；它只定位证据，不是产品默认路径。
 - 固定下载机制：直接消费协调仓 `docs/specs/domestic-cloud-connectivity/design.md`「切片四」§4.11、§10 冻结回执，读取版本同上；继承 R1 `6b0e4c0` 的处置，不另定清单、镜像、续传或回退规则。
-- 启动器输入：#1760 的 `docs/specs/connector-launchers/design.md`，固定合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`（#1766），status=frozen，继承其 R1 处置。本文按要求执行 `git fetch -q origin && git show origin/alpha:docs/specs/connector-launchers/design.md`（exit 0），未合并 origin/alpha；消费其 §4.1..4.3、§4.5、§4.7。该版本 `:104` 的 platform 仍只有 darwin-arm64 / win32-x64，darwin-x64 请求留在 §8/§10；冻结是决定的状态，不是实现完成证明。
+- 启动器输入：#1760 的 `docs/specs/connector-launchers/design.md`，固定合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`（#1766），status=frozen，继承其 R1 处置。本文按要求执行 `git fetch -q origin && git show origin/alpha:docs/specs/connector-launchers/design.md`（exit 0），未合并 origin/alpha；消费其 §4.1..4.3、§4.5、§4.7。该版本 `:104` 的 platform 为 darwin-arm64 / win32-x64，与本设计范围一致；文档消费者的 bootstrap 读取面保留本次交接确认由启动器设计接受的 `DOC-NODE-v2`。冻结是决定的状态，不是实现完成证明。
 - AC-01..AC-03 的分数仍归规格及已授权的默认模型实测。本文不改变分数、不进行付费调用，也不以强模型试验成绩证明默认模型能力。
 - 文档影响为 feature decision；唯一落点是本文与必要的生成索引行。ADR-014 第 5 条的后续修订属于实现批准后的同项决定传播，本文不修改受保护规则资产。
 
@@ -35,12 +35,12 @@ last_reviewed: 2026-11-26
 | 编号 | 观察及证据 | 决定所依赖的结论 |
 | --- | --- | --- |
 | F-01 | `office-mcp/server.py:127-275,290-295` 暴露四对 reader/writer；`:348`、`:614`、`:658`、`:691` 的 writer 只覆盖基础结构；`:600-610` 用 `data_only=False` 读取 Excel。 | 不能靠扩充原四个 writer 的字段实现成熟生成；Excel 的 computed value 要单独补齐。 |
-| F-02 | `office-runtime/requirements.in:1-5` 已有 python-docx 1.2.0、openpyxl 3.1.5、python-pptx 1.0.2、pypdf 6.16.1、reportlab 5.0.0；`scripts/build-office-runtime.ts:21-22,38-57` 只构建 mac 两架构；`ext-mcp-policy.ts:66-72,86-94` 写死 `bin/python3`。 | Python 原有打包权威继续拥有文档库；Windows 解释器、轮子和路径是本票明确新增能力。不能宣称 Windows 现成可用。 |
+| F-02 | `office-runtime/requirements.in:1-5` 已有 python-docx 1.2.0、openpyxl 3.1.5、python-pptx 1.0.2、pypdf 6.16.1、reportlab 5.0.0；`scripts/build-office-runtime.ts:21-22,38-57` 仅提供 mac 构建；`ext-mcp-policy.ts:66-72,86-94` 写死 `bin/python3`。 | Python 原有打包权威继续拥有文档库；Windows 解释器、轮子和路径是本票明确新增能力。不能宣称 Windows 现成可用。 |
 | F-03 | `pilot/E-skills/repo` 的 HEAD 为 `e4bb5d960d87126ff3b3a8af1a104b7db67560ba`。docx/xlsx/pptx/pdf/frontend-design/canvas-design/theme-factory 各自 `LICENSE.txt:1-4` 为 Apache-2.0。[固定提交许可证](https://github.com/anthropics/skills/blob/e4bb5d960d87126ff3b3a8af1a104b7db67560ba/skills/docx/LICENSE.txt)。docx、xlsx、pptx 各带 `scripts/office/schemas/`，包括 ISO-IEC29500-4_2016、ecma、microsoft、mce 的外部 XSD，没有相应独立许可说明。 | 技能代码与标准定义必须分开判定；不能从目录的 Apache 许可证推定第三方标准的再分发权。 |
 | F-04 | 同提交 docx `SKILL.md:13-21,36-45,90-92` 采用 npm docx，假设预装、pandoc/Poppler；pptx `SKILL.md:13,155-160` 采用 PptxGenJS，字体建议偏向 Office 西文字体；xlsx `scripts/recalc.py:29,47-50,62-80,172-196` 依赖 PATH、宏和系统 timeout/gtimeout。 | 不能原封不动交给模型执行；保留制作知识，替换运行入口、渲染、重算和字体指导。 |
 | F-05 | `pilot/E-skills/node/package-lock.json` 钉 docx 9.16.0、pptxgenjs 4.0.1；真实 npm lock 带 integrity。canvas-fonts 有逐家 OFL 文本，但 IBM Plex Serif 文件没有同名许可文本；本文未逐个核清字体与许可的对应关系。 | 只带需要的 npm 闭包；上游字体包不整体搬入，中文字体另取有清晰来源的 OFL 字体。 |
 | F-06 | 继承试验：讨论记录 `:125-140,186-220`，Word/PPT 技能路径 10/10、11/11，Excel 一轮修改后满足样例；普通机器上的 LibreOffice 字体替代会逐字混用。`pilot/E-libreoffice/bin/soffice:4-6` 设 FONTCONFIG_FILE 和独立 UserInstallation；`fonts.conf:3-7` 指向 mac 系统字体与私有缓存。 | 这个字体配置证明“能找到系统字体”，没有证明稳定中文替代；本票补确定的中文字体与替代表。试验不等于 Windows 或产品正式包证明。 |
-| F-07 | pilot 的 LibreOffice `Contents/Info.plist:1975-1978` 为 26.8.3.1；本次 Python 文件遍历得展开文件总长 805,867,141 B（不重复计 symlink）。读取官方三份 `.mirrorlist` 的 size/SHA-256，命令 exit 0，结果见 §4.3。未下载二进制。 | 版本固定 26.8.3（内部构建 26.8.3.1）；规格约 300 MB/800 MB 是量级，Windows 下载约 376 MB，不能写成三平台都恰好 300 MB。 |
+| F-07 | pilot 的 LibreOffice `Contents/Info.plist:1975-1978` 为 26.8.3.1；本次 Python 文件遍历得展开文件总长 805,867,141 B（不重复计 symlink）。既有官方 `.mirrorlist` 元数据读取命令 exit 0，当前两个目标的 size/SHA-256 结果见 §4.3。未下载二进制。 | 版本固定 26.8.3（内部构建 26.8.3.1）；规格约 300 MB/800 MB 是量级，Windows 下载约 376 MB，不能把两个目标都写成恰好 300 MB。 |
 | F-08 | LibreOffice [启动参数](https://help.libreoffice.org/latest/en-US/text/shared/guide/start_parameters.html) 明确 headless、convert-to、UserInstallation 和 Windows `soffice.com`。固定 26.8.3.1 的 [Windows 字体实现](https://raw.githubusercontent.com/LibreOffice/core/libreoffice-26.8.3.1/vcl/win/gdi/salfont.cxx) `:903-936` 在进程中注册安装根 `share/fonts/truetype`。本机 ElementTree 读取 pilot `Contents/Resources/registry/main.xcd` 的 Substitution/FontReplacement 节点（exit 0），确认 Replacement、FontPairs、ReplaceFont、SubstituteFont、Always、OnScreenOnly 的真实键与类型。 | Windows 可用应用私有解包根的字体目录；不能拿 mac FONTCONFIG_FILE 当 Windows 字体发现机制。具体成品效果仍待 Windows 真包实证。 |
 | F-09 | `rail-preview-host.ts:351-378,463-508`、`html-preview-host.ts:214-250` 已有隔离 session、自定义协议、禁外网与导航；`src/office-preview/index.ts:47-94` 分别用 docx-preview/PPT viewer/spreadsheet viewer。 | 可复用隔离权威，但现有 Office 预览不等于 LibreOffice 自检。Chromium 的逐页/全页面导出端口尚不存在，须明确新增。 |
 | F-10 | `packages/core/src/tool/plugin/read.ts:258-267` 把图片作为 file content 交模型；`packages/ext/src/cloud-vision-hooks.ts:104,137-175,210-239` 为不能看图的模型登记 Read 图片、压缩、转写及按引用追问；能力取 modelFacts 的 capabilities.input，未知按不能看图处理。 | 模型逐页 Read 后走现有云识图；无需新视觉服务、模型白名单或渲染器上传。 |
@@ -53,7 +53,7 @@ last_reviewed: 2026-11-26
 | F-17 | 社区 2.3.2 的 sorting.py/replace.py/cells.py 无 pivot rebuild 调用；`operations/pivot_rebuild.py:56-92` 提供 can_rebuild/rebuild，后者只重建本实现创建且未被 Excel 重刷的透视表；现有调用来自 `slicer_pivot.py:23` 的导入及其切片器路径。 | 原稿“排序后自动更新透视”没有接缝，改为保存前显式调用，并对不可重建者如实诊断。 |
 | F-18 | `factory-skills.ts:124-133` 直接收嵌套 SKILL.md；目录 `codepuppy-catalog.json:999-1013` 已有 canvas-design。`packages/core/src/filesystem/codepuppy-project-watch.ts:16-47,62-64` 是 ADR-047 的项目 watcher 忽略表拥有者，尚无 .document-output。 | 适配技能采用独立 frontmatter name；工作目录写本地 gitignore 并消费同一个 watcher 忽略权威。 |
 
-外部包元数据补核：PyPI `pypdfium2/5.0.0/json`（本次 urllib 读取，exit 0）列出 mac arm64/x64、win_amd64 wheel；许可证为 BSD-3-Clause、Apache-2.0 及 dependency licenses。[Python API](https://pypdfium2.readthedocs.io/en/stable/python_api.html) 提供 PdfDocument、逐页 render。其实际随包加载尚未验证。所有本次探针只运行 Python/读元数据，没有启动桌面应用、Electron 或 LibreOffice。
+外部包元数据补核：PyPI `pypdfium2/5.0.0/json`（本次 urllib 读取，exit 0）列出本设计所需的 mac arm64、win_amd64 wheel；许可证为 BSD-3-Clause、Apache-2.0 及 dependency licenses。[Python API](https://pypdfium2.readthedocs.io/en/stable/python_api.html) 提供 PdfDocument、逐页 render。其实际随包加载尚未验证。所有本次探针只运行 Python/读元数据，没有启动桌面应用、Electron 或 LibreOffice。
 
 ## 4. 接口契约
 
@@ -123,12 +123,11 @@ HTML 默认产物是单文件 HTML：脚本、样式、图片和 OFL 字体子�
 | id（family 均为 libreoffice） | version / provenanceUrl 相对 `https://download.documentfoundation.org/libreoffice/stable/` | bytes / SHA-256 |
 | --- | --- | --- |
 | `libreoffice/darwin-arm64/26.8.3` | `26.8.3` / `26.8.3/mac/aarch64/LibreOffice_26.8.3_MacOS_aarch64.dmg` | `299927705` / `de943203795e5057785f65515063e2db5eb60b0bb6d8e2534fec59e5cc5fb988` |
-| `libreoffice/darwin-x64/26.8.3` | `26.8.3` / `26.8.3/mac/x86_64/LibreOffice_26.8.3_MacOS_x86-64.dmg` | `309939485` / `bb3c35d628780510915ad9e759d7ed898094d7985d01b2181bd1d4ecd94fd159` |
 | `libreoffice/win32-x64/26.8.3` | `26.8.3` / `26.8.3/win/x86_64/LibreOffice_26.8.3_Win_x86-64.msi` | `376311808` / `0e6918c273eabbdbbd800ee0dacbbf130a14c13c2e4cec861b06dd59e015bf94` |
 
-F-07 的读取命令用 urllib 读取三份 `provenanceUrl + ".mirrorlist"`，提取 Size 和 SHA-256；是官方元数据，不是本次下载验真的摘要。发布者核对副本 bytes/hash 后才提交可消费 entry。香港优先、失败后原地址从 byte 0 重取、同来源有效 part 的续传、取消、完整性/磁盘错误、缓存重验，全部沿用冻结机制。这里的“原地址”是自有 GitHub release 副本，不临时回 TDF。
+F-07 的既有 urllib 读取回执提供上述两份 `provenanceUrl + ".mirrorlist"` 的 Size 和 SHA-256；是官方元数据，不是本次下载验真的摘要。发布者核对副本 bytes/hash 后才提交可消费 entry。香港优先、失败后原地址从 byte 0 重取、同来源有效 part 的续传、取消、完整性/磁盘错误、缓存重验，全部沿用冻结机制。这里的“原地址”是自有 GitHub release 副本，不临时回 TDF。
 
-存储统一派生自 USER_DATA_LAYOUT：下载缓存沿 #1760 冻结契约为 `<userData>/pinned-files/<id>/<filename>`，同一宿主按 id 合并在途获取，不另改为按摘要合并；展开 runtime `<userData>/document-runtime/libreoffice/<target>/<version>/`；job profile、font cache、临时文件与检查记录在同一 document-runtime 下的独立子目录。安装资源只读。mac 下载约 300/310 MB，展开实测约 806 MB；Windows 下载约 376 MB、展开体积尚未测量，磁盘错误如实报告，不以约 800 MB 做人为容量闸。
+存储统一派生自 USER_DATA_LAYOUT：下载缓存沿 #1760 冻结契约为 `<userData>/pinned-files/<id>/<filename>`，同一宿主按 id 合并在途获取，不另改为按摘要合并；展开 runtime `<userData>/document-runtime/libreoffice/<target>/<version>/`；job profile、font cache、临时文件与检查记录在同一 document-runtime 下的独立子目录。安装资源只读。mac 下载约 300 MB，展开实测约 806 MB；Windows 下载约 376 MB、展开体积尚未测量，磁盘错误如实报告，不以约 800 MB 做人为容量闸。
 
 mac 用系统 hdiutil `attach -readonly -nobrowse -noautoopen -mountpoint <私有临时挂载点>`，复制原 LibreOffice.app 到临时展开根后卸载；不运行安装器、不写 /Applications、不改上游签名或去 quarantine。Windows 用随包 Python ctypes 调 `MsiOpenDatabaseW(MSIDBOPEN_READONLY)`、查询 Directory/Component/File/Media/_Streams、`MsiRecordReadStream` 取 CAB，再用 Cabinet API `FDICopy` 按 MSI 目录表还原到临时根；不执行安装序列、自定义 action、msiexec 或系统注册。Windows 的这个解包适配是明确新增端口，依据是 [Windows Installer 只读数据库](https://learn.microsoft.com/en-us/windows/win32/api/msiquery/nf-msiquery-msiopendatabasea)、[CAB 文件键](https://learn.microsoft.com/en-us/windows/win32/msi/cabinet-files)、[FDICopy](https://learn.microsoft.com/en-us/windows/win32/api/fdi/nf-fdi-fdicopy)；尚未在该 MSI 实物/Windows 上运行。二进制原字节保留，解包路径不越界；不得以需要管理员权限为解决办法。
 
@@ -427,12 +426,12 @@ K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、E
 
 | 产出方 / 负责 | 产出与 AC / 小节 | 消费契约 | 开工依赖 | 集成/验收依赖 |
 | --- | --- | --- | --- | --- |
-| #1760 的桌面启动器拥有者 | 随包 Node/npm、LauncherEnvironment、固定文件公共口与失败呈现；AC-09/15、§4.1/3/8 | #1766 合入 `173122a8e955f97d830fe53fccd3400d079d9488` 的冻结设计；国内固定文件机制 | 既有冻结输入；本文不修改它的环境权威 | darwin-arm64/win32-x64 消费其决定的 Node/公共端口，实际实现仍须交付。本设计请求把文档消费者纳入合法 bootstrap 读取面；mac x64 的 Node/platform 投影扩展由编排器回 #1760 设计处置，本文不带第二份 Node。仅此目标依赖标 pending-seam；Windows Office Python 归本票。 |
+| #1760 的桌面启动器拥有者 | 随包 Node/npm、LauncherEnvironment、固定文件公共口与失败呈现；AC-09/15、§4.1/3/8 | #1766 合入 `173122a8e955f97d830fe53fccd3400d079d9488` 的冻结设计；国内固定文件机制；本次交接确认的 `DOC-NODE-v2` | 既有冻结输入；本文不修改它的环境权威 | 保留 darwin-arm64/win32-x64 文档消费者的合法 bootstrap 读取面请求，由启动器设计以 DOC-NODE-v2 接受；消费其 Node/公共端口，不带第二份 Node。实际实现仍须交付，Windows Office Python 归本票。 |
 | 目录发布仓（alpha-web）的 catalog-src 生产者；桌面目录快照消费者 | 四条首方 Office 条目的 tools/描述；Excel 新版本 re-intake、artifactDigest 与对应独立锚点；§4.6/§4.8，AC-09/11/14 | Word/PPT/PDF tools 分别只有 read_docx/read_pptx/read_pdf；Excel 为 read_xlsx、excel_inspect、excel_edit、excel_objects、excel_recalculate。codepuppy_document 属 ext，不伪列为连接器工具；四条描述区分技能制作与连接器实际读/操作能力，去掉旧 writer 及其新建/改写承诺。Excel ID 唯一且 default-disabled 不变 | 本冻结契约即可并行准备目录源；实际 digest/intake 依赖本票新的 server.py 和选中源码/许可材料 | 生产者用实际新字节重新 intake，artifactDigest 沿既有 `bundledOfficeServerDigest` / aggregateFilesDigest 域计算，不能沿用旧摘要或虚构值；同步目录 guard 锚点后发布。桌面运行既有 sync-catalog-snapshot 生成字节快照与锁，不手编快照；同一消费版本的工具/说明/digest 与打包字节一致才完成集成。 |
-| 本票的发行资产生产者 | TDF 三份原字节副本、精确 pin 与源码/许可材料；AC-09/14、§4.3 | 冻结 PinnedFiles 与 §4.3 身份 | 本冻结设计、实际发行资产可取得；darwin-x64 的共享启动器集成仍待 seam | 先附加到已公开自有 release 且可取，再提交完整 originUrl；对应清单提交供入口消费。本文没有生产发布授权。 |
+| 本票的发行资产生产者 | TDF 两份原字节副本、精确 pin 与源码/许可材料；AC-09/14、§4.3 | 冻结 PinnedFiles 与 §4.3 身份 | 本冻结设计、实际发行资产可取得 | 先附加到已公开自有 release 且可取，再提交完整 originUrl；对应清单提交供入口消费。本文没有生产发布授权。 |
 | 国内固定文件入口拥有者 | 从桌面固定清单提交投影白名单；AC-09、§4.3 | 冻结切片四的清单快照/锁/relay 规则 | 已冻结共享设计与真实清单 | 香港入口部署匹配该快照；应用真实改道/续传/国内下载证据，不以读取 TDF 元数据代替。 |
 
-不向 #1760 请求文档专属下载器、另一套 preparing 或新包管理器。darwin-x64 是明确的共享输入请求，批准前不能把该目标写成已 ready；已具备的 mac arm64/Windows 设计不因等待这个接缝重开。
+不向 #1760 请求文档专属下载器、另一套 preparing 或新包管理器。两个目标的文档 bootstrap 读取面沿 DOC-NODE-v2 交接；这是已接受契约的实现依赖，不是设计待决项。
 
 目录工具/描述契约已冻结；新的 intake 摘要、目录发布、快照再生成是既有生产者的交付依赖，不是待决的产品取舍，也不把启用 Excel MCP 变成默认用户的前置步骤。本次仅提交设计，不代该仓写源、发布目录或修改桌面字节快照。
 
@@ -445,13 +444,13 @@ K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、E
 | 送审前裁决 | 依据与适用版本 |
 | --- | --- |
 | 七个固定 Anthropic 技能适配随包；排除全部外部标准 XSD、未逐文件核清的上游字体及非必要字体演示 | F-03..05；规格 v1 BR-01/11/14；不再沿用 ADR-014 的失效许可证判断 |
-| Python 文档环境沿现有锁补 Windows；Node 完全消费 #1760；文档 npm 库构建期锁定，运行期不安装 | F-02/04/05；BR-07/11/15；mac x64 输入请求归 §8 |
-| LO 26.8.3 三目标固定文件，首次使用后台准备；不带 OfficeCLI，不挡生成，ready 后原会话补查 | F-07/08/14；BR-07/08、U-12；共享切片四原样消费 |
+| Python 文档环境沿现有锁补 Windows；Node 完全消费 #1760；文档 npm 库构建期锁定，运行期不安装 | F-02/04/05；BR-07/11/15；两个目标的 DOC-NODE-v2 交接归 §8 |
+| LO 26.8.3 两目标固定文件，首次使用后台准备；不带 OfficeCLI，不挡生成，ready 后原会话补查 | F-07/08/14；BR-07/08、U-12；共享切片四原样消费 |
 | Office→LO PDF→PDFium；PDF直接PDFium；HTML/海报内置Chromium；两平台分别配置中文字体发现 | F-06/08/09；BR-04/06；Windows 实物行为尚未验证 |
 | 逐页检查、至多一轮修正，复核当前文件；不能看图的模型沿 Read+现有识图 | F-10；BR-03/13；不宣称默认模型质量数值已过 |
 | Excel 选中 12 个社区操作归三类工具，另加 LO 重算；原 ZIP 缓存合并，不让整本回存破坏对象 | F-11/12；BR-05/09；新增 R9..R11 是实现责任，不伪称现成功能 |
 | 原四 writer 从工具面移除，reader 保留，模板和源文件可直接继续编辑 | F-01、BR-01/10；无兼容分支、无新增用户限制 |
-| 所有能力都有合法符号或 R1..R12 的明确 raise；R1 修正后冻结，darwin-x64 启动器依赖除外 | §6 与本次“apply design review R1, then freeze”指令；pending-seam 精确范围见下文，不把未实现断言写成已证明 |
+| 所有能力都有合法符号或 R1..R12 的明确 raise；R1 修正及 owner 平台范围澄清后全部冻结 | §6、R1 指令与下文 owner 原话；无其它设计待决接缝，不把未实现断言写成已证明 |
 
 | 轮 / 审查版本与范围 | 审计方 | finding 及处置 | 改了什么 / 验证证据 | 没改的及去向 |
 | --- | --- | --- | --- | --- |
@@ -479,16 +478,23 @@ K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、E
 
 | 范围 | 状态与影响 | 所属交接 |
 | --- | --- | --- |
-| 除下一行外的 §1/§2、§4、§5、§6、§8、§9 及本文审查处置 | **frozen**。darwin-arm64/win32-x64 的决定可直接消费；darwin-x64 的 LO pin、字体/PDF/Chromium 等不依赖新 Node 入口的决定也不重开 | 实施者据此编写 plan.md；实际签名/Windows/目录发布/测量证据仍按本节留存 |
-| §4.1 的 darwin-x64 LauncherEnvironment.node 投影及依赖它的制作路径；§6 R1/R2 在该目标的部分；§8 启动器生产者行的 darwin-x64 端到端集成 | **pending-seam**。冻结版 #1760 仍未提供该 platform；只暂停这些依赖条款的实施交接，不能冒称 Intel 目标已 ready，不阻挡其它条款 | 编排器将既有请求回 #1760 设计处置，消费其明确新增 target/Node 资产入口后仅更新受影响条款；本票不带第二份 Node、不新增用户步骤 |
+| §1/§2、§4、§5、§6、§8、§9 及本文审查处置 | **frozen**。仅覆盖 darwin-arm64/win32-x64，全部决定可直接消费，无待决接缝 | 实施者据此编写 plan.md；DOC-NODE-v2 的实现、实际签名/Windows/目录发布/测量证据仍按本节留存 |
+
+### r2：owner 平台范围澄清
+
+owner 2026-11-26 原话（协调仓工程意图 engineering，U-09 / I-37，本次 brief 引用）：「就是我需要澄清，codepuppy 不发 intel 版本的mac 电脑的包，当前只发苹果芯片的mac，以及后续会发 windows 包。」
+
+据此，本设计只保留 darwin-arm64 与 win32-x64 的运行环境、LibreOffice pin、体积与交付责任，删除已不属于发行范围的目标及其启动器扩展请求。#1760 对两个目标的文档 bootstrap 读取面请求保留，按本次交接确认的 DOC-NODE-v2 接受契约消费；没有其它设计待决接缝，状态为完全 frozen。此次仅落实明确的平台范围，不重开 R1，不增加审查轮次或其它改动。
+
+r2 核对回执（Codex / GPT-6）：全文平台/pin/接缝扫查 exit 0，pin 仅上述两个目标，范围外目标说明仅保留在 owner 原话中；DOC-NODE-v2 与 R1 review 收据保留。旧名扫描 exit 0（10 pass）、本文相对链接检查 exit 0（2 links）、`git diff --check` exit 0，官方文档合同检查对本文 0 finding。索引原已为 frozen，无需修改；本次只提交本文。
 
 引用传播已在本文做一次接缝扫查：旧草稿启动器 SHA、按 sha256 派生的固定文件缓存、固定版本 ready 类型、脚本稳定等待、server 适配与 Location 路由决定均移除；对应当前形状在 §1/§4/§6/§8 一致。OFFICE_WRITE_TOOL 与旧 writer 只保留在“删除义务/事实证据”中，不再是有效消费端口。目录源新增的生产者依赖已落在 §8，未另创平行契约。
 
 传播取证范围只有本消费设计：Python 字面搜索旧启动器 SHA、原 server resume 函数名、原 Location 路由类名、固定版本 ready 类型及旧摘要缓存路径，五项各为 0；旧不可用错误名仅 1 处且在 R1-3 历史删除处置中。review 字段、R1-1..R1-10 覆盖及无新旧名词元断言均 exit 0；未修改其它生产者设计，必要输入已按 §8 交接。
 
-**R1 修正文档验证回执**：Codex / GPT-6 核对 review 字段、十项处置和 pending-seam 范围；`git fetch -q origin && git show origin/alpha:docs/specs/connector-launchers/design.md` exit 0，读取到 #1766 的冻结输入，未 merge/rebase。ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail），两份改动文档的 `check-doc-links.py` exit 0（426 links），`git diff --check` exit 0。官方 `check_repo(..., changed_since="origin/alpha")` 对本设计 0 finding，仓级仍为既有 71 errors / 250 warnings（索引/跨仓引用等），未顺带修整。仅更新生成器产出的本设计索引行状态为 frozen，不收其它索引漂移。未启动应用/窗口程序，未跑可选重算替代或付费实测。
+**R1 修正文档验证回执**：Codex / GPT-6 核对 review 字段、十项处置和冻结范围；`git fetch -q origin && git show origin/alpha:docs/specs/connector-launchers/design.md` exit 0，读取到 #1766 的冻结输入，未 merge/rebase。ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail），两份改动文档的 `check-doc-links.py` exit 0（426 links），`git diff --check` exit 0。官方 `check_repo(..., changed_since="origin/alpha")` 对本设计 0 finding，仓级仍为既有 71 errors / 250 warnings（索引/跨仓引用等），未顺带修整。仅更新生成器产出的本设计索引行状态为 frozen，不收其它索引漂移。未启动应用/窗口程序，未跑可选重算替代或付费实测。
 
-**待 owner 定**：无新增产品取舍或限制提案。ADR-014 第 5 条的准确修订仍按原保护资产流程交实施/调度方，本文未越权修改；darwin-x64 是明确的技术接缝请求，归上表，不能转成用户手装依赖。
+**待 owner 定**：无。平台范围已按上述 owner 原话明确，DOC-NODE-v2 是已接受契约的实现依赖。ADR-014 第 5 条的准确修订仍按原保护资产流程交实施/调度方，本文未越权修改。
 
 **仍为推断或未验证的断言**
 
@@ -501,4 +507,4 @@ K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、E
 | ADR-014 决策 5 与新规格冲突 | `.claude/rules/adrs/ADR-014-extension-hub.md:22` 仍写旧的禁止再分发和重量理由 | 精确修订受保护条款须随批准输入交实施；无相邻规则清理 |
 | 文档索引与既有引用不是全绿 | 修改索引前官方 `check_repo(..., changed_since="origin/alpha")` 为 69 errors/252 warnings；新设计无 finding。`docs/README.md:105` 所在生成块原已 stale；只加入生成器产生的本设计一行后为 71/250，其中 `:391`、`:448` 等两类既有跨仓意图引用因索引成为 changed file 从 warning 升为 error，仍非本设计新增引用 | 告知调度方的基线观察，不调查或修复其它文档；本次范围只含本文及必要索引行 |
 
-交接收据：依据为规格 v1、设计 `d07c5aa8a8` 的独立 R1 与 §1 的冻结输入更新；Codex / GPT-6 已核八项 finding 和两项附加指令均有对应契约、接缝及消费者，结论为**修正后冻结，唯上表为 pending-seam**。已定勿重开：技能主路、LO 渲染、不带 OfficeCLI、共享下载/启动器/视觉权威及本轮十项修正。下一步由实施者消费 frozen 条款写 plan.md，编排器处理 #1760 的 darwin-x64 接缝；遗留只有明确的实现/发布证据、默认模型测量与该接缝，无产品范围扩张。
+交接收据：依据为规格 v1、设计 `d07c5aa8a8` 的独立 R1、§1 的冻结输入更新与本轮 owner 平台澄清；Codex / GPT-6 已核八项 finding 和两项附加指令均有对应契约、接缝及消费者，平台仅为 darwin-arm64/win32-x64，结论为**全部冻结，无待决接缝**。已定勿重开：技能主路、LO 渲染、不带 OfficeCLI、共享下载/启动器/视觉权威及 R1 十项修正。下一步由实施者消费 frozen 条款写 plan.md，并按 DOC-NODE-v2 集成文档读取面；遗留只有明确的实现/发布证据与默认模型测量，无产品范围扩张。

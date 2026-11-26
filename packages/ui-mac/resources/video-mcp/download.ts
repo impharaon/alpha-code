@@ -17,35 +17,10 @@ export async function downloadVideo(url: string, runtime: VideoRuntime) {
   await mkdir(directory, { recursive: true })
   // Wheel locations are prepared by #1760; isolated Python imports only these
   // verified wheel paths, never user site-packages, configs or browser cookies.
-  const bootstrap =
-    "import runpy,sys;sys.path[:0]=sys.argv[1:3];sys.argv=sys.argv[3:];runpy.run_module('yt_dlp',run_name='__main__')"
   try {
     await runComponent(
       python.path,
-      [
-        "-I",
-        "-c",
-        bootstrap,
-        ytdlp.path,
-        ejs.path,
-        "yt-dlp",
-        "--ignore-config",
-        "--no-plugin-dirs",
-        "--no-remote-components",
-        "--no-js-runtimes",
-        "--js-runtimes",
-        `node:${node.path}`,
-        "--proxy",
-        runtime.egressProxy,
-        "--ffmpeg-location",
-        ffmpeg.path,
-        "--no-playlist",
-        "--no-progress",
-        "-o",
-        `${directory}/media.%(ext)s`,
-        "--",
-        url,
-      ],
+      videoDownloadArgs(url,{ytdlp:ytdlp.path,ejs:ejs.path,node:node.path,ffmpeg:ffmpeg.path,proxy:runtime.egressProxy,directory,cacheRoot:runtime.cacheRoot}),
       runtime,
     )
   } catch (error) {
@@ -69,4 +44,33 @@ export async function downloadVideo(url: string, runtime: VideoRuntime) {
     bytes: source.bytes,
     durationMs: info.durationMs,
   }
+}
+
+export function videoDownloadArgs(url:string,paths:{ytdlp:string;ejs:string;node:string;ffmpeg:string;proxy:string;directory:string;cacheRoot:string}){
+  const bootstrap =
+    "import runpy,sys;sys.path[:0]=sys.argv[1:3];sys.argv=sys.argv[3:];runpy.run_module('yt_dlp',run_name='__main__')"
+  return [
+        "-I",
+        "-c",
+        bootstrap,
+        paths.ytdlp,
+        paths.ejs,
+        "yt-dlp",
+        "--ignore-config",
+        "--no-plugin-dirs",
+        "--no-remote-components",
+        "--no-js-runtimes",
+        "--js-runtimes",
+        `node:${paths.node}`,
+        "--proxy",
+        paths.proxy,
+        "--ffmpeg-location",
+        paths.ffmpeg,
+        "--no-playlist",
+        "--no-progress",
+        "-o",
+        `${paths.directory}/media.%(ext)s`,
+        "--",
+        url,
+      ]
 }

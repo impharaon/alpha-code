@@ -375,11 +375,15 @@ export const CodePuppyExt: Plugin.Plugin = {
           // I-11(design v9 §4.4「收口」):受管全局 MCP 开不开只看允许集,排在所有配置文档之后。读不到 ⇒ 非云、非项目 MCP 全停。
           const allowSet = readPackageAllowSet(bootstrap.paths.globalRoot)
           const managed = new Set(allowSet?.mcp.map((entry) => entry.name))
+          const pluginMcp = new Set(allInstalledPluginPackages(bootstrap.paths.globalRoot).flatMap(installed =>
+            installed.description.entries.flatMap(entry => entry.kind === "mcp" ? [installed.hostNames[entry.id]!] : []),
+          ))
           for (const [name] of editor.list()) {
             if (name === bootstrap.cloudMcp?.name || projectMcp.has(name) || (allowSet && !managed.has(name))) continue
             const disabled = !managedMcpAllowedHere(name, allowSet, projectRootFor(directory)?.directory)
             editor.update(name, (config) => {
-              config.disabled = disabled
+              // Keep startup templates disabled; an enabled runtime override is already bound by main.
+              config.disabled = disabled || (pluginMcp.has(name) && config.disabled === true)
             })
           }
         } catch (cause) {

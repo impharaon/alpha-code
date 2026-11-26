@@ -943,3 +943,11 @@ B1/B2/B5 与 S-01 bind-only 已完成；片 5 尚需完成并给证据：调用/
 核对：IMPLEMENT，编排器 / Claude Opus 5.5 r10；spec v5 / design v3.1 @f313990 与 r9 已定裁决。2026-11-26 20:47 UTC+08:00 起，顺序 A1 → A2–A9 → B3/B4/B6/B7/B8 → 片 5 剩余运行验收；不重开已定 S-01/allow-set/SSE，不改 pin/vendor。本轮文档影响为运行证据，落同一 plan。
 
 A1 ready 调度：41790bff15 单独回归先红（包内 `bun test --max-concurrency 2 src/main/reload-coordinator.test.ts -t "each ready engine"`，0 pass / 1 fail，`/tmp/plugin-standard-r10-A1-ready-red.log`）。沿现有 applyPackageMcp 入口在每次 attach 请求最终账本投影的重新绑定，不创建 reload generation、不重载 Location、不增加另一绑定器；启动 projection 仍待指定 engine case 验证后修正。纯调度 fast case 在原文件、imports 可追踪，受影响 PR/nightly；原文件完整 12 pass / 0 fail（`/tmp/plugin-standard-r10-A1-ready-green.log`）；该文件不在 gate-files 精确条数表，未增加条数登记。A1 engine 用例已通过 `gate slot --` 排队，未绕过共享 engine 槽。
+
+
+A1 启动投影：真实 engine 红测（`gate slot -- bun test --max-concurrency 2 --timeout 180000 ./src/main/package-hub-lifecycle.engine.cases.ts -t "cold engine generations"`）0 pass / 1 fail，ready 前预期 disabled、实际 pending（`/tmp/plugin-standard-r10-A1-engine-red-boundary.log`）。命令初次漏 `./` 未进入 cases，随后夹具缺 server 发布的 DATA 根而停在安装，均不计为产品红测；夹具补同一发布函数后才得到上述行为红。真实固定 Grafana userConfig/环境声明只替换 Docker 为临时树 echo，原私有设置经真实 IPC 保存，主进程新协调器没有 install/reload 在途。
+
+main 的启动注入只对 pluginTree 所属 MCP 放原中和条目；ext 保留这种关闭，同时保留 main 后续 bound override 的 enabled 状态，不挡原连接器重连。ready 与成功重载继续用原 convergence，运行配置绑定不写回磁盘模板。此修正未增加 engine takeover/公开 DTO。必要同链 `engine-cases.test.ts` 的宿主精确条数 7→8、modules 当前运行边界同提交更新；engine case 的字面路径由原宿主选择，未扩大每 PR 全局声明。下一步完整 engine 文件经同一 gate slot 收口。
+
+
+A1 完整 engine 文件初次为 6 pass / 2 fail（`/tmp/plugin-standard-r10-A1-engine-green.log`）：新冷启动回归通过，两个原非插件包换代用例在 ready 的全包重收敛下失败。ready 的授权对象是 pluginTree，故现有 callback 增加私有 phase 域（engine-ready/reload），前者只选 pluginTree、后者仍按原 items/全包语义；不改变状态 writer 或公开协议。该同链 `ext-ipc.ts` 的选图条件是必要消费者，未给非插件包新增冷启动动作。

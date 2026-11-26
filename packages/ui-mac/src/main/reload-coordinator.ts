@@ -68,7 +68,7 @@ export function createReloadCoordinator(deps: {
   /** 任何会改变「待重载」原因的事件之后调用(hub-view 据此推 `ext-hub-view-changed`)。 */
   onChange: () => void
   restartConnectors?: () => Promise<boolean>
-  applyPackageMcp?: (items: readonly ReloadItem[]) => Promise<void>
+  applyPackageMcp?: (items: readonly ReloadItem[], phase: "engine-ready" | "reload") => Promise<void>
   now?: () => number
 }): ReloadCoordinator {
   const now = deps.now ?? Date.now
@@ -168,7 +168,7 @@ export function createReloadCoordinator(deps: {
           ` after ${record.reportedAt - record.requestedAt}ms`,
       )
       if (report.outcome === "reloaded") {
-        void deps.applyPackageMcp?.(record.items).catch(() => deps.log("reload: package connectors could not be reapplied"))
+        void deps.applyPackageMcp?.(record.items, "reload").catch(() => deps.log("reload: package connectors could not be reapplied"))
         for (const other of [...inFlight.values()])
           if (other.generation <= record.generation && coversScope(record.scope, other.scope)) inFlight.delete(other.generation)
       }
@@ -179,7 +179,7 @@ export function createReloadCoordinator(deps: {
       post = next
       detachedBecause = undefined
       // Runtime bindings belong to this engine generation, even when main has no pending install/reload.
-      void deps.applyPackageMcp?.([]).catch(() => deps.log("reload: package connectors could not be bound after engine ready"))
+      void deps.applyPackageMcp?.([], "engine-ready").catch(() => deps.log("reload: package connectors could not be bound after engine ready"))
       for (const record of [...inFlight.values()].sort((a, b) => a.generation - b.generation)) send(record)
       if (inFlight.size > 0) deps.log(`reload: engine ready — re-sent ${inFlight.size} pending generation(s)`)
       deps.onChange()

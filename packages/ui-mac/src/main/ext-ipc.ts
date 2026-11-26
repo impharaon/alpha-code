@@ -149,10 +149,11 @@ export function registerExtIpcHandlers(
   const convergeManagedMcp = createManagedMcpConvergence({ root: codepuppyGlobalRoot, awaitServer, directory: codepuppyUserWorkspaceDir, userDataPath: () => userDataPath, log: (line) => getLogger()?.warn(line) })
   const reloads = createReloadCoordinator({
     restartConnectors: () => officialRuntime?.refresh() ?? Promise.resolve(false),
-    applyPackageMcp: async (items) => {
+    applyPackageMcp: async (items, phase) => {
       const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
       if (!state.ok) return
       await convergeManagedMcp(state.packageGraphs.filter(graph => {
+        if (phase === "engine-ready" && !graph.pluginTree) return false
         const nodes = [graph.root, ...graph.children]
         return nodes.some(node => node.kind === "mcp") && (!items.length || items.some(item => item.id === graph.packageId || nodes.some(node => node.componentId === item.id)))
       }).flatMap(graph => [graph.root, ...graph.children].filter(node => node.kind === "mcp").map(node => node.name)))

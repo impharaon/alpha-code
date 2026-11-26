@@ -2256,3 +2256,46 @@ packageIt.live("the real Convex hook allow is scoped to one call and never overr
 }), { id: "package-test-hook-ask", setup: async context => {
   await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "edit", resource: "*", effect: "ask" })))
 } }))
+
+
+for (const reject of [false, true]) {
+  packageIt.live(`the real PayPal prompt hook ${reject ? "rejects a controlled prompt variant" : "approves without skipping native approval"} and ignores Read`, () => packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+    if (reject) hooks.hooks.PreToolUse[0].hooks[0].prompt = "Reject this modification with reason 'fixture payment rejection'. " + hooks.hooks.PreToolUse[0].hooks[0].prompt
+    const sample = yield* invocationSample("claude:paypal", reject ? { "hooks/hooks.json": JSON.stringify(hooks) } : {})
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    yield* activateExtUntilFinished
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Payment hook", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    writeFileSync(join(location.directory, "paypal.ts"), "export const payment = 'paypal';")
+    yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_paypal_read" as never, call: { type: "tool-call", name: "read", id: "call_paypal_read", input: { path: "paypal.ts" } } })
+    const llm = yield* TestLLM.Test
+    expect(yield* llm.requests()).toHaveLength(0)
+    yield* llm.push(TestLLM.text(JSON.stringify(reject ? { ok: false, reason: "fixture payment rejection" } : { ok: true }), "paypal-judgment"))
+    const running = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_paypal_write" as never, call: { type: "tool-call", name: "write", id: "call_paypal_write", input: { path: "paypal.ts", content: "export const payment = 'paypal.Buttons';" } } }).pipe(Effect.exit, Effect.forkChild)
+    const permission = yield* Permission.Service
+    let asks = 0
+    for (let waited = 0; waited < 3000 && !running.pollUnsafe(); waited += 10) {
+      for (const request of yield* permission.forSession(parent.id)) { asks++; yield* permission.reply({ requestID: request.id, reply: "once" }) }
+      yield* Effect.sleep("10 millis")
+    }
+    const exit = yield* Fiber.join(running)
+    expect(Exit.isFailure(exit)).toBe(reject)
+    expect(asks).toBe(reject ? 0 : 1)
+    expect(readFileSync(join(location.directory, "paypal.ts"), "utf8")).toBe(reject ? "export const payment = 'paypal';" : "export const payment = 'paypal.Buttons';")
+    const requests = yield* llm.requests()
+    expect(requests).toHaveLength(1)
+    expect(requests[0]!.tools).toHaveLength(0)
+    expect(requests[0]!.model.id).toBe("picked")
+    expect(JSON.stringify(requests[0])).toContain("PayPal SDK")
+    expect(JSON.stringify(requests[0])).toContain("paypal.ts")
+    expect(JSON.stringify(requests[0])).toContain("file_path")
+  }), { id: "paypal-native-ask", setup: async context => {
+    await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "edit", resource: "*", effect: "ask" })))
+  } }))
+}

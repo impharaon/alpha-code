@@ -483,10 +483,11 @@ export async function registerPackageHooks(
                 lifetime,
               }
             if (result.exitCode !== 0) throw Error("hook exited " + result.exitCode)
+            const plain = !/^[\s]*[\[{]/.test(result.stdout)
+            const contextOutput = ["SessionStart", "UserPromptSubmit", "UserPromptExpansion"].includes(event)
+            if (plain && !contextOutput && result.stdout.trim()) input.log("package hook " + event + ": " + result.redact(result.stdout))
             const output: unknown = result.stdout.trim()
-              ? /^[\s]*[\[{]/.test(result.stdout)
-                ? JSON.parse(result.stdout)
-                : { systemMessage: result.stdout }
+              ? plain ? contextOutput ? { systemMessage: result.stdout } : {} : JSON.parse(result.stdout)
               : {}
             if (!record(output)) throw Error("hook output must be an object")
             const specific = record(output.hookSpecificOutput) ? output.hookSpecificOutput : undefined

@@ -580,3 +580,5 @@ A2 推断确认（一次固定源码读取）：`/tmp/alpha-1761-r11/link-source
 A2 green：同一 XML 断言未改，Calc Link=1，Writer Link=2；fonts 文件 4 PASS（A2-green.log）。原生字体/替代/宏/更新检查仍保留。
 
 A3 red：既有 runtime 文件新增 explicit action 用例，当前缺 retry，target exit 1（A3-red.log）。要求仅 failed 才重开一次 preparation，preparing/ready 不启动，且没有自动循环。下一提交只补本功能方法；#1760 action 仍为具体未实现接线依赖，不冒称完成。
+
+A3 runtime green：原断言不改，runtime 文件 12 PASS（A3-green.log）。retry 仅 failed → 同一准备过程，未新增自动循环、工具/API 或第二下载器；action 接线待 #1760 拥有者。

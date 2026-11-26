@@ -127,6 +127,12 @@ export function createDocumentRuntime(input: {
     } catch (error) { if (!disposed) fail(error) }
   }
   return {
+    retry() {
+      if (disposed || state.phase !== "failed") return
+      preparation = undefined
+      publish({ phase: "preparing", stage: "download" })
+      preparation = prepare()
+    },
     invalidatePythonEnvironment(location: Location.Ref, registrationId: string, reason: "location-disposed" | "sidecar-stopped") { projections.invalidate(location, registrationId, reason) },
     pythonEnvironment(location: Location.Ref) {
       const registration = registrations.get(key(location))

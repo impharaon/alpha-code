@@ -51,3 +51,5 @@ export function SettingsProductionHarness(props: {
     </PlatformProvider>
   )
 }
+
+export { SettingsNetworkEgress } from "./settings-network-egress"

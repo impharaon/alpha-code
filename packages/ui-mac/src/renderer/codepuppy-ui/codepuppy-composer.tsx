@@ -1,3 +1,4 @@
+import { setSessionNetworkTier } from "./network-egress"
 // CodePuppyComposer — REQ-055/REQ-125 C7:alpha 唯一的 composer 组件(用户拍板 2026-07-07:「一个 CSS
 // 一个完整的组件」「自建,不再集成 opencode」)。首页(mode="home")、新会话与会话页
 // (mode="session",由 seam 会话页的 SessionComposerDock **直挂**,props 传入 —— 零 Portal/
@@ -1936,6 +1937,8 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
         pushToast({ kind: "error", title: t("codepuppy.composer.sessionPending") })
         return
       }
+      await setSessionNetworkTier({ serverKey: submittedServerKey, directory: dir, sessionID: sid }, submittedPerm)
+      if (interrupted()) return
       const slash = routeSlash(body)
       if (slash) {
         const { data: cmds } = await c.command

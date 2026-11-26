@@ -3,6 +3,121 @@
     {
       "components": [
         {
+          "id": "plugin-package:plugin-package-real-superpowers-v1",
+          "payload": {
+            "blobs": [
+              {
+                "bytes": 497,
+                "mediaType": "application/octet-stream",
+                "sha256": "6728b554d1aaf9235f7981c7838a32f50c191297284af97f4c2a808155f7c399",
+                "url": "https://example.invalid/blobs/6728b554d1aaf9235f7981c7838a32f50c191297284af97f4c2a808155f7c399"
+              },
+              {
+                "bytes": 3192,
+                "mediaType": "application/octet-stream",
+                "sha256": "82c5c8866ad7f5dd4440ce66bd7806ba48a2f13771beae5cf112e53f08fe36ba",
+                "url": "https://example.invalid/blobs/82c5c8866ad7f5dd4440ce66bd7806ba48a2f13771beae5cf112e53f08fe36ba"
+              }
+            ],
+            "description": {
+              "description": "Core skills library for Claude Code: TDD, debugging, collaboration patterns, and proven techniques",
+              "diagnostics": [],
+              "entries": [
+                {
+                  "directory": "skills/using-superpowers",
+                  "display": {
+                    "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+                    "name": "using-superpowers"
+                  },
+                  "id": "skill:skills/using-superpowers/SKILL.md",
+                  "instruction": [
+                    "---\nname: using-superpowers\ndescription: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions\n---\n\n<SUBAGENT-STOP>\nIf you were dispatched as a subagent to execute a specific task, ignore this skill.\n</SUBAGENT-STOP>\n\n<EXTREMELY-IMPORTANT>\nIf you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.\n\nIF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.\n\nThis is not negotiable. You cannot rationalize your way out of this.\n</EXTREMELY-IMPORTANT>\n\n## The Rule\n\n**Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.\n\n**Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.\n\nThen announce \"Using [skill] to [purpose]\" and follow the skill exactly. If it has a checklist, create a todo per item.\n\n## Skill Priority\n\nWhen multiple skills apply, process skills come first — they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.\n\n- \"Let's build X\" → superpowers:brainstorming first, then implementation skills.\n- \"Fix this bug\" → superpowers:systematic-debugging first, then domain skills.\n\n## Red Flags\n\nThese thoughts mean STOP—you're rationalizing:\n\n| Thought | Reality |\n|---------|---------|\n| \"This is just a simple question\" | Questions are tasks. Check for skills. |\n| \"I need more context first\" | Skill check comes BEFORE clarifying questions. |\n| \"Let me explore the codebase first\" | Skills tell you HOW to explore. Check first. |\n| \"I can check git/files quickly\" | Files lack conversation context. Check for skills. |\n| \"Let me gather information first\" | Skills tell you HOW to gather information. |\n| \"This doesn't need a formal skill\" | If a skill exists, use it. |\n| \"I remember this skill\" | Skills evolve. Read current version. |\n| \"This doesn't count as a task\" | Action = task. Check for skills. |\n| \"The skill is overkill\" | Simple things become complex. Use it. |\n| \"I'll just do this one thing first\" | Check BEFORE doing anything. |\n| \"This feels productive\" | Undisciplined action wastes time. Skills prevent this. |\n| \"I know what that means\" | Knowing the concept ≠ using the skill. Invoke it. |\n\n## Platform Adaptation\n\nIf your harness appears here, read its reference file for special instructions:\n\n- Claude Code: `references/claude-code-tools.md`\n- Codex: `references/codex-tools.md`\n- Pi: `references/pi-tools.md`\n- Antigravity: `references/antigravity-tools.md`\n- Hermes Agent: `references/hermes-tools.md`\n- Muse: `references/muse-tools.md`\n\n## User Instructions\n\nUser instructions (CLAUDE.md, AGENTS.md, GEMINI.md, etc, direct requests) take precedence over skills, which in turn override default behavior. Only skip skill workflows or instructions when your human partner has explicitly told you to.\n"
+                  ],
+                  "invocation": {
+                    "allowedTools": [],
+                    "deniedTools": [],
+                    "fork": false,
+                    "implicitInvocation": true,
+                    "userInvocable": true
+                  },
+                  "kind": "skill",
+                  "mcpDependencies": [],
+                  "sourceName": "using-superpowers",
+                  "sourcePath": "skills/using-superpowers/SKILL.md"
+                }
+              ],
+              "name": "superpowers",
+              "provider": "claude-code",
+              "schema": "codepuppy.plugin-package.v1",
+              "secrets": [],
+              "source": {
+                "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+                "ecosystem": "claude",
+                "entryName": "superpowers",
+                "kind": "marketplace",
+                "locator": "https://github.com/obra/superpowers",
+                "pluginPath": "",
+                "repository": "https://github.com/obra/superpowers"
+              },
+              "tree": [
+                {
+                  "bytes": 497,
+                  "digest": "sha256:6728b554d1aaf9235f7981c7838a32f50c191297284af97f4c2a808155f7c399",
+                  "kind": "file",
+                  "mode": 436,
+                  "path": ".claude-plugin/plugin.json"
+                },
+                {
+                  "bytes": 3192,
+                  "digest": "sha256:82c5c8866ad7f5dd4440ce66bd7806ba48a2f13771beae5cf112e53f08fe36ba",
+                  "kind": "file",
+                  "mode": 436,
+                  "path": "skills/using-superpowers/SKILL.md"
+                }
+              ],
+              "treeDigest": "sha256:ee1d6d6d96fb540dd265d2742d5d49f100a1597594f80e65a34b5a1f6a5103d5",
+              "version": "7.0.2"
+            },
+            "schema": "codepuppy.host-extension-package.payload.plugin-package.v1"
+          }
+        }
+      ],
+      "envelope": {
+        "capabilities": [],
+        "components": [
+          {
+            "capabilities": [],
+            "dependencies": [],
+            "id": "plugin-package:plugin-package-real-superpowers-v1",
+            "payloadRef": {
+              "bytes": 5915,
+              "mediaType": "application/vnd.codepuppy.host-extension-package.plugin-package.v1+json",
+              "sha256": "08aacf161edd45c214b5427d10dce0785fc0cd1a15fbb76bad6c734af0287bab",
+              "url": "https://example.invalid/packages/plugin-package/plugin-package-real-superpowers-v1.json"
+            },
+            "profileId": "plugin-package",
+            "profileVersion": 1,
+            "required": true
+          }
+        ],
+        "prelude": {
+          "packageId": "package:plugin-package-real-superpowers-v1",
+          "version": "1.0.0"
+        },
+        "presentation": {
+          "description": "Synthetic plugin-package-real-superpowers-v1 decoder case",
+          "displayName": "plugin-package-real-superpowers-v1"
+        },
+        "root": "plugin-package:plugin-package-real-superpowers-v1",
+        "schema": "codepuppy.host-extension-package.v1"
+      },
+      "expect": "accepted",
+      "name": "plugin-package-real-superpowers-v1",
+      "skipped": []
+    },
+    {
+      "components": [
+        {
           "id": "skill:skill-v1",
           "payload": {
             "behavior": {
@@ -783,7 +898,7 @@
     {
       "components": [
         {
-          "id": "skill:skill-v1",
+          "id": "plugin-package:plugin-package-real-superpowers-v1",
           "payload": null
         }
       ],
@@ -793,26 +908,26 @@
           {
             "capabilities": [],
             "dependencies": [],
-            "id": "skill:skill-v1",
+            "id": "plugin-package:plugin-package-real-superpowers-v1",
             "payloadRef": {
-              "bytes": 361,
-              "mediaType": "application/vnd.codepuppy.host-extension-package.skill.v1+json",
-              "sha256": "9a2c2d1d4bd99f403f4787ec313fb4ed7062ff222b9b1551a3db6cb67aa8feac",
-              "url": "https://example.invalid/packages/skill/skill-v1.json"
+              "bytes": 5915,
+              "mediaType": "application/vnd.codepuppy.host-extension-package.plugin-package.v1+json",
+              "sha256": "08aacf161edd45c214b5427d10dce0785fc0cd1a15fbb76bad6c734af0287bab",
+              "url": "https://example.invalid/packages/plugin-package/plugin-package-real-superpowers-v1.json"
             },
             "profileVersion": 1,
             "required": true
           }
         ],
         "prelude": {
-          "packageId": "package:skill-v1",
+          "packageId": "package:plugin-package-real-superpowers-v1",
           "version": "1.0.0"
         },
         "presentation": {
-          "description": "Synthetic skill-v1 decoder case",
-          "displayName": "skill-v1"
+          "description": "Synthetic plugin-package-real-superpowers-v1 decoder case",
+          "displayName": "plugin-package-real-superpowers-v1"
         },
-        "root": "skill:skill-v1",
+        "root": "plugin-package:plugin-package-real-superpowers-v1",
         "schema": "codepuppy.host-extension-package.v1"
       },
       "expect": "blocked",

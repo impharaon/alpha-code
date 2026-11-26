@@ -1,3 +1,4 @@
+import type { NetworkEgressApi } from "../shared/network-egress-wire"
 import type { SourceSearchResultV1, PreparePluginSourceInputV1, PreparePluginSourceResultV1 } from "../main/plugin-sources"
 import type { InstallRequestV1, InstallOutcomeV1 } from "../shared/plugin-install"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
@@ -679,6 +680,7 @@ export type {
 export type { CodePuppyEnvironmentInfo }
 
 export type ElectronAPI = {
+  networkEgress: NetworkEgressApi
   killSidecar: () => Promise<void>
   sidecarGeneration: {
     getState: () => Promise<SidecarGenerationState>

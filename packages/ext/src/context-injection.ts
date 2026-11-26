@@ -567,6 +567,9 @@ function toolFailureFragments(): (TemplateFragment | TextFragment | WrapperFragm
  * EPERM/project-relative paths do not establish the main open-register fact.
  * The execute.after hook uses this neutral instruction for every observed refusal.
  */
+export const NETWORK_EGRESS_NOTE =
+  "联网正在等待批准或已被应用拒绝，这是 Code Puppy 的联网保护，不是电脑网络故障；请等待决定或获准后重试，不要排查网络或绕开代理。"
+
 export const WRITE_REFUSED_ID = "sandbox.write-refused"
 export const WRITE_REFUSED_NOTE =
   "The system refused this write (operation not permitted). Do not try other ways to write it and do not look for workarounds; stop and tell the user which write was refused."
@@ -606,6 +609,8 @@ export const CONTEXT_INJECTIONS: readonly ContextInjection[] = Object.freeze([
   ...attachmentFragments(),
   // ── 工具失败时交回模型的话(`#1704`)─────────────────────────────────────────────────────
   ...toolFailureFragments(),
+  defineText({ id: "network.egress.notice.system", sink: "system", text: NETWORK_EGRESS_NOTE, maxBytes: CAP_DESCRIPTION }),
+  defineText({ id: "network.egress.notice.result", sink: "tool-failure", text: NETWORK_EGRESS_NOTE, maxBytes: CAP_DESCRIPTION }),
   // ── agent-mention-hooks.ts:点名助手的派发指令(`#1669`)────────────────────────────────────────
   defineTemplate({ id: AGENT_MENTION_ID, sink: "agent-mention", template: AGENT_MENTION_TEMPLATE, maxBytes: CAP_DESCRIPTION }),
   // ── ui-mac codepuppy-config-injection.ts:cfg.instructions 文件(`#1296`)────────────────

@@ -74,6 +74,7 @@ describe("HostExtensionPackageV1 artifact", () => {
       "command",
       "mcp-local",
       "mcp-remote",
+      "plugin-package",
       "skill",
     ])
     expect(CAPABILITY_REGISTRY_V1.map((capability) => capability.token)).toEqual([
@@ -175,10 +176,10 @@ describe("HostExtensionPackageV1 artifact", () => {
     for (const profile of PROFILE_REGISTRY_V1) {
       const schema = (await Bun.file(resolve(import.meta.dir, profile.schemaPath)).json()) as {
         additionalProperties?: unknown
-        properties?: { behavior?: { additionalProperties?: unknown } }
+        properties?: { behavior?: { additionalProperties?: unknown }; description?: { additionalProperties?: unknown } }
       }
       expect(schema.additionalProperties, profile.schemaPath).toBe(false)
-      expect(schema.properties?.behavior?.additionalProperties, profile.schemaPath).toBe(false)
+      expect((profile.profileId === "plugin-package" ? schema.properties?.description : schema.properties?.behavior)?.additionalProperties, profile.schemaPath).toBe(false)
     }
     // 完整绑定(id@version + mediaType + schemaPath)的 exact-set。它挡的是「悄悄加一个」——
     // 一个把新 profile 指向别人的 schema 或别人的 mediaType 的实现也在这里红。
@@ -193,6 +194,7 @@ describe("HostExtensionPackageV1 artifact", () => {
       "command@1 application/vnd.codepuppy.host-extension-package.command.v1+json profiles/command.v1.schema.json",
       "mcp-local@1 application/vnd.codepuppy.host-extension-package.mcp-local.v1+json profiles/mcp-local.v1.schema.json",
       "mcp-remote@1 application/vnd.codepuppy.host-extension-package.mcp-remote.v1+json profiles/mcp-remote.v1.schema.json",
+      "plugin-package@1 application/vnd.codepuppy.host-extension-package.plugin-package.v1+json profiles/plugin-package.v1.schema.json",
       "skill@1 application/vnd.codepuppy.host-extension-package.skill.v1+json profiles/skill.v1.schema.json",
     ])
     // ADR-040(`#830`):这条曾在 Phase 4 被**翻成正向**以容纳 `opencode-plugin`。owner 否决了

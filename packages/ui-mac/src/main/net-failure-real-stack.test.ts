@@ -1,3 +1,4 @@
+import { testEgressDial } from "../../test-component/egress-upstream-fixture"
 // `#1572` AC4 —— 引擎在错误被压成一段文本之前取层,对着**真运行时**钉住(#1662 起是 OpenCode 2):
 //   · Electron 内嵌 node(= 出货 sidecar 的 utilityProcess 运行时;Node 自带的 undici 由 http.setGlobalProxyFromEnv 接上代理)。
 //     分类读的是这个运行时的原文:tls-silent 那一条是 undici 目标 TLS connector 的 10 s 计时器先于代理的 15 s 兜底到点
@@ -124,15 +125,15 @@ describeDarwin("`#1572` AC4 真栈:Electron 内嵌 node + 真出网代理 + 真 
     silentPort = (silent.address() as net.AddressInfo).port
     servers.push(silent)
 
-    proxy = await startEgressPolicyProxy({
+    proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }],
       log: (record) => void proxyLog.push(record),
       authorize: (host) => host !== TARGETS.policy && Object.values(TARGETS).includes(host as never),
-      dial: (host, port) => {
+      dial: testEgressDial((host, port) => {
         if (host === TARGETS.refused) return net.connect(closedPort, "127.0.0.1")
         if (host === TARGETS.blackhole) return new net.Socket()
         if (host === TARGETS.silent || host === TARGETS.timeout) return net.connect(silentPort, "127.0.0.1")
         return net.connect({ host, port, autoSelectFamily: true }) // .invalid:生产拨号,DNS 在代理进程里真失败
-      },
+      }),
       dialTimeoutMs: 1_000,
     })
 

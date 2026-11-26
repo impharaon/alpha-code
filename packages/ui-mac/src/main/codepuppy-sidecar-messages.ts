@@ -1,4 +1,5 @@
 import { parseVideoBridgeRequest, type VideoBridgeRequest, type VideoBridgeReply } from "../shared/video-understanding"
+import type { NetworkOutbound } from "../shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
@@ -158,6 +159,7 @@ export type CodePuppySidecarInbound =
   | HubInstallRequest
 export type CodePuppySidecarOutbound =
   | VideoBridgeReply
+  | NetworkOutbound
   | ReloadRequestMessage
   | PackageAuthorizationReply
   | HubViewReplyMessage

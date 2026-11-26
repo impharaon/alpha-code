@@ -1,48 +1,54 @@
 ---
 id: DESIGN-secrets-usable-not-visible
 title: 密钥文件程序可用、助手不可见 技术设计
-summary: 消费规格 v3；实时输出按匹配前缀保留尾部，故障终态只留隐藏说明；统一 ANSI、env 逐次写回和凭据字段规则，R2 修正后冻结。
+summary: v3.3 冻结：同一 SC-01 回调用 Core 提供的 publish 按序发布多段安全字节，逐段背压与计数；原失败收口、规格 v4 与两处引擎授权不变。
 kind: tech-design
 status: frozen
+design_version: "3.3"
 spec: SPEC-secrets-usable-not-visible
-spec_version: 3
+spec_version: 4
 review:
   rounds: 2
   reviewed_sha: "d336e59d04"
-  verdict: "fix-then-freeze; R2 3 Major 3 Minor accepted and corrected"
+  verdict: "v3.3 frozen; SC-01 callback shape amended, ordering/failure guarantees unchanged; R2 receipt retained"
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # DESIGN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 技术设计
 
-本设计对应 #1758，状态 **frozen**。消费已批准规格 v3；R1 的 2 Blocker、4 Major、1 Minor 和 R2 的 3 Major、3 Minor 均按编排器裁决接受并修正，收据见 §10。LIVE-01 的先打印后落盘窗口已由 U-39 纳入规格限制；故障后的终态仍严格按 BR-07 只有隐藏说明。没有待 owner 项，也不再发起审查轮次。
+本设计对应 #1758；**v3.3 为 frozen，消费规格 v4**。本增量只修订 SC-01 的单槽发布形状：同一 capture 回调可逐段 await Core 的 publish，不聚合全部安全字节。原顺序、背压、故障锁存与终态仅说明保证不变，沿用 U-38 的同一引擎接管，不新增 hook 或 owner 项。v3.2 的原 read 分页/after 安全视图及 U-42 不新增 SC-03 的说明文件边界继承；SC-02 及其余已定契约不变。review 轮数/版本保留真实 R2 收据，不冒报本轮独立审查。
 
 ## 1. 基线
 
-- Spec：[SPEC-secrets-usable-not-visible v3](spec.md)，#1769 的固定输入提交 `aa2476b378da663115e6735b991f6cbf2e04b5c6`；用 `git show aa2476b378da663115e6735b991f6cbf2e04b5c6:docs/specs/secrets-usable-not-visible/spec.md` 复核。v1/v2 证据继承，不再是当前范围基线。
+- Spec：[SPEC-secrets-usable-not-visible v4](spec.md)，固定输入提交 `0099c0c2481d7dddb0b14d614712d659e0230d9a`；已用 `git show 0099c0c248:docs/specs/secrets-usable-not-visible/spec.md` 复核 U-42 的说明文件限制及批准记录。本工作树未合并上游、未修改本地 spec.md，当前规格内容以该固定提交为准；v1..v3 的有效证据继承。
 - 覆盖：BR-01..BR-07、AC-01..AC-10。AC-09 由实时 flush 保持，AC-10 由逐 profile 凭据字段提取保持；成功结果 hook 沿用 §2 证据，本文探针不代替验收。
 - 输入收据：owner 2026-11-26 的 U-38「好的。」已批准 SC-01、前后可读值边界及失败整次隐藏；U-39「这两个你的建议是什么，按你的建议吧。」批准实时逐段遮盖、先打印后写入的窄残留，以及非 env 格式只提取凭据字段，已落入规格 v3。继承 Windows 发布时真机验收和「复用工具卡文本区、无需 frames」约定。自动化仍消费 [SPEC-unattended-run-permissions v2](../unattended-run-permissions/spec.md) BR-03。
 - 背景：规格[来源](spec.md#来源)所指的协调仓安全意图 I-45、讨论 P-06/P-08；不重开「程序可用」「全部批准读项目外文件不问」和原样匹配边界。
 - r3 输入：独立 R2 审查 `582f056887..d336e59d04`，FIX-THEN-MERGE；本轮按六项 finding 与三项补充处置冻结。执行 `git fetch`、`git rebase origin/alpha`（上游 `d4a849e524`），无冲突，没有新增 merge；只改本文与必要索引行。
+- v3.3 / r8 输入：当前工作树基线 `7ef8b89b30`，未 merge；实施④ `7908e114024baeec5c76cf92a9846c863353362c` 的 plan.md「④ r6 接缝收据：SC-01 单槽发布与长 escape」。仅核对 §4.5/§4.7/§5 的 AC-08/09 直接后果；U-38「好的。」所批 SC-01 的位置/职责不变，只改回调形状。
+- r7 输入：v3.2 `176c6e8c6a`；owner 2026-11-27 在协调仓安全意图 U-42「同意。」与上述规格 v4，决定说明文件边界、不新增第三处引擎改动。当前仅更新设计裁决，保留原页 after 路径；没有待 owner 决定。
+- v3.2 / r6 输入：v3.1 `832ab5a4f4` / #1780；实施③ `793fdff5db` 的 plan.md「③ r5 实施收据与接缝返回」。当前基线 `4d9392d6d3`，新工作树未 merge。只核对 BR-02/03/06/07、AC-01/04/06/07/08 的读取后果；未扩大权限档、格式或用户限制。SC-01/U-38 与 SC-02/U-40 是仅有的两处已批准引擎改动。
+- r5 输入：v3.1 `4466819664`；本轮派单转录的协调仓安全意图 U-40，owner 2026-11-27「Cargo 选 1，第二处引擎改动允许，Supabase 报告批准」。本票只消费第二处引擎改动的批准，冻结既有 SC-02 契约，不扩大范围。
+- v3.1 输入：已合入的设计 `66313542d3` / #1772；实施②的采集提交 `d14b17a2ea` 与接缝收据 `9a08725438`，其 `plan.md` 的「偏离记录 / ②实施检查收据」提供真实 Code Mode 反例。当前只处理 BR-03/BR-07 对进度、记录和模型的义务，不增加 AC 或改动其余实施段。新工作树基线 `a586b16fcac32702d2d14cda898c5a32bb71d02c`，未 merge。
 - 代码证据基线：`9f08c506d9842d319616c7e45c33d3b9c3279e48`，引擎包版本 `2.2.5`，Bun `1.4.4`、Node `26.13.1`。r1 授权的合并为历史事实；r3 对 Core/Plugin/Ext 源码与 ANSI 权威执行 `git diff --stat 9f08c506d9842d319616c7e45c33d3b9c3279e48 HEAD -- packages/core/src packages/plugin/src packages/ext/src packages/session-ui/src/tools/ansi.ts`，输出为空，继承有效的行号/探针。
 
 ## 2. 地面真相
 
-继承成功 hook、R1 的直播/Code Mode/写回/SQLite 证据。r3 只核查 R2 改变的承重事实：归一化权威、重复键语义、清理入口和新增凭据字段；用小探针验证尾部算法反例与文件替换原语，不扩查已定范围。
+继承成功 hook、R1 的直播/Code Mode/写回/SQLite 证据。r3 的归一化/重复键/清理证据继承。v3.1 只追踪外层 progress → 发布缓存 → 实时卡/失败记录/模型的可达链路；停止条件是证实现有非引擎出口完整覆盖，或找到它无法覆盖的实际写入反例并定义最小所需接缝（已由 U-40 批准）。
 
 | 已观察的事实 | 证据与结论 |
 | --- | --- |
 | 成功 hook 的改动会成为最终结果 | `packages/core/src/tool.ts:163-179` 把 `afterEvent.result` 交回调用者；`packages/plugin/src/promise/tool.ts:47-65` 允许替换 `result`。`packages/ext/src/plugin.ts:224-231` 已在成功分支替换不符云契约的结果。 |
 | 结果进入历史之前还有截断和发布 | `packages/core/src/session/runner/step.ts:98-125` 先执行工具、再 `ToolOutput.truncate`、再发布；`packages/core/src/session/runner/publish-llm-event.ts:561-578` 发布成功正文和 metadata；`packages/core/src/session/projector.ts:1112` 投影成功事件；模型从 `packages/core/src/session/runner/to-llm-message.ts:114-137` 读取投影后的工具正文/错误。因此在执行后、发布前改写可同时覆盖模型、历史和终态卡片。 |
 | MCP 与 Code Mode 子调用同样经过工具执行器 | `packages/core/src/tool/mcp.ts:67-146` 将 MCP 文本、structured、错误转成 Tool 结果；`packages/core/src/tool.ts:274-279,346-360` 的 Code Mode 子调用走 `run`，继而经过相同 before/after。不能只处理 `shell` 或 `content`。 |
-| 进度早于 after，不能靠终态修补 | `packages/core/src/session/runner/publish-llm-event.ts:548-558` 直接发布 progress；`packages/ext/src/policy/display.ts:43-70` 已用 `tool.transform` 包装 `context.progress`。运行卡可以先见到 metadata，错误终态还会合并最后一份进度。 |
+| 进度早于 after，且外层 execute 绕过包装 | `packages/core/src/tool.ts:272-278,313-314` 在 registry transforms 之外合成/执行 CodeModeTool；`codemode/tool.ts:126,220-222` 直接将子调用 input 发布为 toolCalls。`packages/ext/src/policy/display.ts:43-70` 的 ToolEditor 包装只覆盖已注册工具，不能覆盖该外层。进度的缓存/发布入口仍是 `session/runner/publish-llm-event.ts:548-558`。 |
 | shell 另有实时出口和后台持久化 | `packages/core/src/shell.ts:333-355` 将 `handle.all` 原字节写文件；`:208-235` 的 `output` 读取该文件。`packages/session-ui/src/tools/tool-renderer.tsx:2262-2277` 跟随输出，`packages/app/src/shell/routes/session-ui-provider.tsx:212` 接到 `api.shell.output`。`packages/core/src/tool/plugin/shell.ts:210-239` 将捕获文本交给 Job，`:144-173` 又直接产生 synthetic 通知。只遮盖 after 会漏实时卡片、Job 与后台通知。 |
 | shell 暂无输出改写 hook | `packages/plugin/src/effect/shell.ts:11-13` 与 Promise 对应契约只有 `create.before`。`PluginHooks.trigger` 顺序执行并保留原事件对象（`packages/core/src/plugin/hooks.ts:88-96`），宿主 `packages/core/src/plugin/host.ts:500` 和 Promise adapter `:660-662` 已泛型转发 shell hook；新增输出事件无需另建 IPC。 |
 | 受保护路径目前只是风险探针 | `packages/ext/src/policy/risk.ts:149-164` 的凭据路径正则只有抬风险用途，并非读文件或结果遮盖规则。其余系统文件风险不能因提取密钥名单消失。 |
-| 直接读可以在物理读取前替换 | `packages/plugin/src/promise/tool.ts:25-35` 的 editor 可更新已有执行器。原 read 在 `packages/core/src/tool/plugin/read.ts:104` 调用 `FileAccess.authorizeRead`；后者先 external_directory、再 read（`packages/core/src/file-access.ts:147-166`）。安全视图可在原执行器之前返回，避免先审批再遮盖。 |
+| read 可前置说明或后置安全页，但有旁路 | `packages/plugin/src/promise/tool.ts:25-35` 可包装原执行器；non-env 保护文件前置返回说明。env 的原 read 先完成分页/输出编码，再进入 after；它还会在 `packages/core/src/tool/plugin/read.ts:127-158` 先加载邻近 AGENTS.md，不能据 after 推导所有发布都已遮盖。 |
 | 项目外 ask 不区分读写 | `packages/ext/src/external-directory-rule.ts:20,38-52` 给 build 与询问档注入相同 `external_directory` ask；`packages/ext/src/plugin.ts:412-418` 消费它。整条删除会同时放松写和 shell 的目录审批，超出 BR-05。 |
-| deny 不能被 evaluate hook 放宽 | `packages/core/src/permission.ts:232-247` 在触发 hook 前返回已配置 deny。三档例外必须由安全视图实现，并去掉交互载体中与之冲突的 `.env` 专用规则；不能假设 hook 能翻转任意 deny。 |
+| deny 不能被 evaluate hook 放宽 | `packages/core/src/permission.ts:232-247` 在 hook 前返回已配置 deny。保留删除交互 `.env` 专用规则的既有决定；non-env 保护读取前置说明，env 使用项目内受保护路径后置处理；不翻转其它显式 deny。 |
 | 自动化有独立的现成识别权威 | `packages/ext/src/policy/unattended.ts:30-42` 的 `unattendedProfile` 同时识别在册会话和请求 agent；档位来自 `packages/schema/src/codepuppy-unattended.ts:5-9`。不得靠新建 agent 名单或单看名字推断自动化。 |
 
 ### 成功结果探针：规格「待决」已解决
@@ -106,6 +112,38 @@ expect(JSON.stringify(yield* snapshot.execute(call("disabled")))).toContain(valu
 临时目录探针 `node /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r3-probe-ibgw2row/probe.mjs`，exit **0**。输入仅为进程生成的测试值、R2 指定的 `Listening on http://localhost:3000` 和仓内 `ansi.test.ts` 的 CSI/OSC 样本，不读用户凭据。七项布尔断言全真：长匹配单位下普通末行立即可发；固定 L−1 对照发不出；测试值每个切分点都保留完整秘密前缀并遮盖；直接调用共用 ANSI 函数覆盖 CSI/OSC；parseEnv 的重复键后值覆盖前值；按出现序号保住两个不同 RHS；真实 rename 后文件只有说明、没有原前缀。**观察**仅支持算法原则与现成原语，尚不是 SC-01/流式 matcher 或全消费者实现证明。
 
 字段依据限定为一手资料：[Kubernetes OIDC](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#openid-connect-tokens) 明列 `auth-provider.config.id-token`；[botocore tokens.py](https://raw.githubusercontent.com/boto/botocore/develop/botocore/tokens.py) 的 `SSOTokenProvider._attempt_create_token` 写 accessToken/clientSecret/refreshToken；[credentials.py](https://raw.githubusercontent.com/boto/botocore/develop/botocore/credentials.py) 的 `SSOCredentialFetcher._get_credentials` 写 Credentials 下三项凭据；[Azure identity.py](https://raw.githubusercontent.com/Azure/azure-cli/dev/src/azure-cli-core/azure/cli/core/auth/identity.py) 的 `get_entry_to_persist` 区分 client_secret/client_assertion 与证书路径，[persistence.py](https://raw.githubusercontent.com/Azure/azure-cli/dev/src/azure-cli-core/azure/cli/core/auth/persistence.py) 的 file_extensions 区分 `.json`/`.bin`。只据此补发布数据，不采集 account/region/expiry/证书路径或尝试解密。
+
+### v3.1 外层进度的边界证据
+
+1. **实时与持久边界不同。** `packages/schema/src/session-event.ts:524-532` 将 Tool.Progress 定义为 ephemeral，Core projector 不登记它（`packages/core/src/session/projector.ts:1109-1113`）；但 publisher 在 `publish-llm-event.ts:551` 先缓存原 update。取消/defect 时 `packages/core/src/session/runner/step.ts:152-155,227-235` 进入 failUnsettledTools，`packages/core/src/session/runner/publish-llm-event.ts:109-112,350-374` 的 failureSnapshot 把缓存 metadata 合进 durable Tool.Failed。`packages/core/src/tool.ts:142-145` 只将 Tool.Error 转成 after 事件；中断/defect 不保证经过该 after，因此不能依靠 after 清空 toolCalls。
+2. **桌面出口晚于这一写入。** `packages/ui-mac/src/engine-adapter/opencode2/events.ts:159,427-431` 的 createProjector 可在 progress map/卡片之前遮盖；projectEventStream（`:482-497`）却只是公开事件订阅。扩展的 `Context.event.subscribe` 也只有观察能力（`packages/plugin/src/promise/event.ts:6-9`、`packages/core/src/plugin/host.ts:268-284`）。Core `bus.ts:400-431,464-475` 先在事务中投影/按配置记录 durable event，才通知订阅者；`message-updater.ts:368-384` 已将失败 metadata 放进会话消息。后置遮盖或另写修正事件不能使首次写入的原值从未进记录；本票不增加事后清洗。
+3. **模型当前不直接消费这份 metadata。** `SessionModelRequest` 在 `packages/core/src/session/model-request.ts:126` 经 toLLMMessages 降层；`runner/to-llm-message.ts:114-139,190-204` 的 toolResult 只用终态 content/error，不读 state.metadata，也不将 running progress 降层。Code Mode JS 仍从已遮盖的 child 结果取值（`codemode/tool.ts:147-158`）。模型另发工具查询/读取所得内容仍必须过 §4.5 的结果收口；不能据「直接降层不消费」豁免持久记录和实时卡。此判断只针对当前 Code Mode 进度链，不扩成所有 metadata 永远不会影响模型的承诺。
+
+已重跑实施会话真实 PluginHost/Promise adapter/Tool/Code Mode 探针：从该会话的 `packages/ext` 执行 `bun test /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codemode-mask-seam-el22rvgw/seam.test.ts`，exit **0**、1 pass / 0 fail，事实仍为 `virtualExecuteListed=false, liveContainsKnownValue=true, terminalContainsKnownValue=false`。它是缺口反例，不是隐私验收通过。
+
+另在临时目录复用 `packages/core/test/session-runner-tool-events.test.ts:140-170` 的真实 AppNodeBuilder、Bus.configured({persist:true})、Database、SessionProjector 与 publisher；payload 行形状来自上述实际 Code Mode 探针，只将值换成进程内 UUID；直接调用 runner 取消路径实际使用的 failUnsettledTools，不用替身实现该收尾。命令（实施会话 `packages/core`）：`bun test /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codemode-progress-r4-lhto64kj/record.test.ts`，exit **0**、1 pass / 0 fail / 2 expect。六项事实全真：桌面副本可遮；progress 无 durable row；随后取消的失败事件含原值；会话消息含原值；真实模型降层不含该值；在 publisher 接到 progress **之前**替换的干预对照使该失败记录不含值。只输出布尔值，不打印 UUID、不读取用户凭据。**观察**证明桌面单独遮盖不足；前置干预仅证明所需时点，不冒充已有 hook 或 SC-02 实现。
+
+新工作树无安装依赖；未安装或改动环境，以上探针在已有依赖的实施会话执行。`git diff --stat HEAD 9a08725438 -- packages/core/src/bus.ts packages/core/src/session/projector.ts packages/core/src/session/message-updater.ts packages/core/src/session/runner packages/core/src/codemode/tool.ts packages/core/src/tool.ts packages/plugin/src` 在本设计基线上输出为空，所测生产链与本轮代码相同。初次在新工作树运行临时探针仅遇 import 缺依赖，未计为行为证据。
+
+### v3.2：分页可复用，但 after 不是 read 的唯一发布口
+
+**观察**：`packages/core/src/tool/read-filesystem.ts:292-328` 的 textPage/clampLine 为私有函数，行/字节/单行常量同属该 reader（`:14-20`）；扩展不能导入其服务实现，也不另抄分页器。原 read 的 `toModelContent`（`packages/core/src/tool/plugin/read.ts:258-293`）已经生成行号、页眉和 continuation；raw read 无 progress 调用，权限请求只含路径/来源（`:100,155-169`、`packages/core/src/file-access.ts:139-154`）。after 在输出校验之后、normalizeImages/截断/持久化/模型降层之前（`packages/core/src/tool.ts:142-179`、§2 原探针）；因此原页和原格式可以作为已完成的输入消费，勿复制或重新计算分页。
+
+**反例**：原 read 的 `:127-152` 在返回前调用 SessionInstructions.load。`packages/core/src/session/instructions.ts:58-81` 读取邻近文件，并直接发布含全文的 durable Synthetic；`Context.session.hook("context")` 是模型请求阶段，`Context.event.subscribe` 在提交之后，均不能阻止这份原文进入记录。现有 SessionHooks 只有 prompt/context/compaction 等，没有这一发布前接口（`packages/plugin/src/promise/session.ts:191-207`）。SC-02 只处理根 progress，不覆盖该 synthetic。
+
+临时探针复用 `packages/core/test/tool-read.test.ts:29-42,109-123` 的注册方式，使用真实 ReadTool、ReadToolFileSystem、本地 Environment、SessionInstructions、Bus/Database/SessionProjector 和真实 execute.after；只将权限问答与图像服务按原测试层替代。临时项目的 `.env` 取自实施②的 `fixtures/secret-files/node-env.txt`（provenance.json 记录 Node v24 官方 valid.env），只将一个既有赋值换成进程生成 UUID；邻近 AGENTS.md 复用该仓真实 AGENTS.md 并追加同一测试值。不读取用户凭据，不手写另一套引擎消息或外部格式。命令（实施工作树的 `packages/core`）：`bun test /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/safe-read-r6-zk4rkq5q/read.test.ts`，exit **0**、1 pass / 0 fail / 1 expect，六项事实全真：原 read 到达 after；after 整份替换后终态无值；无 read progress；权限预览无文件字节；synthetic 已存原值；真实 toLLMMessages 将其交给模型。只输出布尔值。探针初次缺测试图的 Database/PluginHooks 导出节点，补齐后测得上述行为；不把搭层错误当产品证据。
+
+`git diff --stat HEAD 793fdff5db -- packages/core/src/tool/plugin/read.ts packages/core/src/tool/read-filesystem.ts packages/core/src/session/instructions.ts packages/core/src/file-access.ts` 为空；上述承重实现与本设计基线一致，复用已有依赖运行探针，未改本工作树生产代码。**裁决更新**：上述观察继承；r6 据此提出 SC-03，U-42/规格 v4 已将说明文件中的值不遮盖明确列入限制，因此不再要求补这个发布前口。after 负责既有 read 工具结果的安全视图；说明文件的初始加载、附带 synthetic 及模型消费沿原链路，按该限制处理。保持原分页与原指令加载能力，不新增分页出口、指令预处理、事后清洗或 Core 服务依赖。
+
+### v3.3 / r8：单槽发布不足与流式写盘原语
+
+本次只回答：同一 SC-01 回调怎样在不聚合密文余量的前提下发布多段安全文本；停止证据为原 normalizer 的反例、真实 writer 的顺序/背压原语以及合法 hook 分派口。实施④ `7908e114024b` 的 plan.md:337-343 已返回单槽接缝；`git diff --stat HEAD 7908e114024b -- packages/core/src/shell.ts packages/core/src/plugin/hooks.ts packages/plugin/src/effect/shell.ts packages/plugin/src/promise/shell.ts packages/session-ui/src/tools/ansi.ts` 为空。另查 Promise adapter，仅末尾 toolHook 增加 SC-02 的 execute.progress；shell 的泛型分派未变。
+
+**观察**：Core 当前 pump（`packages/core/src/shell.ts:333-355`）顺序读取合并 stdout/stderr，逐块写入、累计字节/换行，关闭 writer 后打开 outputDone；SC-01 尚未实现。`PluginHooks.trigger`（`packages/core/src/plugin/hooks.ts:88-95`）逐个 await 回调、返回原事件；Promise shell adapter（`packages/plugin/src/promise/adapter.ts:660-662`）直接传同一事件，未复制或序列化它。因此可以在原事件提供进程内 Promise 函数，不必改 trigger/adapter 或增加发布后 hook。
+
+临时原语探针命令（当前 `packages/core`）：`bun /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r8-publish-6cfh4f78/probe.ts`，exit **0**。输入沿实施④合成控制字节：1 MiB 的 `ESC ] + x`，生产 `stripAnsi` 在补 BEL 后输出为空、补无效 `ESC X` 后完整保留；不读取用户数据、不复制正则。另用真实 createWriteStream（仅探针以 highWaterMark=1 强制背压）顺序 await 两次 publish，确认第一次内容在回调结束前已可读、第二次不越过 drain、字节/行数只计实际安全写入。五项布尔断言全真，不打印正文。此为 normalizer/writer 原语证据，**不是** Core SC-01、认证 spool 或全消费者故障实现证明。
+
+**裁决**：单个 Uint8Array 必须聚合已消歧余量，块数组也保留全部安全余量；都不能成为长未闭合 escape 的正确出口。§4.5 改为回调存续期内的 publish 函数，每次解密/归一化/匹配出一段便 await 写盘，之后才读取下一帧；总长度不决定一次堆内聚合量。保留同一 start/chunk/end、同一 withheld 锁存及 end 原子替换，不另加异步迭代器的回调外消费生命周期。
 
 ## 4. 接口契约
 
@@ -224,24 +262,19 @@ Windows 的 home 使用宿主 `os.homedir()`（一般为 USERPROFILE）；APPDAT
 
 允许跳过未变来源的重读，唯一缓存键为 `(dev,ino,size,mtimeNs,ctimeNs)`，取 `fs.stat({bigint:true})`；任一不同就读内容，不能仅看 mtime。SQLite 同时纳入主库、WAL、SHM 的身份；发现/消失也算变化。新受保护文件的发现使用目录五元组缓存：首次按 sources 建立已发现目录/候选文件集合；每次 flush stat 已发现目录，只对目录 stat 变化的那一层 readdir，新增子目录首次发现时按同一剪枝规则遍历。不存在的发布根保留最近现存父目录的变化检测；子目录各自 stat，不能用祖先目录未变推断整棵树未变。已知文件仍独立 stat，不能漏掉不改变目录 stat 的原地写入；不逐 chunk 全量递归 readdir，也不依赖 watcher。没有 TTL 或自行选择的数量/长度上限。ENOENT/EACCES/EPERM 表示该次缺失/不可读，不贡献新值，后续仍重试判定；其它无法完成采集/解析/匹配的异常进入本次隐藏分支。
 
-`(sessionID,messageID,id)` **仅作外层事务键**。begin 放在现有 `policy.seal()` 登记的尾部 execute.before 回调（`packages/ext/src/policy/index.ts:248-264`）内，confirm/pin 完成后的最后一步，而不是较早的 plugin.ts:195 回调：审批拒绝尚未创建遮盖事务，begin 自身不向闸门抛错。普通根调用建立普通状态；合成 execute 根调用建立 Code Mode 外层状态。该键已有活动 execute 时，随后的子工具 before 不 begin；子工具 after 只做**无调用状态的** Location retained-values + 结果时重读/遮盖，不 end/delete 外层，也不把子工具故障锁存到其它子工具。只有外层 execute 的 after 结束它。child input/update 不写外层的进度缓存；原引擎也已把 child progress 设为空。shellID 的捕获状态是独立的进程流生命周期，多个 Code Mode shell 子调用各有 shellID，不能与共享工具事务键混用。
+`(sessionID,messageID,id)` **仅作外层事务键**。begin 放在现有 `policy.seal()` 登记的尾部 execute.before 回调（`packages/ext/src/policy/index.ts:248-264`）内，confirm/pin 完成后的最后一步，而不是较早的 plugin.ts:195 回调：审批拒绝尚未创建遮盖事务，begin 自身不向闸门抛错。普通根调用建立普通状态；合成 execute 根调用建立 Code Mode 外层状态。该键已有活动 execute 时，随后的子工具 before 不 begin；子工具 after 只做**无调用状态的** Location retained-values + 结果时重读/遮盖，不 end/delete 外层，也不把子工具故障锁存到其它子工具。正常完成只有外层 execute 的 after 结束它；根中断/defect 的回收用现成 Context.event.subscribe 收到对应 Tool.Success/Failed 后按 `(sessionID,assistantMessageID,id)` 释放根缓存，Location 释放仍清所有材料。此订阅只作进程内清理，不能承担遮盖或阻止原值入库。child input/update 不写外层的进度缓存；原引擎也已把 child progress 设为空。shellID 的捕获状态是独立的进程流生命周期，多个 Code Mode shell 子调用各有 shellID，不能与共享工具事务键混用。
 
 ```ts
 import type { Tool } from "@opencode/schema/tool"
 
 type MaskCall = { sessionID: string; messageID: string; id: string }
-type MaskedRead = {
-  output: { type: "text-page"; content: string; mime: "text/plain"; offset: number; truncated: boolean; next?: number }
-  content: readonly { type: "text"; text: string }[]
-  metadata: { truncated: boolean }
-}
 type EnvMutation =
   | { operation: "write"; path: string; content: string }
   | { operation: "edit"; path: string; oldString: string; newString: string; replaceAll?: boolean }
   | { operation: "patch"; patchText: string }
 type SecretMask = {
   begin(input: { call: MaskCall; kind: "tool" | "execute" }): Promise<void>
-  read(input: { call: MaskCall; file: ProtectedFile; offset?: number; limit?: number }): Promise<MaskedRead>
+  read(input: { call: MaskCall; file: ProtectedFile; result: Tool.Result }): Promise<Tool.Result>
   result(input: { call: MaskCall; tool: string; result: Tool.Result }): Promise<Tool.Result>
   error(input: { call: MaskCall; tool: string; error: Tool.Error }): Promise<Tool.Error>
   progress(input: { call: MaskCall; update: Tool.Metadata }): Promise<Tool.Metadata>
@@ -250,7 +283,7 @@ type SecretMask = {
 }
 ```
 
-这些是明确决定新增的扩展能力；MaskedRead 沿用 §4.4 的 TextPage 形状。result/error 根据活动外层与事件 tool 判定根/子，不依靠不存在的独立子调用 ID。begin 自身采集失败只标记根事务，不阻止原工具执行；子调用只把本次无法遮盖的结果换说明，外层仍可继续。固定 `MASKING_FAILED_TEXT = "这次输出没能遮盖，已隐藏"` 归 Schema 同一权威，不再经过 masker。
+这些是明确决定的扩展能力；read 消费原工具已经编码的 Tool.Result，不重声明 TextPage/输出 schema。§4.9 的说明文件链路按规格 v4 限制处理，不新增 instructions 接口；其余接口授权不变。result/error 根据活动外层与事件 tool 判定根/子，不依靠不存在的独立子调用 ID。begin 自身采集失败只标记根事务，不阻止原工具执行；子调用只把本次无法遮盖的结果换说明，外层仍可继续。固定 `MASKING_FAILED_TEXT = "这次输出没能遮盖，已隐藏"` 归 Schema 同一权威，不再经过 masker。
 
 env（包括 `.envrc`）静态解析用 `node:util.parseEnv` 读取可识别的赋值，并由同一 env 解析边界保留每个键的**出现序号及原 RHS 词法跨度**；`export K=V` 与普通赋值同义，安全变量视图按源文件顺序保留重复键，采集每次出现的值而非只用最终 map。未识别的 `.envrc` shell 语句不执行、不返回原文；不执行 shell、include、命令替换或变量展开。其它格式仅按 §4.1 的 profile 提取；SQLite 单元格/JSON 字段不是整个文件，也不把 JSON 错误退化为不透明全文匹配。私钥与真正加密容器仍按其专用原始单位，解密后才出现的值沿用 v2 排除。
 
@@ -268,17 +301,17 @@ env（包括 `.envrc`）静态解析用 `node:util.parseEnv` 读取可识别的�
 
 权限预览消费现有 `Context.permission.hook("evaluate")`，在请求发布前用已采集值原位替换 metadata 的动态 diff/files；不修改权限 effect。遮盖失败只使预览正文显示固定说明，不改变原写入审批结局。写回仍完全由原 execute/FileWrite/FileMutation/Patch 完成，既有 read view 使助手看不到恢复出的值。
 
-### 4.4 直接读：变量视图与说明视图
+### 4.4 直接读：前置说明、原页后置变量视图
 
-只包装身份权威确认的内置 `read`，不凭一个第三方工具恰好叫 read 就给它豁免。安全视图在原物理读和 `authorizeRead` 之前分流：
+仅包装身份权威确认的内置 read；自动化先走原拒绝，整只工具被停用仍由策略权威拒绝。前置使用同一词法路径/realpath 保护判定，不调用 Core 服务，不修改 pin 后的 event.input。
 
-1. 先消费现有 `unattendedProfile`。在册自动化及自动化载体继续走已有 deny，不进入交互豁免；不改自动化注入的 `*.env*` deny。
-2. 词法路径和真实目标命中名单：返回安全视图；不调用原 read，不发 read / external_directory 审批。三种交互档一致，主目录私钥也不问。
-3. env 返回所有变量名；秘密值统一 `[REDACTED]`，BR-06 公开值保留。注释和未解析内容不原样带回；无法解析的部分显示遮盖说明。其它受保护文件只返回「这是密钥文件，值不提供给助手；程序运行时照常能用。」不返回私钥、公钥派生信息或附件。
-4. 正常结果沿用 read 的 TextPage 形状和分页输入；先构造安全文本，再应用现有分页语义。说明固定放入工具卡正文，env 视图也带相同说明。原目标不存在仍是具名读失败；安全视图/遮盖出错则返回同形 TextPage 的固定失败说明（§5），不退回原始读。
-5. 未命中名单：执行原 read；只在 §4.6 指定的全部批准项目外读取上取消目录 ask。
+1. **non-env 保护文件**：保留原设计的执行前说明分流，不调用原 read/authorizeRead，不读出附件或私钥正文，不发 read/external_directory 卡片。说明结果由原注册 tool.output codec 解码固定说明 DTO 后交原输出编码，不手写 TextPage 类/schema；已有实施 codec 探针证明这一路合法，不需要构造器接管。不存在/不可读来源保留具名读失败，不假装文件存在。
+2. **env 保护文件**：改为调用原 execute，offset/limit 不改；原 reader 负责行/字节/单行裁剪、EOF/越界、TextPage 或 utf8 FileContent、行号/页眉/续页提示。env profile 的发布路径在项目内；若只是项目外别名的 realpath 命中项目 env，则原 execute 的局部副本使用同一已核实项目目标路径，前后展示仍为原请求路径。词法项目 env 指向外部的链接仍按其词法保护路径执行。此为同文件路径归一化，不换 agent、不生成 grant、不松开只读档的普通外读 deny；非 env 的外部保护文件始终走上一分流。
+3. **安全页投影**：在最终 execute.after、通用投影之前，SecretMask.read 同时改写 output 与 content，说明置于正文页外。`type/mime/offset/truncated/next` 作为分页结构消费，安全正文不重新触发原物化 URI/附件。消费原 output 的类型、offset/truncated/next 和原 content 的公开行号格式（read 的 description 明示 `<line>: <content>`），保留引擎生成的页眉、行号及 continuation；不重新数行、限页、裁字节或从完整文件补回未选中的内容。通用结果收口最后仍执行，不重新用 read 输出 codec 拒绝已经安全的结果。
+4. **按源位置生成变量视图**：用同一 envAssignments 的键出现序号/RHS 词法跨度和调用前后可核实的源快照，对原页中可见区间逐行投影。已识别赋值保留可见变量名，秘密 RHS 为遮盖符，公开值沿用 BR-06；跨页的引号/多行 RHS、仅剩前缀的长行同样按源跨度遮盖，不能只 exact-match 页面里的完整值。注释/未解析内容不透传；保留原页的行槽和前缀，不重排重复键或把下一页内容塞进本页。页与源快照无法对应时整次隐藏，不猜测为公开值。
+5. **错误、附件及其它读取**：原 read 的正常 IO/二进制/越界错误没有文件正文，仍经已有 error 收口去 cause；投影/解析失败只返回固定隐藏说明。若声明为 env 的文件实际返回 media/base64/list 等非文本结果，删除整份原 output/content/附件，换说明，不能交给后续 normalizeImages。未命中保护的 read 保留原实现与通用结果遮盖。原 read 仍会先发布邻近指令；§4.9 按规格 v4 明确这条说明文件链路不遮盖，不将其视为遮盖步骤故障。工具结果的 output/content、错误和附件继续按本节及通用收口处理。
 
-交互注入中的 `.env` ask / deny 与安全视图冲突，删除这些专用条目，不把受保护模式再生成进配置；read 的其它规则继续由既有权限权威解释。build 的上游底座不接管：安全视图根本不触发它的原始 read 审批。用户明确停用整只工具的既有规则仍由工具策略权威执行，本票不扩权到停用工具。
+保留删除交互 `.env` ask/deny 注入的既有决定；引擎原 build 底座的 `.env` ask 在已核实项目 env 调用的 permission.evaluate 中按同一读关联改为 allow，询问/只读档删冲突条目后按原 read allow。三档的 non-env 保护读不触发授权；自动化原 `.env` deny 不变。不得把项目外普通 read 的 BR-05 例外扩大到其它档位/写操作，也不翻转用户已有的其它显式 deny。
 
 ### 4.5 通用工具结果与 shell 捕获
 
@@ -290,9 +323,9 @@ env（包括 `.envrc`）静态解析用 `node:util.parseEnv` 读取可识别的�
 
 Tool.Content 的文本、文件 uri/name 都属于处理面。内联 data URI 先按协议还原载荷再查原样值；文本载荷可替换后重编码；二进制载荷命中时以一个 text 遮盖符替换该文件 content，避免把损坏的图/PDF交给模型。文件引用如果指向受保护文件则换说明；非保护文件的内联字节同样检查。只检查原始字节，不承诺 OCR、解密、解压或程序额外编码的识别。MCP 非内联二进制资源已保存到普通工具产物时，后续读取仍经过同一结果遮盖，不能把产物路径当作安全证明。
 
-进度继续使用现成 tool.transform 包装：可信运行标识/display 立即发布；普通根工具输出字段用当前 retained values 加重读后处理，每份未发布 update 若失败就隐藏该 update。Code Mode children 不建立进度/结果事务；其结果在交给 JS 前无状态遮盖，外层最终结果再用 retained values 与结束重读处理。不能让 child after 清掉 outer 的状态。
+普通已注册工具的进度继续用现成 tool.transform 包装，可信运行标识/display 立即发布；输出字段用当前 retained values 加重读处理，失败隐藏该 update。**外层 execute 不在该包装范围，改由 §4.8 的已批准 SC-02 承担发布前遮盖；现有接口尚不能闭合此保证。** Code Mode children 不建进度/结果事务；child 结果在交给 JS 前无状态遮盖，外层终态仍在 after 重遮盖，不能让 child after 清掉 outer。不得把成功终态已遮盖当成外层直播/取消记录已安全。
 
-**已批准接管 SC-01** 保留 shell.capture，规则仍在扩展。r2 在同一 Core Shell 生命周期增加直播 publish 与终态文件替换，Effect/Promise 两面同形：
+**已批准接管 SC-01** 保留 shell.capture，规则仍在扩展。v3.3 将单槽改为回调内多段 publish；同一 Core Shell 生命周期、终态文件替换及 Effect/Promise 两面同形不变：
 
 ```ts
 import type { Shell } from "@opencode/schema/shell"
@@ -303,8 +336,9 @@ type ShellCapture = {
   readonly phase: "start" | "chunk" | "end"
   readonly file: string // Core 给出的实际捕获文件，决定加密暂存目录
   readonly withheld: boolean
-  bytes: Uint8Array
-  disposition: "hold" | "publish" | "withhold" | "replace"
+  readonly bytes: Uint8Array // 仅为本 phase 的原始输入；start/end 为空，不作为安全输出槽
+  readonly publish: (chunk: Uint8Array) => Promise<void> // Core 提供，仅本次 chunk/end trigger 存续期有效
+  disposition: "hold" | "withhold" | "replace"
   replacement?: { file: string; size: number; newlines: number }
 }
 interface ShellHooks {
@@ -313,7 +347,15 @@ interface ShellHooks {
 }
 ```
 
-创建时以已有 PluginHooks.has 判定是否进入 capture 模式；无 hook 的裸引擎保留普通路径。已进入模式后默认 hold，不能因重载失去回调而透传。callback 必须修改原事件的 bytes/disposition/replacement，返回新对象不会被 hooks.trigger 自动采用。start 在 spawn 前，chunk 顺序处理合并 stdout/stderr，end 覆盖原进程结束/超时/取消后的流关闭；没有新增命令超时。
+创建时以已有 PluginHooks.has 判定是否进入 capture 模式；无 hook 的裸引擎保留普通路径。已进入模式后 disposition 默认 hold：仅表示不自动发布输入 bytes，不撤回已由 publish 写出的安全段；不能因重载失去回调而透传。扩展只设置原事件的 disposition/replacement，安全字节改经 publish，返回新对象不会被 hooks.trigger 自动采用。start 在 spawn 前只初始化；chunk 顺序处理合并 stdout/stderr，end 覆盖原进程结束/超时/取消后的流关闭；没有新增命令超时。
+
+#### 回调内发布、顺序与背压
+
+Core 在每次 chunk/end trigger 内提供调用期限定的 publish。扩展按源流顺序零次或多次 `await input.publish(safeChunk)`；Effect 回调用现有 Effect.promise 承接同一 Promise，Promise adapter 无须转换函数。每次只传当前已认证、归一化及遮盖的安全段，允许零长度（无写入、无计数）；不能传全部块数组、拼接整个余量、并发/脱离回调发布，或在 Promise 完成前修改/复用所传字节。start 不发布正文。
+
+Core 逐段写入自己持有的捕获 writer；publish 的 Promise 在该段 write 回调成功、size/newlines 更新、且 write 返回 false 时的 drain 已满足后才 resolve，不承诺每段 fsync。计数只扫描该安全段的实际字节/换行，Shell.output 的 cursor 继续消费此安全 size；不计原 bytes 或密文大小，不等待整个 capture 回调结束才让文件可读。Core 在本回调及其在途写入收口前不处理下一原始 chunk、不进入 end/replace；扩展也不预取并排队全部解密帧，内存只需当前帧、真前缀尾部及必要状态，不加段数、输出量或时限上限。
+
+publish 的写入错误先由 Core 锁存 withheld，再 reject 无正文的内部错误；回调随后捕获错误或设置 replace 都不能清除此锁存。并发发布属于契约故障，同样锁存，不建立无界 Promise 队列；trigger 正常或异常结束即撤销本次函数的发布能力，过期调用 reject 且不写盘/计数。Core 收妥在途写入后执行既有故障路径；callback reject/defect、注册消失、ext reload 亦同。已完成的安全段属于既有直播前缀，单次回调不是原子发布事务；剩余段不发布，终态仍按下述 BR-07 原子替换为仅说明。
 
 #### 直播 flush
 
@@ -323,7 +365,7 @@ start 做前采集并创建 shellID 的私有材料。每次 flush 先按 §4.3 
 
 因此，即使集合含数 KB 的私钥块，`Listening on http://localhost:3000` 这类不以秘密前缀结尾的末行也在本 chunk 发布，空闲期间无需等下一个 chunk 或退出，不加 idle 定时器/等待阈值。确实以某个秘密真前缀结尾的片段只等消歧或 EOF；EOF 对余下完整值遮盖并释放其它尾部。集合变化时用新集合重新扫描尚未发布尾部，已发布的未知值不能追回，属于下述已批准 LIVE-01。
 
-安全 bytes 即刻返回 publish 并追加捕获文件；Core 按实际写入的安全字节更新 size/cursor/行数，现有 Shell.output、实时卡和模型在运行中读取文件的能力继续可用。不能恢复 r1 的「进程结束前 size 恒为 0」，也不增加输出容量或运行时限。
+已确定的安全段在当前 flush 内逐次 await publish，即刻追加捕获文件；若无效 escape 使长密文尾部成为普通文本，扩展逐帧认证解密、交给同一归一化/matcher，再逐段发布，不整份回填 bytes。若后续终止符使 OSC 完整，则整段丢弃，不发布其正文。Core 按实际安全写入更新 size/cursor/行数，现有 Shell.output、实时卡和模型运行中读文件的能力继续可用；既不延到下一 chunk/退出，也不加容量或运行时限。
 
 #### 加密暂存与终态重遮盖
 
@@ -331,7 +373,7 @@ start 做前采集并创建 shellID 的私有材料。每次 flush 先按 §4.3 
 
 spool 顺序流式写入，内存只有当前原始帧、实际真前缀尾部及必要解析状态；总输出增长只增加密文文件，不增加全量原文内存或用户输出上限。帧格式为私有临时数据，不是持久契约或可恢复凭据存储。正常完成后流式解密，用前后/运行中 retained values 并集调用同一 stripAnsi 和尾部 matcher，再流式写同目录安全 staging；整个过程中不拼接完整原文。
 
-end 成功返回 replace + staging 文件路径/安全 size/行数；Core 先关闭旧输出 writer，原子替换最终捕获文件并更新计数，再打开 outputDone。replace 只允许在 end，staging 必须是本次 capture 目录内已完成的安全文件。Shell.result、Job、后台 synthetic 通知、模型终态与存储记录只在此后消费同一最终文件；普通模型结果、根包装保存的进度和外层 Code Mode 结果也再用结束集合重投影，不能把运行时截取的旧正文带回终态。
+end 成功设置 replace + staging 文件路径/安全 size/行数；Core 先关闭旧输出 writer，原子替换最终捕获文件并更新计数，再打开 outputDone。replace 只允许在 end，staging 必须是本次 capture 目录内已完成的安全文件。Shell.result、Job、后台 synthetic 通知、模型终态与存储记录只在此后消费同一最终文件；普通模型结果、根包装保存的进度和外层 Code Mode 结果也再用结束集合重投影，不能把运行时截取的旧正文带回终态。
 
 前景终态卡原有 saved 状态消费最终结果（`packages/session-ui/src/tools/run-machine.ts:22-36,60-104`）；直播 follower 是追加缓存，不能撤回用户已经看到的内容。先打印后落盘的残留在规格 v3 限制表内；已按当时集合遮盖的直播前缀留在缓存，不等于允许终态文件、Job、模型或记录保留故障前缀。
 
@@ -342,7 +384,7 @@ end 成功返回 replace + staging 文件路径/安全 size/行数；Core 先关
 | 第一次 publish 以前失败 | 锁存 withheld，运行文件只发布一次固定说明；命令照常运行。end 仍完成下述仅说明文件替换。 |
 | 已发布若干段后失败 | 立刻锁存 withheld，丢弃未发布尾部/当前原文，停止继续暂存/发布原字节；运行文件可在已有遮盖前缀后追加一次说明，之后持续 drain 并丢弃进程输出。已见直播卡/缓存不回撤；**不得据此保留终态前缀**。 |
 | end 的重读、解密认证、重遮盖或安全 staging 失败 | 同样锁存 withheld；删除不完整 staging/spool 并释放 key，由 Core 生成仅含固定说明的安全文件，原子替换原捕获文件，不把旧运行文件当作最终结果。 |
-| callback reject/defect、注册消失或 ext reload 丢失 key | Core 在写盘前用 Effect.exit 收口非外部取消的回调故障并锁存 withheld；之后只 drain，end 的仅说明替换不依赖扩展或 masker。故障不停止/取消/重跑命令；真正用户取消维持原行为。 |
+| publish reject、callback reject/defect、注册消失或 ext reload 丢失 key | Core 用 Effect.exit 收口非外部取消的回调故障；发布/写盘故障即时锁存 withheld，收妥在途写入后不再发布其它段。之后只 drain，end 的仅说明替换不依赖扩展或 masker。故障不停止/取消/重跑命令；真正用户取消维持原行为。 |
 
 **withheld 一旦锁存（包括 ext reload），end 无条件走仅说明终态**：Core 关闭 writer，以 Schema 常量 `MASKING_FAILED_TEXT` 写同目录安全 staging，原子替换最终 capture 文件，size/行数改为该说明的实际计数，再完成 outputDone。所有终态消费者 Shell.result、Job、后台通知、工具终态卡、模型和存储记录读取/投影这个仅说明文件，不能重新附带运行中缓存或故障前缀。Core 自己生成说明，不再调用故障 masker；若连说明文件的 IO 都失败，终态出口保持 withheld 并直接生成同一句安全正文，绝不回读旧文件/半份 staging 或发布其正文引用。真实 exit/signal/timeout 不变。已经发布到直播卡/缓存的遮盖前缀仍在，但它不是终态文件或终态记录的来源；这不构成 BR-07 的产品例外。
 
@@ -352,7 +394,7 @@ end 成功返回 replace + staging 文件路径/安全 size/行数；Core 先关
 
 正常结束或故障时扩展 unlink spool、释放 key；ext reload 不能用新 key 解旧 spool。崩溃后的清理归 **Core 现有 `Shell.cleanup` / 全局 `cleanupNode`（`packages/core/src/shell.ts:91-125`）**，与 SC-01 同一接管面内增加专用临时材料识别。加密 spool 使用 capture 文件名加 `.pending.<pid>.<bootNonce>.enc` 后缀（nonce 非秘密）；下次引擎/应用启动的首次 cleanup 扫描和已有周期 cleanup 都只清理该专用命名且 owner 进程确定已退出的孤立文件，不等旧 `.out` 保留期、不增加 TTL。活跃进程或身份不明的不删；以 Node `process.kill(pid,0)` 仅探测存活，EPERM 视为仍存活，不发送终止信号。扩展清理失败留下的密文也由此回收。孤立内容只有认证密文，无可恢复 key，不做解密、历史恢复或迁移，也不删用户来源文件。
 
-接管仍仅是 Core Shell 捕获生命周期和 Effect/Promise ShellHooks 同一事件；没有新增 synthetic、模型或 UI takeover。扩展负责采集、profile、匹配、加密暂存和安全 staging；Core 只做发布/替换、计数、故障收口和专用捕获材料清理，依赖 Schema 固定说明，不复制匹配规则。登记范围仍见 §10。
+SC-01 的接管仍仅是 Core Shell 捕获生命周期和 Effect/Promise ShellHooks 同一事件；没有新增 synthetic、模型或 UI takeover。扩展负责采集、profile、匹配、加密暂存和安全 staging；Core 只做发布/替换、计数、故障收口和专用捕获材料清理，依赖 Schema 固定说明，不复制匹配规则。登记范围仍见 §10。
 
 ### 4.6 只取消全部批准档的项目外读取 ask
 
@@ -368,15 +410,19 @@ end 成功返回 replace + staging 文件路径/安全 size/行数；Core 先关
 
 | 所依赖的能力 | 合法 callable / 明确新增或 raise | 消费者与边界 |
 | --- | --- | --- |
-| 修改全部类型的成功/错误终态 | `Context.tool.hook("execute.after", ...)`，`packages/plugin/src/promise/tool.ts:47-71`；`Tool.executeTool`，`packages/core/src/tool.ts:155-179`，已实测 | 扩展 SecretMask；覆盖内置、插件、MCP、Code Mode 子调用与外层终态 |
-| 覆盖运行期进度 | `Context.tool.transform` / `ToolEditor.update`，`packages/plugin/src/promise/tool.ts:25-35`；既有 `wrapForDisplay`，`packages/ext/src/policy/display.ts:43` | 已核实状态立即发，正文用当前集合处理，不等待长期进程退出 |
+| 修改正常返回或 Tool.Error 终态 | `Context.tool.hook("execute.after", ...)`，`packages/plugin/src/promise/tool.ts:47-71`；`Tool.executeTool`，`packages/core/src/tool.ts:155-179`，已实测 | 扩展 SecretMask；覆盖内置、插件、MCP、Code Mode 子调用与外层的正常返回/Tool.Error；中断/defect 无 after，需发布前安全缓存 |
+| 已注册工具的运行期进度 | `Context.tool.transform` / `ToolEditor.update`，`packages/plugin/src/promise/tool.ts:25-35`；既有 `wrapForDisplay`，`packages/ext/src/policy/display.ts:43` | 仅覆盖 registry 工具；不能声称包含合成 execute |
+| 中断根缓存回收 | 现有 `Context.event.subscribe`（`packages/plugin/src/promise/event.ts:6-9`）；根键对应终态事件的 sessionID/assistantMessageID/id | 只释放私有缓存，不改事件/数据库；不能当作发布前遮盖接缝 |
+| 外层 execute 进度与取消记录 | **raise SC-02，U-40 已批准**：§4.8 `tool.execute.progress`，根调用 context.progress 交给 publisher 前由扩展改写 | 现有 callable 缺失；非引擎 createProjector/Context.event.subscribe 只能护桌面副本，不能护已提交的失败记录；按冻结契约实施并登记接管 |
 | 外层 begin / 子调用无状态 | **新增** SecretMask.begin 接在 `policy.seal` 的尾部 execute.before 回调内（`packages/ext/src/policy/index.ts:248-264`），confirm/pin 后最后一步；共享 context 的证据为 `packages/core/src/codemode/tool.ts:147-150` | 根 execute 建/结束唯一事务；活动键下 child before 不 begin，child after 只重读并转换自己的结果 |
-| 保护直接读并保留 read 形状 | 同一 ToolEditor.update；现有 `ReadToolFileSystem.TextPage`，`packages/core/src/tool/read-filesystem.ts:81-88` | 新增 SecretMask.read；复用形状，不导入 Core 服务实现 |
+| non-env 前置说明 / env 安全页 | 原注册 `ToolEditor.update`/tool.output codec；原 `execute.after`；**修订** SecretMask.read（§4.4） | 前者解码说明 DTO；后者消费原页 output/content 并投影，不复制 TextPage schema 或分页，不 import Core 服务 |
+| 页边界、行号、续页 | 原 read 执行器（`packages/core/src/tool/plugin/read.ts:94-101,155-158,258-293`）及其私有 reader | 调用已有 execute，消费生成结果；不把私有 textPage 冒充 callable，不增加分页出口 |
+| read 附带说明文件 | 现有 `SessionInstructions.load`，`packages/core/src/session/instructions.ts:58-81`；规格 v4/U-42 | 原加载/发布链不改；说明文件中的值不遮盖，不新增 hook 或遮盖保证 |
 | 判定路径 / 凭据字段 / 非密钥 | **新增** ProtectedFiles.sources/match/probe/isPublicValue 及 §4.1 profile 发布数据 | Schema 一份权威；相同依赖树边界、KUBECONFIG 拆分和列/字段选择由所有消费者共用 |
 | 采集与变化检测 | **新增** §4.3 的 SecretMask 方法；Node `fs/promises.readdir/realpath/readFile/stat({bigint:true})`、`node:util.parseEnv` | 文件/目录 stat 五元组缓存；变目录逐层 readdir 发现新来源，已知文件独立 stat；SQLite 含 WAL/SHM；不收集任意 scalar |
 | SQLite 明文单元格 | 已有 Node 内建 `DatabaseSync` 的 readOnly、prepare/iterate/close；仓内使用点 `packages/core/node_modules/@effect/sql-sqlite-node/src/SqliteClient.ts:36`；**新增**发布 profile 查询投影 | 扩展直接用 Node 内建，只读打开来源库；官方 gcloud schema 与只读/反例探针见 §2 |
 | env 写回恢复 | 已有 ToolEditor.update/execute 包装；write Input `packages/core/src/tool/plugin/write.ts:19-24`、edit Input `:24-33`、Patch.parse/Hunk `packages/util/src/patch.ts:27-49`；**新增** SecretMask.prepareMutation | 传局部恢复副本给原执行器，不改 pin 后事件；old/new/context 按对应文件的键出现序号恢复。重建 patch 的私有序列化能力明确在扩展写回边界新增，不声称 Patch 已有 format API |
-| 实时 shell / 最终文件 / 后台通知 | **raise SC-01**：§4.5 ShellHooks.capture 的 start/chunk/end + publish/replace | Core 同一捕获生命周期新增发布/安全文件替换；outputDone 前成功重遮盖或故障仅说明，说明文件 IO 失败的终态也由同一 Core withheld 状态直接生成说明，不回读旧文件；不依赖 synthetic hook |
+| 实时 shell / 最终文件 / 后台通知 | **raise SC-01（U-38）**：§4.5 ShellHooks.capture 的 start/chunk/end + 回调内 publish/replace；原 pump/writer/outputDone 为 `packages/core/src/shell.ts:333-355` | 同一捕获生命周期提供多段 Promise 发布、逐段背压/计数及安全文件替换；outputDone 前成功重遮盖或故障仅说明，说明文件 IO 失败的终态也由同一 Core withheld 状态直接生成说明，不回读旧文件；不依赖 synthetic hook |
 | ANSI 归一化与实时尾部 | 已有 `stripAnsi`，`packages/session-ui/src/tools/ansi.ts:6`；**新增**扩展的增量边界适配和真前缀尾部 matcher | 窄引用纯函数，不依赖 UI barrel、不复制 CSI/OSC 语义；直播/终态均先归一化再匹配，普通末行立即发布 |
 | 加密 spill / 流式终态重写 | **新增** §4.5 私有 spool；Node `crypto.randomBytes/createCipheriv/createDecipheriv`、认证 tag，`fs.createReadStream/createWriteStream` 与 `fs/promises.rename/unlink` | event.file 提供合法捕获目录；key 只留进程，原文仅当前帧/匹配尾部，不加输出上限 |
 | 遮盖故障，命令继续 | **新增**总回调收口和固定说明；SC-01 采用已有 PluginHooks.has（`packages/core/src/plugin/hooks.ts:43-47,97-102`）、Effect.exit | 未发布部分丢弃；end 由 Core 原子替换为仅说明文件，所有终态读同一文件；已见直播缓存不用于终态 |
@@ -387,11 +433,39 @@ end 成功返回 replace + staging 文件路径/安全 size/行数；Core 先关
 | 风险标注与当前卡片呈现 | `classifyPermissionRequest`，`packages/ext/src/policy/risk.ts:730`；`attachTerminal`，`packages/ext/src/policy/display.ts:67` | 复用既有风险信号和 Tool.Content 文本，末尾再遮盖 |
 | 存储和模型消费 | `publisher.toolExecution`，`packages/core/src/session/runner/publish-llm-event.ts:561`；`toolResult`，`packages/core/src/session/runner/to-llm-message.ts:114` | 消费现有安全结果，不增加持久 schema、重放补丁或 UI 接缝 |
 
+### 4.8 v3.1：已批准第二接缝 SC-02
+
+**SC-02 由 U-40 单独批准，不挪用 SC-01 的授权。** 最小所需能力是在 Core `Tool.snapshot.execute` 已完成 before/确认及有效工具名解析、构造根执行 context 时，包装传入的 progress：每次先执行扩展可改写事件，再将安全 metadata 交回原 `input.progress`。位置必须早于 `publisher.progress` 的缓存与发布，不是 bus 订阅回调。普通根与合成 execute 共用这个位置，child 仍由引擎现有 noop progress 隔离，不引入第二个 Code Mode runtime、子调用状态或新的限额。
+
+已冻结的最小接口（Effect/Promise 的 ToolHooks 同形；其它既有事件不变）：
+
+```ts
+import type { Tool } from "@opencode/schema/tool"
+
+type ToolProgress = Pick<Tool.Context, "sessionID" | "agent" | "messageID" | "id"> & {
+  readonly tool: string // before 后解析出的有效工具名
+  metadata: Tool.Metadata
+}
+interface ToolHooks {
+  readonly "execute.progress": ToolProgress
+}
+```
+
+事件按现有 hook 语义替换其 metadata 字段，不采用返回新事件对象；SecretMask 生成安全副本，不改 Code Mode 内部 calls 或子工具真实 input；Effect 的 `ToolFailures["execute.progress"]` 为 never。规则、重读、根事务与故障隐藏仍唯一归扩展 SecretMask.progress（§4.3），Core 不持名单/秘密值。采用此公共根出口后，已注册工具包装保留 display 等原职责，进度遮盖在此统一执行一次；不能让多层 masker、第三方后续 hook 或旧原 metadata 回填绕过最终安全值。BR-07 的总收口须覆盖回调 reject/defect 和注册失效，不能因 hook 本身故障透传 update 或终止命令；继续复用 §4.3/§5 的安全进度/终态说明投影，不新增原文 fallback；真实故障注入仍待实施验证，不在本次冒称完成。
+
+最小新增面是 **Core Tool.snapshot.execute 的根 progress 包装、Plugin 的 Effect/Promise ToolHooks/失败类型，以及 Promise adapter 的 toolHook 分派**（现成分派仅列 before/after，`packages/plugin/src/promise/adapter.ts:686-692`）；现有 host.tool.hook/PluginHooks.trigger 仍负责注册与转发。无须修改 Core CodeModeTool、publisher、Bus、持久 projector、模型降层或桌面投影；它们统一消费入口已处理的 metadata。U-40 已批准这一第二处引擎改动；实施与接管登记消费 §10，不增加其它引擎改动。
+
+### 4.9 v3.2：说明文件边界（规格 v4 / U-42）
+
+owner 2026-11-27「同意。」：不为 read 附带的 AGENTS.md 等说明文件新增第三处引擎改动；写进这些给助手看的说明文件的密钥值不遮盖。依据为规格 v4「用户会碰到的限制」新增行及 U-42 批准记录。
+
+说明文件继续由原 SessionInstructions.load 发布 synthetic，初始加载及后续附带内容仍交给模型。移除 r6 的 SC-03 接口、注册失效保护状态与 SecretMask.instructions 候选，不改 loader、PluginHooks 或两面 SessionHooks。普通工具结果仍执行既有遮盖，不为说明文件另加名单或旁路通用结果投影；额外遮盖保证不覆盖上述说明文件加载链路。该边界是已批准的规格取舍，不是 BR-07 的失败分支，不自动隐藏指令或让 read 失败。
+
 ## 5. 数据与失败
 
-不新增业务数据库、会话 schema、历史清洗或凭据存储。终态/存储记录仍在 after 后经原事件投影事务写入；直播文件逐段含当前集合处理的文本，成功结束从加密原文 spool 用并集重写，失败结束原子替换为仅说明文件。直播与终态是两个明确的发布边界，终态绝不复用旧正文绕过收口。
+不新增业务数据库、会话 schema、历史清洗或凭据存储。正常返回/Tool.Error 的终态仍在 after 后经原事件投影事务写入；根中断/defect 的记录直接来自 publisher 的缓存（外层 execute 的安全缓存由 SC-02 保证，尚待实施验证），不宣称它经过 after；直播文件逐段含当前集合处理的文本，成功结束从加密原文 spool 用并集重写，失败结束原子替换为仅说明文件。直播与终态是两个明确的发布边界，终态绝不复用旧正文绕过收口。
 
-普通根工具/连接器的未发布结果若处理失败，整份动态 content/output/metadata/附件/error cause 换固定说明，保留可信执行状态。子工具使用同一安全替换形状，但不创建/销毁外层状态；外层 Code Mode 只在自己的 after 终结。没有调用 ID 去重把不同 child 当作重试，也不会漏第二个/并发子调用。
+普通根工具/连接器的未发布结果若处理失败，整份动态 content/output/metadata/附件/error cause 换固定说明，保留可信执行状态。子工具使用同一安全替换形状，但不创建/销毁外层状态；外层 Code Mode 正常返回在自己的 after 终结，中断缓存清理按 §4.3。没有调用 ID 去重把不同 child 当作重试，也不会漏第二个/并发子调用。
 
 ```ts
 const hiddenResult: Tool.Result = {
@@ -400,14 +474,14 @@ const hiddenResult: Tool.Result = {
 }
 ```
 
-安全 read 出错返回固定说明的 TextPage（offset=1、truncated=false、无 next）；工具自身已失败时保留 Tool.Error 类型，message 只有说明，移除 cause。shell 不论第一次 publish 前还是中途故障，**最终文件和该次终态正文都只有说明**；中途已经发出的遮盖前缀仅留直播卡/缓存，不能持久化成失败终态。命令照常完成、exit/signal/timeout 真实可见，不自动重跑、不加确认、时限或容量上限。
+安全 read 投影出错以 content-only 的固定说明替换原 output/content/metadata/附件；non-env 的执行前说明仍由注册 output codec 构造；工具自身已失败时保留 Tool.Error 类型，message 只有说明，移除 cause。shell 不论第一次 publish 前还是中途故障，**最终文件和该次终态正文都只有说明**；中途已经发出的遮盖前缀仅留直播卡/缓存，不能持久化成失败终态。命令照常完成、exit/signal/timeout 真实可见，不自动重跑、不加确认、时限或容量上限。
 
-终态 metadata 连同根包装保存的最后 progress 以结束集合重投影并覆盖同名键；不能只删 error.metadata，让 publisher 的 `failureSnapshot`（`packages/core/src/session/runner/publish-llm-event.ts:109-113`）再次合并旧正文。shell withheld 时正文引用换成最终仅说明文件，动态键覆盖为安全空值，只保留可信执行字段；Code Mode 自有 toolCalls 摘要在故障终态置空，避免共享 ID 使父级回填原文。历史已见直播缓存不作为这一投影的输入。
+对可包装的已注册根工具，终态 metadata 连同根包装保存的最后 progress 以结束集合重投影并覆盖同名键；不能只删 error.metadata，让 publisher 的 `failureSnapshot`（`packages/core/src/session/runner/publish-llm-event.ts:109-113`）再次合并旧正文。shell withheld 时正文引用换成最终仅说明文件，动态键覆盖为安全空值，只保留可信执行字段；Code Mode 自有 toolCalls 摘要在故障终态置空，避免共享 ID 使父级回填原文。历史已见直播缓存不作为这一投影的输入。**外层 execute 的取消/defect 可绕过 after 并复制 publisher 缓存；该路径只有发布前 SC-02 才能保证缓存已安全，不能靠本段的 after 覆盖假装解决。**
 
 | 失败窗口 | 收口与消费者 |
 | --- | --- |
 | 前采集/首次输出之前 | 普通结果或 shell 文件只有说明，原工具/进程继续；单来源缺失/不可读按 §4.3 的来源边界处理。 |
-| 直播 flush、spill 加密/写入、匹配或回调错误 | 锁存 withheld，丢弃未发布及后续原文，清理 cipher/key；仅已见直播缓存保留已发遮盖前缀。end 原子写仅说明文件，Shell.result、Job、后台通知、模型和记录均只消费说明。 |
+| 直播 flush、spill 加密/写入、匹配、publish 或回调错误 | 锁存 withheld，丢弃未发布及后续原文，清理 cipher/key；仅已见直播缓存保留已发遮盖前缀。end 原子写仅说明文件，Shell.result、Job、后台通知、模型和记录均只消费说明。 |
 | end 的采集、认证、重遮盖、staging 构建失败 | 删除不完整 staging，由 Core 生成仅说明文件并原子替换最终 capture；outputDone 在收口之后，不能保留运行文件前缀作为终态，也不重调故障 masker。 |
 | end 成功 | 关闭 writer、替换完整安全文件、更新计数、完成 outputDone；Job/后台 synthetic、Shell.result 和存储消费同一重遮盖终态。 |
 | env 恢复 | 原 writer 前按文件/键/出现序号恢复局部副本，保持权限/原错误契约；不从 parseEnv 的末值或跨键历史补写。错误/输出/审批预览也遮盖。 |
@@ -424,8 +498,10 @@ const hiddenResult: Tool.Result = {
 | --- | --- | --- |
 | 保护名单、公开值判定、平台路径匹配 | Schema 的纯 Code Puppy 契约；不依赖 Core/Server/UI | K2 收敛：风险器、read 和遮盖不再各持名单 |
 | 凭据字段/SQLite 采集、安全 read、env 写回恢复、输出遮盖与加密 spool | Ext 的 Location 生命周期；依赖 Schema、公开 Plugin API、Node IO/crypto/sqlite 及现成 stripAnsi 纯函数 | 不 import Electron main 私有模块、不增加包依赖；ANSI 只窄引用原纯函数，不引 UI 运行时；原 writer、Patch.parse、身份和自动化仍为权威 |
-| shell 捕获出口 | Core 调用已有 PluginHooks，事件类型归 Plugin；不反向依赖 Ext；复用自己的 cleanup | SC-01 是明确必要接管；规则实现仍归扩展，不把名单写入上游 pump |
+| shell 捕获出口 | Core 调用已有 PluginHooks，事件类型归 Plugin；不反向依赖 Ext；复用自己的 cleanup | SC-01 由 U-38 批准；SC-02 由 U-40 另行批准；规则仍归扩展 |
+| 根工具进度入口 | Core/Plugin 只增加可改写事件，Ext 继续持有 SecretMask | SC-02 已由 U-40 批准；不绕过权限/代际权威、不复制名单，不以桌面过滤替代持久记录保证 |
 | 档位注入与项目外审批 | UI main 消除交互 `.env` 专用冲突；Ext 原权限权威解释操作例外 | K1 不新建档位载体列表；自动化原规则和非读取 ask 保持原义 |
+| read 页与说明文件 | 原 read/分页为权威；Ext 投影工具结果；原指令 loader 不改 | U-42/规格 v4 明确说明文件中的值不遮盖；无 SC-03，不复制分页或导入 Core 服务 |
 | 历史、模型与卡片 | 现有投影、终态降层和直播跟随文本区 | 直播继续，终态成功重遮盖、故障仅说明；已见缓存不回撤、不写回终态；先打印后落盘仅 LIVE-01；不添 UI redactor/frames/客户端协议 |
 
 复用原则：固定名单是业务常量，roots 是已有宿主路径事实，均不是新增用户配置；跨平台路径在共享权威实现一次；所有数据错误不含秘密。现有风险探针的输入扫描 cap 不得继承给秘密结果遮盖，不能借性能理由新加秘密长度或结果长度限制。
@@ -434,7 +510,8 @@ const hiddenResult: Tool.Result = {
 
 - OS 拒读名单：程序也读不到，违反 BR-04。
 - 只遮盖模型请求或 UI：数据库或另一消费者仍保留原值，违反 BR-03。
-- 只写 after：探针与 shell 调用链证明进度、实时卡片和后台持久化会先漏。
+- 只写 after：shell 与 Code Mode 探针证明直播先漏，取消/defect 又可绕过 after 把缓存进度写进记录。
+- 只在桌面 createProjector 或扩展事件订阅遮盖：可护卡片副本，但 §2 的真实失败记录反例仍含原值；后置改记录不能满足原值不进入记录。禁用 Code Mode 或删直播也不是已批准替代。
 - 只删 build 的 external_directory ask：同时放松写入类目录审批，超出 BR-05。
 - 只按 API key 前缀/长度识别：普通密码、短值、自定义 token 不满足保证；BR-06 必须按发布规则而非猜测。
 - 依靠 watcher 承诺覆盖命令内部临时值：超出 v2 已批准范围且没有证明。
@@ -445,17 +522,64 @@ const hiddenResult: Tool.Result = {
 
 安全边界：可信方是宿主、发布名单、引擎/扩展实现及进程内存；不可信输入包括模型发起的命令、文件内容、工具/MCP 返回值。连接器执行时照常读文件，服务器与程序已经接触值不属于「未给模型」的证明。已批准的残留是原样同值误遮、程序编码/拆分、前后不可读的临时生成后删除值、加密存储经程序解密才输出的值，以及 LIVE-01 的先打印后落盘直播窗口；用户粘贴、应用自有凭据和阻止程序联网按规格排除。任意原生插件读内存、外部程序直接联网、OS 数据库解密没有在本票得到新的防护承诺。
 
-不变量：不为遮盖改写来源文件；授权 env 写回按当前文件/键/出现序号恢复值；秘密集合/key 不出进程，spool 只含认证密文；直播只发布按当时已知集合处理的文本；成功终态用前后并集再次遮盖模型结果、记录和最终文件；故障终态仅说明且不停止命令；名单/字段与公开值只有一份权威；ANSI 归一化复用同一函数。直播已见缓存不是终态记录，不承诺追回已见内容或全时刻零泄漏，LIVE-01 只承载规格 v3 批准的一个窄窗口。
+不变量：不为遮盖改写来源文件；授权 env 写回按当前文件/键/出现序号恢复值；秘密集合/key 不出进程，spool 只含认证密文；直播只发布按当时已知集合处理的文本；成功终态用前后并集再次遮盖模型结果、记录和最终文件；故障终态仅说明且不停止命令；名单/字段与公开值只有一份权威；ANSI 归一化复用同一函数。直播已见缓存不是终态记录，不承诺追回已见内容或全时刻零泄漏；LIVE-01 继承规格 v3 的窗口，说明文件加载/附带内容另按规格 v4 的已批准限制不遮盖。
 
 ## 8. 拆分决定
 
-不适用跨仓拆分；Schema、Ext、Core、Plugin、桌面宿主在同一仓。SC-01 是上游接管权限边界，不是另开跨仓接口或顺序 Task。后续实施需消费经裁决和审查冻结的 §4；不能在未映射的出口上先行实现。
+不适用跨仓拆分；Schema、Ext、Core、Plugin、桌面宿主在同一仓。SC-01 是上游接管权限边界，不是另开跨仓接口或顺序 Task。后续实施需消费经裁决和审查冻结的 §4；SC-01/SC-02 授权继承；U-42 已决定不新增 SC-03，安全 read 按既有分页/after 契约实施，没有第三处接管依赖。
 
 ## 9. 回滚
 
 不适用。没有数据迁移、不可逆数据改动或规格要求的回退路径；不设计旧版本行为或兼容期。
 
 ## 10. 裁决与审查结论
+
+### v3.3 / r8：SC-01 回调形状修订（沿用 U-38）
+
+| 裁决 | 依据 / 后果 |
+| --- | --- |
+| CAPTURE-01：同一回调逐段 publish | 采纳实施④的接缝返回；§4.5 的 readonly bytes 只作输入，Core 提供 `publish(chunk): Promise<void>`，替代单个输出 bytes / publish disposition。每段 await 后才解下一帧，不使用全量数组、不直写 Core 文件或增加 hook。§2 的原 normalizer 与 writer 探针 exit 0。 |
+| 顺序、计数与背压沿用 | 原本就是按源流顺序发布安全前缀，现在同一回调可以发布多个前缀；Core 仍独占 writer/size/newlines，逐段完成 write/drain 后应答，下一输入及终态替换等本次收口。不得用安全输出总长决定内存聚合或延迟到下次输出。 |
+| BR-07 保证不变 | 任一段失败即锁存 withheld；已发布安全前缀仅留直播，余下不发布，end 无条件换成仅说明文件，所有终态消费者同源；即便扩展捕获 publish 错误也不能恢复普通终态。此为原有“已发布若干段后失败”分支，未添加回调原子性或新的产品例外。 |
+| 授权与登记不增加 | U-38（2026-11-26，owner「好的。」）已批的 SC-01 内修订 callback 形状；仍只接管 Core Shell 捕获/清理和两面 ShellHooks。沿原 ADR-050 的 SC-01 小节与 registry `secrets-output-capture` 更新实际契约/mechanism/proof，不增加第三个接管 ID；本轮不改登记资产。SC-02/U-40 与不新增 SC-03/U-42 不变。 |
+| 状态：frozen | 顺序、背压及失败的对外保证未改变，只补足同一回调释放多帧的合法口，按本轮派单无需 frozen-pending-review。保留真实 R2 review 轮数/版本，不记新独立审查或新增 owner 批准；无 owner-only 项。 |
+
+本轮收据：Codex / GPT-6 作者定向核对，依据规格 v4、v3.2 与实施④ `7908e114024b`；本文仅 §2、§4.5/4.7、§5 与直接元数据/裁决变化。SC-01 尚未实现；新回调的真引擎顺序/多段 IO 故障与终态消费者证明留实施④/⑤，原语探针不替代这些证明。消费面检索 `rg -l 'ShellCapture|ShellHooks.capture|shell\.capture' docs/specs -g design.md` 只命中本文；旧单槽在 §4.5 与 §4.7 已同步替换，实施 plan 的旧输入收据由实施方消费本增量后更新，本轮不改计划。检查：临时原语探针 exit **0**；`packages/ui-mac` 下 `bun test src/main/old-name-scan.test.ts` exit **0**、10 pass / 0 fail；本文文档契约 findings **0**，元数据/链接及 `git diff --check` 通过。`affected-tests --list` exit **0**，scope line：`affected tests: 19 of 687 test files`（仅列范围，未运行全套）。只提交 design.md，不 merge、不更新索引/plan/运行资产，不派发子会话。
+
+### v3.2 / r6、r7：READ-01 与 U-42 冻结裁决
+
+| 裁决 | 依据 / 后果 |
+| --- | --- |
+| READ-01：保留既有 after 安全视图，不新增分页出口 | 原 reader 负责页选择、裁剪及 toModelContent；§4.4 消费原页，offset/next/行号不重算。不导入 Core 服务，不复制分页/schema/常量；non-env 仍执行前用注册 output codec 返回说明，保护原附件通道。 |
+| READ-02：原指令发布事实继承，按规格 v4 限制处理 | §2 探针证明终态遮盖不影响先发布的 synthetic；U-42 已接受说明文件中的值不遮盖。此事实不再构成安全 read 的待决阻塞，也不作为 BR-07 故障注入失败或新接口需求。 |
+| **SC-03：不实施，owner 已决定** | 2026-11-27，协调仓安全意图 U-42，owner 原话「同意。」；规格 v4 `0099c0c248` 的新增限制行明确：写进 AGENTS.md 这类给助手看的说明文件的密钥值不遮盖，不为此再改引擎。移除 r6 待批 hook/状态/扩展接口，保留 §4.4 原 read 分页后的 execute.after 改写。 |
+| 授权与登记 | 引擎改动仍只有 U-38/SC-01 与 U-40/SC-02；既有 ADR/authority registry 只按这两处已批契约登记，不新增 SC-03 或 secrets-instructions-output 条目。本轮不改运行规则或登记资产，无待 owner 项。 |
+
+| 本增量收据 | 检查方 / 结论 | 遗留去向 |
+| --- | --- | --- |
+| r6 / `176c6e8c6a`，分页与 read 指令反例 | Codex / GPT-6 作者定向核对；真实 read/指令/记录/模型探针 1 pass、exit 0 的观察继承 | 原 SC-03 待决由 U-42/规格 v4 解决，候选不实施。 |
+| r7 / `176c6e8c6a` + 规格 v4 `0099c0c248` / U-42 | Codex / GPT-6 作者核对规格限制与 owner 原话，仅移除未采纳接口并更新范围；没有新增独立审查轮次 | **v3.2 frozen**；无 owner-only 决定；分页投影、多行/长行/别名与三档端到端仍待实施验证。 |
+
+本轮只提交 design.md，按派单不更新生成索引、不合并上游；继承 r6 的代码证据，不重跑未改变的引擎探针。新增引擎面已取消，按 r6 派单条件由编排器记录本增量 review not-required，review 轮数/版本保留 R2 的真实历史收据；不伪造新审查通过。r7 检查：`packages/ui-mac` 下 `bun test src/main/old-name-scan.test.ts` exit **0**、10 pass / 0 fail；本文文档契约 findings 为 **0**，元数据、范围核对与 `git diff --check` 通过。`affected-tests --list` exit **2**：本工作树缺 `.gate-tests`，无 scope line（stderr：`/tmp/secrets-1758-r7-affected-scope.txt`），不扩项修复。规格 v4 是当前产品基线，说明文件限制仅按 U-42 消费，不增加其它限制或历史清洗。
+
+### v3.1 / r4、r5 裁决与批准
+
+**PROGRESS-01：接受实施②的 SEAM-CHANGE-NEEDED。** 原 §4.5/§4.7 把 ToolEditor 当成所有根进度出口，前提已被真实 Code Mode 探针否定。本次只重开这一边界及取消/记录/模型的直接后果；R1/R2 的其它结论与规格 v3 不重开。
+
+| 裁决 | 依据 / 处置 |
+| --- | --- |
+| 不采用桌面出口作为完整纠正 | §2 六项真实 Bus/DB 事实：卡片副本虽可遮盖，取消后的失败事件和消息已含原值。createProjector/Context.event.subscribe 都晚于 durable commit；只能做显示保护，不能实现 BR-03 的记录义务。 |
+| 不以仅终态 after 或模型降层代替 | 成功终态可遮盖、直接模型降层不读 progress metadata 均为真，但取消/defect 绕过 after，failureSnapshot 先落原值。两项真事实不构成全消费者保证。 |
+| **SC-02 — U-40 已批准（2026-11-27）** | 已批准 §4.8 的第二处根工具 progress 发布前 hook：在 Tool.snapshot.execute 包装根 context.progress，扩展改写 metadata 后原 publisher 才缓存/发出。Effect/Promise ToolHooks 和 Promise 分派同形补接口；名单、采集、匹配仍归扩展。不修改 Code Mode runtime、Bus/投影器或桌面协议。 |
+| 授权边界与结果 | 本轮派单转录的协调仓安全意图 U-40，owner 2026-11-27 原话：「Cargo 选 1，第二处引擎改动允许，Supabase 报告批准」。本票只消费「第二处引擎改动允许」，批准 §4.8 的 SC-02，不包含其它业务事项。U-38 的 SC-01 与 U-40 的 SC-02 分别记授权来源，不把第二处冒充第一处既有授权。无需再问 owner。 |
+| 登记与派工 | SC-02 与 SC-01 使用同一现有运行规则 ADR 命名空间及接管权威册：在 `.claude/rules/adrs/ADR-050-secrets-output-capture.md` 中单列 SC-02/U-40；在 `docs/architecture/codepuppy-authority-registry.json` 单独登记 ID `secrets-tool-progress`、`adr: ["ADR-050"]`。该条 takeovers 仅覆盖 §4.8 的根进度包装、Effect/Promise ToolHooks 及 Promise 分派，mechanism 指向实际扩展遮盖实现；SC-01 的 `secrets-output-capture` 条目保持独立。相关上游准入逐文件沿用 `scripts/north-star-guard.sh` 的 UPSTREAM_EXCLUDES（与 SC-01 同一 CI 权威），不加包级豁免。登记及真实 proof 随 SC-02 实现生效；本轮仅提交设计，不伪造 ADR/registry 已写入或机制已实现。 |
+
+| 本增量收据 | 检查方 / 结论 | 遗留去向 |
+| --- | --- | --- |
+| v3.1，`66313542d3` 设计 + `d14b17a2ea`/`9a08725438` 实施反例 | Codex / GPT-6 作者定向核对；重跑原反例 1 pass，真实 Bus/DB 新探针 1 pass，均 exit 0；生产链定向 diff 为空。没有实施生产代码、没有新独立审查结论 | r4 待批状态由 r5 的 U-40 解决；证据继承，不重审其它范围。 |
+| r5 / `4466819664` + U-40，授权与登记 delta | Codex / GPT-6 作者核对；按 owner 原话确认批准来源，仅消除待批标记、固定登记归属，无新增独立审查轮次 | **frozen**；无 owner-only 决定；SC-02 实现与端到端证明仍留实施。 |
+
+本轮检查：`packages/ui-mac` 执行 `bun test src/main/old-name-scan.test.ts`，exit **0**、10 pass / 0 fail；按已解析 delivery profile 调用 `check_repo(..., changed_since="HEAD")`，本文 findings 为 **0**，元数据/本地链接/旧名词元及 `git diff --check` 通过。文档检查只针对本次增量；按本轮「commit only the design」不更新索引，也不把现有 index.stale 报成全仓通过。尚未验证 SC-02 的实际接线/回调故障、完整 live card 和各消费者端到端；现有探针证明的是旧接缝不足及所需前置边界，不能宣称第二 hook 已经生效。没有新增产品限制或规格取舍。
 
 ### R1 处置（继承，受 R2 修正的部分以下文为准）
 
@@ -474,7 +598,7 @@ const hiddenResult: Tool.Result = {
 
 ### R2 处置与冻结
 
-独立 R2：Claude Opus 5.5，只读，范围 `582f056887..d336e59d04`，FIX-THEN-MERGE（3 Major、3 Minor）。编排器全部接受并明确本轮纠正后直接 frozen、**不再审查一轮**。本表是修正/核对收据，不伪造独立复审通过。
+独立 R2：Claude Opus 5.5，只读，范围 `582f056887..d336e59d04`，FIX-THEN-MERGE（3 Major、3 Minor）。编排器当轮要求纠正后直接 frozen、不追加同轮复审；v3.1 因后续实施新证据单独重开。本表是修正/核对收据，不伪造独立复审通过。
 
 | finding / 处置 | 最小修正与证据 | 结论 |
 | --- | --- | --- |
@@ -500,7 +624,7 @@ SC-01 的登记权威固定如下；这是架构边界决定，本设计提交�
 - 唯一权威册 `docs/architecture/codepuppy-authority-registry.json` 新增决策 ID `secrets-output-capture`。`takeovers` 只列 SC-01 的 Core Shell 捕获/清理生命周期与两个 ShellHooks 面，`mechanism` 指向实际持有遮盖规则的扩展；`adr`/来源关联 ADR-050、#1758 与 U-38/U-39。真实实现/证明到位时按已有格式登记 proof，不填不存在的测试、不登记成 blocked 项。
 - 上游准入逐文件登记在 `scripts/north-star-guard.sh:124` 的 `UPSTREAM_EXCLUDES`；CI 的 `.github/workflows/codepuppy-ci.yml:126-133` 调同一脚本，不重建第二张 CI excludes 表。沿用 parity/authority judge，不加包级豁免、不以设计文字替代登记。守卫 `:117-118` 的旧双表说明与当前调用接线不符，仍只消费实际单一权威，不修旁观注释。
 
-登记与 SC-01 实现同一行为变更生效；本轮只冻结决定与授权，不伪造已实现机制或验证。实施消费规格 v3、本节来源与 §4/§5；原 ANSI 纯函数只是已有 callable 复用，不构成新的 UI 接管。
+登记与 SC-01 实现同一行为变更生效；本轮只冻结决定与授权，不伪造已实现机制或验证。实施消费规格 v4、本节来源与 §4/§5；原 ANSI 纯函数只是已有 callable 复用，不构成新的 UI 接管。
 
 ### 检查收据
 
@@ -518,4 +642,4 @@ SC-01 的登记权威固定如下；这是架构边界决定，本设计提交�
 
 **仍未核验**：SC-01、增量归一化/matcher、env 写回包装、各 profile 解析与 spill/staging 尚未实现；全消费者真引擎故障注入、真实并发/目录变化与出货 Windows/Node SQLite 验收仍属实施证明。本机临时原语/算法探针不冒充出货验证，也不承诺 LIVE-01 窗口内新值从未被已见直播消费。
 
-**留档**：入口索引的既有问题、守卫旧双表说明保持原处置，不改运行规则/权威册。R1/R2 全部已处置，规格 v3 是唯一有效产品基线；没有等待 owner 的残留或追加审查轮次。
+**留档**：入口索引与守卫旧说明保持原处置，不改运行规则/权威册。R1/R2 的历史 finding 已处置；当前产品以规格 v4 为准。SC-01/SC-02 授权继承；v3.2 的 SC-03 候选已由 U-42 决定不实施，v3.3 仅补 SC-01 的多段发布形状；无待 owner 项，不伪造新增独立审查或已完成实施。

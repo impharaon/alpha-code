@@ -1230,3 +1230,5 @@ packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts	vend
 packages/codepuppy-contracts-consumer/src/decode.ts	../vendor/alpha-platform-video-understanding/v1/video-understanding.schema.json	1	external-anchor	平台视频契约及真实媒体来源固定；与 producer 仓名/锁/原字节路径对应（#1775）。
 packages/ui-mac/src/main/fixtures/video/platform-sample.provenance.json	impharaon/alpha-platform	1	external-anchor	平台视频契约及真实媒体来源固定；与 producer 仓名/锁/原字节路径对应（#1775）。
 packages/codepuppy-contracts-consumer/alpha-platform-video-understanding.lock.json	文件名	1	external-anchor	平台视频契约及真实媒体来源固定；与 producer 仓名/锁/原字节路径对应（#1775）。
+packages/ui-mac/icons/source/make-icons.py	Image.alpha_composite	1	third-party	#1784: Pillow module API; not a product name.
+packages/ui-mac/icons/source/make-icons.py	flat.alpha_composite	1	third-party	#1784: Pillow image API; not a product name.

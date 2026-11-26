@@ -357,7 +357,7 @@ export function buildMcpTxItems(input: McpTxBuildInputV1): PackageTxBuildResultV
     server: input.name,
     items: input.secretNeeds.map((need) => ({ prerequisiteId: need.needId, componentId: receipt.id, label: need.needId, required: true, target: input.leaf.type === "local" ? { kind: "mcp-environment", variable: need.needId } : { kind: "mcp-remote-headers", variable: need.needId, headers: Object.keys(input.leaf.headers ?? {}).filter((key) => input.leaf.type === "remote" && input.leaf.headers?.[key]?.includes(`{secret:${need.needId}}`)) } })),
   }
-  const official = "payload" in input && "officialRecipe" in input.payload.behavior && input.payload.behavior.officialRecipe
+  const official = "payload" in input && "behavior" in input.payload && "officialRecipe" in input.payload.behavior && input.payload.behavior.officialRecipe
   if (official && !isOfficialConnector(input.name)) return { ok: false, reason: "invalid official connector identity" }
   const secretVersion = prerequisite.items.length ? input.newSecretVersionId() : undefined
   const submitted = prerequisite.items.filter((item) => typeof input.secretValues[item.prerequisiteId] === "string" && input.secretValues[item.prerequisiteId]!.length > 0)

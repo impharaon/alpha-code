@@ -2964,7 +2964,7 @@ export async function setPackageStateV1(
       const advisory = deps.advisoryGate({ catalogId: record.id, name: record.name, payloadDigest: record.payloadDigest, provenance: record.origin === "catalog" ? "cache" : "bundled" })
       if (!advisory.allowed) return { ok: false, reason: `advisory ${advisory.advisoryId}: ${advisory.reason}` }
       if (record.origin === "catalog" && verified) {
-        const matched = verifyPackageCandidate(graph, verified, record)
+        const matched = verifyPackageCandidate(graph, verified, graph.pluginTree ? { ...rootRecord, id: graph.root.componentId } : record)
         if (!matched.ok) return matched
       }
     }

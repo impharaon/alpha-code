@@ -1,4 +1,6 @@
 import { parseVideoBridgeReply, type VideoBridgeRequest, type VideoBridgeReply } from "../../ui-mac/src/shared/video-understanding"
+import { createNetworkEgress } from "./network-egress"
+import { parseNetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../../ui-mac/src/shared/package-admission"
 import type { PluginSourceIdV1, SourceSearchResultV1 } from "../../ui-mac/src/main/plugin-sources"
 import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/plugin-source-timing"
@@ -58,6 +60,7 @@ type VideoAction = VideoBridgeRequest extends infer Request ? Request extends Vi
 
 export type HubBridge = {
   video(input: VideoAction): Promise<VideoBridgeReply | BridgeFailure>
+  readonly network: ReturnType<typeof createNetworkEgress>
   readonly unattended: ReturnType<typeof createUnattendedState>
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
@@ -108,6 +111,11 @@ export function createHubBridge(
     const message = event?.data
     if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
+    if (type.startsWith("codepuppy.network.")) {
+      const parsed = parseNetworkOutbound(message)
+      if (!parsed) return log("network egress: malformed runtime message")
+      if (network.receive(parsed)) return
+    }
     if (type === "codepuppy.unattended.live") {
       const parsed = parseUnattendedLive(message)
       if (!parsed) return log(`[@codepuppy/ext] dropped a malformed unattended snapshot`)
@@ -159,6 +167,17 @@ export function createHubBridge(
     })
   }
 
+  const network = createNetworkEgress({
+    log,
+    send: async (build) => {
+      const reply = await ask(build, (message) => {
+        const parsed = parseNetworkOutbound(message)
+        return parsed?.type === "codepuppy.network.activity.reply" ? parsed : undefined
+      })
+      return "type" in reply ? reply : undefined
+    },
+  })
+
   const writeToolPolicy = async (build: (id: number) => unknown): Promise<{ backup?: string }> => {
     const result = await ask(build, (message) => {
       const reply = parseToolPolicyWriteReply(message)
@@ -176,6 +195,7 @@ export function createHubBridge(
 
   return {
     video: (input) => ask((id)=>({type:"codepuppy.video.understand",id,...input}),parseVideoBridgeReply),
+    network,
     unattended,
     available: !!port,
     ...(port

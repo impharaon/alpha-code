@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Run only the shared selector's file list. ui-mac real engines stay serial;
-# browsers use one isolated worker to avoid sharing Vite's dependency cache.
+# Run only the shared selector's file list. Real engines own their test-group slot;
+# browser processes use separate Vite caches.
 set -uo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 step="$1"; WORKDIR="$2"; floor="$3"; shift 3
@@ -28,10 +28,9 @@ ui_mac_is_engine() { # <相对 packages/ui-mac 的文件>
 }
 
 # <相对 packages/ui-mac 的文件> <层> → 它进哪一组:parallel / serial / browser。ui-mac 的分组只在这里定(门与测量都读它)。
-#   serial  = 起真引擎的 integration / scenario 文件,一个进程按文件表顺序跑(#1740);
-#   browser = 真浏览器文件(*.browser.*):每个起一台 vite 开发服务器 + 真 Chrome。两台同时跑会共用 vite 的依赖缓存、互相触发整页
-#             重载(aa455979a3 上 composer-popover-gap 两次红在 `Execution context was destroyed ... navigation`);放进不隔离的串行
-#             进程又会被前一个文件留下的全局打坏(tooltip 读不了 vite 配置)。所以单独一组:`--parallel=1`,一个隔离 worker 逐个跑;
+#   serial  = 起真引擎的 integration / scenario 文件;组内 --parallel=3,组间串行以免别组抢 CPU 触发引擎超时。
+#   browser = 真浏览器文件(*.browser.*):每个隔离进程起一台 vite + Chrome;test-visual/vite.config.ts 按 PID 隔离依赖缓存,
+#             避免共用缓存触发整页重载(aa455979a3 上 composer-popover-gap 的 navigation 红);组内 --parallel=5。
 #   parallel = 其余。
 ui_mac_run_group() {
   case "${1##*/}" in *.fast.test.ts|*.fast.test.tsx) echo parallel; return 0 ;; esac
@@ -51,6 +50,22 @@ run_group() {
   return "$rc"
 }
 if [ "$WORKDIR" != packages/ui-mac ]; then
+  if [ "$WORKDIR" = packages/ext ]; then
+    ext_files=(); upstream_red_files=()
+    for f in "${files[@]}"; do
+      case "$f" in
+        *-upstream-reds.scenario.test.ts) upstream_red_files+=("$f") ;;
+        *) ext_files+=("$f") ;;
+      esac
+    done
+    rc=0
+    # 普通 ext 文件串行:policy-host 的顶层 await 共享模块不能被 --isolate 打断初始化。
+    # 两组之间串行:普通组的真实 policy-host 引擎先结束,再让红例子进程并行加载 core/server,避免 CPU 竞争超时。
+    [ "${#ext_files[@]}" -eq 0 ] || run_group "$step" "$floor" "${ext_files[@]}" || rc=1
+    # 预期红例宿主不导入 policy-host;各自把上游文件放进子进程,可隔离并行。
+    [ "${#upstream_red_files[@]}" -eq 0 ] || run_group "$step+upstream-reds" 0 --parallel=3 "${upstream_red_files[@]}" || rc=1
+    exit "$rc"
+  fi
   run_group "$step" "$floor" ${flags[@]+"${flags[@]}"} "${files[@]}"
   exit $?
 fi
@@ -66,7 +81,14 @@ floor_parallel=0; floor_serial=0
 if [ "${CODEPUPPY_TEST_FULL:-0}" = 1 ]; then floor_parallel=1600; floor_serial=305; fi
 export CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv
 rc=0
+# 组间串行:浏览器冷构建不与普通组叠加;两者结束后才把测试组时段交给真引擎。
 [ "${#parallel_files[@]}" -eq 0 ] || run_group ui-mac "$floor_parallel" --parallel "${parallel_files[@]}" || rc=1
-[ "${#serial_files[@]}" -eq 0 ] || run_group ui-mac+serial "$floor_serial" "${serial_files[@]}" || rc=1
-[ "${#browser_files[@]}" -eq 0 ] || run_group ui-mac+browser 1 --parallel=1 "${browser_files[@]}" || rc=1
+[ "${#browser_files[@]}" -eq 0 ] || run_group ui-mac+browser 1 --parallel=5 "${browser_files[@]}" || rc=1
+if [ "${#serial_files[@]}" -gt 0 ]; then
+  # bootstrap 探针会安装依赖、typecheck、跑围栏;只与非引擎组重叠,全部退出后引擎才独占 CPU。
+  for pid in ${CODEPUPPY_TEST_PROBE_PIDS:-}; do
+    while kill -0 "$pid" 2>/dev/null; do sleep 0.05; done
+  done
+  run_group ui-mac+serial "$floor_serial" --parallel=3 "${serial_files[@]}" || rc=1
+fi
 exit "$rc"

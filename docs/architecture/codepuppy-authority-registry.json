@@ -2118,7 +2118,7 @@
     },
     {
       "id": "plugin-local-mcp",
-      "decision": "Only the managed plugin MCP instance receives a main-issued, generation-bound loopback proxy capability; ordinary tools and child processes retain the existing destination authority. Review r20 A1: every Location plugin setup publishes its readiness over the existing private sidecar channel; main uses the same managed MCP convergence after that build and after every reload. Plugin-tree graphs are always selected regardless of the reloading items; other graphs retain their item selection. Runtime projections and startup templates keep their original owners.",
+      "decision": "Only the managed plugin MCP instance receives a main-issued, generation-bound loopback proxy capability; ordinary tools and child processes retain the existing destination authority. Review r20 A1: every Location plugin setup publishes its readiness over the existing private sidecar channel; main uses the same managed MCP convergence after that build and after every reload. Plugin-tree graphs are always selected regardless of the reloading items; other graphs retain their item selection. Runtime projections and startup templates keep their original owners. Review r20 A5: main retains only the current named dependency-missing convergence detail per Location/server and notifies the existing hub view. That view uses its existing non-reloadable not-loaded detail when the connector is not connected; a later non-error convergence clears the detail. No new engine or UI status DTO.",
       "adr": [
         "ADR-029"
       ],
@@ -2159,6 +2159,10 @@
         {
           "file": "packages/ui-mac/src/main/package-hub-lifecycle.engine.cases.ts",
           "name": "plugin MCP remains connected after a skills-only package reload"
+        },
+        {
+          "file": "packages/ui-mac/src/main/package-hub-lifecycle.engine.cases.ts",
+          "name": "plugin MCP missing environment dependency appears in the hub row detail"
         }
       ],
       "note": "The existing connection input fetch is scoped before McpClient.connect. index.ts connectProvider and explicit authorization already override that service with the layer-captured fetch, so their exact composition points also consume the same private wrapper. oauth.ts, the public server schema, global fetch, NO_PROXY, seatbelt and the gate are unchanged. #1776 r11 A4 (orchestrator r9 S-12 ruling): source transport reaches the existing connection fetch. Only the bound SSE transport issues endpoint registration through its private proxy headers; main checks the live declared SSE stream, origin and generation capability, registers the exact POST URL, and removes the control header. Same bearer and stream revocation; no second SSE parser, SDK private access, general same-origin grant or public binding fields."

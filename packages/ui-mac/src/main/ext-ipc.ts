@@ -146,7 +146,19 @@ export function registerExtIpcHandlers(
     }
   }
   // I-11(design v9 §4.4「运行时收敛」):受管全局 MCP 的一切运行时操作只经这一个实例(按名串行,执行时读最终投影)。
-  const convergeManagedMcp = createManagedMcpConvergence({ root: codepuppyGlobalRoot, awaitServer, directory: codepuppyUserWorkspaceDir, userDataPath: () => userDataPath, log: (line) => getLogger()?.warn(line) })
+  const runManagedMcp = createManagedMcpConvergence({ root: codepuppyGlobalRoot, awaitServer, directory: codepuppyUserWorkspaceDir, userDataPath: () => userDataPath, log: (line) => getLogger()?.warn(line) })
+  const mcpDependencyErrors = new Map<string, string>()
+  const mcpDependencyKey = (directory: string, name: string) => JSON.stringify([directory, name])
+  const convergeManagedMcp = async (names: readonly string[]) => {
+    const results = await runManagedMcp(names)
+    for (const result of results) {
+      const key = mcpDependencyKey(result.directory, result.name)
+      if (result.detail?.startsWith("dependency-missing:")) mcpDependencyErrors.set(key, result.detail)
+      else mcpDependencyErrors.delete(key)
+    }
+    notifyHubViewChanged()
+    return results
+  }
   const reloads = createReloadCoordinator({
     restartConnectors: () => officialRuntime?.refresh() ?? Promise.resolve(false),
     applyPackageMcp: async (items, phase) => {
@@ -1501,6 +1513,7 @@ export function registerExtIpcHandlers(
     projectEntry: (directory) => resolveProjectEntry(directory),
     defaultDirectory: codepuppyUserWorkspaceDir,
     projectMcpState: (name, projectDir) => projectMcpState(name, projectDir, false),
+    mcpDependencyError: (directory, name) => mcpDependencyErrors.get(mcpDependencyKey(directory, name)),
     awaitServer,
     pendingFor: (directory, itemID) => reloads.pendingFor(directory, itemID),
   })

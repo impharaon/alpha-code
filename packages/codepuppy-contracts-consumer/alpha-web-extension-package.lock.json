@@ -1,8 +1,8 @@
 {
   "repo": "jinjunnn/alpha-web",
-  "commit": "b9979b8696414658b0ac3f60926a2eb78bc9c8f7",
+  "commit": "a5db3e343eb4162c78bd5f84c408052a26e7adf4",
   "artifactPath": "contracts/extension-package/artifact",
-  "artifactSha256": "b3b9bc150a93fa68a7c966d13f55cf81f4b58250c941db0e2d76d6eac0aa2a6c",
+  "artifactSha256": "439f84fc7d20ebe5ee02df0a0824c6795f5cbceda036ee04b5a4e82d6ac3423f",
   "files": [
     {
       "path": "asset.generic-bundle-agent.md",
@@ -18,11 +18,11 @@
     },
     {
       "path": "claude-code.rules.v1.json",
-      "sha256": "fbb29317b797552e0b92c9ff05a8b8eec60fd92e57432555b4e0033b62aabe3f"
+      "sha256": "73bc3889dbebac14ac26a6fafc9417d457bf7beab4565be7bdcd3120caeebb10"
     },
     {
       "path": "codex.rules.v1.json",
-      "sha256": "726d19ea97bd9af932471a9438aa9908c714a3e69b50e646fd1cb5449c063191"
+      "sha256": "2ea1cd900cb9f9671f6331a787d0675df2bedab8dd02c3198e5c198144eb3a00"
     },
     {
       "path": "codepuppy-package-compatibility-report-v1.schema.json",
@@ -58,7 +58,7 @@
     },
     {
       "path": "extension-package-producer-artifact.v1.json",
-      "sha256": "77fe1b68d5cffbd200c40285a3319e6ecd976913c1148d3059324f6f59210113"
+      "sha256": "6a9fb5d7efe18d5e0bd70e3acdfdbba23c79164a75800decbb8a537b5be3d9f5"
     },
     {
       "path": "generic-profiles.v1.json",
@@ -66,11 +66,11 @@
     },
     {
       "path": "generic-rules.v1.json",
-      "sha256": "8df5c24be9e78f7ad3ec740283e1f4256332246f9117f636c7123c81a518eefa"
+      "sha256": "07f4201ed40bc9282f4b778526aeb9415e68eba21c8bb78160e543a27176afb8"
     },
     {
       "path": "host-contract-pin.v1.json",
-      "sha256": "5b6e1eab950b8daa318f831faaad84c3d4d9e19ea905277c2f92e249dd9fe5f3"
+      "sha256": "e4fdcd3974fa730521796e7f70416bb414ab7dd15fcb305214e2061ecc2d6071"
     },
     {
       "path": "host-extension-package-artifact.v1.json",

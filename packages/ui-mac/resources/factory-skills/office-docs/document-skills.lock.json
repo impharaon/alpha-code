@@ -1,0 +1,1474 @@
+{
+  "upstream": "https://github.com/anthropics/skills",
+  "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba",
+  "adaptedAt": "2026-11-26",
+  "files": [
+    {
+      "sourcePath": "skills/canvas-design/LICENSE.txt",
+      "sourceSha256": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+      "path": "canvas-design/LICENSE.txt",
+      "sha256": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+      "changes": "Unmodified upstream Apache-2.0 licence."
+    },
+    {
+      "sourcePath": "skills/canvas-design/SKILL.md",
+      "sourceSha256": "a1f288079624402f30682753c1d43920b6664785698d21d3e7aa197450a6448b",
+      "path": "canvas-design/SKILL.md",
+      "sha256": "6fa64d913afee31698ceb4bfed0c1ac3b3aa72f32fa7ad11a7f12b1a72b76a76",
+      "changes": "Adapted runtime/workflow, Chinese typography, local delivery, template priority and bounded visual review; retained format/design knowledge."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/ArsenalSC-OFL.txt",
+      "sourceSha256": "8ddd61b18ba2c0d0dbe4a691cf5f1a0673f473d02fa0546e67ee88c006aeff6e",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/ArsenalSC-Regular.ttf",
+      "sourceSha256": "65e6f89df58f68fd905b3add34a79dd6106aa3b3044df0dad9676fff53d504b9",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/BigShoulders-Bold.ttf",
+      "sourceSha256": "b43bcd198b9fdf717dd42aa61a34dba32e01aceaeae659d689afd0ca52c37ea2",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/BigShoulders-OFL.txt",
+      "sourceSha256": "fbc746aabf0eb1847dfd92e2efc4596d79fa897d60b8e64062a22f585508fb3f",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/BigShoulders-Regular.ttf",
+      "sourceSha256": "18a879fc71978a4447150705caf880a9da3860083c259fd29e6dc03057b6842a",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Boldonse-OFL.txt",
+      "sourceSha256": "45cc82ab4032273c0924025ffcf8f0665a68e1a5955e3f7247e5daf1deeb1326",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Boldonse-Regular.ttf",
+      "sourceSha256": "cc2e540604565c0f90a7d8d46194a2f42fc9c45512cd2e39bf03b50eb68c35a4",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/BricolageGrotesque-Bold.ttf",
+      "sourceSha256": "a737b146fe0d77ffe8a86e3cd16700dd431d3b1e420d4fd80e142cd68a1cb50d",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/BricolageGrotesque-OFL.txt",
+      "sourceSha256": "0e4f4eb8534bc66a76aca13dd19c1f9731b2008866b29ccff182b764649df9b4",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/BricolageGrotesque-Regular.ttf",
+      "sourceSha256": "972a6d098c9867ae131d0ea99e221e63976b11a19d4b931c2c7ace525674e4f6",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/CrimsonPro-Bold.ttf",
+      "sourceSha256": "48f191e38355c8db100eb3ce157c20f9302a3b9a37b44a660f77ecfce3986609",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/CrimsonPro-Italic.ttf",
+      "sourceSha256": "52318db3526b644e6efa60be0b3ca5a50e40fbe8bd026c261e0aa206f0772267",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/CrimsonPro-OFL.txt",
+      "sourceSha256": "35680d14547b6748b6f362a052a46d22764ce5eccf96e18b74f567bb2ee58114",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/CrimsonPro-Regular.ttf",
+      "sourceSha256": "48fad08cb1917a7b2f2c6fe5135d6c07743a6663cf7631ec4481108aaf081422",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/DMMono-OFL.txt",
+      "sourceSha256": "bfe7842fcb88323e2981e24710c25202677385a8c75fb6a87217b275a0247ae3",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/DMMono-Regular.ttf",
+      "sourceSha256": "f98ada968dc3b6b2c08d3f5caaf266977df0bfe0929372b93df5a06cf2ace450",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/EricaOne-OFL.txt",
+      "sourceSha256": "e0de629968b52255548d5fafcf30b24ff9edae0eda362380755a75816404d0fa",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/EricaOne-Regular.ttf",
+      "sourceSha256": "db1d89e80e33a8a01beaaac7a85df582857d24a43f1e181461aa7ff5d701476a",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/GeistMono-Bold.ttf",
+      "sourceSha256": "75c0828d5c1ee44b9ef9f4df577bf41595ec362e2ea3f1e558590c9e92c7949d",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/GeistMono-OFL.txt",
+      "sourceSha256": "6a873c900f584109b13ae0aaf81d6e3cf0a68751a216b03f7b6c68d547057bb4",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/GeistMono-Regular.ttf",
+      "sourceSha256": "a55c1b51cda4afeab9e471e7947b85a20f7c8831d7e6b1470c1b7fbdc0f0f15e",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Gloock-OFL.txt",
+      "sourceSha256": "c0a3f3125ac491ef3d1f09f401be4834c646562f647e44f2bcbc49f0466c656d",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Gloock-Regular.ttf",
+      "sourceSha256": "e86b4ce66dbd3f1f83eee8db99ec96e0da1128c3f53df0e9b3b7472025dfe960",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/IBMPlexMono-Bold.ttf",
+      "sourceSha256": "dbd2a2fb024579438d6400a84e57579bfd2dbe67c306c8fd9fde92a61e4f2eea",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/IBMPlexMono-OFL.txt",
+      "sourceSha256": "5294ce778857e1eb02e830b6ab06435537d38f43055327e73d03a2d4d57d5123",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/IBMPlexMono-Regular.ttf",
+      "sourceSha256": "ab08018ccd276b79fb2c636bb95b9c543598f9d50505fe92506fcb4dae7810cd",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/IBMPlexSerif-Bold.ttf",
+      "sourceSha256": "b8d294e9b5c5a0940f167c3ced0f7ef2e3f57082ca3ff096ef30e86e26c1c159",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/IBMPlexSerif-BoldItalic.ttf",
+      "sourceSha256": "da64b75f4284f53e7b5c71fa190a35b8bf3494fe19f1804c81c3a53340bca570",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/IBMPlexSerif-Italic.ttf",
+      "sourceSha256": "b11f1048745e715a55c9d837b3f10226ca3d78867b7db7251ddad8f98dcf0f38",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/IBMPlexSerif-Regular.ttf",
+      "sourceSha256": "77cd233a2af8dc6b1022faea3bb3b01f3c75af68bcf530cb6aeb15982ff3dbb7",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/InstrumentSans-Bold.ttf",
+      "sourceSha256": "444f85bf1c4b0e1ce1ca624f6be54bcd832207714ccaf4ea99ee531341683bdf",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/InstrumentSans-BoldItalic.ttf",
+      "sourceSha256": "3762f6cef95d6039489ad5ba5787d4c30f17a1ad01e9ac3c816ed69692722a68",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/InstrumentSans-Italic.ttf",
+      "sourceSha256": "78e85858e371b2cb4e18f617c10f0f937c0e12a0887ffee98555b24ed305b3a7",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/InstrumentSans-OFL.txt",
+      "sourceSha256": "bf4dc6d13a8cccd4807133c77a1ee9619a16b92cb23322258725ab6731c2f6e5",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/InstrumentSans-Regular.ttf",
+      "sourceSha256": "a22cb26e48fd79bcb01bf2fc92d36785474dce36d9c544ab0a8868c2657c4a87",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/InstrumentSerif-Italic.ttf",
+      "sourceSha256": "9c86e4d5a47b50224a2463a9eca8535835257c8e85c470c2c6b454b1af6f046e",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/InstrumentSerif-Regular.ttf",
+      "sourceSha256": "56ac3be03ac3ba283196b3e77850ab2ffcf56cfb6fd3212c5620109a972f8c99",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Italiana-OFL.txt",
+      "sourceSha256": "8373b11312ace78c4cec2e8f9f6aa9f2330601107dac7bcf899c6f2dbd40c5a5",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Italiana-Regular.ttf",
+      "sourceSha256": "15c4dd6ab8cf4a29ba8826f65edcbe2f6c266c557d34d081f25072dfd5605fd2",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/JetBrainsMono-Bold.ttf",
+      "sourceSha256": "a2349098b9e45419e7bf0e2958d6c4937a049dded37387b08be725be4c7615f3",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/JetBrainsMono-OFL.txt",
+      "sourceSha256": "a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/JetBrainsMono-Regular.ttf",
+      "sourceSha256": "b6b1ff4ddefe36d7f2a6174e1d001cab374e594519ee9049af028d577b64c5f5",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Jura-Light.ttf",
+      "sourceSha256": "c891a381df056b2c4dfe85841e911bf45da0890fa21a7b2692cbe5ea1f505e1e",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Jura-Medium.ttf",
+      "sourceSha256": "c72965cb732a92872643819fd1734128238583cc36b116313859137a51d3368a",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Jura-OFL.txt",
+      "sourceSha256": "eaf9bdb675f6d87e5feb88199ab3ea581d3bd2082f426e384fa9c394576d7260",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/LibreBaskerville-OFL.txt",
+      "sourceSha256": "55959eef5b0c3b2e3c1c7631b8ff0f9447d75de20f29cfa7db5bcfb026763343",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/LibreBaskerville-Regular.ttf",
+      "sourceSha256": "2101302538d9e88adb679031c04623e4578b5745e89566284fd2c508d79acae0",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Lora-Bold.ttf",
+      "sourceSha256": "7d74015e950c2fb66519c7295b8155621d22200ae2ca2a4c6b43ce3c490cac87",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Lora-BoldItalic.ttf",
+      "sourceSha256": "152f87e71f5ddb60d5c57ecd9132807c947e65c42977193c9164e7c5a6690081",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Lora-Italic.ttf",
+      "sourceSha256": "be627e595184e8afe521f08da0607eee613f1997d423bc8dadc5798995581377",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Lora-OFL.txt",
+      "sourceSha256": "62e37a82d3f1ef2a70712885fa8b3144b65fd144d8e748d6196b690a354d792c",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Lora-Regular.ttf",
+      "sourceSha256": "7ed00e7c9cdf16ab7e2fd2361fe45d4f0b61263cd60aae398b27b7ee08108827",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/NationalPark-Bold.ttf",
+      "sourceSha256": "69ac4c301c4a7233c6e602d12a92c54d7967b575f4449951c45ce773f7acff53",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/NationalPark-OFL.txt",
+      "sourceSha256": "81c6c71d83b5b45d7344f96df12bb4a2477a5b092a9144757ee1d0f50f855175",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/NationalPark-Regular.ttf",
+      "sourceSha256": "a477338b7e18308d476650dfe31235ef86a883572665e56ffb5fb80f82009b58",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/NothingYouCouldDo-OFL.txt",
+      "sourceSha256": "7c2a6970584ddad04919816163746f83b378078015899b18468b40f05e9ce128",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/NothingYouCouldDo-Regular.ttf",
+      "sourceSha256": "d866f985896d3280f4fce72db7e17302c24a0c1fdb0699b6b5ed3af14f944d57",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Outfit-Bold.ttf",
+      "sourceSha256": "6654b93d21301ec61887d3cedd6c11d9df1b1dfb63f9cf45ac7995f6e2235ab1",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Outfit-OFL.txt",
+      "sourceSha256": "1945b62cd76da9a3051a1660dde72afaa64ffc2666d30e7a78356d651653ba2f",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Outfit-Regular.ttf",
+      "sourceSha256": "f24945365147c9e783e91d8649959b59be6b00c9ee4ecd2f6b33afbb2dd871fe",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/PixelifySans-Medium.ttf",
+      "sourceSha256": "38397504f71c122b03d234ea6f55118e3d5bdbddffd82bedddbd7755d3b3be82",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/PixelifySans-OFL.txt",
+      "sourceSha256": "7f54d1d9f1ae1ba9f2722f978145f90324fea34ca3c2304b3a29cfa96ac6037e",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/PoiretOne-OFL.txt",
+      "sourceSha256": "2eaf541f7eb8b512e4c757a5212060abf5b6edfef230e9d7640bf736b315c33a",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/PoiretOne-Regular.ttf",
+      "sourceSha256": "9cf265b139648b36b6c0afdfeb0bf27f7e66db9a16094bc40f644d8da05bc318",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/RedHatMono-Bold.ttf",
+      "sourceSha256": "7ef48353f4be5ddb90f000f6fad48f2b62b3e8c27d9818d8d45ff46c201065e0",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/RedHatMono-OFL.txt",
+      "sourceSha256": "435fbfb7e66988b2a06686a4cb966faec733f35d8fe100a1601573c27f3e0bb8",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/RedHatMono-Regular.ttf",
+      "sourceSha256": "452fe826871b37539f5212b20c87cf30f82f58dd2741f1c96edd1dcbdc0db6b4",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Silkscreen-OFL.txt",
+      "sourceSha256": "6b849745119bbe85ec01fd080c9cd50234da9f52ac6e48b55d1a424a0c4d7ca9",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Silkscreen-Regular.ttf",
+      "sourceSha256": "49567408600809e25147e9225ac4f37f410e2df45a750696c45027531fb65f1b",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/SmoochSans-Medium.ttf",
+      "sourceSha256": "dd76e6e77cce82f827a8654cd906e9ce58f3aaf78adda63c4a7f655b8ecb41f0",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/SmoochSans-OFL.txt",
+      "sourceSha256": "74c9c4eb88e891483e1b7bc54780b452cbf4f4df66d4e71881d7569aa2130749",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Tektur-Medium.ttf",
+      "sourceSha256": "52bbe8c9b057b3d2da4eeace31a524b1ea26a1375ae34319cf6900ccc57a4c82",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Tektur-OFL.txt",
+      "sourceSha256": "3f1466cb5438f31782eeb6e895f3a655bc4d090e24263e331f555357d1cb734e",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/Tektur-Regular.ttf",
+      "sourceSha256": "162e1b36c4718c5b051b36c971ad7e50d341944f35618f480422ebbe72988f98",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/WorkSans-Bold.ttf",
+      "sourceSha256": "240d125fc9f8561363dc1ea3f513501253bd70942f41468f48f0b0cafb0c82e2",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/WorkSans-BoldItalic.ttf",
+      "sourceSha256": "a5b2cad813df0aaa7d16621f2e93b5117c25e9bc788bc9a3ad218e9d6348ce34",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/WorkSans-Italic.ttf",
+      "sourceSha256": "6b7f7002e0b0c8b261fe878658ef5551e3e59d9f6b609b04efb90dde1e2c1ada",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/WorkSans-OFL.txt",
+      "sourceSha256": "ace8c22a3326318b54e67c3691857929634205533f454a70ef5a3473ddb2e2ba",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/WorkSans-Regular.ttf",
+      "sourceSha256": "e67985a843df0d3cdee51a3d0f329eb1774a344ad9ff0c9ab923751f1577e2a4",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/YoungSerif-OFL.txt",
+      "sourceSha256": "cdcb8039606b40a027a6d24586ec62d5fe29c701343d82a048c829cb28a3dd28",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/canvas-design/canvas-fonts/YoungSerif-Regular.ttf",
+      "sourceSha256": "f8dc08f77abad753a00670af70756a8ace938e5c3f0b770f4f4c2071c4bd8fc6",
+      "excluded": "Excluded upstream font collection: per-file licence correspondence not established; use bundled OFL Chinese fonts."
+    },
+    {
+      "sourcePath": "skills/docx/LICENSE.txt",
+      "sourceSha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "path": "docx/LICENSE.txt",
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "changes": "Unmodified upstream Apache-2.0 licence."
+    },
+    {
+      "sourcePath": "skills/docx/SKILL.md",
+      "sourceSha256": "895d5aa6c4cd98e4aed4c995d846f056f3549086e79bcd6617afea6014f82288",
+      "path": "docx/SKILL.md",
+      "sha256": "b99d4296ac9da1f92caf44ac32df58a8423b679643ebdf70f8c8ed47e34e61fa",
+      "changes": "Adapted runtime/workflow, Chinese typography, local delivery, template priority and bounded visual review; retained format/design knowledge."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/__init__.py",
+      "sourceSha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/accept_changes.py",
+      "sourceSha256": "0c991d2bc7304a1248e9f3bf9b1498f0b6e76641fc457e7cbd73c99b4eef3a74",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/comment.py",
+      "sourceSha256": "37d116e5f56bb142b208c6c6a4bbcf960495abf470ddb7c6675ccfac864ba3d7",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/merge_runs.py",
+      "sourceSha256": "3ab367fd7fba4647943d0aa5e65203b15458551410f5ffc821d902616a4b9f40",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/helpers/__init__.py",
+      "sourceSha256": "5c456ffc522900399b5f9402f92d66aaf2d9f87655d236c69f60bf07f4fd7c9b",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/helpers/pptx_chart.py",
+      "sourceSha256": "aed734e9a6c743ae712fc228c868bf0f6abcfb6a53549eefb19081b15d240fda",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/helpers/pptx_slide.py",
+      "sourceSha256": "06fe06953bf038826b85ecc142f4dc9299a37fa0c4e4dd9b00b10486df33524d",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/helpers/pptx_theme.py",
+      "sourceSha256": "ebb54c56e9c13807f5f98f0cae22d47cdd0162da8525eaa664e3f2c8c8d6bb03",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd",
+      "sourceSha256": "41b93bd8857cc68b1e43be2806a872d736a9bdd6566900062d8fdb57d7bbb354",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd",
+      "sourceSha256": "3fd0586f2637b98bb9886f0e0b67d89e1cc987c2d158cc7deb5f5b9890ced412",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd",
+      "sourceSha256": "29b254ee0d10414a8504b5a08149c7baec35a60d5ff607d6b3f492aa36815f40",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd",
+      "sourceSha256": "5cb76dabd8b97d1e9308a1700b90c20139be4d50792d21a7f09789f5cccd6026",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd",
+      "sourceSha256": "5375417f0f5394b8dd1a7035b9679151f19a6b65df309dec10cfb4a420cb00e9",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd",
+      "sourceSha256": "5d389d42befbebd91945d620242347caecd3367f9a3a7cf8d97949507ae1f53c",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd",
+      "sourceSha256": "b4532b6d258832953fbb3ee4c711f4fe25d3faf46a10644b2505f17010d01e88",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd",
+      "sourceSha256": "bdad416b096b61d37b71603b2c949484f9070c830bdaeba93bf35e15c8900614",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd",
+      "sourceSha256": "d173c3e5d61e42e2e3a97226c632fd2ab7cc481fc4e492365b87024ab546daff",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd",
+      "sourceSha256": "3c6709101c6aaa82888df5d8795c33f9e857196790eb320d9194e64be2b6bdd8",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd",
+      "sourceSha256": "0b364451dc36a48dd6dae0f3b6ada05fd9b71e5208211f8ee5537d7e51a587e2",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd",
+      "sourceSha256": "e2abacbb9a55ce1365f8961bc1b1395bbc811e512b111000d8c333f98458dece",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd",
+      "sourceSha256": "0ef4bb354ff44b923564c4ddbdda5987919d220225129ec94614a618ceafc281",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd",
+      "sourceSha256": "0d103b99a4a8652f8871552a69d42d2a3760ac6a5e3ef02d979c4273257ff6a4",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd",
+      "sourceSha256": "9c085407751b9061c1f996f6c39ce58451be22a8d334f09175f0e89e42736285",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd",
+      "sourceSha256": "bc92e36ccd233722d4c5869bec71ddc7b12e2df56059942cce5a39065cc9c368",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd",
+      "sourceSha256": "7b5b7413e2c895b1e148e82e292a117d53c7ec65b0696c992edca57b61b4a74b",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd",
+      "sourceSha256": "3213ef1631606250f5010b42cad7ef716f7c59426367798e33c374c0ec391d3a",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd",
+      "sourceSha256": "12264f3c03d738311cd9237d212f1c07479e70f0cbe1ae725d29b36539aef637",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd",
+      "sourceSha256": "beffeed56945c22a77440122c8bdc426f3fcbe7f3b12ea0976c770d1f8d54578",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd",
+      "sourceSha256": "f5ee623b08b6a66935e5aced2f5d8ad0fc71bf9e8e833cd490150c0fa94b8763",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd",
+      "sourceSha256": "585bedc1313b40888dcc544cb74cd939a105ee674f3b1d3aa1cc6d34f70ff155",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd",
+      "sourceSha256": "133c9f64a5c5d573b78d0a474122b22506d8eadb5e063f67cdbbb8fa2f161d0e",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd",
+      "sourceSha256": "6bdeb169c3717eb01108853bd9fc5a3750fb1fa5b82abbdd854d49855a40f519",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd",
+      "sourceSha256": "475dcae1e7d1ea46232db6f8481040c15e53a52a3c256831d3df204212b0e831",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd",
+      "sourceSha256": "c2dd9f61f892deae6acd8d20771ea79b12018af25f3bf8d06639c8542d218cfd",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd",
+      "sourceSha256": "a539aa2fb154fa50e0f5cc97e6ad7cbc66f8ec3e3746f61ec6a8b0d5d15ecdf2",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd",
+      "sourceSha256": "9e0b7209fc69ab11987900404540969976000c5ebe4d4f58c43dc3842886bf3a",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd",
+      "sourceSha256": "451958454e8588dfc7cd945981ada142ca06ff3307937f5700df059c2b307fa8",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd",
+      "sourceSha256": "6de111e11403f7cd49027400755bae0ea1cabef2815f09bd40a24f0017613b24",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd",
+      "sourceSha256": "f565adfef5a502044abc3a9153e157edc25af78304d335994afb958874b15e26",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/mce/mc.xsd",
+      "sourceSha256": "3a37e461ecf5a8670fdec34029703401f8728ab9c96ec1739a6ae58d55212413",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/microsoft/wml-2010.xsd",
+      "sourceSha256": "568b26ee156cb9549aa439ca2158965f77b7c1602b7e0316f40ac6cf586e35f2",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/microsoft/wml-2012.xsd",
+      "sourceSha256": "0fa75578a000439a7988ba0c59fdc69f774bbd416cbacc14d07125b3f686cb74",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/microsoft/wml-2018.xsd",
+      "sourceSha256": "be0ff793a22dd31384650c3a4da14c2fa8062751c2e97b0e5ee852bda13c60ad",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/microsoft/wml-cex-2018.xsd",
+      "sourceSha256": "fddc2b880cabb9005aebbc7e783e53c19fec1c03df7d0e2f2076a33a0fdfd081",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/microsoft/wml-cid-2016.xsd",
+      "sourceSha256": "127ca209fa73d7cb708449cb355c871867948a96e4a74f7bf5811ef62d17991d",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd",
+      "sourceSha256": "842e7163409c8d74f4d7088a8bc99500d80bc75332681a0980055b08f374a604",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/schemas/microsoft/wml-symex-2015.xsd",
+      "sourceSha256": "16f6f8072249f431370723c2cd8974672e0d9c897e00e97dd918079df934871b",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/soffice.py",
+      "sourceSha256": "bcfa227707681ffbecc0f0af5c4e7155407b3baaf5cec5cdd41387c97cdd40c7",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/validate.py",
+      "sourceSha256": "8c10ec61d8e880877515019e1fe8fab9a1f590c9e50ed0631418e960aca1e313",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/validators/__init__.py",
+      "sourceSha256": "83e0f035c5abea238d3f2c3968afbd511ed022b527b7c9cb60a9434cc34ff987",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/validators/base.py",
+      "sourceSha256": "6129ec6a4fc0a4aa78af1434f9baa73994cc24d3261afda4e680e00f215cbf3b",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/validators/docx.py",
+      "sourceSha256": "7b0f1a23c9cd9ff07187d9d7d359f62317f94a5e389d63fd19766e1688a195a2",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/validators/pptx.py",
+      "sourceSha256": "3a100ec5f00ae183bca67f4aaa8e3e902caee60254e141b8120f32c53d85cee7",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/office/validators/redlining.py",
+      "sourceSha256": "f9c4455adc32b3890d5203d6c25d868d98d7e970bbad76b686f502950737599a",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/templates/comments.xml",
+      "sourceSha256": "a08ba83ee8790ac9e3dc61921f4988f19edd7e06ac09d6f1897a877c1581818d",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/templates/commentsExtended.xml",
+      "sourceSha256": "544eeecfeceed4b468fff163cd9c366d33641c8b8ab691ce002576197846afe8",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/templates/commentsExtensible.xml",
+      "sourceSha256": "bad10b3283e6ad6e7ef6d1ca5169683721ed690ee331282c65df04017e080631",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/templates/commentsIds.xml",
+      "sourceSha256": "db20f9616e004ec42ef736e80c2384e45db0f8d1194d31dc8b37c7d6ecdd6420",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/docx/scripts/templates/people.xml",
+      "sourceSha256": "056f63aa1197fd8c9dda980c9f1b9ff016fd5fa4a462df8aec5f384f39d23e37",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/frontend-design/LICENSE.txt",
+      "sourceSha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "path": "frontend-design/LICENSE.txt",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "changes": "Unmodified upstream Apache-2.0 licence."
+    },
+    {
+      "sourcePath": "skills/frontend-design/SKILL.md",
+      "sourceSha256": "d91970639e9f5c37682ac7ab60094d35f1c7c1f38d731bd56396563aee10c1d3",
+      "path": "frontend-design/SKILL.md",
+      "sha256": "71fd315b97a918a0d7aa52fb8c435f2e502f51b3196c71e6e785eb863b605f0c",
+      "changes": "Adapted runtime/workflow, Chinese typography, local delivery, template priority and bounded visual review; retained format/design knowledge."
+    },
+    {
+      "sourcePath": "skills/pdf/FORMS.md",
+      "sourceSha256": "d5df5757e23634cd8a1a37e092af6c3b3b63afb3fd3ce86337fce9017cc3ee9f",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pdf/LICENSE.txt",
+      "sourceSha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "path": "pdf/LICENSE.txt",
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "changes": "Unmodified upstream Apache-2.0 licence."
+    },
+    {
+      "sourcePath": "skills/pdf/REFERENCE.md",
+      "sourceSha256": "07af9a8f59e77e88fe9b238a403348244f38a4771c54911c412716d8f88f0ea9",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pdf/SKILL.md",
+      "sourceSha256": "d1c7caf5f35eb7d37877dd7fc33a095037be2b34fb5d2f7f4d43bde3165bb4ee",
+      "path": "pdf/SKILL.md",
+      "sha256": "d1b6eddc4eb7446728f4c99ec837e8a56262f3f230d85c6d67f194f4f45d4192",
+      "changes": "Adapted runtime/workflow, Chinese typography, local delivery, template priority and bounded visual review; retained format/design knowledge."
+    },
+    {
+      "sourcePath": "skills/pdf/scripts/check_bounding_boxes.py",
+      "sourceSha256": "0ced522402dd7b3c82a0be9518cf4e485fa9cc0467d7beab6ddb04cb36fcc3e1",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pdf/scripts/check_fillable_fields.py",
+      "sourceSha256": "1fe10b9980a5493c9bbec8c20630c603eaa475b45403751c08f26738736647b8",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pdf/scripts/convert_pdf_to_images.py",
+      "sourceSha256": "7f58e292a67e18a8ff000d30bad2469389546731f7e8a698cc1d0aed001ea15d",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pdf/scripts/create_validation_image.py",
+      "sourceSha256": "8fa9fd7962c9f940045b81cf6b991e7c1057c1838e3f9cc6d305007a222ffebf",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pdf/scripts/extract_form_field_info.py",
+      "sourceSha256": "bb235b36f497bbb1c7c6821cecf527bbba7213520de11219da99f7b13a38c109",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pdf/scripts/extract_form_structure.py",
+      "sourceSha256": "6814e3fe8f78c2b16d766c132b5a727ff7a31b71d76a7d46bd6e40fe50bc97c5",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pdf/scripts/fill_fillable_fields.py",
+      "sourceSha256": "d140872c2e92e41b1e05370ae8d270c5b7f5ebdf55d9905f03bc974a9c708ff5",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pdf/scripts/fill_pdf_form_with_annotations.py",
+      "sourceSha256": "8a56e063a49ed53c0b0e1d312ecf8023af76816ed139486ec3b539873de202fd",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pptx/LICENSE.txt",
+      "sourceSha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "path": "pptx/LICENSE.txt",
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "changes": "Unmodified upstream Apache-2.0 licence."
+    },
+    {
+      "sourcePath": "skills/pptx/SKILL.md",
+      "sourceSha256": "598c981d93f2173b251f86a4bc94e9fb4e4f5ddaa314ba2dd4eca24b7a07808e",
+      "path": "pptx/SKILL.md",
+      "sha256": "0bda63d2f25025b78a3ccc26317d7245665d8680d5664261fed5a25084a707f8",
+      "changes": "Adapted runtime/workflow, Chinese typography, local delivery, template priority and bounded visual review; retained format/design knowledge."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/__init__.py",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/add_slide.py",
+      "sourceSha256": "23a4c66a9f43e651189cbc9f82ba0a8271d19dc8d44cf0c426dda66f7eb6a93a",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/apply_theme.js",
+      "sourceSha256": "e440b33c43f2e707076cb64b57ca926ce886564b115c19ee23ac487bdb1a6259",
+      "path": "pptx/scripts/apply_theme.cjs",
+      "sha256": "d14dd48bfa41a8544de9bfbf6e377458c292c8265b587ed10952406f07b9abdf",
+      "changes": "CommonJS extension; explicit bundled nodeModules resolution; atomic publication; updated CLI/documentation. Retained upstream theme/chart checks."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/clean.py",
+      "sourceSha256": "5c808cd4dff7e02661ef3c68b5917f4e25097cc6610c92a3a7df4a6366a5c3c1",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/helpers/__init__.py",
+      "sourceSha256": "5c456ffc522900399b5f9402f92d66aaf2d9f87655d236c69f60bf07f4fd7c9b",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/helpers/pptx_chart.py",
+      "sourceSha256": "aed734e9a6c743ae712fc228c868bf0f6abcfb6a53549eefb19081b15d240fda",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/helpers/pptx_slide.py",
+      "sourceSha256": "06fe06953bf038826b85ecc142f4dc9299a37fa0c4e4dd9b00b10486df33524d",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/helpers/pptx_theme.py",
+      "sourceSha256": "ebb54c56e9c13807f5f98f0cae22d47cdd0162da8525eaa664e3f2c8c8d6bb03",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd",
+      "sourceSha256": "41b93bd8857cc68b1e43be2806a872d736a9bdd6566900062d8fdb57d7bbb354",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd",
+      "sourceSha256": "3fd0586f2637b98bb9886f0e0b67d89e1cc987c2d158cc7deb5f5b9890ced412",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd",
+      "sourceSha256": "29b254ee0d10414a8504b5a08149c7baec35a60d5ff607d6b3f492aa36815f40",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd",
+      "sourceSha256": "5cb76dabd8b97d1e9308a1700b90c20139be4d50792d21a7f09789f5cccd6026",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd",
+      "sourceSha256": "5375417f0f5394b8dd1a7035b9679151f19a6b65df309dec10cfb4a420cb00e9",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd",
+      "sourceSha256": "5d389d42befbebd91945d620242347caecd3367f9a3a7cf8d97949507ae1f53c",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd",
+      "sourceSha256": "b4532b6d258832953fbb3ee4c711f4fe25d3faf46a10644b2505f17010d01e88",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd",
+      "sourceSha256": "bdad416b096b61d37b71603b2c949484f9070c830bdaeba93bf35e15c8900614",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd",
+      "sourceSha256": "d173c3e5d61e42e2e3a97226c632fd2ab7cc481fc4e492365b87024ab546daff",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd",
+      "sourceSha256": "3c6709101c6aaa82888df5d8795c33f9e857196790eb320d9194e64be2b6bdd8",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd",
+      "sourceSha256": "0b364451dc36a48dd6dae0f3b6ada05fd9b71e5208211f8ee5537d7e51a587e2",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd",
+      "sourceSha256": "e2abacbb9a55ce1365f8961bc1b1395bbc811e512b111000d8c333f98458dece",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd",
+      "sourceSha256": "0ef4bb354ff44b923564c4ddbdda5987919d220225129ec94614a618ceafc281",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd",
+      "sourceSha256": "0d103b99a4a8652f8871552a69d42d2a3760ac6a5e3ef02d979c4273257ff6a4",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd",
+      "sourceSha256": "9c085407751b9061c1f996f6c39ce58451be22a8d334f09175f0e89e42736285",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd",
+      "sourceSha256": "bc92e36ccd233722d4c5869bec71ddc7b12e2df56059942cce5a39065cc9c368",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd",
+      "sourceSha256": "7b5b7413e2c895b1e148e82e292a117d53c7ec65b0696c992edca57b61b4a74b",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd",
+      "sourceSha256": "3213ef1631606250f5010b42cad7ef716f7c59426367798e33c374c0ec391d3a",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd",
+      "sourceSha256": "12264f3c03d738311cd9237d212f1c07479e70f0cbe1ae725d29b36539aef637",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd",
+      "sourceSha256": "beffeed56945c22a77440122c8bdc426f3fcbe7f3b12ea0976c770d1f8d54578",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd",
+      "sourceSha256": "f5ee623b08b6a66935e5aced2f5d8ad0fc71bf9e8e833cd490150c0fa94b8763",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd",
+      "sourceSha256": "585bedc1313b40888dcc544cb74cd939a105ee674f3b1d3aa1cc6d34f70ff155",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd",
+      "sourceSha256": "133c9f64a5c5d573b78d0a474122b22506d8eadb5e063f67cdbbb8fa2f161d0e",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd",
+      "sourceSha256": "6bdeb169c3717eb01108853bd9fc5a3750fb1fa5b82abbdd854d49855a40f519",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd",
+      "sourceSha256": "475dcae1e7d1ea46232db6f8481040c15e53a52a3c256831d3df204212b0e831",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd",
+      "sourceSha256": "c2dd9f61f892deae6acd8d20771ea79b12018af25f3bf8d06639c8542d218cfd",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd",
+      "sourceSha256": "a539aa2fb154fa50e0f5cc97e6ad7cbc66f8ec3e3746f61ec6a8b0d5d15ecdf2",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd",
+      "sourceSha256": "9e0b7209fc69ab11987900404540969976000c5ebe4d4f58c43dc3842886bf3a",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd",
+      "sourceSha256": "451958454e8588dfc7cd945981ada142ca06ff3307937f5700df059c2b307fa8",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd",
+      "sourceSha256": "6de111e11403f7cd49027400755bae0ea1cabef2815f09bd40a24f0017613b24",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd",
+      "sourceSha256": "f565adfef5a502044abc3a9153e157edc25af78304d335994afb958874b15e26",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/mce/mc.xsd",
+      "sourceSha256": "3a37e461ecf5a8670fdec34029703401f8728ab9c96ec1739a6ae58d55212413",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/microsoft/wml-2010.xsd",
+      "sourceSha256": "568b26ee156cb9549aa439ca2158965f77b7c1602b7e0316f40ac6cf586e35f2",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/microsoft/wml-2012.xsd",
+      "sourceSha256": "0fa75578a000439a7988ba0c59fdc69f774bbd416cbacc14d07125b3f686cb74",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/microsoft/wml-2018.xsd",
+      "sourceSha256": "be0ff793a22dd31384650c3a4da14c2fa8062751c2e97b0e5ee852bda13c60ad",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/microsoft/wml-cex-2018.xsd",
+      "sourceSha256": "fddc2b880cabb9005aebbc7e783e53c19fec1c03df7d0e2f2076a33a0fdfd081",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/microsoft/wml-cid-2016.xsd",
+      "sourceSha256": "127ca209fa73d7cb708449cb355c871867948a96e4a74f7bf5811ef62d17991d",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd",
+      "sourceSha256": "842e7163409c8d74f4d7088a8bc99500d80bc75332681a0980055b08f374a604",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/schemas/microsoft/wml-symex-2015.xsd",
+      "sourceSha256": "16f6f8072249f431370723c2cd8974672e0d9c897e00e97dd918079df934871b",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/soffice.py",
+      "sourceSha256": "bcfa227707681ffbecc0f0af5c4e7155407b3baaf5cec5cdd41387c97cdd40c7",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/validate.py",
+      "sourceSha256": "8c10ec61d8e880877515019e1fe8fab9a1f590c9e50ed0631418e960aca1e313",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/validators/__init__.py",
+      "sourceSha256": "83e0f035c5abea238d3f2c3968afbd511ed022b527b7c9cb60a9434cc34ff987",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/validators/base.py",
+      "sourceSha256": "6129ec6a4fc0a4aa78af1434f9baa73994cc24d3261afda4e680e00f215cbf3b",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/validators/docx.py",
+      "sourceSha256": "7b0f1a23c9cd9ff07187d9d7d359f62317f94a5e389d63fd19766e1688a195a2",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/validators/pptx.py",
+      "sourceSha256": "3a100ec5f00ae183bca67f4aaa8e3e902caee60254e141b8120f32c53d85cee7",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/office/validators/redlining.py",
+      "sourceSha256": "f9c4455adc32b3890d5203d6c25d868d98d7e970bbad76b686f502950737599a",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/slide_text.py",
+      "sourceSha256": "0deab09d4ae494411ee893f9c69fffc19fe264a6053990a2f066334c0d88d422",
+      "excluded": "Unused optional helper/reference; supported production routes use bundled libraries and the shared workflow instead."
+    },
+    {
+      "sourcePath": "skills/pptx/scripts/thumbnail.py",
+      "sourceSha256": "94ef83a84346aa2d63913de0d42bb2fe902ccdc17bfac6130096ca758381793c",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/theme-factory/LICENSE.txt",
+      "sourceSha256": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+      "path": "theme-factory/LICENSE.txt",
+      "sha256": "bc6b3af2f331cbc7fb0da1344efb2cbe5877a31498b4d70dbc7000f3405a1362",
+      "changes": "Unmodified upstream Apache-2.0 licence."
+    },
+    {
+      "sourcePath": "skills/theme-factory/SKILL.md",
+      "sourceSha256": "c35893e221e28895c52143cc11bf30e41a44817796b39d4b15727dadc9796552",
+      "path": "theme-factory/SKILL.md",
+      "sha256": "c4009e8efed3178bda1c43978d66235d708fb3d07ed08040cf1629dd5b3283ca",
+      "changes": "Adapted runtime/workflow, Chinese typography, local delivery, template priority and bounded visual review; retained format/design knowledge."
+    },
+    {
+      "sourcePath": "skills/theme-factory/theme-showcase.pdf",
+      "sourceSha256": "3e126eca9fe99088051f7cb984c97cedb31c7d9e09ce0ba5d61bd01e70a0d253",
+      "excluded": "Excluded optional showcase; not required for the requested output and would add a theme-selection step."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/arctic-frost.md",
+      "sourceSha256": "868a75a8fb5b2a61d0f0ab87c437fe632d3cbab6371c418f06aa2816ac109ae0",
+      "path": "theme-factory/themes/arctic-frost.md",
+      "sha256": "f7f6bd49c2689f3359ce5f4b5aef818131464740dbf06414f29c183880f88953",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/botanical-garden.md",
+      "sourceSha256": "222cb8e7496abc9b75b29453c809fb9839e7e4b01fa45deecdd896b38d087765",
+      "path": "theme-factory/themes/botanical-garden.md",
+      "sha256": "d649f972b037599f688e64f9c47e7385e33839327e5d4e3317c47d317c9dc899",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/desert-rose.md",
+      "sourceSha256": "bd065b8629be3b64655183927e248e3d892a27b8d184b009cfba89c96102744f",
+      "path": "theme-factory/themes/desert-rose.md",
+      "sha256": "b43030959090c79a94d6ce58f9a92c676c5c21614e27ebcdc51ace7b5e13650d",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/forest-canopy.md",
+      "sourceSha256": "ecb722efa24688e808b5bf323c334ca2349e989cfddd72ce8400ce5d4c4bd3e7",
+      "path": "theme-factory/themes/forest-canopy.md",
+      "sha256": "c08fdcbe8fb5c2c075dfd1f1b7f66c9d8377dd51689ad4769cd6d89d50baaf06",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/golden-hour.md",
+      "sourceSha256": "3444a00df971d3c2f06b665e21a2e9eb5d7d7d6f6281f2758773b8345776a139",
+      "path": "theme-factory/themes/golden-hour.md",
+      "sha256": "5bc26b6434f40ee9b44dce89c60e3b1b2334c03c23b7eb1f8083b408b82f9140",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/midnight-galaxy.md",
+      "sourceSha256": "0e134c4c0324df41e34ac314269aa6829cd378cf3c304b31858d0cd158d2f944",
+      "path": "theme-factory/themes/midnight-galaxy.md",
+      "sha256": "da3f3a49471c5ad680a2a9c371043a06134c5f6828f18558c301077d273e2289",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/modern-minimalist.md",
+      "sourceSha256": "b8bc572b75948d4df69c401af703b9262ed6820a3ceb270da30a529e92763614",
+      "path": "theme-factory/themes/modern-minimalist.md",
+      "sha256": "ddc3d7f660c6032752856473088dfdda6195639aca32a90b3da08de37398e179",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/ocean-depths.md",
+      "sourceSha256": "a7ad8eec85341dbfcb2665da827a4b6a4baee08ab3335ac02421f18e6b46b2e2",
+      "path": "theme-factory/themes/ocean-depths.md",
+      "sha256": "b8c6bd30ef82ccab909b2e72c03db7d1cddc3858d7bc55b5a4c833001e36d843",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/sunset-boulevard.md",
+      "sourceSha256": "658af11ab04be4923692571081ffb42a428141ae537703117b9236d9f8ee22a3",
+      "path": "theme-factory/themes/sunset-boulevard.md",
+      "sha256": "a3fe270d696b7b60a4db0a6be3f3b611f9e2b32360459eb9ece8db4267cd31cf",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/theme-factory/themes/tech-innovation.md",
+      "sourceSha256": "183648163026dd5eeba3df5effa335b55ba333c3ee1fe215278605e55f40a52a",
+      "path": "theme-factory/themes/tech-innovation.md",
+      "sha256": "b6b3280349a3ccad8fc8f62f50568ec8e0c4b46fdb2df76ba43480817033395f",
+      "changes": "Retained palette and use cases; replaced font pair with bundled Chinese families; marked adaptation."
+    },
+    {
+      "sourcePath": "skills/xlsx/LICENSE.txt",
+      "sourceSha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "path": "xlsx/LICENSE.txt",
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "changes": "Unmodified upstream Apache-2.0 licence."
+    },
+    {
+      "sourcePath": "skills/xlsx/SKILL.md",
+      "sourceSha256": "f32b1c2b5d5d31e02964df110d6489613d9345f86830c118cfe24159d8448ce6",
+      "path": "xlsx/SKILL.md",
+      "sha256": "1bae7018ab5204de95d7bee79e1e2756562af12288c05eba230e73fe1801c2c6",
+      "changes": "Adapted runtime/workflow, Chinese typography, local delivery, template priority and bounded visual review; retained format/design knowledge. Slice 5: shared edit opens a copied template; host projection is injected by the existing environment/shell entry."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/helpers/__init__.py",
+      "sourceSha256": "5c456ffc522900399b5f9402f92d66aaf2d9f87655d236c69f60bf07f4fd7c9b",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/helpers/pptx_chart.py",
+      "sourceSha256": "aed734e9a6c743ae712fc228c868bf0f6abcfb6a53549eefb19081b15d240fda",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/helpers/pptx_slide.py",
+      "sourceSha256": "06fe06953bf038826b85ecc142f4dc9299a37fa0c4e4dd9b00b10486df33524d",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/helpers/pptx_theme.py",
+      "sourceSha256": "ebb54c56e9c13807f5f98f0cae22d47cdd0162da8525eaa664e3f2c8c8d6bb03",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd",
+      "sourceSha256": "41b93bd8857cc68b1e43be2806a872d736a9bdd6566900062d8fdb57d7bbb354",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd",
+      "sourceSha256": "3fd0586f2637b98bb9886f0e0b67d89e1cc987c2d158cc7deb5f5b9890ced412",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd",
+      "sourceSha256": "29b254ee0d10414a8504b5a08149c7baec35a60d5ff607d6b3f492aa36815f40",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd",
+      "sourceSha256": "5cb76dabd8b97d1e9308a1700b90c20139be4d50792d21a7f09789f5cccd6026",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd",
+      "sourceSha256": "5375417f0f5394b8dd1a7035b9679151f19a6b65df309dec10cfb4a420cb00e9",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd",
+      "sourceSha256": "5d389d42befbebd91945d620242347caecd3367f9a3a7cf8d97949507ae1f53c",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd",
+      "sourceSha256": "b4532b6d258832953fbb3ee4c711f4fe25d3faf46a10644b2505f17010d01e88",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd",
+      "sourceSha256": "bdad416b096b61d37b71603b2c949484f9070c830bdaeba93bf35e15c8900614",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd",
+      "sourceSha256": "d173c3e5d61e42e2e3a97226c632fd2ab7cc481fc4e492365b87024ab546daff",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd",
+      "sourceSha256": "3c6709101c6aaa82888df5d8795c33f9e857196790eb320d9194e64be2b6bdd8",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd",
+      "sourceSha256": "0b364451dc36a48dd6dae0f3b6ada05fd9b71e5208211f8ee5537d7e51a587e2",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd",
+      "sourceSha256": "e2abacbb9a55ce1365f8961bc1b1395bbc811e512b111000d8c333f98458dece",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd",
+      "sourceSha256": "0ef4bb354ff44b923564c4ddbdda5987919d220225129ec94614a618ceafc281",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd",
+      "sourceSha256": "0d103b99a4a8652f8871552a69d42d2a3760ac6a5e3ef02d979c4273257ff6a4",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd",
+      "sourceSha256": "9c085407751b9061c1f996f6c39ce58451be22a8d334f09175f0e89e42736285",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd",
+      "sourceSha256": "bc92e36ccd233722d4c5869bec71ddc7b12e2df56059942cce5a39065cc9c368",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd",
+      "sourceSha256": "7b5b7413e2c895b1e148e82e292a117d53c7ec65b0696c992edca57b61b4a74b",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd",
+      "sourceSha256": "3213ef1631606250f5010b42cad7ef716f7c59426367798e33c374c0ec391d3a",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd",
+      "sourceSha256": "12264f3c03d738311cd9237d212f1c07479e70f0cbe1ae725d29b36539aef637",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd",
+      "sourceSha256": "beffeed56945c22a77440122c8bdc426f3fcbe7f3b12ea0976c770d1f8d54578",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd",
+      "sourceSha256": "f5ee623b08b6a66935e5aced2f5d8ad0fc71bf9e8e833cd490150c0fa94b8763",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd",
+      "sourceSha256": "585bedc1313b40888dcc544cb74cd939a105ee674f3b1d3aa1cc6d34f70ff155",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd",
+      "sourceSha256": "133c9f64a5c5d573b78d0a474122b22506d8eadb5e063f67cdbbb8fa2f161d0e",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd",
+      "sourceSha256": "6bdeb169c3717eb01108853bd9fc5a3750fb1fa5b82abbdd854d49855a40f519",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd",
+      "sourceSha256": "475dcae1e7d1ea46232db6f8481040c15e53a52a3c256831d3df204212b0e831",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd",
+      "sourceSha256": "c2dd9f61f892deae6acd8d20771ea79b12018af25f3bf8d06639c8542d218cfd",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd",
+      "sourceSha256": "a539aa2fb154fa50e0f5cc97e6ad7cbc66f8ec3e3746f61ec6a8b0d5d15ecdf2",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd",
+      "sourceSha256": "9e0b7209fc69ab11987900404540969976000c5ebe4d4f58c43dc3842886bf3a",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd",
+      "sourceSha256": "451958454e8588dfc7cd945981ada142ca06ff3307937f5700df059c2b307fa8",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd",
+      "sourceSha256": "6de111e11403f7cd49027400755bae0ea1cabef2815f09bd40a24f0017613b24",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd",
+      "sourceSha256": "f565adfef5a502044abc3a9153e157edc25af78304d335994afb958874b15e26",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/mce/mc.xsd",
+      "sourceSha256": "3a37e461ecf5a8670fdec34029703401f8728ab9c96ec1739a6ae58d55212413",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/microsoft/wml-2010.xsd",
+      "sourceSha256": "568b26ee156cb9549aa439ca2158965f77b7c1602b7e0316f40ac6cf586e35f2",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/microsoft/wml-2012.xsd",
+      "sourceSha256": "0fa75578a000439a7988ba0c59fdc69f774bbd416cbacc14d07125b3f686cb74",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/microsoft/wml-2018.xsd",
+      "sourceSha256": "be0ff793a22dd31384650c3a4da14c2fa8062751c2e97b0e5ee852bda13c60ad",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/microsoft/wml-cex-2018.xsd",
+      "sourceSha256": "fddc2b880cabb9005aebbc7e783e53c19fec1c03df7d0e2f2076a33a0fdfd081",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/microsoft/wml-cid-2016.xsd",
+      "sourceSha256": "127ca209fa73d7cb708449cb355c871867948a96e4a74f7bf5811ef62d17991d",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd",
+      "sourceSha256": "842e7163409c8d74f4d7088a8bc99500d80bc75332681a0980055b08f374a604",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/schemas/microsoft/wml-symex-2015.xsd",
+      "sourceSha256": "16f6f8072249f431370723c2cd8974672e0d9c897e00e97dd918079df934871b",
+      "excluded": "Excluded external ISO/ECMA/Microsoft/mce standards: redistribution licence not established."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/soffice.py",
+      "sourceSha256": "bcfa227707681ffbecc0f0af5c4e7155407b3baaf5cec5cdd41387c97cdd40c7",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/validate.py",
+      "sourceSha256": "8c10ec61d8e880877515019e1fe8fab9a1f590c9e50ed0631418e960aca1e313",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/validators/__init__.py",
+      "sourceSha256": "83e0f035c5abea238d3f2c3968afbd511ed022b527b7c9cb60a9434cc34ff987",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/validators/base.py",
+      "sourceSha256": "6129ec6a4fc0a4aa78af1434f9baa73994cc24d3261afda4e680e00f215cbf3b",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/validators/docx.py",
+      "sourceSha256": "7b0f1a23c9cd9ff07187d9d7d359f62317f94a5e389d63fd19766e1688a195a2",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/validators/pptx.py",
+      "sourceSha256": "3a100ec5f00ae183bca67f4aaa8e3e902caee60254e141b8120f32c53d85cee7",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/office/validators/redlining.py",
+      "sourceSha256": "f9c4455adc32b3890d5203d6c25d868d98d7e970bbad76b686f502950737599a",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    },
+    {
+      "sourcePath": "skills/xlsx/scripts/recalc.py",
+      "sourceSha256": "7265aa4a41f5273596ee5694ce8a4d881c18adafb6203fece769107d08403263",
+      "excluded": "Replaced sandbox conversion/XSD/recalculation/thumbnail path with the frozen document tool or OfficeExcel runtime; no PATH or optional runtime installer."
+    }
+  ],
+  "applicationFiles": [
+    {
+      "path": "WORKFLOW.md",
+      "sha256": "a34f1634a7a5e25c62c5c841368dbce5663ce4269de660f1c80e283590e59736",
+      "description": "Shared application-authored execution guidance for the seven adapted skills."
+    }
+  ]
+}

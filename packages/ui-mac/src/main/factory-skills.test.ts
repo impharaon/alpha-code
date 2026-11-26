@@ -3,6 +3,7 @@
 // 幂等、绝不动用户内容、同名遮蔽不注入(防引擎双源)、REQ-059 逃生门不拆不改、
 // legacy `~/.opencode/skill/` 直链清理。
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { createHash } from "node:crypto"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -18,6 +19,7 @@ import { CLOUD_MCP_TOOLS } from "./fixtures/cloud-mcp-tools"
 import { cloudMcpToolId } from "./cloud-web-search"
 import { TOOL_TEXT } from "../../../ext/src/context-injection"
 import { classifySkill } from "./codepuppy-skill-placeholder"
+import documentSkills from "../../resources/factory-skills/office-docs/document-skills.lock.json"
 
 let tmp: string
 let home: string
@@ -232,6 +234,56 @@ async function engineSkills(directories: string[]) {
   return skills
 }
 
+describe("document skill assets", () => {
+  test.each(["dev", "packaged"] as const)("%s resources retain discovery, licences and the pinned inventory", async (layout) => {
+    const dev = factorySkillSources({ packaged: false, resourcesPath: "/ignored", moduleDir: import.meta.dir })
+    if (layout === "packaged") {
+      const { getConfig } = await import("../../electron-builder.config")
+      const resources = getConfig("prod").extraResources
+      if (!Array.isArray(resources)) throw new Error("packaged resources are missing")
+      for (const from of ["resources/factory-skills/", "resources/NOTICE.txt"]) {
+        const entry = resources.find((item) => typeof item !== "string" && item.from === from)
+        if (!entry || typeof entry === "string" || !entry.from || !entry.to) throw new Error(`resource copy missing: ${from}`)
+        expect(entry.filter).toBeUndefined()
+        cpSync(join(import.meta.dir, "../..", entry.from), join(res, entry.to), { recursive: true })
+      }
+    }
+    const registered = layout === "packaged" ? sources : dev
+    const office = registered["office-docs"]!
+    const lock: typeof documentSkills = JSON.parse(readFileSync(join(office, "document-skills.lock.json"), "utf8"))
+    expect(lock.upstream).toBe("https://github.com/anthropics/skills")
+    expect(lock.commit).toBe("e4bb5d960d87126ff3b3a8af1a104b7db67560ba")
+    expect(new Set(lock.files.map((file) => file.sourcePath)).size).toBe(lock.files.length)
+    const discovered = await engineSkills(reconcileFactorySkills(registered, roots).paths)
+    expect(discovered.filter((entry) => entry.name === "office-docs").map((entry) => entry.file)).toEqual([join(office, "SKILL.md")])
+    const notice = readFileSync(join(layout === "packaged" ? res : join(import.meta.dir, "../../resources"), "NOTICE.txt"), "utf8")
+    expect(notice).toContain(lock.upstream + "/tree/" + lock.commit + "/skills")
+    expect(notice).toContain("factory-skills/office-docs/")
+    for (const name of ["docx", "xlsx", "pptx", "pdf", "frontend-design", "canvas-design", "theme-factory"]) {
+      const skill = discovered.filter((entry) => entry.name === `codepuppy-document-${name}`)
+      expect(skill, name).toHaveLength(1)
+      expect(skill[0]!.file).toBe(join(office, name, "SKILL.md"))
+      expect(discovered.some((entry) => entry.name === name), name).toBe(false)
+      const licence = lock.files.find((file) => file.path === `${name}/LICENSE.txt`)
+      expect(licence, name).toBeDefined()
+      expect(licence!.sourceSha256).toBe(licence!.sha256)
+      expect(readFileSync(join(office, name, "LICENSE.txt"), "utf8")).toContain("Apache License")
+      expect(notice).toContain(name)
+    }
+    const inventory = [...new Bun.Glob("**/*").scanSync({ cwd: office, onlyFiles: true, dot: true })].sort()
+    expect(inventory.filter((file) => /\.xsd$|(^|\/)canvas-fonts\/|(^|\/)theme-showcase\.pdf$/.test(file))).toEqual([])
+    const shipped = lock.files.flatMap((file) => file.path ? [{ path: file.path, sha256: file.sha256! }] : [])
+    expect(inventory).toEqual(["SKILL.md", "document-skills.lock.json", ...shipped.map((file) => file.path), ...lock.applicationFiles.map((file) => file.path)].sort())
+    for (const file of [...shipped, ...lock.applicationFiles])
+      expect(createHash("sha256").update(readFileSync(join(office, file.path))).digest("hex"), file.path).toBe(file.sha256)
+    for (const file of lock.files) {
+      expect(file.sourceSha256, file.sourcePath).toMatch(/^[0-9a-f]{64}$/)
+      if (!file.path) expect(file.excluded, file.sourcePath).toBeTruthy()
+    }
+    expect(existsSync(roots.codepuppyRoot)).toBe(false)
+  })
+})
+
 describe("#1724 plugin helper factory resources", () => {
   test.each(["dev", "packaged"] as const)("#1724 real %s resources reach engine discovery without ledger writes", async (layout) => {
     expect(FACTORY_SKILL_IDS).toContain("plugin-helper")
@@ -292,9 +344,6 @@ describe("REQ-233 cloud skill instructions", () => {
   test("AC1 §2.8 routes explicit cloud, local files, formatted creation, images, facts, research and review", () => {
     for (const rule of [
       /用户明确说「用云端」 \| 用云（Word\/Excel\/PPT\/PDF 与网页除外，见下）/,
-      /生成、读、改 Word\/Excel\/PPT\/PDF \| 一律用本机 MCP（按 `office-docs` 技能）；文件写进项目目录、不出本机，无云端费用/,
-      /生成网页 \/ HTML \| 本机直接写 HTML 文件进项目目录（可自带 CSS 与 JS），在文件面板预览；不派发云端，无云端费用/,
-      /生成图片 \| 用云；本机没有图片生成能力/,
       /查一个事实、读一个网页 \| 先用本机搜索\/读取；本机不可用才用 `codepuppy_web_search` \/ `codepuppy_web_fetch`/,
       /多来源深度调研 \| 用云端 `research`，做多轮检索与综合/,
       /代码审查 \| 默认本机 agent；用户要求「联网复核」或「第二意见」时用云/,
@@ -305,7 +354,6 @@ describe("REQ-233 cloud skill instructions", () => {
   // alpha-platform#552 AC3: cloud office-report is retired; Office files are always made locally.
   test("AC3 Office files go to the local tools and explicit review requests select cloud code-review first", () => {
     expect(cloud.content).toContain("云端 Word/Excel/PPT 生成（`office-report`）已停用：不要派发它，用户明确要求云端时也如实说明")
-    expect(cloud.content).toContain("改用本机 `mcp:codepuppy-word`、`mcp:codepuppy-excel`、`mcp:codepuppy-powerpoint`、`mcp:codepuppy-pdf`")
     expect(cloud.content).toContain("选择云端 `code-review`")
     expect(cloud.content).toContain("不先改成本机搜索或本机代码审查")
     expect(office.content.replace(/\s+/g, " ")).toContain(
@@ -384,19 +432,4 @@ describe("REQ-233 cloud skill instructions", () => {
     }
   })
 
-  test("AC2 office-docs creates, reads and edits every office file locally", () => {
-    const text = office.content.replace(/\s+/g, " ")
-    for (const instruction of [
-      "**Create, read or edit Word/Excel/PowerPoint/PDF with Code Puppy's four first-party local stdio MCP connectors below**",
-      "`mcp:codepuppy-word`, `mcp:codepuppy-excel`, `mcp:codepuppy-powerpoint` and `mcp:codepuppy-pdf`",
-      "They write the file straight into the project directory",
-      "the file stays on this machine, with no cloud charge",
-      "also when the user asks for the cloud: say it is no longer offered and do the job with the local tools",
-      "write what the connector supports, say plainly which parts are missing, and offer a local script (below) for those parts with the user's consent",
-      // #1564:运行环境随应用自带 —— 不让模型告诉用户去装 uv 或等第一次下载。
-      "run on a Python runtime and pinned libraries that ship inside Code Puppy",
-    ]) expect(text).toContain(instruction)
-    expect(text).not.toContain("Load `cloud-capabilities`")
-    expect(text).not.toMatch(/`uv`|first run may download/)
-  })
 })

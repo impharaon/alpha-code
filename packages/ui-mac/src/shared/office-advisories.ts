@@ -1,3 +1,4 @@
+import { DOCUMENT_PYTHON_HOST, matchesDocumentPythonEnvironment, type DocumentPythonEnvironment } from "../../../util/src/codepuppy-document"
 // office-advisories — REQ-105 archived Office guidance + REQ-133 Code Puppy first-party registry +
 // REQ-135 retired community Office denial.
 //
@@ -106,14 +107,6 @@ export const CODEPUPPY_OFFICE_CONNECTORS = [
   extension: string
 }>
 
-/** 第一方 Office 服务的写工具名(resources/office-mcp/server.py tools_for 的写入口)。 */
-export const OFFICE_WRITE_TOOL: Readonly<Record<CodePuppyOfficeFormat, string>> = Object.freeze({
-  word: "write_docx",
-  excel: "write_xlsx",
-  powerpoint: "write_pptx",
-  pdf: "write_pdf",
-})
-
 /** #1564: the app-bundled interpreter and the shared server, as `{codepuppyResources}`-relative slots. */
 export const CODEPUPPY_OFFICE_PYTHON_SLOT = "{codepuppyResources}/office-runtime/bin/python3"
 export const CODEPUPPY_OFFICE_SERVER_SLOT = "{codepuppyResources}/office-mcp/server.py"
@@ -186,6 +179,7 @@ export function checkCodePuppyOfficeMcpSafety(
   server: Record<string, unknown>,
   workspace?: string,
   codepuppyResources?: string,
+  pythonEnvironment?: DocumentPythonEnvironment,
 ): OfficeSafetyVerdict {
   const command = Array.isArray(server.command) ? (server.command as unknown[]).filter((argument): argument is string => typeof argument === "string") : []
   const connector = codepuppyOfficeConnector(name, command)
@@ -213,7 +207,9 @@ export function checkCodePuppyOfficeMcpSafety(
     server.environment && typeof server.environment === "object" && !Array.isArray(server.environment)
       ? (server.environment as Record<string, unknown>)
       : {}
+  if (!matchesDocumentPythonEnvironment(env, pythonEnvironment)) return { ok: false, reason: `${connector.name} document host environment does not match its live Location` }
   for (const [key, value] of Object.entries(env)) {
+    if (key === DOCUMENT_PYTHON_HOST && pythonEnvironment) continue
     if (!CODEPUPPY_OFFICE_ALLOWED_ENV.has(key) || CODEPUPPY_OFFICE_BANNED_ENV.has(key.toUpperCase()) || (typeof value === "string" && value.includes("0.0.0.0"))) {
       return { ok: false, reason: `${connector.name} unapproved runtime environment is refused (REQ-133)` }
     }

@@ -1,0 +1,1 @@
+export { DOCUMENT_ASSET_BUILD_DIR, OFFICE_RUNTIME_BUILD_DIR, officePythonPath, readDocumentAssets, documentResources, documentRuntimeResources, type DocumentAssets } from "../shared/document-resources"

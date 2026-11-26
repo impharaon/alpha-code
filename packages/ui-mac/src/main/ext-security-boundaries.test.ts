@@ -192,7 +192,7 @@ describe("AC4④ Electron <webview> 全仓禁用", () => {
         expect(text).toMatch(/webviewTag\s*:\s*false/)
       }
     }
-    // 锚点:当前仅两处窗口创建点(新增创建点必须带 webviewTag:false 并更新此清单)。
-    expect(creators.sort()).toEqual(["html-preview-host.ts", "windows.ts"])
+    // 锚点:三个窗口创建点（含文档导出专用离屏窗口）(新增创建点必须带 webviewTag:false 并更新此清单)。
+    expect(creators.sort()).toEqual(["document-chromium.ts", "html-preview-host.ts", "windows.ts"])
   })
 })

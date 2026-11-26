@@ -1,0 +1,9 @@
+{
+  "name": "codepuppy-document-assets",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "docx": "9.16.0",
+    "pptxgenjs": "4.0.1"
+  }
+}

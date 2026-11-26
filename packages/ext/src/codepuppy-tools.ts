@@ -1,4 +1,4 @@
-// codepuppy-tools — ext 自己的五个工具(codepuppy_reload / register / echo / access / ping),`#1665` 起是 OpenCode 2 的
+// codepuppy-tools — ext 自己的工具(codepuppy_document / reload / register / echo / access / ping),`#1665` 起是 OpenCode 2 的
 // promise 工具形状,经 `tool.transform` 的 `editor.add` 注册(清点表 P8)。工具表文字一律取自 context-injection.ts 的
 // 登记簿(REQ-157 `#1284`:内联字面量 = 绕过登记簿,咽喉测试当场红)。
 //
@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import type { Info as ToolInfo } from "@opencode/plugin/promise/tool"
+import { documentToolForLocation } from "./document-register"
 import { cloudAccessState } from "./cloud-access"
 import { TOOL_TEXT } from "./context-injection"
 import type { ProjectRoot } from "./project-config"
@@ -29,6 +30,7 @@ export function createCodePuppyTools(input: {
   const directory = context.location.directory
   const refused = (output: string) => ({ content: output, metadata: { ok: false } })
   return [
+    documentToolForLocation(context.location),
     {
       name: "codepuppy_reload",
       description: TOOL_TEXT.codepuppy_reload.description,

@@ -64,7 +64,9 @@ describe("#907 the host's read-only face is not widened while fixing the UI", ()
     // safeOrigin 是刻意的:不留 path/query,不给不可信文档经状态面外带数据的机会。
     expect(host).toContain("function safeOrigin(")
     expect(host).toContain("return new URL(rawUrl).origin")
-    expect(host).toContain("recordBlocked(record, safeOrigin(details.url))")
+    expect(host).toContain("blocked: (url) =>")
+    expect(host).toContain("recordBlocked(record, safeOrigin(url))")
+    expect(host).not.toContain("recordBlocked(record, url)")
   })
 
   test("the record cap is one shared source of truth, so the UI count cannot drift from it", () => {

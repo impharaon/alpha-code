@@ -287,6 +287,7 @@ function uiMacAgentFragments(): TextFragment[] {
 /** 工具表文字(`plugin.ts` 的 `tool()` 从这里取,不再内联字面量)。`readable` = 详情里给人看的可读标识(#1568 AC5),
  *  经构建期清单(scripts/build.ts)交给引擎,只有清单核验成立的自有工具才带进显示快照;它不进模型上下文。 */
 export const TOOL_TEXT = {
+  codepuppy_document: { readable: "codepuppy:document", description: "Get the bundled document environment; render every Office/PDF page or an offline HTML/design canvas; record the page inspection. Use render after generation, Read every returned page, correct at most once with the same checkId and revision 1. Compare the source SHA-256 before correcting; do not overwrite concurrent edits. Re-render and Read every corrected page. If vision is unavailable, list uninspected pages with reasons instead of claiming success. A pending inspection delivers the existing file now with layout (and any Excel recalculation) explicitly unchecked; its owning Session receives a queued follow-up when ready. Report the checked version, actual coverage, fixes and remaining issues.", args: {} },
   codepuppy_access: {
     readable: "codepuppy:access",
     description: "调用任何云端工具(codepuppy_dispatch、codepuppy_web_search 等)前,或工具表里没有它们时先调它。只读查询本机登录状态与云端工具是否可用,并返回登录入口;不读取登录令牌,不查询额度或余额。",

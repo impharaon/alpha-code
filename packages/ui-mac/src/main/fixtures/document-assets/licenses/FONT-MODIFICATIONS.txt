@@ -1,0 +1,1 @@
+Code Puppy, 2026-11-26. Noto source f8d157532fbfaeda587e826d4cd5b21a49186f7c. FontTools 4.69.1; wght=400/700, static TrueType, explicit regular/bold style names. Original OFL and copyrights retained. No Reserved Font Name declared in these source licences.

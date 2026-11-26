@@ -1,14 +1,13 @@
 // DESIGN-local-session-artifacts §4.1/§4.2 —— 「产物 → 本次对话」里的本机产物:助手在本次对话(含子代理会话)里于本机
 // **成功写成**、落在会话目录内的文档。只读引擎已持久化的工具 part,不新建记录、不认模型说了什么。零 DOM、零 window.api。
 //
-// 三条来源:A 第一方 Office 写工具(直接或在 `execute` 里,匹配器与附件判定共用 officeCallsOf);B 引擎 `write`;
+// 三条来源:A 第一方文档工具的实际成品回执;B 引擎 `write`;
 // C 引擎 `patch` 新建(`metadata.files[].type === "add"`)。B、C 只收「文档类型」(viewerPlanFor 的结论),编码对话里的源码与
 // 配置在审查面板。身份 = 会话目录内的 POSIX 相对路径,同一路径只留最近一次。
 import type { Message, Part, ToolPart } from "../../../../engine-adapter/contract/v1"
 import { normalizePosixPath } from "../../../../shared/attachment-path"
-import { CODEPUPPY_OFFICE_CONNECTORS, OFFICE_WRITE_TOOL } from "../../../../shared/office-advisories"
-import { taskCardInfoOf, toolCardDispatchOf } from "../../session-timeline/cards/tool-card-model"
-import { officeCallsOf } from "../../session-timeline/timeline-attachments"
+import { DOCUMENT_WORK_DIR, documentArtifactFromMetadata } from "../../../../../../util/src/codepuppy-document"
+import { isDocumentTool, taskCardInfoOf, toolCardDispatchOf } from "../../session-timeline/cards/tool-card-model"
 import { splitViewerPath, viewerPlanFor } from "../files/file-viewer-core"
 import { SCOPE_ANCESTRY_MAX_DEPTH } from "./artifacts-core"
 
@@ -55,19 +54,15 @@ function isDocument(path: string): boolean {
   return plan.kind === "text" && (plan.view === "markdown" || plan.view === "csv" || plan.view === "text")
 }
 
-const OFFICE_WRITES = CODEPUPPY_OFFICE_CONNECTORS.map((connector) => ({ server: connector.name, tool: OFFICE_WRITE_TOOL[connector.format] }))
-
 type Candidate = { path: string; document: boolean }
 
 /** 一条工具 part 写成的候选路径(未判目录、未判类型之外的准入都在这里)。 */
 function candidatesOf(part: ToolPart): Candidate[] {
-  const office = OFFICE_WRITES.flatMap(({ server, tool }) =>
-    officeCallsOf(part, server, tool).flatMap((call) =>
-      call.status === "completed" && typeof call.input?.path === "string" ? [{ path: call.input.path, document: true }] : [],
-    ),
-  )
-  if (office.length > 0) return office
   if (part.state.status !== "completed") return []
+  if (isDocumentTool(part)) {
+    const artifact = documentArtifactFromMetadata(part.state.metadata)
+    return artifact ? [...new Set([artifact.sourcePath, artifact.artifactPath])].map((path) => ({ path, document: true })) : []
+  }
   const dispatch = toolCardDispatchOf(part)
   if (dispatch.metadataOnly) return []
   if (dispatch.kind === "write") {
@@ -103,7 +98,7 @@ export function scanLocalArtifacts(
         if (typeof end !== "number" || !Number.isFinite(end)) continue
         for (const candidate of candidatesOf(part)) {
           const path = relativeInside(directory, candidate.path)
-          if (!path || (!candidate.document && !isDocument(path))) continue
+          if (!path || path.split("/").includes(DOCUMENT_WORK_DIR) || (!candidate.document && !isDocument(path))) continue
           items.push({ path, name: splitViewerPath(path).name, writtenAt: end, sessionID, partID: part.id })
         }
       } catch {

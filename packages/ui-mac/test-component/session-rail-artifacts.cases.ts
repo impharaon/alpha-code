@@ -1214,8 +1214,11 @@ function writePart(path: string, end: number) {
   return { id: `prt_l${++localSeq}`, sessionID: "ses_a", messageID: "msg_l", type: "tool", tool: "write", callID: `c${localSeq}`, display: builtinDisplay("write"), state: { status: "completed", input: { path, filePath: path, content: "x" }, metadata: {}, time: { start: end - 1, end } } }
 }
 function officePart(path: string, end: number) {
-  return { id: `prt_l${++localSeq}`, sessionID: "ses_a", messageID: "msg_l", type: "tool", tool: "execute", callID: `c${localSeq}`, state: { status: "completed", input: { code: "" }, metadata: { toolCalls: [{ tool: "codepuppy-excel.write_xlsx", status: "completed", input: { path } }] }, time: { start: end - 1, end } } }
+  const id = ++localSeq
+  // Application-owned persisted metadata contract, matching the production document tool receipt.
+  return { id: `prt_l${id}`, sessionID: "ses_a", messageID: "msg_l", type: "tool", tool: "codepuppy_document", callID: `c${id}`, display: { identity: { source: "plugin", origin: "app", name: "codepuppy_document" }, technicalId: "codepuppy_document", readable: "codepuppy:document", authority: { kind: "codepuppy-bundled", bindingId: "app", evidenceDigest: "b".repeat(64) }, location: { kind: "local" } }, state: { status: "completed", input: {}, metadata: { codepuppyDocument: { schemaVersion: 1, artifact: { checkId: `check-${id}`, kind: "xlsx", sourcePath: path, artifactPath: path, sourceSha256: "a".repeat(64), artifactSha256: "a".repeat(64) } } }, time: { start: end - 1, end } } }
 }
+
 const localPage = (...parts: unknown[]) => [{ info: { id: "msg_l", sessionID: "ses_a", role: "assistant" }, parts }]
 const at = (hour: number, minute: number) => new Date(2026, 10, 19, hour, minute).getTime()
 

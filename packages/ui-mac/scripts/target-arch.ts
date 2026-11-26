@@ -16,6 +16,8 @@ import fs from "node:fs"
 import { createRequire } from "node:module"
 import path from "node:path"
 
+import { OFFICE_RUNTIME_BUILD_DIR, officePythonPath } from "../src/main/document-resources"
+
 import { parseAsarHeader } from "../src/main/release-sbom"
 
 export const TARGET_ARCH_ENV = "CODEPUPPY_TARGET_ARCH"
@@ -65,7 +67,7 @@ export function macNativePackages(arch: TargetArch): string[] {
  * (`<这里>/<arch>/bin/python3`)。build-office-runtime.ts 写它,electron-builder 的 extraResources 把
  * `<这里>/<arch>/` 装成 `<Resources>/office-runtime/`,beforePack 用 checkOfficeRuntime 在装包前核对它。
  */
-export const OFFICE_RUNTIME_BUILD_DIR = path.join("native", "office-runtime", "build")
+export { OFFICE_RUNTIME_BUILD_DIR }
 
 /**
  * DESIGN-domestic-cloud-connectivity §4.8:随包 ripgrep 的构建产物根,相对 packages/ui-mac,下面每个目标架构一份
@@ -178,10 +180,18 @@ export function checkBundledNodePty(outMainDir: string, platform: string, arch: 
  * #1564 AC5:随包 Office 运行时在、`bin/python3` 在,且目录里**每一个** Mach-O(解释器、libpython、
  * 各库的 `.so`)都含目标架构片。返回问题清单(空 = 通过)。符号链接不跟(`bin/python3` → `python3.11` 只判一次)。
  */
-export function checkOfficeRuntime(dir: string, arch: TargetArch): string[] {
-  if (!fs.existsSync(path.join(dir, "bin", "python3")))
+export function checkOfficeRuntime(dir: string, arch: TargetArch, platform: string = process.platform): string[] {
+  if (!fs.existsSync(officePythonPath(dir, platform)))
     return [`${path.join(dir, "bin", "python3")} 不存在(先跑 \`${TARGET_ARCH_ENV}=${arch} bun ./scripts/build-office-runtime.ts\`)`]
   const problems: string[] = []
+  if (platform === "win32") {
+    const native = walk(dir).filter((file) => /\.(exe|dll|pyd)$/i.test(file))
+    return native.flatMap((file) => {
+      const bytes = fs.readFileSync(file)
+      const offset = bytes.length >= 64 ? bytes.readUInt32LE(60) : 0
+      return offset > 0 && offset + 6 <= bytes.length && bytes.toString("ascii", offset, offset + 4) === "PE\0\0" && bytes.readUInt16LE(offset + 4) === 0x8664 ? [] : [`${file}: expected win32-x64 PE binary`]
+    })
+  }
   let machO = 0
   for (const file of walk(dir)) {
     const archs = machOArchs(readHead(file))

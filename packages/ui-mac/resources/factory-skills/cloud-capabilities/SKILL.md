@@ -13,15 +13,16 @@ license: MIT (Code Puppy original)
 | 情况 | 执行位置与动作 |
 | --- | --- |
 | 用户明确说「用云端」 | 用云（Word/Excel/PPT/PDF 与网页除外，见下），仍须先检查登录、费用和上传授权。 |
-| 生成、读、改 Word/Excel/PPT/PDF | 一律用本机 MCP（按 `office-docs` 技能）；文件写进项目目录、不出本机，无云端费用。 |
-| 生成网页 / HTML | 本机直接写 HTML 文件进项目目录（可自带 CSS 与 JS），在文件面板预览；不派发云端，无云端费用。 |
-| 生成图片 | 用云；本机没有图片生成能力。 |
+| 生成、读、改 Word/Excel/PPT/PDF | 按 `office-docs` 随包技能在本机制作、编辑与逐页检查；已有连接器可读文件和操作 Excel，生成不要求启用连接器。文件写进项目目录，不派发云端生成。 |
+| 生成网页 / HTML | 按 `office-docs` 的网页路由在本机制作自包含 HTML/CSS/JS，渲染与视觉检查后交付到项目目录；不派发云端生成，识图沿已有视觉服务和计费规则。 |
+| 海报 / 排版设计图片 | 按 `office-docs` 的海报路由在本机制作 HTML 源并导出 PNG，逐页检查后交付。 |
+| 照片、插画等图片生成 | 用云；使用既有生图服务。 |
 | 查一个事实、读一个网页 | 先用本机搜索/读取；本机不可用才用 `codepuppy_web_search` / `codepuppy_web_fetch`。 |
 | 多来源深度调研 | 用云端 `research`，做多轮检索与综合。 |
 | 代码审查 | 默认本机 agent；用户要求「联网复核」或「第二意见」时用云。 |
 | 要把本机私有文件传云 | 先问用户，获得上传授权后才发送内容；不能把选用云端当作上传私有文件的授权。 |
 
-云端 Word/Excel/PPT 生成（`office-report`）已停用：不要派发它，用户明确要求云端时也如实说明，改用本机 `mcp:codepuppy-word`、`mcp:codepuppy-excel`、`mcp:codepuppy-powerpoint`、`mcp:codepuppy-pdf`，按 `office-docs` 技能执行。
+云端 Word/Excel/PPT 生成（`office-report`）已停用：不要派发它，用户明确要求云端时也如实说明，改按 `office-docs` 的随包技能在本机制作、编辑与检查；连接器只作已有文件读取与 Excel 操作入口。
 网页 / HTML 由本机直接写文件：不要派发云端 `html-generate`，用户明确要求云端时也如实说明并改为本机生成。
 代码审查一旦要求联网复核或第二意见，选择云端 `code-review`；先加载本技能并检查云端准入，不先改成本机搜索或本机代码审查。
 

@@ -24,25 +24,27 @@ function withoutDistribution(text: string, name: string): string {
   return [...lines.slice(0, start), ...lines.slice(end < 0 ? lines.length : end)].join("\n")
 }
 
-describe("#1564 AC2 bundled Office runtime locks", () => {
-  test("requirements.in names exactly the five top-level packages the four formats import, each pinned", () => {
+describe("document runtime locks", () => {
+  test("requirements.in names the pinned document packages the four formats import, each pinned", () => {
     expect([...parseRequirementsLock(requirementsIn)].map(([name, pin]) => `${name}==${pin.version}`).sort()).toEqual([
       "openpyxl==3.1.5",
+      "pydantic==2.14.4",
       "pypdf==6.16.1",
+      "pypdfium2==5.0.0",
       "python-docx==1.2.0",
       "python-pptx==1.0.2",
       "reportlab==5.0.0",
     ])
   })
 
-  for (const arch of ["arm64", "x64"] as const) {
+  for (const arch of ["arm64", "win32-x64"] as const) {
     test(`requirements-${arch}.lock is the complete hashed closure of requirements.in`, () => {
       const text = read(`requirements-${arch}.lock`)
       expect(lockClosureProblems(requirementsIn, text, lock.requires)).toEqual([])
       // 闭包实测 11 个发行包(方案 §1.3:五个顶层包只是其中一部分)。
-      expect(parseRequirementsLock(text).size).toBe(11)
+      expect(parseRequirementsLock(text).size).toBe(16)
       // 两份 lock 都由 uv pip compile 按各自的目标平台与 Python 3.11 生成(文件头记着命令)。
-      expect(text).toContain(`--python-version 3.11 --python-platform ${arch === "arm64" ? "aarch64" : "x86_64"}-apple-darwin --generate-hashes`)
+      expect(text).toContain(`--python-version 3.11 --python-platform ${arch === "arm64" ? "aarch64-apple-darwin" : "x86_64-pc-windows-msvc"} --generate-hashes`)
     })
 
     test(`requirements-${arch}.lock: deleting one transitive dependency, or adding one outside the closure, is named`, () => {
@@ -63,14 +65,14 @@ describe("#1564 AC2 bundled Office runtime locks", () => {
 
   test("the runtime itself is a python-build-standalone CPython 3.11 pinned by URL + sha256 per architecture", () => {
     expect(lock.python.version).toMatch(/^3\.11\.\d+$/)
-    for (const [arch, triple] of [["arm64", "aarch64-apple-darwin"], ["x64", "x86_64-apple-darwin"]] as const) {
+    for (const [arch, triple] of [["arm64", "aarch64-apple-darwin"], ["win32-x64", "x86_64-pc-windows-msvc"]] as const) {
       const pin = lock.python[arch]
       expect(pin.url).toBe(
         `https://github.com/astral-sh/python-build-standalone/releases/download/${lock.python.release}/cpython-${lock.python.version}%2B${lock.python.release}-${triple}-install_only_stripped.tar.gz`,
       )
       expect(pin.sha256).toMatch(/^[0-9a-f]{64}$/)
     }
-    expect(lock.python.arm64.sha256).not.toBe(lock.python.x64.sha256)
+    expect(lock.python.arm64.sha256).not.toBe(lock.python["win32-x64"].sha256)
     // 下载缓存本机所有 worktree 共用,不在任何一个 checkout 里(新 worktree 不必再经代理下载一遍)。
     expect(OFFICE_RUNTIME_DOWNLOAD_CACHE).toBe(join(homedir(), "Library", "Caches", "codepuppy", "office-runtime"))
     expect(OFFICE_RUNTIME_DOWNLOAD_CACHE.startsWith(join(OFFICE_RUNTIME_LOCK_DIR, "..", ".."))).toBe(false)

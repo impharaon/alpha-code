@@ -105,7 +105,7 @@ PLAN 起草轮只做文档合同、链接和 diff 检查，并按当轮“commit
 ## 切片二：随包制作环境、中文字体与模板
 
 - 依据：[spec v1](spec.md) @ `31cd182e09710b603721c6f44d471b01289dd951`，AC-01..04、08、09、12、14、15 的资源/制作基础；[design](design.md) @ `7d1c4fdb55cc388af1fc7069249ec3d449641a60` §4.1/4.2、§6 R2/R6、§8/§10；[connector-launchers frozen design](../connector-launchers/design.md) @ `f7424aa45225a6d02d1958f4b4f72d247f99acc4` 的 v2 §4.1 / DOC-NODE-v2。切片一 `91aabeab39`、`7c739dc021` 已由 Claude Opus 5.5（orchestrator）接受；继承其来源、许可与发现结论。
-- 核对：待调度方核对本切片 PLAN 提交；下次 IMPLEMENT 的首个提交按恢复 brief 的 `Phase:` 行填写提交号、核对者/模型与结论。
+- 核对：`7569b9dfe8` · Claude Opus 5.5（orchestrator）· 通过。恢复 brief `Phase: IMPLEMENT` 接受文件、顺序、风险与逐 AC 证明；#1760 接线、Windows 实机和 LO 字体渲染继续 pending。Node 接收启动器提供的入口，v2.1 token 细节留集成，不另造路径约定。
 
 本片交付可供制作使用的资源树、构建来源与资源路径解析，不接通默认生成/自检流程。实际依据为当前 `build-office-runtime.ts` 的 mac-only 安装/验证、`office-runtime.lock` 的 CPython 3.11.15 与两份 mac 架构锁、`electron-builder.config.ts` 的 darwin-only Office 复制规则。沿用这些构建与打包拥有者补 Windows，不新建 Office Python 或 Node 的平行环境。既有普通读工具在本片仍可使用，旧 writer 删除及其烟测转换仍在片 7 同步完成。
 

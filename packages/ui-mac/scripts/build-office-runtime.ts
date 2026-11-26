@@ -20,8 +20,7 @@
 //   6. 每个 Mach-O 含目标架构片(与 beforePack 同一判据),没有任何文件带着构建机的 staging 路径,打印本架构的实际体积。
 // lock 与本脚本都没变时跳过 1–4(产物戳记),5–6 每次都跑。
 //
-// x64 产物在 arm64 宿主上用 `arch -x86_64`(Rosetta)执行同样的安装与验证;解释器跑不起来就响亮失败,不跳过。
-// 只在 darwin 上构建;别的平台打印一行并 no-op(随包运行时只进 mac 包)。
+// Build on the target host: darwin-arm64 or win32-x64. Node is owned by the launcher; this builder only ships Office Python.
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
@@ -35,16 +34,18 @@ import { OFFICE_RUNTIME_BUILD_DIR, checkOfficeRuntime, machOArchs, resolveTarget
 const scriptPath = fileURLToPath(import.meta.url)
 const packageDir = resolve(dirname(scriptPath), "..")
 export const OFFICE_RUNTIME_LOCK_DIR = join(packageDir, "resources", "office-runtime")
+import { officePythonPath } from "../src/main/document-resources"
+
 const SERVER = join(packageDir, "resources", "office-mcp", "server.py")
 /** 运行时下载缓存,本机所有 worktree 共用(新 worktree 第一次构建不必再经代理下载);命中仍按 lock 的 sha256 核验。 */
 export const OFFICE_RUNTIME_DOWNLOAD_CACHE = join(homedir(), "Library", "Caches", "codepuppy", "office-runtime")
 const STAMP = ".office-runtime-stamp"
 const TRIMMED = ["test", "tkinter", "idlelib", "ensurepip"]
 
-export const officeRuntimeDir = (arch: TargetArch) => join(packageDir, OFFICE_RUNTIME_BUILD_DIR, arch)
+export const officeRuntimeDir = (arch: TargetArch) => join(packageDir, OFFICE_RUNTIME_BUILD_DIR, process.platform === "win32" ? "win32-x64" : arch)
 
 export type OfficeRuntimeLock = {
-  python: { version: string; release: string } & Record<TargetArch, { url: string; sha256: string }>
+  python: { version: string; release: string } & Record<"arm64" | "win32-x64", { url: string; sha256: string }>
   requires: Record<string, string[]>
 }
 
@@ -105,11 +106,13 @@ export function lockClosureProblems(requirementsIn: string, lockText: string, re
 export type OfficeRuntimeBuild = { dir: string; arch: TargetArch; reused: boolean; bytes: number; files: number; machO: number; modules: string[] }
 
 export function buildOfficeRuntime(options: { arch?: TargetArch } = {}): OfficeRuntimeBuild {
-  if (process.platform !== "darwin") throw new Error("the bundled Office runtime builds on darwin only")
+  if (process.platform !== "darwin" && process.platform !== "win32") throw new Error("Office runtime targets darwin-arm64 and win32-x64")
   const arch = options.arch ?? resolveTargetArch()
+  if ((process.platform === "darwin" && arch !== "arm64") || (process.platform === "win32" && arch !== "x64")) throw new Error(`unsupported Office target: ${process.platform}-${arch}`)
+  const target = process.platform === "win32" ? "win32-x64" : "arm64"
   const dir = officeRuntimeDir(arch)
   const lock = readOfficeRuntimeLock()
-  const requirementsPath = join(OFFICE_RUNTIME_LOCK_DIR, `requirements-${arch}.lock`)
+  const requirementsPath = join(OFFICE_RUNTIME_LOCK_DIR, `requirements-${target}.lock`)
   const lockText = readFileSync(requirementsPath, "utf8")
   const closure = lockClosureProblems(readFileSync(join(OFFICE_RUNTIME_LOCK_DIR, "requirements.in"), "utf8"), lockText, lock.requires)
   if (closure.length) throw new Error(`requirements-${arch}.lock is not the closure of requirements.in:\n  - ${closure.join("\n  - ")}`)
@@ -141,21 +144,23 @@ function install(input: {
   rmSync(staging, { recursive: true, force: true })
   mkdirSync(staging, { recursive: true })
   try {
-    run("tar", ["-xzf", download(input.lock.python[input.arch]), "-C", staging])
+    run("tar", ["-xzf", downloadOfficeBuildFile(input.lock.python[process.platform === "win32" ? "win32-x64" : "arm64"]), "-C", staging])
     const root = join(staging, "python")
-    const python = [...interpreter(input.arch), join(root, "bin", "python3"), "-I"]
+    const python = [...interpreter(input.arch), officePythonPath(root, process.platform), "-I"]
     // pip 往 bin/ 写的控制台脚本把 staging 解释器路径写进 shebang,包里也用不到 —— 装完只留运行时原包的 bin/。
-    const shippedBin = new Set(readdirSync(join(root, "bin")))
+    const bin = join(root, process.platform === "win32" ? "Scripts" : "bin")
+    mkdirSync(bin, { recursive: true })
+    const shippedBin = new Set(readdirSync(bin))
     const pipInstall = [...python, "-m", "pip", "--isolated", "install", "--disable-pip-version-check", "--no-input", "--no-compile", "--require-hashes", "--only-binary=:all:", "-r", input.requirementsPath]
     retry(3, () => run(pipInstall[0]!, pipInstall.slice(1)))
     run(python[0]!, [...python.slice(1), "-m", "pip", "--isolated", "check"])
     assertInstalledMatchesLock(python, input.locked, input.lock.requires)
-    const stdlib = join(root, "lib", "python3.11")
+    const stdlib = process.platform === "win32" ? join(root, "Lib") : join(root, "lib", "python3.11")
     for (const name of TRIMMED) rmSync(join(stdlib, name), { recursive: true, force: true })
     for (const entry of readdirSync(join(stdlib, "site-packages")))
       if (entry === "pip" || /^pip-.*\.dist-info$/.test(entry)) rmSync(join(stdlib, "site-packages", entry), { recursive: true, force: true })
-    for (const entry of readdirSync(join(root, "bin")))
-      if (!shippedBin.has(entry) || /^pip(3(\.\d+)?)?$/.test(entry)) rmSync(join(root, "bin", entry), { recursive: true, force: true })
+    for (const entry of readdirSync(join(root, process.platform === "win32" ? "Scripts" : "bin")))
+      if (!shippedBin.has(entry) || /^pip(3(\.\d+)?)?$/.test(entry)) rmSync(join(bin, entry), { recursive: true, force: true })
     // -f:全部重编(含运行时原包自带的几个 .pyc);-s:co_filename 去掉 staging 前缀,包里不留构建机路径。
     run(python[0]!, [...python.slice(1), "-m", "compileall", "-q", "-f", "-j", "0", "-s", root, "--invalidation-mode", "unchecked-hash", stdlib])
     writeFileSync(join(root, STAMP), input.stamp)
@@ -210,8 +215,8 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
   const workspace = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-office-runtime-verify-")))
   try {
     // 干净环境:没有用户的 PATH / HOME,证明不靠本机装的 python、uv 或缓存。
-    const env = { PATH: "/usr/bin:/bin", HOME: workspace, TMPDIR: workspace, LANG: "en_US.UTF-8" }
-    const python = [...interpreter(arch), join(dir, "bin", "python3"), "-I", "-B"]
+    const env = { PATH: process.platform === "win32" ? join(process.env.SystemRoot!, "System32") : "/usr/bin:/bin", HOME: workspace, TMPDIR: workspace, TEMP: workspace, LANG: "en_US.UTF-8", ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot! } : {}) }
+    const python = [...interpreter(arch), officePythonPath(dir, process.platform), "-I", "-B"]
     const importScript = [
       "import importlib, importlib.metadata as md, json, sys",
       "mods = []",
@@ -241,7 +246,7 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
       const command = [
         ...interpreter(arch),
         ...codepuppyOfficeInstallCommand(sample.format).map((argument) =>
-          argument === CODEPUPPY_OFFICE_PYTHON_SLOT ? join(dir, "bin", "python3") : argument === CODEPUPPY_OFFICE_SERVER_SLOT ? SERVER : argument === WORKSPACE_MARKER ? workspace : argument,
+          argument === CODEPUPPY_OFFICE_PYTHON_SLOT ? officePythonPath(dir, process.platform) : argument === CODEPUPPY_OFFICE_SERVER_SLOT ? SERVER : argument === WORKSPACE_MARKER ? workspace : argument,
         ),
       ]
       const stdout = run(command[0]!, command.slice(1), {
@@ -282,7 +287,7 @@ function interpreter(arch: TargetArch): string[] {
   throw new Error(`cannot execute the ${arch} Office runtime on a ${process.arch} host`)
 }
 
-function download(pin: { url: string; sha256: string }): string {
+export function downloadOfficeBuildFile(pin: { url: string; sha256: string }): string {
   mkdirSync(OFFICE_RUNTIME_DOWNLOAD_CACHE, { recursive: true })
   const file = join(OFFICE_RUNTIME_DOWNLOAD_CACHE, `${pin.sha256}.tar.gz`)
   if (!existsSync(file) || sha256(file) !== pin.sha256) {
@@ -352,6 +357,6 @@ function readText(file: string) {
 }
 
 if (import.meta.main) {
-  if (process.platform !== "darwin") console.log(`[alpha:office-runtime] skipped on ${process.platform} — the bundled Office runtime ships in mac packages only`)
+  if (process.platform !== "darwin" && process.platform !== "win32") console.log(`[alpha:office-runtime] unsupported build host ${process.platform}`)
   else buildOfficeRuntime()
 }

@@ -49,7 +49,7 @@ export const Plugin = define({
       Effect.sync(() => registerPackageInstructionRenderer(location, input =>
         runInstruction(evaluateTemplate(input, { location, processes, shell })), input =>
         runInstruction(Effect.gen(function* () {
-          const executable = yield* shell.resolve({ priority: "config" })
+          const executable = yield* shell.resolve({ priority: "compat" })
           const bound = bindTemplateNode({ kind: "shell", parts: input.parts.map(part => typeof part === "string" ? { source: part } : part) }, "literal", () => undefined)
           return { executable, argv: ShellSelect.args(executable, bound.text), env: bound.env }
         })))),
@@ -271,14 +271,16 @@ function evaluateTemplate(
       return args[named] ?? ""
     }
     const rendered = nodes.map(node => ({ kind: node.kind, delimiter: node.delimiter, ...bindTemplateNode(gated ? { ...node, kind: "text" } : node, input.syntax, parameter) }))
-    const shell = rendered.some(node => node.kind === "shell") && !gated ? yield* services.shell.resolve({ priority: "config" }) : undefined
     const outputs = yield* Effect.forEach(rendered, node => {
       if (node.kind !== "shell") return Effect.succeed(node.text)
-      if (!shell) return Effect.succeed(node.delimiter === "```" ? "```!" + node.text + "```" : "!`" + node.text + "`")
-      return services.processes.run(ChildProcess.make(shell, ShellSelect.args(shell, node.text), { cwd: input.cwd, stdin: "ignore", extendEnv: true, env: { ...input.environment, ...node.env } }), { combineOutput: true }).pipe(
-        Effect.map(result => (result.output ?? Buffer.concat([result.stdout, result.stderr])).toString("utf8")),
-        Effect.mapError(error => new Error("Shell interpolation failed: " + error.message)),
-      )
+      if (gated) return Effect.succeed(node.delimiter === "```" ? "```!" + node.text + "```" : "!`" + node.text + "`")
+      return Effect.gen(function* () {
+        const shell = yield* services.shell.resolve({ priority: node.hasValues ? "compat" : "config" })
+        return yield* services.processes.run(ChildProcess.make(shell, ShellSelect.args(shell, node.text), { cwd: input.cwd, stdin: "ignore", extendEnv: true, env: { ...input.environment, ...node.env } }), { combineOutput: true }).pipe(
+          Effect.map(result => (result.output ?? Buffer.concat([result.stdout, result.stderr])).toString("utf8")),
+          Effect.mapError(error => new Error("Shell interpolation failed: " + error.message)),
+        )
+      })
     }, { concurrency: 2 })
     const text = outputs.join("").trim()
     if (hasArguments || !input.rawArguments.trim()) return text
@@ -381,7 +383,7 @@ function bindTemplateNode(node: TemplateNode, syntax: PreparedInstruction["synta
     if (piece.values.length && !heredoc && !comment) wordStart = false
   }
   endHeredocLine()
-  return { text, env }
+  return { text, env, hasValues: pieces.some(piece => "values" in piece) }
 }
 
 function parseArguments(input: string, syntax: PreparedInstruction["syntax"]) {

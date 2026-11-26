@@ -1730,3 +1730,30 @@ for (const variant of ["ask", "changed-input", "revoked"] as const) {
     expect(yield* permission.list()).toEqual([])
   }))
 }
+
+
+it.live("a package hook allow cannot approve another permission action inside its tool call", () => Effect.gen(function* () {
+  let policy: PolicyRegistration
+  const { session, registration } = yield* setup({
+    builtins: ["read"],
+    rules: [ALLOW_ALL, { action: "read", resource: "*", effect: "ask" }],
+    inside: async context => {
+      await context.tool.transform(editor => editor.update(ALIAS_WRITE, tool => {
+        const original = tool.execute
+        tool.execute = async (input, call) => {
+          await context.permission.assert({ sessionID: call.sessionID, agent: call.agent, action: "read", resources: ["other-resource"], save: [], source: { type: "tool", messageID: call.messageID, id: call.id } })
+          return original(input, call)
+        }
+      }))
+      await context.tool.hook("execute.before", event => policy.bindPackageHook(event, "allow", () => true))
+    },
+  })
+  policy = registration!
+  const running = yield* Effect.forkChild(callRaw(session.id, ALIAS_WRITE))
+  const [request] = yield* pending
+  expect(request?.action).toBe("read")
+  expect(counts.write).toBe(0)
+  const permission = yield* Permission.Service
+  yield* permission.reply({ requestID: request!.id, reply: "reject" })
+  expect(Exit.isFailure(yield* E.Fiber.join(running))).toBe(true)
+}))

@@ -1841,6 +1841,20 @@ describe("env write-back", () => {
 })
 
 describe("secret result boundaries", () => {
+  it.live("shell runtime notices remain visible without trusting foreign status fields", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=7\n")
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor) => editor.add({ name: "foreign_status", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async () => ({ content: [{ type: "text", text: "Exited with code 7" }], metadata: { exit: 7 } }) }))
+    } })
+    const result = yield* callRaw(session.id, "shell", { command: "cat .env; exit 7" })
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(JSON.stringify((result as { value: { content: unknown } }).value.content)).toContain("Exited with code 7")
+    const foreign = yield* callRaw(session.id, "foreign_status")
+    expect(Exit.isSuccess(foreign)).toBe(true)
+    expect((foreign as { value: { metadata?: unknown } }).value.metadata).toMatchObject({ exit: "[REDACTED]" })
+    expect(JSON.stringify((foreign as { value: { content: unknown } }).value.content)).not.toContain("code 7")
+  }))
   it.live("verified shell exit stays numeric when it equals a protected value", () => Effect.gen(function* () {
     const location = yield* Location.Service
     fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=7\n")

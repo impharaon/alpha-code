@@ -141,3 +141,39 @@ files.dispose(); writer.close();
   expect(await child.exited, errors).toBe(0)
   expect(JSON.parse(output)).toEqual({ first: true, second: true, metadata: false, denied: true })
 })
+
+// Integration on production Node; audit real filesystem calls, never substitute file data.
+async function nodeCollector(root: string, roots: ProtectedFiles.ProtectedRoots, source: string) {
+  const bundle = await Bun.build({ entrypoints: [path.join(import.meta.dir, "secret-files.ts")], target: "node", format: "esm" })
+  expect(bundle.success).toBe(true)
+  await writeFile(path.join(root, "collector.mjs"), await bundle.outputs[0].text())
+  await writeFile(path.join(root, "driver.mjs"), source)
+  const child = Bun.spawn(["node", path.join(root, "driver.mjs"), JSON.stringify(roots)], { stdout: "pipe", stderr: "pipe" })
+  const [output, errors, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  expect(exit, errors).toBe(0)
+  return JSON.parse(output)
+}
+
+test("realistic home collection never visits unrelated deep directories", async () => {
+  const { root, roots } = await setup()
+  for (const directory of ["Documents/unrelated/deep/tree", "Library/Unrelated/deep/tree", "Library/Keychains", ".aws", ".docker", ".kube"])
+    await mkdir(path.join(roots.home, directory), { recursive: true })
+  await copyFile(fixture("aws-credentials.ini"), path.join(roots.home, ".aws", "credentials"))
+  await copyFile(fixture("docker.json"), path.join(roots.home, ".docker", "config.json"))
+  await copyFile(fixture("kube.yaml"), path.join(roots.home, ".kube", "config"))
+  await writeFile(path.join(roots.home, "Library/Keychains", "login.keychain-db"), "fixture-encrypted-keychain")
+  await writeFile(path.join(root, "audit.mjs"), `
+import fs from 'node:fs/promises';export const visited=[];
+export const stat=async (...args)=>{visited.push(String(args[0]));return fs.stat(...args)};
+export const readdir=async (...args)=>{visited.push(String(args[0]));return fs.readdir(...args)};
+export const readFile=fs.readFile,realpath=fs.realpath;
+`)
+  expect(await nodeCollector(root, roots, `
+import {registerHooks} from 'node:module';
+registerHooks({resolve(name,context,next){return next(name==='node:fs/promises'&&context.parentURL?.endsWith('/collector.mjs')?new URL('./audit.mjs',import.meta.url).href:name,context)}});
+const {createSecretFiles}=await import('./collector.mjs');const roots=JSON.parse(process.argv[2]);
+const files=createSecretFiles(roots);await files.refresh();await files.refresh();
+const {visited}=await import('./audit.mjs');const values=files.values().map(v=>Buffer.from(v).toString());
+console.log(JSON.stringify({unrelatedCalls:visited.filter(p=>p.includes('/Documents')||p.includes('/Library/Unrelated')).length,keychain:values.includes('fixture-encrypted-keychain'),aws:values.includes('fixture-secret-key'),kube:values.includes('fixture-kube-token')}));files.dispose();
+`)).toEqual({ unrelatedCalls: 0, keychain: true, aws: true, kube: true })
+})

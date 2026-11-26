@@ -252,7 +252,7 @@ last_reviewed: 2026-11-26
 | 接口（原位置） | 原签名 / 本票消费点 |
 | --- | --- |
 | `process-fence-profile.ts` R1 | `resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations`；input 原字段为 platform/home/userDataPath/configHome/appData/localAppData/goInstallBin/xdgCacheHome/bunInstall，全必填；`PackageManagerLocations.env: Readonly<Record<string,string>>`、writable 原样消费。main 在白名单过滤后的同次位置计算拿 env，填 LauncherEnvironment.packageManagerEnv，不再算 UV/npm 根 |
-| `process-fence-plan.ts` 绑定 | `planPackageManagerCaches(input: PackageManagerLocationInput & { truthPath: string; eligibility: WorkspaceDirectoryInput })`；消费该分支实际绑定后的环境/位置，候选路径不能绕过已有身份绑定。生产 fence 与 bootstrap 用同一份结果 |
+| `process-fence-plan.ts` 绑定 | `planPackageManagerCaches(input: PackageManagerLocationInput & { truthPath: string; eligibility: WorkspaceDirectoryInput }): { env: Record<string,string>; cacheEnv: Record<string,string>; rules: ProcessFenceWriteRule[]; locations: WritableLocationTruth["entries"] }`；消费该分支实际绑定后的 env（含 npm prefix）与 cacheEnv（最终缓存投影）/rules/locations，候选路径不能绕过已有身份绑定。生产 fence 与 bootstrap 用同一份结果 |
 | `src/shared/package-manager-environment.ts` R2 | `installPackageManagerEnvironment(value: unknown, pull?: () => Promise<PackageManagerEnvironment>)`；sidecar 在 import engine 前使用 #1759 的安装路径，不另 publish 一份缓存表 |
 | 同模块最终投影 | `projectPackageManagerEnvironment<T>(source: Readonly<Record<string,T>> | undefined)`，以及 `packageManagerEnvironment(): PackageManagerEnvironment` / `refreshPackageManagerEnvironment()`；最终实际 spawner 由该分支投影，launcher 的业务/专用覆盖先合成，不在 core 重写 R1 缓存键 |
 | `engine/package-manager-spawner.ts` | 消费其现有 spawner adapter 在最终 spawn 时调用 refresh/project 的接线；MCP 的 prepare/已准备入口都走同一个 Location Environment，不能由 main 安装任意包 |
@@ -270,6 +270,20 @@ AC-10 独立证据必须观察重启后未调用解析器/下载器，key 不含
 
 同一展开器已完成 Node/cache-root 的整 token 规则；v2 声明核验 codeSha256/environment/cwd，返回工具及原模板的两类摘要；ext authority 消费同一摘要，旧 policy canonical 实现原样移动。原生无槽的 Office 可以在启动器装配之前核验；含槽声明没有本代可信描述即不获声明。core/ext 的临时只读 `Reflect.get(bootstrap, "launchers")` 接法与既有视频消费者一致，#1759 接入时随必填 bootstrap 字段改为类型化读取；未声称当前生产已发布该描述。
 
-证据：core 原文件命名纯用例 4 PASS / 57 assertions；identity 文件 19 PASS / 56 assertions；sidecar-wiring 4 PASS（同次 snapshot 文件 2 FAIL：worktree 未构建 Office Python，ENOENT）。`python /tmp/connector-r3-manifest-check.py` 使用 producer 原 EXPORT_TOOLS 在本机 Python 解释器载入真实 server.py，四格式工具、实际代码 hash、v2 形状 PASS，不替代随包解释器的完整 snapshot。为补齐 prerequisite，通过 `gate slot -- bun scripts/build-office-runtime.ts` 尝试原 builder，compileall `-j 0` exit 1，未重跑/修改 builder；日志 `/tmp/connector-r3-office-build.log`，交编排器处理构建前置，非本片回归。前一轮类型检查 util 114 files、core 2056 files/2 projects、ext/ui-mac 均 exit 0；最终变更静态检查见后续总收据。
+证据：core 原文件命名纯用例 4 PASS / 57 assertions；identity 文件 19 PASS / 56 assertions；sidecar-wiring 4 PASS（同次 snapshot 文件 2 FAIL：worktree 未构建 Office Python，ENOENT）。更正 `fc7cb56ccf` 的收据：`python /tmp/connector-r3-manifest-check.py` 使用 producer 原 EXPORT_TOOLS 载入真实 server.py，但因 `codepuppy_office` 前置包未安装而 exit 1，不能记 PASS；仅静态 JSON 形状/真实 hash 的机械投影已完成，不替代完整 producer snapshot。为补齐 prerequisite，通过 `gate slot -- bun scripts/build-office-runtime.ts` 尝试原 builder，compileall `-j 0` exit 1，未重跑/修改 builder；日志 `/tmp/connector-r3-office-build.log`，交编排器处理构建前置，非本片回归。前一轮类型检查 util 114 files、core 2056 files/2 projects、ext/ui-mac 均 exit 0；最终变更静态检查见后续总收据。
 
 偏离：`policy/resolver.ts` 的 McpEntry 本来丢弃 environment，本次为冻结身份要求保留该字段；`policy/index.ts` 将同代可信描述送入身份核验，为同一调用链必要文件。core 既有引擎场景夹具按 v2 的显式 environment 同步，未运行时序场景。生产 boot Node 重锚及准备前等待仍待生产 launcher 描述装配，不以这组纯用例计作 AC-01/10 整体验收。
+
+身份移除臂：临时去掉 environment/cwd 比较，`bun test test/codepuppy-mcp-runtime.test.ts -t "bundled declarations reject"` 为 0 PASS / 1 FAIL（期望 undefined 却获得声明）；已用 scoped git restore 还原。
+
+### r3 呈现与重试片实施收据
+
+Phase: IMPLEMENT（r3；计划 `2e75ba3f76`）。新增 `main/connector-launch-state.ts` 持有当前代快照、序号与旧 attempt 排除；冻结 ConnectorLaunchApi 的重试入口查当前身份后，已绑定文档 runtime 时直接调用真实 `runtime.retry()`，动作自身不清除失败。preload/main IPC 已暴露同一面，composition root 安装端口留给生产启动链；没有伪造一个已经注册的生产 runtime。
+
+UI：`connector-launch-presentation.ts` 为行和 BackgroundProblemWatcher 的唯一新详情投影，准备进度可见且不入问题；下载、密钥、目录、依赖和崩溃各只有一个原因/动作。诊断交接消费现有 startChat；命令数组、cwd、阶段、真实退出码/信号与 stderr 首条带入，4096 字符只决定完整宿主文件附件与 inline 的展示方式，不截断/拒绝内容；沿 onSessionCreated/existingSessionID 重试失败首条。主进程诊断产生/遮密 tee 尚未接入，不能据消费者测试声称 AC-08 的引擎半条链完成。
+
+证据：`bun test src/main/document-runtime.test.ts src/main/connector-launch-state.test.ts src/renderer/extensions/connector-launch-presentation.test.ts` 28 PASS / 134 assertions；包含真 runtime 的 failed→connector API retry→实际准备/验证→ready。`bun test src/renderer/codepuppy-ui/background-problem-watcher.test.ts -t "launcher snapshots suppress"` 1 PASS / 13 assertions，真实挂 watcher+问题入口，准备压过 SDK 的旧失败；点击 retry 不提前消除问题，密钥/非仓库消息与动作同步，connected 清除；该用例不推进时钟，旧计时用例未跑。core 纯分类用例 1 PASS / 10 assertions：仅 connect/timeout/5xx/429 为 download，404/403/解析/完整性/磁盘和粗 network 为 unknown。
+
+偏离/必要同链文件：依据 documents plan:573/704 的明确已接受接缝，撤回本轮计划里拟增 DocumentHost/bridge 方法的路线；实际重试直接绑定当前 runtime 到已有 connector API，没有改 DocumentHost/引擎 API。新增 `connector-launch-client/actions/assistant` 与 `connector-assistant-host.tsx` 分别复用窄 preload、现有密钥/OAuth 入口和现有 router/startChat；index 只挂已有壳的动作宿主；en/zh 添加本片文案；test-component/preload-stub 机械登记新能力缺席，避免改变无此能力的旧组件夹具。`connector-launch-state` 为本片必要生产端文件，使用冻结 API，没有另造下载器/Session 队列。最终静态检查及移除臂见总收据。
+
+未闭环：生产 controller 安装、core changed/diagnostic 消息桥、DocumentRuntime 当前 attempt 绑定由待接启动链装配；Node boot 重锚、PackageRunner 持久准备/离线入口仍需后续实现。未将这些写成已依赖 #1759 自然完成：R1/R2 合入后只解决其位置/最终投影端口，本票仍拥有余下代码与整链验收。

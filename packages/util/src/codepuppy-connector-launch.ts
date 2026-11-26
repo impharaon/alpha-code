@@ -122,3 +122,47 @@ export function createPinnedFileRequester(post: (message: PinnedFileRequest | Pi
     },
   }
 }
+
+export type LaunchIdentity = { directory: string; server: string; attempt: string }
+export type PreparationProgress =
+  | { unit: "bytes" | "packages"; completed: number; total?: number }
+  | { unit: "activity"; detail: string }
+export type ConnectorLaunchState =
+  | { phase: "preparing"; stage: "launcher" | "python" | "packages"; progress: PreparationProgress }
+  | { phase: "connecting" | "connected" | "disabled" }
+  | { phase: "failed"; failure: ConnectorLaunchFailure; diagnostic: string }
+export type LaunchSnapshot = { identity: LaunchIdentity; sidecarGeneration: string; sequence: number; state: ConnectorLaunchState }
+export type LaunchActionResult = { ok: true } | { ok: false; error: "not-current" | "unavailable" | "cancelled"; detail?: string }
+export type ConnectorLaunchDiagnostic = {
+  identity: LaunchIdentity
+  requestedCommand: string[]
+  effectiveCommand: string[]
+  cwd: string
+  exitCode: number | null
+  signal: string | null
+  stderr: string
+  stage: "launcher" | "python" | "packages" | "handshake" | "running"
+  transcriptFile: string
+}
+export type ConnectorLaunchApi = {
+  list(directory: string): Promise<LaunchSnapshot[]>
+  subscribe(listener: (snapshot: LaunchSnapshot) => void): () => void
+  retry(identity: LaunchIdentity): Promise<LaunchActionResult>
+  diagnostic(identity: LaunchIdentity): Promise<{ ok: true; value: ConnectorLaunchDiagnostic } | Extract<LaunchActionResult, { ok: false }>>
+  openNetworkApproval(identity: LaunchIdentity): Promise<LaunchActionResult>
+  chooseWorkspace(identity: LaunchIdentity): Promise<LaunchActionResult>
+}
+
+export function isLaunchIdentity(value: unknown): value is LaunchIdentity {
+  return !!value && typeof value === "object" && "directory" in value && typeof value.directory === "string" && /^(?:\/|[a-z]:[\\/])/i.test(value.directory) && "server" in value && typeof value.server === "string" && value.server !== "" && "attempt" in value && typeof value.attempt === "string" && value.attempt !== ""
+}
+export function isLaunchSnapshot(value: unknown): value is LaunchSnapshot {
+  if (!value || typeof value !== "object" || !("identity" in value) || !isLaunchIdentity(value.identity) || !("sidecarGeneration" in value) || typeof value.sidecarGeneration !== "string" || !("sequence" in value) || !Number.isSafeInteger(value.sequence) || Number(value.sequence) < 0 || !("state" in value) || !value.state || typeof value.state !== "object" || !("phase" in value.state)) return false
+  const state = value.state
+  if (["connecting", "connected", "disabled"].includes(String(state.phase))) return true
+  if (state.phase === "failed") return "failure" in state && isConnectorLaunchFailure(state.failure) && "diagnostic" in state && typeof state.diagnostic === "string"
+  if (state.phase !== "preparing" || !("stage" in state) || !["launcher", "python", "packages"].includes(String(state.stage)) || !("progress" in state) || !state.progress || typeof state.progress !== "object" || !("unit" in state.progress)) return false
+  const progress = state.progress
+  if (progress.unit === "activity") return "detail" in progress && typeof progress.detail === "string"
+  return ["bytes", "packages"].includes(String(progress.unit)) && "completed" in progress && Number.isSafeInteger(progress.completed) && Number(progress.completed) >= 0 && (!("total" in progress) || (Number.isSafeInteger(progress.total) && Number(progress.total) >= Number(progress.completed)))
+}

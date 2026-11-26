@@ -47,6 +47,7 @@ const { Integration } = await import("@opencode/core/integration")
 const { Location } = await import("@opencode/core/location")
 const { Mcp } = await import("@opencode/core/mcp/index")
 const { McpClient } = await import("@opencode/core/mcp/client")
+const { classifyStartFailure } = await import("@opencode/core/mcp/codepuppy-startup")
 const { McpPool } = await import("@opencode/core/mcp/pool")
 const { declaredListedTools, declaredFirstPartyTools, expandFirstPartyCommand, commandMatchesTemplate, listsDeclaration } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
 const { __resetCodePuppyBootstrapForTests, parseCodePuppyBootstrap, publishCodePuppyBootstrap, tryCodePuppyBootstrap } = await import("@opencode/util/codepuppy-bootstrap")
@@ -774,3 +775,14 @@ describe("video progress", () => {
     }),
   )
 })
+
+// Integration layer, pure source classification: a coarse network code must never imply retry.
+testEffect(Layer.empty).effect("launcher download classification uses final transport facts and preserves deterministic failures", () => Effect.sync(() => {
+  for (const failure of [{ kind: "connect", detail: "refused" }, { kind: "timeout", detail: "idle" }, { kind: "http", status: 503, detail: "upstream" }, { kind: "http", status: 429, detail: "busy" }] as const) {
+    expect(classifyStartFailure(undefined, { type: "local" }, { download: { result: { ok: false, error: "network" }, failure } }).failure).toEqual({ kind: "download", detail: failure.detail })
+  }
+  for (const failure of [{ kind: "http", status: 404, detail: "not published" }, { kind: "http", status: 403, detail: "registry forbidden" }, { kind: "integrity", detail: "digest mismatch" }, { kind: "disk", detail: "disk full" }, { kind: "resolution", detail: "requires-python conflict" }] as const) {
+    expect(classifyStartFailure(undefined, { type: "local" }, { download: { result: { ok: false, error: "network" }, failure } }).failure).toEqual({ kind: "unknown", detail: failure.detail })
+  }
+  expect(classifyStartFailure(undefined, { type: "local" }, { download: { result: { ok: false, error: "network" } } }).failure?.kind).toBe("unknown")
+}))

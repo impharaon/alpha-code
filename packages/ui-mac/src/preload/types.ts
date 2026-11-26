@@ -1,3 +1,4 @@
+import type { ConnectorLaunchApi } from "../../../util/src/codepuppy-connector-launch"
 import type { NetworkEgressApi } from "../shared/network-egress-wire"
 import type { SourceSearchResultV1, PreparePluginSourceInputV1, PreparePluginSourceResultV1 } from "../main/plugin-sources"
 import type { InstallRequestV1, InstallOutcomeV1 } from "../shared/plugin-install"
@@ -680,6 +681,7 @@ export type {
 export type { CodePuppyEnvironmentInfo }
 
 export type ElectronAPI = {
+  connectorLaunch: ConnectorLaunchApi
   networkEgress: NetworkEgressApi
   killSidecar: () => Promise<void>
   sidecarGeneration: {

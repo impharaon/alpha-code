@@ -1,3 +1,4 @@
+import { ConnectorAssistantHost } from "./extensions/connector-assistant-host"
 import { VideoUploadDialog } from "./extensions/video-upload-dialog"
 // @refresh reload
 
@@ -600,6 +601,7 @@ render(() => {
               </CodePuppyBoundary>
               {/* `#1687` v2:连不上的工具服务只进「未恢复问题」入口(不弹提示);首读在启动静默窗口之后。 */}
               <CodePuppyBoundary name="BackgroundProblemWatcher">
+                <ConnectorAssistantHost projects={codepuppyProjects} serverKey={projectsServerKey} />
                 <BackgroundProblemWatcher server={sidebarServer} />
               </CodePuppyBoundary>
               <CodePuppyBoundary name="ContractFailureBanner">

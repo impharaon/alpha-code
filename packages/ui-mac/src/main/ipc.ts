@@ -1,3 +1,5 @@
+import { connectorLaunchApi } from "./connector-launch-state"
+import { isLaunchIdentity } from "../../../util/src/codepuppy-connector-launch"
 import { execFile } from "node:child_process"
 import { stat } from "node:fs/promises"
 import { basename } from "node:path"
@@ -89,6 +91,14 @@ export function registerIpcHandlers(deps: Deps) {
   const updaterSubscriptions = createUpdaterSubscriptions()
   app.once("will-quit", updaterSubscriptions.clear)
   registerStartupTimelineIpc(ipcMain)
+  ipcMain.handle("connector-launch-list", (_event, directory: unknown) => typeof directory === "string" ? connectorLaunchApi.list(directory) : [])
+  ipcMain.handle("connector-launch-retry", (_event, identity: unknown) => isLaunchIdentity(identity) ? connectorLaunchApi.retry(identity) : { ok: false, error: "not-current" })
+  ipcMain.handle("connector-launch-diagnostic", (_event, identity: unknown) => isLaunchIdentity(identity) ? connectorLaunchApi.diagnostic(identity) : { ok: false, error: "not-current" })
+  ipcMain.handle("connector-launch-network", (_event, identity: unknown) => isLaunchIdentity(identity) ? connectorLaunchApi.openNetworkApproval(identity) : { ok: false, error: "not-current" })
+  ipcMain.handle("connector-launch-workspace", (_event, identity: unknown) => isLaunchIdentity(identity) ? connectorLaunchApi.chooseWorkspace(identity) : { ok: false, error: "not-current" })
+  app.once("will-quit", connectorLaunchApi.subscribe((snapshot) => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("connector-launch-changed", snapshot)
+  }))
 
   // REQ-098(AC#6):环境快照只读 IPC —— 回调零参数(不读任何 renderer 输入),返回启动时冻结的
   // 快照;不存在任何对应写面(环境只由 main 的构建事实解析,见 codepuppy-environment.ts)。

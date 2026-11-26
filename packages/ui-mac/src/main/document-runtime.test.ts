@@ -1,3 +1,4 @@
+import { createConnectorLaunchState } from "./connector-launch-state"
 import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import { createHash } from "node:crypto"
 import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, existsSync, realpathSync, rmSync, writeFileSync } from "node:fs"
@@ -239,4 +240,33 @@ test("publishing the Python environment for an enabled connector does not begin 
     expect(query.mock.calls).toHaveLength(0)
     expect(f.counts.acquire).toBe(0)
   } finally { query.mockRestore(); await runtime.dispose() }
+})
+
+// Integration layer: the shipped connector action calls the actual runtime, not a retry counter adapter.
+test("connector retry action restarts the current real document preparation", async () => {
+  const f = fixture()
+  let first = true
+  const runtime = createDocumentRuntime({ ...f.input, ensureFile: async (...args) => {
+    if (first) { first = false; return { result: { ok: false, error: "network" }, failure: { kind: "connect", detail: "interrupted" } } }
+    return f.input.ensureFile(...args)
+  } })
+  runtimes.push(runtime)
+  const identity = { directory: f.location.directory, server: "documents", attempt: "document-preparation" }
+  const state = createConnectorLaunchState("3", { retry: async () => { throw Error("document action must not restart the connector") }, diagnostic: async () => ({ ok: false, error: "unavailable" }), openNetworkApproval: async () => ({ ok: false, error: "unavailable" }), chooseWorkspace: async () => ({ ok: false, error: "unavailable" }) })
+  const unsubscribe = runtime.subscribe((value, sequence) => state.changed({ identity, sidecarGeneration: "3", sequence, state: value.phase === "ready" ? { phase: "connected" } : value.phase === "failed" ? { ...value, diagnostic: "document-preparation" } : { phase: "preparing", stage: "packages", progress: { unit: "activity", detail: value.stage } } }))
+  const unbind = state.bindDocumentRuntime(identity, runtime)
+  runtime.subscribeRuntimeVerify(f.location, f.completed)
+  const failed = until(runtime, (value) => value.phase === "failed")
+  runtime.query(f.location)
+  await failed
+  expect((await state.api.list(identity.directory))[0]?.state.phase).toBe("failed")
+  expect(await state.api.retry({ ...identity, attempt: "old" })).toEqual({ ok: false, error: "not-current" })
+  const ready = until(runtime, (value) => value.phase === "ready")
+  expect(await state.api.retry(identity)).toEqual({ ok: true })
+  await ready
+  expect(f.counts).toEqual({ acquire: 1, extract: 1, verify: 1 })
+  expect((await state.api.list(identity.directory))[0]?.state.phase).toBe("connected")
+  await state.api.retry(identity)
+  expect(f.counts.acquire).toBe(1)
+  unbind(); unsubscribe(); state.dispose()
 })

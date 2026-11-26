@@ -101,6 +101,7 @@ export type ProvidedKey = keyof ReturnType<typeof createBaseStub>
  */
 export type AbsentOnPurposeKey =
   // ① 缺席即语义:组件按「有没有这个键」分支
+  | "connectorLaunch" // Current-attempt snapshots/actions are injected by their dedicated component cases.
   | "networkEgress" // Connection cards require an applied fence; tests inject their own main service.
   | "sidecarGeneration"
   | "ext"

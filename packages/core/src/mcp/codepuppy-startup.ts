@@ -1,3 +1,4 @@
+import type { ConnectorLaunchFailure, PinnedFileDelivery } from "@opencode/util/codepuppy-connector-launch"
 /**
  * Code Puppy's MCP startup rules on OpenCode 2 (#1563, #1572; #1662 L4 ruling item 5). Used by the re-taken
  * `client.ts` (classification at the source), `connection.ts` (start concurrency) and `index.ts` (background
@@ -31,6 +32,7 @@ export interface StartFailure {
   /** A registered code: index.ts prefixes the failed status with it, and the desktop reads it back (#1564). */
   readonly code: CodepuppyFailureCode
   readonly reconnect: boolean
+  readonly failure?: ConnectorLaunchFailure
 }
 
 const RECONNECT_CODES = new Set([
@@ -51,10 +53,15 @@ const RECONNECT_CODES = new Set([
 export function classifyStartFailure(
   error: unknown,
   config: { readonly type: string; readonly url?: string },
-  hints: { readonly timedOut?: boolean; readonly httpStatus?: number } = {},
+  hints: { readonly timedOut?: boolean; readonly httpStatus?: number; readonly download?: PinnedFileDelivery } = {},
   env: Record<string, string | undefined> = process.env,
   egressProxy: string | undefined = tryCodePuppyBootstrap()?.network.egressProxy,
 ): StartFailure {
+  if (hints.download && !hints.download.result.ok) {
+    const fact = hints.download.failure
+    const temporary = fact?.kind === "connect" || fact?.kind === "timeout" || (fact?.kind === "http" && (fact.status === 429 || fact.status >= 500))
+    return { code: "spawn_failed", reconnect: false, failure: { kind: temporary ? "download" : "unknown", detail: fact?.detail ?? hints.download.result.error } }
+  }
   const remote = config.type === "remote"
   if (hints.timedOut) return { code: "handshake_timeout", reconnect: remote }
   if (!remote) {

@@ -1,3 +1,7 @@
+import { useConnectorLaunchSnapshots } from "./connector-launch-client"
+import { connectorLaunchPresentation } from "./connector-launch-presentation"
+import { runConnectorLaunchAction } from "./connector-launch-actions"
+import { createDefaultWorkspaceDir } from "../codepuppy-ui/default-workspace"
 // The Extension Hub (定制中心) — a full PAGE (not a modal) covering the content area, rendered as a
 // sibling of <CodePuppySidebar> inside AppInterface (renderer/index.tsx) via a dedicated Portal host on
 // #root. Only mounted while open, so it can never intercept background clicks. Browsable items come
@@ -159,6 +163,8 @@ export function ExtensionHub(props: {
       return active?.sessionID === id ? active.directory : undefined
     })
   })
+  const defaultDirectory = createDefaultWorkspaceDir()
+  const connectorLaunch = useConnectorLaunchSnapshots(() => projectDir() ?? defaultDirectory(), props.server)
   const ext = useExtensions(props.server, props.open, projectDir, props.directories)
   const section = hubSection
   // REQ-103(#195):governance 只读视图(逐扩展五维所有权 + availability/activation/health 三态)。
@@ -1922,8 +1928,19 @@ export function ExtensionHub(props: {
       !rowSessionGrant()
     const isOn = () => (row.type === "mcp" && row.receipt.installedAt === "" ? !!row.mcp?.connected : desiredOn())
 
+    const launch = () => row.type === "mcp" ? connectorLaunch(row.name) : undefined
+    const launchPresentation = () => { const snapshot = launch(); return snapshot && connectorLaunchPresentation(snapshot.state) }
+    const launchAction = async () => {
+      const snapshot = launch()
+      const action = launchPresentation()?.action
+      if (!snapshot || !action) return
+      try { await runConnectorLaunchAction(snapshot, action.kind, (name) => ext.authenticateMcp(name)) }
+      catch (error) { flash(error instanceof Error ? error.message : String(error), "error") }
+    }
     // 一行状态:取最要紧的那一件。
     const line = (): { text: string; err?: boolean; hub?: string; detail?: string } => {
+      const presentation = launchPresentation()
+      if (presentation) return { text: launch()?.state.phase === "preparing" && presentation.detail ? `${presentation.reason} · ${presentation.detail}` : presentation.reason, err: presentation.problem, detail: presentation.detail }
       if (row.type === "mcp" && row.mcp?.error && !row.mcp.pending)
         return { text: row.mcp.repair === "reinstall-app" ? t("codepuppy.ext.officeRuntimeMissing") : mcpFailureReason(row.mcp.code), err: true, detail: row.mcp.error }
       // `#733`:`needs_auth` 不是「未连接」——它是一个用户能自己修好的状态。
@@ -1976,7 +1993,7 @@ export function ExtensionHub(props: {
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
             <b title={row.name}>{row.displayName}</b>
-            <Show when={!projectMcpView() && line().err}>
+            <Show when={!projectMcpView() && !launchPresentation() && line().err}>
               <RowStatus tone="err" text={t("codepuppy.ext.statusFailed")} />
             </Show>
           </div>
@@ -2029,7 +2046,10 @@ export function ExtensionHub(props: {
             )}
           </Show>
         </div>
-        <Show when={attention()}>
+        <Show when={launchPresentation()?.action}>
+          {(action) => <button class="codepuppy-ext-updbtn" onClick={(event) => { event.stopPropagation(); void launchAction() }}>{action().label}</button>}
+        </Show>
+        <Show when={!launchPresentation() && attention()}>
           {(kind) => (
             <>
               {/* `#733`:MCP 走 OAuth 且当前没令牌 ⇒ 一颗能点的「去授权」,与状态「需要重新登录」是同一个事实的两半。 */}

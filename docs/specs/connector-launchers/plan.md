@@ -523,3 +523,11 @@ SEAM-CHANGE-NEEDED：首方 Node boot re-anchor / 持久 tool-service binding �
 遗留去向：Node 重锚的策略绑定语义 → 编排器/设计 §10；完整官方 uv/key/安装/bin/prepare → #1760 续接；#1759 → 合入后按本表装配；Office compileall → documents（已路由，本轮未碰）；docs/README.md index.stale 等 → 文档治理。OPTIONAL：无。无迁移。
 
 本轮时间核对：2026-11-26T19:02:34Z；自 18:08:43Z 起约 53 分钟（原预期约 90 分钟）。本轮只报告已完成子链；未完成项与冻结接缝已逐项列明。
+
+## r6｜槽位策略绑定裁定与准备链续接
+
+- 依据：r6 IMPLEMENT；r5 的六个提交已接受，继承其证据。编排器 Claude Opus 5.5（2026-11-27）已裁定 Node/cache-root 的 host-only 槽保留声明 token 参与 binding digest；不再因应用位置重锚添加询问步骤，仍按当前 descriptor 和完整显式配置严格核验。
+- 核对：Phase IMPLEMENT，Codex / GPT-6；原 r5 策略接缝已获裁定，不能继续当作阻塞。起始 2026-11-26T19:04:46Z，预计约 90 分钟。
+- 第一项文件：core/mcp/codepuppy-first-party-mcp 的单一声明匹配 owner 输出经核验的绑定命令；保留现有 declaredFirstPartyTools 的冻结形状。ext/policy/identity 消费这些事实形成槽位声明的策略 digest；普通 MCP 的 resolver/store 契约不改。回归放既有 identity.test.ts，以生产 toolFacts + save/load + resolve 在真临时磁盘验证 Node/cache 位置变动后 saved enabled 保留，以及声明 arg/env/cwd 变动和非首方配置仍重绑。按 red-first 单独提交红例，再实现。
+- 后续文件：core/codepuppy-npm-launch、codepuppy-connector-launch 及必要的自有 uv 语法/内容指纹 helper；仍使用随包官方解释器、Location files/spawner 和现有准备收据。按官方语法、非秘密内容 key、真实安装/bin 捕获、prepareConnectorLaunch 组合的顺序推进；已有 controller/Host/root 装配仍等 #1759。
+- 证明：迭代仅命名例；每步本行为文件一次；返回前相关 mock/枚举消费者一次、适用包类型检查、移除臂和 affected-tests --list。大实物仅 gate slot 一次性证据，不运行应用、全门或计时/容量用例。#1759 当前接口提交仍 ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f；不复制其 R1/R2。

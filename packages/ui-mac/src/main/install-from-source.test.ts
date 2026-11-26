@@ -718,3 +718,18 @@ test("allocated plugin host names survive removal of a colliding connector", () 
   expect(result.ok && result.installed[0]!.hostName).toBe(hostName)
   expect(readMcpLeafStrict(hostName)).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
 }))
+
+test("standard plugin content installs before configuration programs or local services are ready", async () => {
+  for (const name of ["claude:grafana-mcp", "claude:langfuse-observability", "claude:rill", "claude:cockroachdb", "claude:sap-hana-cli"]) await installerHarness(async h => {
+    const capture = await captureStandardFixture(name)
+    const converted = await convertPluginTree(capture)
+    h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+    const result = await h.install(h.request(name, "standard_content_" + name.split(":")[1]!.replaceAll("-", "_")))
+    expect(result.ok).toBe(true)
+    const state = readPackageLedgerStateV1(h.root)
+    if (!state.ok) throw Error(state.reason)
+    expect(state.packageGraphs[0]?.root.kind).toBe("bundle")
+    expect(state.packageGraphs[0]?.pluginTree).toBeDefined()
+    expect(result.ok && result.installed.length).toBe(converted.package.entries.filter(entry => entry.kind === "skill" || entry.kind === "mcp").length)
+  })
+})

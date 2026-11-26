@@ -159,6 +159,7 @@ it.live("shell runtime values stay data in command substitutions and unquoted he
 for (const item of [
   { name: "quoted heredoc retains source variables and binds literal argument data", source: "!`cat <<'EOF'\n$HOME\n$0\nEOF\n`", value: "hello ; $(printf INJECTED)", prefix: "$HOME\n" },
   { name: "quoted heredoc cannot be closed by a delimiter line in argument data", source: "!`cat <<'EOF'\n$0\nEOF\n`", value: "first\nEOF\nprintf INJECTED\n#", prefix: "" },
+  { name: "quoted heredoc closes at the end of source without a final newline", source: "!`cat <<\"EOF\"\n$0\nEOF`", value: "end of source ; $(printf INJECTED)", prefix: "" },
   { name: "an apostrophe in a shell comment does not change argument quoting", source: "!`# don't open a quote\nprintf '%s' $0\n`", value: "x;$(printf INJECTED)", prefix: "" },
 ]) it.live(item.name, () => Effect.gen(function* () {
   yield* runCommand({ template: "Initialize native command services" }, {})

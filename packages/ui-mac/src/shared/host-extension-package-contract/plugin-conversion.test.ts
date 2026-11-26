@@ -496,3 +496,28 @@ test("real skill bodies retain shell environment expressions byte for byte excep
     expect(renderPluginText(entry.instruction, bindings)).toBe(expected)
   }
 })
+
+test("sensitive structured credentials preserve each path binding and hide nested default literals", async () => {
+  const original = await captureFixture("external_plugins/github")
+  const source = new TextDecoder().decode(await original.readFile(".mcp.json"))
+  // Controlled credential-field variants of the recorded GitHub declaration; no real credential.
+  for (const value of ["${CLAUDE_PLUGIN_DATA}/token.json", "${CLAUDE_PLUGIN_ROOT}/token.json", "${OUTER_TOKEN:-${INNER_TOKEN:-fixture-nested-private-default}}"] ) {
+    const capture = await captureFixture("external_plugins/github", { ".mcp.json": source.replace("Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}", value) })
+    const converted = await (await converter()).convertPluginTree(capture)
+    const replacement = converted.replacements.get(".mcp.json")
+    const text = new TextDecoder().decode(replacement ?? await capture.readFile(".mcp.json"))
+    if (value.endsWith("/token.json")) expect(JSON.parse(text).github.headers.Authorization).toBe(value)
+    else {
+      expect(JSON.stringify(converted.package)).not.toContain("fixture-nested-private-default")
+      expect(text).not.toContain("fixture-nested-private-default")
+      expect([...converted.privateCredentials.values()].map(bytes => new TextDecoder().decode(bytes))).toContain("fixture-nested-private-default")
+      const { renderPluginText } = await import("./plugin-package")
+      const entry = converted.package.entries.find(entry => entry.kind === "mcp")!
+      if (entry.kind !== "mcp" || entry.transport === "stdio") throw Error("GitHub fixture must be remote")
+      const render = (environment: Record<string, string>) => renderPluginText(entry.headers.Authorization!, { pluginRoot: "/plugin", projectDir: "/project", resolveEnvironment: name => environment[name], resolveSecret: id => { const bytes = converted.privateCredentials.get(id); return bytes && new TextDecoder().decode(bytes) } })
+      expect(render({ OUTER_TOKEN: "outer" })).toBe("outer")
+      expect(render({ INNER_TOKEN: "inner" })).toBe("inner")
+      expect(render({})).toBe("fixture-nested-private-default")
+    }
+  }
+})

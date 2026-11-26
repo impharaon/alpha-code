@@ -194,6 +194,10 @@ const generateLayer = Layer.succeed(
   nodes.Generate.Service.of({ text: () => Effect.succeed(""), image: () => Effect.die("unused"), decisions: () => Effect.die("unused") }),
 )
 const configLayer = nodes.Config.testLayer()
+// Only this module's integration fixture gains writer services; literal imports keep PR selection traceable.
+const { FileMutation } = await import("../../../core/src/file-mutation")
+const { FileWrite } = await import("../../../core/src/file-write")
+const { Formatter } = await import("../../../core/src/formatter")
 
 /**
  * The tools the MCP runtime reports as listed by its servers (`Mcp.tools()`); empty unless a test fills it. The real
@@ -236,6 +240,9 @@ export const HostLayer = AppNodeBuilder.build(
     nodes.Database.node,
     nodes.Environment.node,
     nodes.FileAccess.node,
+    FileMutation.node,
+    FileWrite.node,
+    Formatter.node,
     Global.node,
     nodes.Bus.node,
     nodes.Form.node,

@@ -24,7 +24,8 @@ export function envAssignments(text: string) {
       if (value === undefined) return []
       const occurrence = (counts.get(match[1]) ?? 0) + 1
       counts.set(match[1], occurrence)
-      return [{ name: match[1], value, occurrence, start: match.index, end, valueStart: start, valueEnd: end }]
+      const valueEnd = quoted ? end : end - (text.slice(start, end).match(/[\t \r]*$/)?.[0].length ?? 0)
+      return [{ name: match[1], value, occurrence, start: match.index, end, valueStart: start, valueEnd, rhs: text.slice(start, valueEnd) }]
     },
   )
 }

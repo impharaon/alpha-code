@@ -12,6 +12,7 @@
 import { realpathSync } from "node:fs"
 import path from "node:path"
 import { AUTOMATION_PROFILES } from "../../schema/src/codepuppy-unattended"
+import type { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
 import type { ToolFacts } from "./policy/identity"
 import { toolCallKey } from "./policy/identity"
 import type { PermissionEvaluation } from "../../plugin/src/effect/permission"
@@ -63,16 +64,23 @@ export function placeAfterBase(id: string, permissions: Rule[], rules: Rule[]): 
 
 /** Execution facts, never permission metadata, identify the exceptional read operation. */
 export function createExternalDirectoryRead() {
-  const reads = new Map<string, string>()
+  const reads = new Map<string, { agent: string; file?: ProtectedFiles.ProtectedFile }>()
   return {
     begin: (call: { sessionID: string; messageID: string; id: string; agent: string }, facts: ToolFacts) => {
       reads.delete(toolCallKey(call))
       if (facts.identity.source === "builtin" && facts.identity.name === "read" && !Object.hasOwn(AUTOMATION_PROFILES, call.agent))
-        reads.set(toolCallKey(call), call.agent)
+        reads.set(toolCallKey(call), { agent: call.agent })
     },
+    protect: (call: { sessionID: string; messageID: string; id: string }, file: ProtectedFiles.ProtectedFile) => {
+      const read = reads.get(toolCallKey(call))
+      if (read) read.file = file
+    },
+    file: (call: { sessionID: string; messageID: string; id: string }) => reads.get(toolCallKey(call))?.file,
     evaluate: (event: PermissionEvaluation) => {
-      if (event.action !== "external_directory" || event.effect !== "ask" || event.source?.type !== "tool" || event.agent !== FULLY_APPROVED_AGENT) return
-      if (reads.get(toolCallKey({ sessionID: event.sessionID, messageID: event.source.messageID, id: event.source.id })) === event.agent) event.effect = "allow"
+      if (event.effect !== "ask" || event.source?.type !== "tool") return
+      const read = reads.get(toolCallKey({ sessionID: event.sessionID, messageID: event.source.messageID, id: event.source.id }))
+      if (!read || read.agent !== event.agent) return
+      if (event.action === "external_directory" && event.agent === FULLY_APPROVED_AGENT || event.action === "read" && read.file?.format === "env") event.effect = "allow"
     },
     end: (call: { sessionID: string; messageID: string; id: string }) => { reads.delete(toolCallKey(call)) },
     dispose: () => { reads.clear() },

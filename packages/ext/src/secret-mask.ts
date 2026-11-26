@@ -1,3 +1,13 @@
+import { restoreEnvMutation, type EnvMutation, type EnvSnapshot } from "./secret-mutations"
+import { projectEnvDiff } from "./secret-diff"
+import { constants } from "node:fs"
+import { access, readFile, stat } from "node:fs/promises"
+import path from "node:path"
+import { Schema } from "effect"
+import type { ToolFacts } from "./policy/identity"
+import { AUTOMATION_PROFILES, type UnattendedProfile } from "../../schema/src/codepuppy-unattended"
+import { credentialValues, envAssignments } from "./secret-values"
+import { projectSecretRead } from "./secret-read"
 import { isUtf8 } from "node:buffer"
 import { fileURLToPath } from "node:url"
 import type { ToolEditor, ToolContext } from "@opencode/plugin/promise/tool"
@@ -15,12 +25,15 @@ type CallState = {
   last?: Tool.Metadata
   published?: Tool.Metadata
   publish?: ToolContext["progress"]
+  mutations?: EnvSnapshot[]
+  read?: { before?: string; requested: string; target: string }
 }
 const WRAPPED = Symbol("secret-progress")
 
 export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
   const files = createSecretFiles(roots)
   const calls = new Map<string, CallState>()
+  const views = new WeakMap<object, () => Tool.Result>()
   const stateOf = (call: MaskCall, tool: string) => {
     const state = calls.get(toolCallKey(call))
     return state?.kind === "execute" && tool !== "execute" ? undefined : state
@@ -104,6 +117,33 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       ...(item.name === undefined ? {} : { name: text(item.name) }),
     }
   }
+  const prepareMutation = async (input: EnvMutation) => {
+    const prepared = await restoreEnvMutation(input, roots)
+    for (const snapshot of prepared.snapshots)
+      for (const source of [snapshot.before, snapshot.after])
+        if (source !== undefined) files.remember(credentialValues(snapshot.file, Buffer.from(source)))
+    return prepared
+  }
+  const mutationProjection = async (value: unknown, state?: CallState): Promise<unknown> => {
+    if (!state?.mutations?.length) return value
+    const sources = new Map(await Promise.all(state.mutations.map(async (snapshot) => [snapshot.path, [snapshot.before, snapshot.after, await readFile(snapshot.path).then((bytes) => new TextDecoder("utf-8", { fatal: true }).decode(bytes)).catch(() => undefined)].filter((source): source is string => source !== undefined)] as const)))
+    const visit = (item: unknown): unknown => {
+      if (Array.isArray(item)) return item.map(visit)
+      if (typeof item !== "object" || item === null) return item
+      const result: Record<string, unknown> = Object.create(null)
+      for (const [key, child] of Object.entries(item))
+        result[key] = key === "patch" && typeof child === "string" && typeof (item as { file?: unknown }).file === "string" && state.mutations?.some((snapshot) => snapshot.path === path.resolve(roots.directory, (item as { file: string }).file))
+          ? projectEnvDiff(child, sources.get(path.resolve(roots.directory, (item as { file: string }).file)) ?? [], text) : visit(child)
+      const data = item as { diff?: unknown; files?: unknown }
+      if (typeof data.diff === "string" && Array.isArray(data.files)) {
+        const original = data.files.map((file: { patch?: unknown }) => typeof file.patch === "string" ? `${file.patch}\n` : "").join("")
+        if (data.diff !== original) throw new Error("Unattributed mutation diff")
+        result.diff = (result.files as { patch: string }[]).map((file) => `${file.patch}\n`).join("")
+      }
+      return result
+    }
+    return visit(value)
+  }
   const finishProgress = async (state: CallState | undefined, failed: boolean) => {
     if (!state?.publish) return
     const safe = failed ? hiddenMetadata(state) : metadata(state.last)
@@ -112,6 +152,21 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
   }
   const service = {
     roots,
+    prepareMutation: async (input: EnvMutation): Promise<EnvMutation> => (await prepareMutation(input)).mutation,
+    read: async (input: { call: MaskCall; file: ProtectedFiles.ProtectedFile; result: Tool.Result }): Promise<Tool.Result> => {
+      const state = stateOf(input.call, "read")
+      try {
+        const after = input.file.view === "variables" ? new TextDecoder("utf-8", { fatal: true }).decode(await readFile(state?.read?.target ?? input.file.path)) : undefined
+        if (after !== undefined) files.remember(credentialValues(input.file, Buffer.from(after)))
+        const render = () => projectSecretRead({ file: input.file, result: input.result, sources: [state?.read?.before, after].filter((source): source is string => source !== undefined), requested: state?.read?.requested ?? input.file.path, target: state?.read?.target ?? input.file.path, mask: text })
+        const safe = render()
+        views.set(safe, render)
+        return safe
+      } catch {
+        if (state) state.failed = true
+        return { content: [{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }] }
+      }
+    },
     isRoot: (call: MaskCall, tool: string) => stateOf(call, tool) !== undefined,
     begin: async (input: { call: MaskCall; kind: "tool" | "execute" }) => {
       if (calls.get(toolCallKey(input.call))?.kind === "execute") return
@@ -128,15 +183,17 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       try {
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
+        const view = views.get(input.result)?.()
+        const payload = view ?? await mutationProjection(input.result, state) as Tool.Result
         const result: Tool.Result = {
-          ...(input.result.output === undefined ? {} : { output: project(input.result.output) }),
-          content:
+          ...(view ? { output: view.output } : payload.output === undefined ? {} : { output: project(payload.output) }),
+          content: view ? view.content :
             typeof input.result.content === "string"
               ? text(input.result.content)
               : input.result.content === undefined
                 ? undefined
                 : await Promise.all(input.result.content.map(content)),
-          metadata: metadata(input.result.metadata),
+          metadata: { ...metadata(payload.metadata), ...(view ? { truncated: payload.metadata?.truncated } : {}) },
         }
         await finishProgress(state, false)
         return result
@@ -158,9 +215,13 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       try {
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
+        if (state?.mutations?.some((snapshot) => [snapshot.before, snapshot.after].some((source) => source !== undefined && envAssignments(source).some((record) => !ProtectedFiles.isPublicValue(record) && record.rhs.split(/\r?\n/).some((part) => {
+          const fragment = part.replace(/^["'`]|["'`]$/g, "")
+          return fragment.length > 0 && input.error.message.includes(fragment)
+        }))))) throw new Error("Restored env excerpt in error")
         const error = new Tool.Error({
           message: text(input.error.message),
-          metadata: metadata({ ...state?.last, ...input.error.metadata }),
+          metadata: metadata(await mutationProjection({ ...state?.last, ...input.error.metadata }, state) as Tool.Metadata),
         })
         await finishProgress(state, false)
         return error
@@ -193,10 +254,10 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         }
       }
     },
-    preview: async (value: Record<string, unknown>) => {
+    preview: async (value: Record<string, unknown>, call?: MaskCall) => {
       try {
         await files.refresh()
-        const safe = project(value)
+        const safe = project(await mutationProjection(value, call ? calls.get(toolCallKey(call)) : undefined))
         return typeof safe === "object" && safe !== null
           ? (safe as Record<string, unknown>)
           : { output: ProtectedFiles.REDACTED }
@@ -204,7 +265,11 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         return { output: ProtectedFiles.MASKING_FAILED_TEXT }
       }
     },
-    wrap: (editor: ToolEditor) => {
+    wrap: (editor: ToolEditor, readAccess: {
+      facts: (tool: string) => Promise<ToolFacts | undefined>
+      profile: (sessionID: string, agent?: string) => Promise<UnattendedProfile | undefined>
+      protect: (call: MaskCall, file: ProtectedFiles.ProtectedFile) => void
+    }) => {
       for (const tool of editor.list())
         editor.update(tool.id, (draft) => {
           if (Object.hasOwn(draft.execute, WRAPPED)) return
@@ -212,6 +277,34 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
           const wrapped: typeof inner = async (input, context) => {
             const state = stateOf(context, tool.id)
             if (state) state.publish = context.progress
+            const facts = await readAccess.facts(tool.id)
+            if (facts?.identity.source === "builtin" && facts.identity.name === "read" && !Object.hasOwn(AUTOMATION_PROFILES, context.agent) && await readAccess.profile(context.sessionID, context.agent) === undefined) {
+              const request = input as { path: string }
+              const target = path.resolve(roots.directory, request.path)
+              const file = await resolveProtectedFile(target, roots)
+              if (file) {
+                readAccess.protect(context, file)
+                if (file.view === "notice") {
+                  try { await stat(target); await access(target, constants.R_OK) } catch (cause) {
+                    throw new Tool.Error({ message: `${(cause as NodeJS.ErrnoException).code === "ENOENT" ? "File not found:" : "Unable to read"} ${request.path}` })
+                  }
+                  if (!Schema.isSchema(draft.output)) throw new Tool.Error({ message: ProtectedFiles.MASKING_FAILED_TEXT })
+                  return { output: Schema.decodeUnknownSync(draft.output)({ type: "text-page", content: ProtectedFiles.PROTECTED_FILE_TEXT, mime: "text/plain", offset: 1, truncated: false }), content: [{ type: "text", text: ProtectedFiles.PROTECTED_FILE_TEXT }], metadata: { truncated: false } }
+                }
+                const before = await readFile(file.path).then((bytes) => new TextDecoder("utf-8", { fatal: true }).decode(bytes)).catch(() => undefined)
+                if (state) state.read = { before, requested: request.path, target: file.path }
+                return inner({ ...request, path: file.path }, context)
+              }
+            }
+            if (facts?.identity.source === "builtin" && (facts.identity.name === "write" || facts.identity.name === "edit" || facts.identity.name === "patch")) {
+              const prepared = await prepareMutation({ ...(input as object), operation: facts.identity.name } as EnvMutation)
+              if (state) state.mutations = prepared.snapshots
+              const result = await inner(prepared.mutation, context)
+              if (!("replacements" in prepared)) return result
+              const count = prepared.replacements
+              const displayCount = (value: string) => value.replace(/\(1 replacement\)$/, `(${count} replacements)`)
+              return { ...result, output: { ...(result.output as object), replacements: count }, content: typeof result.content === "string" ? displayCount(result.content) : result.content?.map((item) => item.type === "text" ? { ...item, text: displayCount(item.text) } : item) }
+            }
             return inner(input, {
               ...context,
               progress: async (update) => {

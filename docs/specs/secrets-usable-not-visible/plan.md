@@ -271,3 +271,19 @@ AC-01/05/07 的完整 read/权限/Windows 证明不在②宣告完成。去掉�
 BR-07 同调用链补正：在 `6556071e90` 单独提交 `masking failure drops previous and current dynamic key names` 红例，0 pass / 1 fail；Ext 原隐藏分支会保留上一条或当前 update 的未知动态键名，值置 null 仍不满足整次隐藏。现从失败投影移除全部动态键，仅留固定说明、Code Mode 空摘要和可信 display，重新发布的完整 progress 替换 publisher 缓存。该红例未改断言，修正后 1 pass / 5 expect；属于本轮根发布接线后的同调用链必要修正，不扩大到其它模块。最终去重相关用例为 **329 PASS**（Ext 255，Core 74），此前 328 为新增此红例之前的收据；不计草稿测试。
 
 Ext 补正完整检查：`packages/ext` 下 `bun test --max-concurrency 2 src/secret-mask.test.ts src/policy/register-policy.test.ts`，exit 0，87 pass / 0 fail / 270 expect；`bun typecheck` 与这两个 TS 文件 oxlint 均 exit 0、0 warnings / 0 errors。原 pending 工件 privacy-current.test.ts 只新增 execute.progress 接线，不改输入或三项期望，实际运行 1 pass / 1 expect（liveContainsKnownValue=false）；再旁路 SC-02 根包装运行同一工件，exit 1 / 0 pass / 1 fail，失败仍是原 liveContainsKnownValue 断言，日志在同目录 privacy-current-removal.log。原 privacy.test.ts 历史反例保留未改；永久同名断言也已进入 register-policy.test.ts。
+
+
+### ③ r6 续行：消费 v3.2 / 规格 v4
+
+- 核对增量：r6 派单明确继续实施；`git show cac06529fa:docs/specs/secrets-usable-not-visible/design.md` §4.4/4.9/§10 和规格 v4 / U-42 取代原分页阻塞。继承原①②/SC-02及③目录例外、共享风险检查；不 merge/rebase，不新增 SC-03，不处理 read 附带说明文件。首次本轮提交据此填写，不重审已定范围。
+- 对原本段顺序第1项的必要修订：non-env 在原执行器前用注册 output codec 解码固定说明 DTO；env 调原 execute 保留原页选择、裁剪和格式，尾部 after 用前后源快照/逐次跨度投影原页，再通用收口。无 Core read 服务或分页常量依赖。别名只在 env 原 execute 的局部副本中归到已核实项目目标，工具展示保留原请求；read 原权限 ask 通过同一已核实根 read 关联放行，显式 deny、自动化与整工具停用保留原义。
+- 文件增量：新增 `packages/ext/src/secret-read.ts` 持有安全页纯投影及邻接 fast 用例（真实内存 reader + 原 toModelContent 产生输入，不自抄分页）；`secret-files.ts` 必要地把 realpath 目标映回单一发布 sources 以识别别名根，不另持名单。`external-directory-rule.ts` 扩现有 read 事实记录持有已核实保护类别，policy 复用这一个关联；其它文件仍在原清单内。
+- 测试分层：新纯投影用例为 fast；实际 Tool/permission/本机文件接线仍加入现有 register-policy 的 integration 行为用例，不加完整模型会话。FS fixture/工具依赖均使用静态 import、字面量路径/URL；不改全局 setup 或 gate。当前工作树没有 `.gate-tests` 声明，新增层落点与既有模块邻接保持一致；最终仍按新规则执行 affected-tests --list 并如实返回该现有缺失，gate 冻结不在本段自行治理。
+
+### ③ r6 完成收据
+
+- 已核：Codex / GPT-6，消费 v3.2 @ `cac06529fa`、规格 v4 与 r6 续派；完成安全原页投影、交互配置、当前 RHS 写回。AC-01/04 的原页与私钥读取、BR-04 写回、AC-06 三消费者联合及 BR-07 故障基础已核；全会话/模型/记录证明仍归⑤，不宣告全票 AC 验收。
+- `packages/ext`: `bun test --max-concurrency 2 src/secret-read.test.ts src/secret-diff.test.ts src/secret-files.test.ts src/secret-mask.test.ts src/secret-values.test.ts src/secret-mutations.test.ts src/external-directory-rule.test.ts`，25 pass；`src/policy/register-policy.test.ts` 完整 92 pass，随后新增三消费者联合具名用例 1 pass；diff 增强后 2 pass。`packages/ui-mac`: `src/main/codepuppy-config-injection.test.ts` 29 pass。均 exit 0。Ext `bun typecheck` 与改动 TS oxlint exit 0。
+- 六个移除臂 exit 1：`read-spans`、`nth-rhs`、`no-restore`、`diff-projection`、`read-wrapper`、`preview`。日志 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r6-arms-x8vmqxq7/`。最初 diff 只去 old side 在共享 context 上仍被 new side遮盖，通过后补真实 formatter 的删/增 RHS 两侧样本再反证；preview 初次 -t 括号未转义而未选中用例，不算证明，已以整个 env write-back 组重跑变红。均恢复原代码。临时向唯一 Schema 家族添加 `vault.custom`，同一联合用例 1 pass，源码/测试已原样恢复。
+- 偏离：新增 `secret-diff.ts/test.ts` 以真实 fileDiff 的行槽消费 shared `projectEnvRows`；普通精确值替换不足以遮盖带 diff 前缀的多行 RHS。新增 `secret-read.ts/test.ts` 消费原 reader 的 DTO，替代旧计划的先构页分页；不复制 reader。`policy-host.cases.ts` 增加真实 FileMutation/FileWrite/Formatter 服务，以运行原 writers，literal 动态 import 在隔离 HOME 之后；会扩大导入该 fixture 的相关测试依赖，不增全局 setup。`secret-values.ts` 为同一词法 span 增加 rhs、去无引号尾空白，不新建 dotenv parser。`secret-files.ts` 将宿主 realpath 根映回同一发布源，覆盖项目外别名。模块地图登记上述实际权威。目录/risk ③已接受部分继承 r5 收据。
+- 分层：read/diff 是纯内存 fast；mutation/files 与 register-policy 是隔离 IO/真实 Core integration；无常驻重负载场景。相关集与最终 package 检查本轮结束统一一次；`.gate-tests` 缺失的既有选择器输入按原去向交编排器，不改 gate。

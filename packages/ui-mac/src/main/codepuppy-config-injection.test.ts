@@ -730,3 +730,13 @@ describe("`#1381` 远程 MCP 从真源注入;codepuppy.jsonc 与用户全局里�
     assertNativeV2(JSON.stringify(config))
   })
 })
+
+
+test("interactive env read rules preserve automation denies", () => {
+  givenLoggedInWithByok()
+  const { config } = inject(EXT_DIR)
+  for (const name of ["codepuppy-readonly", "codepuppy-ask"])
+    expect(config.agents?.[name]?.permissions?.filter((rule) => rule.action === "read" && rule.resource.includes(".env"))).toEqual([])
+  for (const name of ["codepuppy-automation", "codepuppy-automation-standard"])
+    expect(config.agents?.[name]?.permissions).toContainEqual({ action: "read", resource: "*.env*", effect: "deny" })
+})

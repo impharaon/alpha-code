@@ -361,7 +361,7 @@ export function injectCodePuppyConfig(
           mode: "primary",
           system: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt,
           permissions: rules([
-            ["read", { "*": "allow", "*.env*": "deny" }],
+            ["read", "allow"],
             ["glob", "allow"],
             ["grep", "allow"],
             ["list", "allow"],
@@ -393,8 +393,7 @@ export function injectCodePuppyConfig(
     //       的两条覆盖原样带上,否则「请求审批」会比「全部批准」少掉 question 工具。
     //       REQ-236(方案 §2.3):委派给其它助手(模型派子任务 / 点名 / 命令换助手 / 直接子任务)派出前
     //       也问一次 —— 子会话不继承本 agent 的 ask,不问就等于整段跳过「逐次询问」;同档自身不问。
-    //       另把 defaults 里 `doom_loop` 与 `read *.env*` 的 ask **原样重写一遍**:agent 自己的键排在
-    //       配置顶层 `permission` 之后,项目配置放宽不了它们(`*.env.example` 照 defaults 仍放行)。
+    //       doom_loop 沿用原 ask；交互 read 的密钥文件安全视图由扩展在原授权前提供(#1758)。
     //       `external_directory`(R2:工作区外先问)不写在这里:写进配置会排在用户自己的规则之后、压过它们;由 ext 的 agent 变换
     //       插在引擎底座之后(packages/ext/src/external-directory-rule.ts,`#1662` parity)。
     //       没有 prompt(见 codepuppy-agents.ts 抬头:给了 prompt 就会顶掉整份底座)。
@@ -419,7 +418,6 @@ export function injectCodePuppyConfig(
           ["shell", "ask"],
           ["subagent", { "*": "ask", "codepuppy-ask": "allow" }],
           ["doom_loop", "ask"],
-          ["read", { "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" }],
         ]),
       },
     }

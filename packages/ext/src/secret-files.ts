@@ -9,9 +9,22 @@ export function sourceVersion(value: Pick<BigIntStats, "dev" | "ino" | "size" | 
 }
 
 export async function resolveProtectedFile(file: string, roots: ProtectedFiles.ProtectedRoots) {
-  const lexical = ProtectedFiles.match({ path: file, roots })
-  const target = await available(() => realpath(file))
-  return lexical ?? (target ? ProtectedFiles.match({ path: target, roots }) : undefined)
+  const api = roots.platform === "win32" ? path.win32 : path
+  const absolute = api.resolve(roots.directory, file)
+  const lexical = ProtectedFiles.match({ path: absolute, roots })
+  if (lexical) return lexical
+  const target = await available(() => realpath(absolute))
+  if (!target) return
+  const direct = ProtectedFiles.match({ path: target, roots })
+  if (direct) return direct
+  for (const source of ProtectedFiles.sources(roots)) {
+    const root = await available(() => realpath(source.root))
+    if (!root) continue
+    const relative = api.relative(root, target)
+    if (relative === ".." || relative.startsWith(`..${api.sep}`) || api.isAbsolute(relative)) continue
+    const match = ProtectedFiles.match({ path: api.join(source.root, relative), roots })
+    if (match) return { ...match, path: target }
+  }
 }
 
 export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {

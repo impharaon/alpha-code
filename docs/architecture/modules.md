@@ -29,7 +29,7 @@ review_after: 2027-05-09
 | `packages/effect-drizzle-sqlite/` | Effect 的 Drizzle SQLite 接线 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/effect-drizzle-sqlite/package.json) |
 | `packages/effect-sqlite-node/` | Effect 的 Node SQLite 接线 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/effect-sqlite-node/package.json) |
 | `packages/enterprise/` | 上游企业应用 | `core`, `session-ui`, `ui` | 见架构约束 | [入口](../../packages/enterprise/package.json) |
-| `packages/ext/` | Code Puppy 宿主扩展及自有工具 | `codepuppy-contracts-consumer`, `plugin` | Electron main 私有模块 | [入口](../../packages/ext/package.json)；[秘密来源采集](../../packages/ext/src/secret-files.ts)、[静态凭据值解析](../../packages/ext/src/secret-values.ts)、[工具结果遮盖](../../packages/ext/src/secret-mask.ts)、[目录读例外](../../packages/ext/src/external-directory-rule.ts)、[共享名单风险标注](../../packages/ext/src/policy/risk.ts) |
+| `packages/ext/` | Code Puppy 宿主扩展及自有工具 | `codepuppy-contracts-consumer`, `plugin` | Electron main 私有模块 | [入口](../../packages/ext/package.json)；[秘密来源采集](../../packages/ext/src/secret-files.ts)、[静态凭据值解析](../../packages/ext/src/secret-values.ts)、[工具结果遮盖](../../packages/ext/src/secret-mask.ts)、[原页安全读视图](../../packages/ext/src/secret-read.ts)、[当前 env RHS 恢复](../../packages/ext/src/secret-mutations.ts)、[env diff 投影](../../packages/ext/src/secret-diff.ts)、[目录读例外](../../packages/ext/src/external-directory-rule.ts)、[共享名单风险标注](../../packages/ext/src/policy/risk.ts) |
 | `packages/function/` | 上游后台函数 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/function/package.json) |
 | `packages/http-recorder/` | HTTP 录制和回放 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/http-recorder/package.json) |
 | `packages/httpapi-codegen/` | HTTP API 代码生成 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/httpapi-codegen/package.json) |

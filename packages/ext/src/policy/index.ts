@@ -301,7 +301,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
 
       await context.tool.transform((editor) => {
         wrapForDisplay(editor as never, (callID) => displays.get(callID))
-        secrets.wrap(editor)
+        secrets.wrap(editor, { facts: factsFor, profile, protect: externalRead.protect })
       })
       await context.tool.hook("execute.progress", async (event) => {
         const safe = deepFreeze(await secrets.progress({ call: event, update: event.metadata }))
@@ -317,6 +317,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           attachWriteDenied(event as never, context.location.directory)
           attachDirectoryDisplay(event as never)
           attachTerminal(event as never, displays.get(event.id))
+          if (event.status === "completed" && event.tool === "read" && externalRead.file(event)) event.result = await secrets.read({ call: event, file: externalRead.file(event)!, result: event.result })
           if (event.status === "completed") event.result = await secrets.result({ call: event, tool: event.tool, result: event.result })
           else event.error = await secrets.error({ call: event, tool: event.tool, error: event.error })
           displays.delete(event.id)
@@ -326,7 +327,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
 
       await context.permission.hook("evaluate", async (event) => {
         if (!event.metadata) return
-        const safe = await secrets.preview(event.metadata)
+        const safe = await secrets.preview(event.metadata, event.source?.type === "tool" ? { sessionID: event.sessionID, messageID: event.source.messageID, id: event.source.id } : undefined)
         for (const key of Object.keys(event.metadata)) delete event.metadata[key]
         Object.assign(event.metadata, safe)
       })

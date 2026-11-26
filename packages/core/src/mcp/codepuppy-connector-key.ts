@@ -10,13 +10,15 @@ export type ConnectorRequirement = (
   | { kind: "content"; sha256: string; name?: string }
 ) & { extras?: readonly string[]; alias?: string }
 
-// Only resolution-affecting fields from pinned npm's flat options / uv's resolved
+// Only normalized resolution-affecting facts from pinned npm / uv's resolved
 // resolver settings. Cache locations, logging, credentials, argv and workspace IDs are not inputs.
 const npmResolutionOptions = new Set([
   "registry",
   "tag",
   "defaultTag",
   "before",
+  "minReleaseAge",
+  "minReleaseAgeExclude",
   "include",
   "omit",
   "legacyPeerDeps",
@@ -24,6 +26,8 @@ const npmResolutionOptions = new Set([
   "preferDedupe",
   "installStrategy",
   "installLinks",
+  "packageLock",
+  "lockfileVersion",
   "force",
   "engineStrict",
   "nodeVersion",

@@ -106,7 +106,7 @@ export function parseUvToolSettings(text: string) {
     if (text[offset] === "}")
       return {
         command: strings(fields.command!, "list"),
-        from: strings(fields.from!, "scalar")[0] ?? null,
+        from: strings(fields.from!, "scalar").at(0) ?? null,
         with: strings(fields.with!, "list"),
         withEditable: strings(fields.with_editable!, "list"),
         environmentFiles: strings(fields.env_file!, "list"),

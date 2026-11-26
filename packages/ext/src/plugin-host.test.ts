@@ -2989,6 +2989,71 @@ for (const handled of [true, false]) packageIt.live(`package elicitation ${handl
   if (!handled) expect(rows[1]).toMatchObject({ action: "accept", content: { answer: "native response" } })
 })))
 
+// dash0 event groups and hookify skill frontmatter; controlled handlers observe a real paused native write.
+packageIt.live("leave during a running task preserves its pending decision scoped hooks and environment until idle", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const sent: unknown[] = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  const hubBridge = createHubBridge({ postMessage: message => { sent.push(message) }, on: (_, listener) => { listeners.push(listener) } })
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  yield* packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+    for (const group of hooks.hooks.SessionStart) for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');await Bun.stdin.json();fs.appendFileSync(process.env.CLAUDE_ENV_FILE,'export R20_RETAINED=retained\\n');fs.writeFileSync('task-env-path',process.env.CLAUDE_ENV_FILE)"]
+    }
+    for (const group of hooks.hooks.PreToolUse) {
+      delete group.matcher
+      for (const hook of group.hooks) {
+        hook.command = process.execPath
+        hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('task-scoped.jsonl',JSON.stringify({path:input.tool_input.file_path,value:process.env.R20_RETAINED})+'\\n');if(input.tool_input.file_path.endsWith('blocked.txt')){fs.writeFileSync('task-decision-started','');while(!fs.existsSync('task-release'))await Bun.sleep(10);console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason:'BLOCK_AFTER_LEAVE'}}))}"]
+      }
+    }
+    const skillTree = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+    const skillSource = new TextDecoder().decode(yield* Effect.promise(() => skillTree.readFile("skills/writing-rules/SKILL.md")))
+    const sample = yield* invocationSample("claude:hookify", {
+      "hooks/hooks.json": JSON.stringify({ hooks: { SessionStart: hooks.hooks.SessionStart } }),
+      "skills/writing-rules/SKILL.md": skillSource.replace(/^---\r?\n/, () => "---\nhooks: " + JSON.stringify({ PreToolUse: hooks.hooks.PreToolUse }) + "\n"),
+    })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const skills = yield* Skill.Service
+    const name = sample.hostNames["skill:skills/writing-rules/SKILL.md"]!
+    yield* ext.finish(skills.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+    const skill = (yield* skills.list()).find(item => item.name === name)!
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Leave during native write", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const llm = yield* TestLLM.Test
+    yield* llm.push(TestLLM.toolCall("leave_blocked", "write", { path: "blocked.txt", content: "must not run" }), TestLLM.toolCall("leave_allowed", "write", { path: "allowed.txt", content: "task continued" }), TestLLM.text("Task complete", "leave-complete"))
+    yield* sessions.prompt({ sessionID: session.id, text: "Use the scoped skill", skills: [{ id: skill.id }] })
+    yield* ext.finish(Effect.promise(() => Bun.file(join(location.directory, "task-decision-started")).exists()))
+    yield* Effect.addFinalizer(() => Effect.sync(() => writeFileSync(join(location.directory, "task-release"), "")))
+    for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 2020, sessionId: session.id, action: "leave", reason: "clear" } })
+    yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 2020)))
+    const environment = readFileSync(join(location.directory, "task-env-path"), "utf8")
+    const retained = yield* Effect.promise(() => Bun.file(environment).exists())
+    writeFileSync(join(location.directory, "task-release"), "")
+    yield* sessions.wait(session.id)
+    expect(retained).toBe(true)
+    expect(yield* Effect.promise(() => Bun.file(join(location.directory, "blocked.txt")).exists())).toBe(false)
+    expect(readFileSync(join(location.directory, "allowed.txt"), "utf8")).toBe("task continued")
+    expect(JSON.stringify(yield* sessions.context(session.id))).toContain("BLOCK_AFTER_LEAVE")
+    expect(readFileSync(join(location.directory, "task-scoped.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))).toEqual([
+      { path: join(location.directory, "blocked.txt"), value: "retained" },
+      { path: join(location.directory, "allowed.txt"), value: "retained" },
+    ])
+    yield* ext.finish(Effect.promise(async () => !await Bun.file(environment).exists()))
+  }))
+}))
+
 packageIt.live("real SessionEnd runs the package hook and closes its remote transport before the parentPort reply", () => Effect.gen(function* () {
   const { processState } = yield* Effect.promise(() => import("./plugin"))
   const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))

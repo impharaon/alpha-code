@@ -62,6 +62,18 @@ const cancelled = (): PinnedFileDelivery => ({ result: { ok: false, error: "canc
 const detailOf = (error: unknown) => sanitizeTransportError(error instanceof Error ? error.message : String(error))
 const inside = (root: string, path: string) => { const part = relative(root, path); return part !== ".." && !part.startsWith(`..${sep}`) && !isAbsolute(part) }
 
+/** Shared by pinned downloads and their prepared entries: inspect ancestors before creating children. */
+export async function ensurePinnedDirectory(root: string, directory: string) {
+  if (!inside(root, directory)) throw new Error("pinned directory escapes its root")
+  let current = root
+  for (const segment of relative(root, directory).split(sep).filter(Boolean)) {
+    current = join(current, segment)
+    await mkdir(current).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
+    const info = await lstat(current)
+    if (info.isSymbolicLink() || !info.isDirectory() || !inside(root, await realpath(current))) throw new Error("pinned file directory is a symlink or not a directory")
+  }
+}
+
 /** One instance at the main composition root owns the host's manifest and in-flight IDs. */
 export function createPinnedFileAuthority(input: {
   userData: string
@@ -132,13 +144,7 @@ export function createPinnedFileAuthority(input: {
   async function acquire(file: PinnedFiles["files"][number], path: string, signal: AbortSignal, progress: NonNullable<Request["onProgress"]>): Promise<PinnedFileDelivery> {
     try {
       // Walk before mkdir: a cache ancestor must never redirect the main downloader outside userData.
-      const directories = relative(dirname(root), dirname(path)).split(sep)
-      let current = dirname(root)
-      for (const segment of directories) {
-        current = join(current, segment)
-        await mkdir(current).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
-        if ((await lstat(current)).isSymbolicLink() || !inside(dirname(root), await realpath(current))) throw new Error("pinned file directory is a symlink")
-      }
+      await ensurePinnedDirectory(dirname(root), dirname(path))
       const cached = await lstat(path).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; return undefined })
       if (cached?.isSymbolicLink() || (cached && !cached.isFile())) throw new Error("pinned cache is not a regular file")
       if (cached?.size === file.bytes) {

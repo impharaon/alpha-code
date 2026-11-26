@@ -379,3 +379,11 @@ r4 诊断 producer：新增 `packages/core/src/mcp/codepuppy-connector-diagnosti
 测试修正事实：stdio.ts:101 的独立 Effect.runPromise 只携带 Scope，调用方 Logger 无法捕获其 debug 行，不能把空 capture 当“不泄漏”。两种 logger 注入均不改变此事实；未修改 stdio。最终在其实际句柄读取边界完整比对 masked bytes，并独立核验可捕获的 spawn/client 日志；不声称捕获了该独立执行体的全部 logger。此处是当前原始 stdio 的上下文限制，不作为本票去修改它的授权。
 
 r4 准备环境补齐：同一 core 模块增加 connectorRunnerEnvironment，入参的 PackageRunner 保留原声明角色；准备/已准备服务共用随包 uv/Node、已解析 Python 与包 bin 的 PATH 次序，原生声明不进入此函数。只清宿主继承的 NODE_OPTIONS/PYTHON* /VIRTUAL_ENV，显式声明的业务输入仍后绑定；Windows 环境键及 PATH 去重按平台大小写语义处理。npm 三项准备设置与 uv 专用 tools/bin 按冻结表覆盖，HOME/XDG_CONFIG_HOME/registry/私有密钥保留；R1 缓存键不由此处投影，仍等最终 R2。3 个 pure 用例 / 26 assertions 通过（`/tmp/connector-r4-runner-env.log`）。修正上一段诊断计数：完整文件实际为 13 PASS / **67** assertions。
+
+r4 v2 main 准备子链：同一 createLauncherAssetAuthority 增加 prepareFiles，composition root 的私有 context 绑定当前 generation/snapshots、受保护 manifestPath 与唯一 files.ensureFile；MCP 不能提供 context。先按完整 identity 和 main 自己的 launchers 调同一 declaredFirstPartyTools，重验显式 entry、代码字节和两个摘要，整组 ID/平台/配方验证完成才 I/O。每项仍走唯一 pinned authority，再按受保护 recipe 展开/复制到 assets/id/recipeSha；required/入口、链接范围和可识别目标架构核验后 ready 原子发布。并发解包合并、缺成员重建，单个取消不损坏其它等待者，失败保留原类别/事实与 progress。
+
+新增必要同链文件 `packages/ui-mac/src/main/pinned-files.ts`：原有逐父目录防软链写入逻辑提取为同文件 ensurePinnedDirectory，下载与派生条目复用一个边界权威；未复制路径表/下载器。系统 archive adapter 的第三参是冻结 recipe 的 archive 域；Windows 的 zip 仍用既有 Expand-Archive，tar 三类用系统 tar，Mac 均用系统 tar；允许合法指向暂存根本身的内部目录链接，仍拒绝根外目标。没有执行包代码或安装命令。
+
+`bun test src/main/connector-launchers.test.ts src/main/pinned-files.test.ts` → 29 PASS / 254 assertions（`/tmp/connector-r4-assets-final.log`）；随后新增 invalid-binding failure 详情，最终相关收据另记。当前 10 个新增用例覆盖 raw file、zip/tar.gz/tar.bz2/tar.xz、完整字节/缓存/缺成员、整组先验零下载、代码/Node/env/cwd/摘要/代不匹配、合法文件与根目录链接、真实 tar 拒绝穿外链写入、二等待者一取消和另一完成。归档由系统 tar 从实际随包 pins JSON 生成，头部取既有原厂 fixture；不是手写 tar/PE/Mach-O 代用品。Windows 全链没有实测。
+
+尚待接上：entryFor 窄桥与 prepareFiles 的 sidecar adapter、生产 attempt/controller→managed binding 构造、Host/文档运行时/root 装配；本段的私有 main context 在 root 落地时只绑定已有权威，不新建第二份配置/身份源。

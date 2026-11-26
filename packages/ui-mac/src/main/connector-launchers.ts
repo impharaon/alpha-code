@@ -6,7 +6,10 @@ import { constants } from "node:fs"
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { promisify } from "node:util"
 import { pathToFileURL } from "node:url"
-import type { LauncherEnvironment, LauncherPlatform } from "../../../util/src/codepuppy-connector-launch"
+import type { LauncherEnvironment, LauncherPlatform, ConnectorLaunchApi, ConnectorLaunchHost, ManagedFirstPartyBinding, ManagedPinnedFilesResult, PinnedEntryRecipe, PinnedPreparationProgress, DownloadFailureEvidence } from "../../../util/src/codepuppy-connector-launch"
+import { canonicalJsonDigest } from "../../../util/src/codepuppy-hash"
+import { declaredFirstPartyTools } from "../../../core/src/mcp/codepuppy-first-party-mcp"
+import { ensurePinnedDirectory } from "./pinned-files"
 import type { PinnedFiles } from "../../../util/src/codepuppy-pinned-files"
 import lock from "../../resources/connector-launchers/lock.json"
 import { videoBinaryTarget } from "../../scripts/video-runtime-artifacts"
@@ -37,7 +40,7 @@ export async function launcherFileDigest(file: string) {
 }
 
 /** System archive tools retain internal links and executable bits; no package code is run. */
-export async function extractLauncherArchive(archive: string, destination: string) {
+export async function extractLauncherArchive(archive: string, destination: string, kind: Exclude<PinnedEntryRecipe["archive"], "file">) {
   const tar = process.platform === "win32" ? join(process.env.SystemRoot!, "System32", "tar.exe") : "/usr/bin/tar"
   const listing = await new Promise<string>((resolve, reject) => {
     const child = spawn(tar, ["-tf", archive])
@@ -48,8 +51,11 @@ export async function extractLauncherArchive(archive: string, destination: strin
     child.on("error", reject)
     child.on("close", (code) => code === 0 ? resolve(output) : reject(Error(error)))
   })
-  for (const member of listing.split(/\r?\n/).filter(Boolean)) safe(destination, member.replace(/\/$/, ""))
-  if (process.platform === "win32") {
+  for (const member of listing.split(/\r?\n/).filter(Boolean)) {
+    if (member === "." || member === "./") continue
+    safe(destination, member.replace(/\/$/, ""))
+  }
+  if (process.platform === "win32" && kind === "zip") {
     const scratch = await mkdtemp(join(dirname(destination), "launcher-zip-"))
     try {
       const zip = join(scratch, "source.zip")
@@ -58,7 +64,7 @@ export async function extractLauncherArchive(archive: string, destination: strin
       await execute(join(process.env.SystemRoot!, "System32/WindowsPowerShell/v1.0/powershell.exe"), ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", `Expand-Archive -LiteralPath ${quote(zip)} -DestinationPath ${quote(destination)} -Force`], { windowsHide: true })
     } finally { await rm(scratch, { recursive: true, force: true }) }
   }
-  if (process.platform !== "win32") await execute(tar, ["-xf", archive, "-C", destination])
+  if (process.platform !== "win32" || kind !== "zip") await execute(tar, ["-xf", archive, "-C", destination])
   await launcherFiles(destination) // Verify link targets as well as lexical members.
 }
 
@@ -68,7 +74,7 @@ async function launcherFiles(root: string) {
     const file = join(directory, entry.name)
     if (entry.isDirectory()) return visit(file)
     const target = await realpath(file)
-    if (!target.startsWith(canonical + sep)) throw Error("launcher link escapes root")
+    if (target !== canonical && !target.startsWith(canonical + sep)) throw Error("launcher link escapes root")
     if ((await stat(target)).isDirectory()) return [] // Internal directory links retain their original shape.
     if (!(await stat(target)).isFile()) throw Error("launcher member is not a file")
     return [relative(root, file).split(sep).join("/")]
@@ -85,7 +91,7 @@ export async function populateLauncherTree(destination: string, archives: { uv: 
       if ((await stat(archives[name])).size !== pin.bytes || await launcherFileDigest(archives[name]) !== pin.sha256) throw Error(`launcher archive integrity mismatch: ${kind}`)
       const directory = join(scratch, kind)
       await mkdir(directory)
-      await extractLauncherArchive(archives[name], directory)
+      await extractLauncherArchive(archives[name], directory, platform === "win32-x64" ? "zip" : name === "uv" ? "tar.gz" : "tar.xz")
       const source = join(directory, pin.root)
       await mkdir(join(destination, kind), { recursive: true })
       if (kind === "uv") {
@@ -168,6 +174,7 @@ export function describeLauncherEnvironment(input: { resources: string; userData
 
 export function createLauncherAssetAuthority(input: Parameters<typeof describeLauncherEnvironment>[0]) {
   const environment = describeLauncherEnvironment(input)
+  const entries = new Map<string, Promise<string>>()
   let pending: Promise<LauncherEnvironment> | undefined
   const resolveAssets = async () => {
     const bundled = join(input.resources, "connector-launchers")
@@ -192,7 +199,109 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
     } finally { await rm(staging, { recursive: true, force: true }) }
     return environment
   }
-  return { environment, resolveAssets() { return pending ??= resolveAssets().finally(() => { pending = undefined }) } }
+  return {
+    environment,
+    resolveAssets() { return pending ??= resolveAssets().finally(() => { pending = undefined }) },
+    /** The root binds this context, never MCP params. Both download and unpack remain in this authority. */
+    async prepareFiles(
+      context: { sidecarGeneration: string; snapshots: Pick<ConnectorLaunchApi, "list">; manifestPath: string; files: Pick<ConnectorLaunchHost, "ensureFile"> },
+      request: { binding: ManagedFirstPartyBinding; ids: readonly string[] },
+      signal: AbortSignal,
+      report: (update: PinnedPreparationProgress) => void,
+    ): Promise<ManagedPinnedFilesResult> {
+      if (signal.aborted) return { ok: false, error: "cancelled" }
+      const binding = request.binding
+      const current = binding.sidecarGeneration === context.sidecarGeneration && (await context.snapshots.list(binding.identity.directory)).some((row) => row.sidecarGeneration === context.sidecarGeneration && row.identity.directory === binding.identity.directory && row.identity.server === binding.identity.server && row.identity.attempt === binding.identity.attempt)
+      const declared = current ? declaredFirstPartyTools(binding.identity.server, binding.entry, context.manifestPath, readFileSync, undefined, environment) : undefined
+      const recipes = new Map(declared?.recipe?.map((recipe) => [recipe.id, recipe]))
+      const pins = new Map(input.pins.files.map((file) => [file.id, file]))
+      const ids = [...new Set(request.ids)]
+      let sequence = 0
+      if (!current || !declared || declared.declarationSha256 !== binding.declarationSha256 || declared.recipeSha256 !== binding.recipeSha256 || !ids.length || !ids.every((id) => {
+        const pin = pins.get(id as PinnedEntryRecipe["id"])
+        return recipes.has(id as PinnedEntryRecipe["id"]) && pin && (pin.target === "any" || pin.target === input.platform)
+      })) {
+        for (const id of ids) if (pins.has(id as PinnedEntryRecipe["id"]) && !signal.aborted) report({ id: id as PinnedEntryRecipe["id"], sequence: ++sequence, phase: "failed", error: "unknown-file", failure: { kind: "other", detail: "Managed pinned-file binding, declaration or recipe is not current" } })
+        return { ok: false, error: "unknown-file" }
+      }
+      const files: Extract<ManagedPinnedFilesResult, { ok: true }>["files"] = []
+      for (const id of ids) {
+        const recipe = recipes.get(id as PinnedEntryRecipe["id"])!
+        const pin = pins.get(recipe.id)!
+        const emit = (update: Omit<PinnedPreparationProgress, "id" | "sequence">) => { if (!signal.aborted) report({ ...update, id: recipe.id, sequence: ++sequence }) }
+        emit({ phase: "download", receivedBytes: 0, totalBytes: pin.bytes })
+        const delivery = await context.files.ensureFile(recipe.id, signal, (receivedBytes, totalBytes) => emit({ phase: "download", receivedBytes, totalBytes }))
+        if (!delivery.result.ok) {
+          emit({ phase: delivery.result.error === "cancelled" ? "cancelled" : "failed", error: delivery.result.error, ...(delivery.failure ? { failure: delivery.failure } : {}) })
+          return delivery.result
+        }
+        if (signal.aborted) return { ok: false, error: "cancelled" }
+        const archive = delivery.result.path
+        emit({ phase: "unpack" })
+        const key = canonicalJsonDigest({ id: recipe.id, sha256: pin.sha256, recipeSha256: binding.recipeSha256, platform: input.platform })
+        const shared = entries.get(key) ?? (() => {
+          const work = preparePinnedEntry(environment, pin, recipe, binding.recipeSha256, archive, realpathSync(input.userData)).finally(() => entries.delete(key))
+          entries.set(key, work)
+          return work
+        })()
+        const prepared = await new Promise<{ ok: true; path: string } | { ok: false; error: "disk" | "integrity" | "cancelled"; failure?: DownloadFailureEvidence }>((resolve) => {
+          const finish = (value: { ok: true; path: string } | { ok: false; error: "disk" | "integrity" | "cancelled"; failure?: DownloadFailureEvidence }) => { signal.removeEventListener("abort", abort); resolve(signal.aborted ? { ok: false, error: "cancelled" } : value) }
+          const abort = () => finish({ ok: false, error: "cancelled" })
+          signal.addEventListener("abort", abort, { once: true })
+          if (signal.aborted) abort()
+          void shared.then((path) => finish({ ok: true, path }), (error: unknown) => {
+            const kind = error instanceof Error && "code" in error && typeof error.code === "string" ? "disk" : "integrity"
+            finish({ ok: false, error: kind, failure: { kind, detail: error instanceof Error ? error.message : String(error) } })
+          })
+        })
+        if (!prepared.ok) { emit({ phase: prepared.error === "cancelled" ? "cancelled" : "failed", error: prepared.error, ...(prepared.failure ? { failure: prepared.failure } : {}) }); return { ok: false, error: prepared.error } }
+        emit({ phase: "verify" })
+        files.push({ id: recipe.id, path: prepared.path })
+        emit({ phase: "ready" })
+      }
+      return signal.aborted ? { ok: false, error: "cancelled" } : { ok: true, files }
+    },
+  }
+}
+
+async function preparePinnedEntry(environment: LauncherEnvironment, pin: PinnedFiles["files"][number], recipe: PinnedEntryRecipe, recipeSha256: string, archive: string, userData: string) {
+  const destination = safe(join(environment.runtimeRoot, "assets"), `${pin.id}/${recipeSha256}`)
+  await ensurePinnedDirectory(userData, dirname(destination))
+  const receipt = { schema: 1, ready: true, id: pin.id, sha256: pin.sha256, recipeSha256, platform: environment.platform }
+  const ready = await readFile(join(destination, "ready.json"), "utf8").then((text) => { try { return JSON.parse(text) } catch { return undefined } }, () => undefined)
+  if (JSON.stringify(ready) === JSON.stringify(receipt) && await verifyPinnedEntry(destination, recipe, environment.platform).then(() => true, () => false)) return safe(destination, recipe.entry)
+  const prior = await lstat(destination).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error })
+  if (prior?.isSymbolicLink()) throw Error("prepared asset root is a symlink")
+  if (prior) await rm(destination, { recursive: true, force: true })
+  const staging = await mkdtemp(join(dirname(destination), "asset-candidate-"))
+  try {
+    if (recipe.archive === "file") {
+      await mkdir(dirname(safe(staging, recipe.entry)), { recursive: true })
+      await cp(archive, safe(staging, recipe.entry), { preserveTimestamps: true })
+    }
+    if (recipe.archive !== "file") await extractLauncherArchive(archive, staging, recipe.archive)
+    await verifyPinnedEntry(staging, recipe, environment.platform)
+    await writeFile(join(staging, "ready.json"), JSON.stringify(receipt))
+    await rename(staging, destination)
+  } finally { await rm(staging, { recursive: true, force: true }) }
+  return safe(destination, recipe.entry)
+}
+
+async function verifyPinnedEntry(root: string, recipe: PinnedEntryRecipe, platform: LauncherPlatform) {
+  if ((await realpath(root)) !== root || !(await lstat(root)).isDirectory()) throw Error("prepared asset root is not a real directory")
+  for (const member of new Set([recipe.entry, ...recipe.required])) {
+    const file = safe(root, member)
+    const targetPath = await realpath(file)
+    if (targetPath !== root && !targetPath.startsWith(root + sep)) throw Error("prepared member escapes root")
+    const info = await stat(file)
+    if (info.isDirectory()) continue
+    if (!info.isFile()) throw Error("prepared member is not a file or directory")
+    const handle = await open(file)
+    const header = Buffer.alloc(4096)
+    try { await handle.read(header, 0, header.length, 0) } finally { await handle.close() }
+    const target = videoBinaryTarget(header)
+    if (target && target !== platform) throw Error("prepared binary target mismatch")
+  }
 }
 
 /** Recompute only after the packaging signer has signed children, immediately before the parent resource seal. */

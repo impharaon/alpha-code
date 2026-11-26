@@ -1,0 +1,46 @@
+{
+  "repo": "impharaon/alpha-platform",
+  "commit": "2626e2f5f8183a78da438db4654572928862f126",
+  "files": [
+    {
+      "path": "v1/video-understanding.schema.json",
+      "sha256": "f7e20441ea3c07e681bf3003abee3655ba840cbf8f6ce76a5f29cbd88a2d6d66"
+    },
+    {
+      "path": "v1/fixtures/video-understanding/input.json",
+      "sha256": "b71b3641cc5d43048a3f1997cb1f1355f14f1f626b0d5350ad26aba12f37c772"
+    },
+    {
+      "path": "v1/fixtures/video-understanding/result.json",
+      "sha256": "5e0f73ef75e57df9fc0d9f9015f409f8202a8836e30bc9551b139c2c399fac8c"
+    },
+    {
+      "path": "v1/fixtures/video-understanding/job-inline.json",
+      "sha256": "21b8dc8ebe5726a7f46614394ee7a586307fcd5a3a1eb76a95e7a2da9563e06e"
+    },
+    {
+      "path": "v1/fixtures/video-understanding/job-artifact.json",
+      "sha256": "84748bce8a72ae5a2965f8ae213c03f050a53728285cc3a617b1c7e1bbf3b94c"
+    },
+    {
+      "path": "v1/fixtures/video-understanding/models-test-price.json",
+      "sha256": "a1b271d714388536f2a8edd7c03f3c9f6ddfef05280e2a7785651747b8735e1e"
+    },
+    {
+      "path": "v1/fixtures/video-understanding/input-unknown-model.json",
+      "sha256": "970f6f22a195d8c50cb85a684048389e03fae2b687a3e27929cb9012114d30b1"
+    },
+    {
+      "path": "v1/fixtures/video-understanding/input-unknown-field.json",
+      "sha256": "51a824828360adbc86780ff86c8cfc477d6c45890f64a94b2decef1dda4e3a73"
+    },
+    {
+      "path": "v1/fixtures/video-understanding/result-negative-usage.json",
+      "sha256": "a1d676c4087898a010f3ab7bb285bd344a4c5d81dca81dfbf0c5cc38baf4f8db"
+    },
+    {
+      "path": "v1/fixtures/video-understanding/models-missing-price.json",
+      "sha256": "8016618e29c70590c70dd6630578f54c337fdf9bd77ab40722c2a128f0c1a177"
+    }
+  ]
+}

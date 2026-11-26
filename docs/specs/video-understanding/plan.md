@@ -556,7 +556,7 @@ UI 的既有 wrapper 实际运行 `test-component/session-timeline.cases.ts`，�
 ## D5 平台视频理解桌面接线
 
 - 依据：impharaon/alpha-work:SPEC-video-understanding v1 @ `25afeda6285b66b3de9d83531fa2e5a6cafa468f` 的 AC-13 桌面入口/上传显示/最终结果，及本片涉及的 AC-09/14/16/17 边界；冻结视频设计 @ `870002ed698f1a83efa9d6ecb359ea5a0d0d41af` §4.1、§4.4、§4.5、§5、§6 D5、§10；#1775 r7 允许同轮计划与实施，但出现未定设计问题时先返计划。D4 已由 r7 接受，继承其进度/vision/卡片证据，不再审查 D1..D4。
-- 核对：本节为 r7 的计划产物；尚未实施，待下述唯一运输预算接缝处置。续派后首个实施提交填写本计划 commit 与检查收据，不自称独立审查通过。
+- 核对：计划 `fc44a45f6f`；r8 Phase: IMPLEMENT，Claude Opus 5.5（orchestrator）2026-11-27 裁决，按公开 exclusive bounds 决定发送/缩小/分片，无新 artifact、无职责变更；Codex / GPT-6 继续实施，不自称独立审查。
 
 ### 改动
 
@@ -623,6 +623,8 @@ UI 的既有 wrapper 实际运行 `test-component/session-timeline.cases.ts`，�
 实施后的删除对照至少覆盖：verified wrapper、原字节/attempt 持久化、已有 job 重接、同租户成功缓存、上游精确字节开销、敏感来源沿同 authority、完整 artifact 读取、范围覆盖与取消全部在途 job。逐臂具名 expect 红后恢复，最终只扩相关集。当前为计划阶段，**未运行这些用例、0 新 PASS、0 删除对照**，不继承 D4 的七臂冒充 D5 证据。
 
 ### 偏离记录与 r7 计划收据
+
+**orchestrator ruling 2026-11-27（r8 / Claude Opus 5.5）**：无新 artifact、无职责变更。桌面只按选中模型的 `upload_media_bytes_exclusive` 与 `inline_media_bytes_exclusive` 比较实际媒体字节，不重做上游 JSON prefix/suffix 计数；平台超界错误沿同一本机 shrink/split 恢复。平台拥有 encoder/framing/base64 计数证据。上文 r7 的预算问题与建议仅为已处置历史，不再构成 pending；计划文件表/顺序/证明中“新运输产物”“上游精确开销”相应替换为该公开 bounds 消费及平台 size-error 恢复，无新余量/常量或 DTO。已确认 #621 经 #623 合入平台主线 `2626e2f5f8183a78da438db4654572928862f126`，schema SHA 与 r7/r8 一致；本次固定该合并后继及 9 份 producer fixture，不再用已删除的工作分支。vendor 的 Git-object/lock 生成只对这一个 capability 条目执行同一取字节/哈希过程，其余 pin 不动。
 
 2026-11-26 · 只读阶段已确认上述跨仓预算输入缺口，按 r7「unless an undecided design question appears」停在 PLAN；本轮只写本 D5 节，没有写业务代码、vendor/pin 或修改冻结设计。候选 pin 来自未合并分支的事实已记录，实际 pin 等同权威运输数据被指明/补齐再提交。
 

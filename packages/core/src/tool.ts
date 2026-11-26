@@ -316,9 +316,7 @@ const layer = Layer.effect(
                 // codepuppy(ADR-050 SC-02): shared root boundary, including synthetic Code Mode.
                 let required = yield* hooks.has("tool", "execute.progress")
                 let withheld = false
-                let published: Tool.Metadata | undefined
                 const hidden = (): Tool.Metadata => ({
-                  ...Object.fromEntries(Object.keys(published ?? {}).map((key) => [key, null])),
                   output: ProtectedFiles.MASKING_FAILED_TEXT,
                   ...(name === "execute" ? { toolCalls: [] } : {}),
                 })
@@ -333,7 +331,6 @@ const layer = Layer.effect(
                   }
                   const safe = withheld ? hidden() : update.metadata
                   yield* context.progress(safe)
-                  published = safe
                 })
                 return yield* executeTool(tool, name, event.input, { ...context, progress }).pipe(
                   Effect.map((result) => withheld

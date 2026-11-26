@@ -707,3 +707,35 @@ test("plugin quit waits for actual viewed Session receipts and then quits once",
     expect(quit).toBe(1)
   } finally { requester.close(); notePluginSessionViewed(2128, undefined) }
 })
+
+test("plugin notification dedup ends with its Session receipt and engine generation", async () => {
+  const { createPluginSessionRequester } = await import("./plugin-session-lifecycle")
+  const sent: Array<{ id: number }> = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  const notification = (sessionId: string) => ({ sessionId, action: "notification" as const, notification: { message: "Native occurrence", notificationType: "idle_prompt", occurrenceId: "evt_same_occurrence" } })
+  const settle = async (result: Promise<void>) => { requester.receive({ id: sent.at(-1)!.id, ok: true }); await result }
+  try {
+    await settle(requester.request(notification("ses_first")))
+    await settle(requester.request(notification("ses_second")))
+    await requester.request(notification("ses_first"))
+    expect(sent).toHaveLength(2)
+    const leaving = requester.request({ sessionId: "ses_first", action: "leave", reason: "clear" })
+    await requester.request(notification("ses_first"))
+    expect(sent).toHaveLength(3)
+    await settle(leaving)
+    const resumed = requester.request(notification("ses_first"))
+    expect(sent).toHaveLength(4)
+    await settle(resumed)
+    await requester.request(notification("ses_second"))
+    expect(sent).toHaveLength(4)
+    requester.close()
+    const nextSent: Array<{ id: number }> = []
+    const next = createPluginSessionRequester(message => { nextSent.push(message) })
+    try {
+      const result = next.request(notification("ses_first"))
+      expect(nextSent).toHaveLength(1)
+      next.receive({ id: nextSent[0]!.id, ok: true })
+      await result
+    } finally { next.close() }
+  } finally { requester.close() }
+})

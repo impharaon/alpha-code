@@ -3419,6 +3419,29 @@ packageIt.live("main forwards real permission and completion notifications to th
   }), { id: "actual-notification-producer", setup: async context => { producer = context } })
 }))
 
+packageIt.live("native Session deletion clears the main notification occurrence ledger", () => {
+  let producer!: Plugin.Context
+  return packageJourney(Effect.gen(function* () {
+    const { createPluginSessionRequester, watchPluginSessionNotifications } = yield* Effect.promise(() => import("../../ui-mac/src/main/plugin-session-lifecycle"))
+    const sent: Array<{ id: number }> = []
+    const requester = createPluginSessionRequester(message => { sent.push(message); queueMicrotask(() => requester.receive({ id: message.id, ok: true })) })
+    yield* Effect.addFinalizer(() => Effect.sync(() => requester.close()))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const watcher = watchPluginSessionNotifications(producer)
+    yield* Effect.addFinalizer(() => Effect.promise(watcher.stop))
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Notification ledger owner" } as never)
+    const action = { sessionId: session.id, action: "notification" as const, notification: { message: "Original occurrence", notificationType: "idle_prompt", occurrenceId: "evt_removed_session" } }
+    yield* Effect.promise(() => requester.request(action))
+    expect(sent).toHaveLength(1)
+    yield* sessions.remove(session.id)
+    yield* ext.finish(Effect.promise(async () => { await requester.request(action); return sent.length === 2 }))
+    expect(sent).toHaveLength(2)
+  }), { id: "deletion-notification-producer", setup: async context => { producer = context } })
+})
+
 packageIt.live("FileChanged replaces each handler watch set and withdraws literal watchers with the package", () => packageJourney(Effect.gen(function* () {
   const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
   const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))

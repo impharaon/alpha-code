@@ -153,3 +153,16 @@ test("OSD script names resolve to existing pins or the default OCR family",async
   else expect(ids.some(id=>id.includes("script-"))).toBe(false)
  }
 })
+
+test("processing recipes ignore unrelated bundled bytes and post-signing digests",async()=>{
+ const {createHash}=await import("node:crypto")
+ const inventory=async(text:string,speech="speech-build",frames="ocr-build")=>{
+  await writeFile(path.join(root,"unrelated.txt"),text)
+  await writeFile(path.join(root,"runtime.json"),JSON.stringify({platform:`${process.platform}-${process.arch}`,files:{"unrelated.txt":createHash("sha256").update(text).digest("hex")},components:{},buildIdentities:{speech:{native:speech},frames:{ocr:frames}}}))
+  return createVideoRuntime(invocation,{signal:new AbortController().signal,meta:undefined,ensure:async()=>({ok:false,error:"network"})})
+ }
+ const first=await inventory("before-signing"),second=await inventory("after-signing")
+ expect(second.recipe).toEqual(first.recipe)
+ const speech=await inventory("after-signing","new-speech-build")
+ expect(speech.recipe).not.toEqual(second.recipe)
+})

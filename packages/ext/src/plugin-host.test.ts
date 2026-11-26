@@ -2594,3 +2594,48 @@ packageIt.live("package compact hooks block before a summary and observe the act
   expect(events()[2]).toMatchObject({ trigger: "manual", compact_summary: expect.stringContaining("Preserved actual work") })
   expect((yield* sessions.context(session.id)).some(message => message.type === "compaction" && message.status === "completed")).toBe(true)
 })))
+
+packageIt.live("Convex skill monitors start once per session and stop without late delivery when the bundle closes", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:convex"))
+  const monitors = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("monitors/monitors.json")))) as { name: string; command: string; when: string }[]
+  for (const monitor of monitors) monitor.command = 'node "${CLAUDE_PLUGIN_ROOT}/monitors/runtime-observe.mjs" ' + monitor.name
+  const observer = `import fs from 'node:fs';const name=process.argv[2];fs.appendFileSync('monitors-started.jsonl',JSON.stringify({name,pid:process.pid})+'\\n');process.stdout.write('MONITOR_STDOUT '+name+'\\r\\n');if(name.includes('insights')){process.on('SIGTERM',()=>{console.log('LATE_SOURCE_LINE');process.exit(0)});setInterval(()=>fs.writeFileSync('monitor-heartbeat',name),10)}else{process.stdout.write('MONITOR_FINAL '+name);process.stderr.write('MONITOR_STDERR_DIAGNOSTIC\\n')}`
+  const sample = yield* invocationSample("claude:convex", { "monitors/monitors.json": JSON.stringify(monitors), "monitors/runtime-observe.mjs": observer, "hooks/hooks.json": null })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const design = sample.description.entries.find(entry => entry.kind === "skill" && entry.sourceName === "design")!
+  const command = sample.hostNames[design.id]!
+  yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Scoped Convex monitors", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.always(TestLLM.text("A monitored task", "monitor-response"))
+  yield* sessions.prompt({ sessionID: session.id, text: "An ordinary turn without a Convex skill" })
+  yield* sessions.wait(session.id)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "monitors-started.jsonl")).exists())).toBe(false)
+  yield* commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Design this fixture" }, delivery: "queue" } })
+  yield* sessions.wait(session.id)
+  for (let waited = 0; waited < 2000 && !(yield* Effect.promise(() => Bun.file(join(location.directory, "monitor-heartbeat")).exists())); waited += 10) yield* Effect.sleep("10 millis")
+  const started = () => readFileSync(join(location.directory, "monitors-started.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(started().map(row => row.name).sort()).toEqual(["convex-occ-insights", "convex-runtime-errors"])
+  for (let waited = 0; waited < 2000 && !JSON.stringify(yield* sessions.context(session.id)).includes("MONITOR_FINAL"); waited += 10) yield* Effect.sleep("10 millis")
+  const history = JSON.stringify(yield* sessions.context(session.id))
+  expect(history).toContain("MONITOR_STDOUT convex-runtime-errors")
+  expect(history).toContain("MONITOR_FINAL convex-runtime-errors")
+  expect(history).toContain("MONITOR_STDOUT convex-occ-insights")
+  expect(history).not.toContain("MONITOR_STDERR_DIAGNOSTIC")
+  const alive = (pid: number) => { try { process.kill(pid, 0); return true } catch { return false } }
+  const live = started().find(row => row.name === "convex-occ-insights")!
+  expect(alive(live.pid)).toBe(true)
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify(membership))
+  for (let waited = 0; waited < 2000 && alive(live.pid); waited += 10) yield* Effect.sleep("10 millis")
+  expect(alive(live.pid)).toBe(false)
+  yield* commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Invoke while bundle is off" }, delivery: "queue" } })
+  yield* sessions.wait(session.id)
+  expect(started()).toHaveLength(2)
+  expect(JSON.stringify(yield* sessions.context(session.id))).not.toContain("LATE_SOURCE_LINE")
+})))

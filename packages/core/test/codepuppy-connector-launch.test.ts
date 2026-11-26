@@ -414,7 +414,16 @@ test("connector diagnostics tee complete masked stderr before stdio and preserve
   expect(JSON.parse(persisted).stderr).toBe(value.err)
   expect(value.diagnostic.transcriptFile.startsWith(path.join(input.runtimeRoot, "diagnostics") + path.sep)).toBe(true)
   expect(logs.some((line) => line.includes("spawning connector process"))).toBe(true)
-  for (const secret of ["known-secret", "line-secret", "unknown-auth", "password", "signed-value", "query-credential", "private-ref", "private-version"])
+  for (const secret of [
+    "known-secret",
+    "line-secret",
+    "unknown-auth",
+    "password",
+    "signed-value",
+    "query-credential",
+    "private-ref",
+    "private-version",
+  ])
     expect([JSON.stringify(value.diagnostic), persisted, ...logs].join("\n")).not.toContain(secret)
 })
 
@@ -1314,7 +1323,8 @@ test("connector content keys exclude invocation state credentials and runtime lo
     launchers: launcherEnvironment("/first-runtime"),
     requirements: [{ kind: "registry" as const, name: "own", version: "1.2.3", extras: ["b", "a"] }],
     options: {
-      registry: "https://first:credential@packages.invalid/?channel=stable&%73ig=one&%70assword=first&credentialRef=first-ref&authVersion=one",
+      registry:
+        "https://first:credential@packages.invalid/?channel=stable&%73ig=one&%70assword=first&credentialRef=first-ref&authVersion=one",
       cache: "/first-cache",
       prefix: "/first-project",
       _authToken: "first-token",
@@ -1340,7 +1350,8 @@ test("connector content keys exclude invocation state credentials and runtime lo
     launchers: launcherEnvironment("/second-runtime"),
     requirements: [{ ...first.requirements[0]!, extras: ["a", "b", "a"] }],
     options: {
-      registry: "https://second:rotated@packages.invalid/?sig=two&channel=stable&password=second&credentialRef=second-ref&authVersion=two",
+      registry:
+        "https://second:rotated@packages.invalid/?sig=two&channel=stable&password=second&credentialRef=second-ref&authVersion=two",
       cache: "/second-cache",
       prefix: "/second-project",
       _authToken: "second-token",

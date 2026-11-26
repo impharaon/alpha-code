@@ -82,6 +82,15 @@ it.live("package instruction renders source nodes before bound values and argume
   expect(yield* render(["No placeholders"], "raw input")).toBe("No placeholders\n\nARGUMENTS: raw input")
 }))
 
+it.live("native and package inline shells inherit process PATH and HOME", () => Effect.gen(function* () {
+  const source = "!`printf '%s\\n%s' \"$PATH\" \"$HOME\"`"
+  const expected = process.env.PATH + "\n" + process.env.HOME
+  const native = yield* runCommand({ template: source + "\n$ARGUMENTS" }, {})
+  expect(native.prompts).toEqual([expected + "\ngo"])
+  const location = yield* Location.Service
+  expect(yield* Effect.promise(() => renderPackageInstruction(location, { parts: [source], rawArguments: "", arguments: [], syntax: "claude", cwd: location.directory }))).toBe(expected)
+}))
+
 it.live("package inline shells receive the invocation environment without reinterpreting its values", () => Effect.gen(function* () {
   yield* runCommand({ template: "Initialize native command services" }, {})
   const location = yield* Location.Service

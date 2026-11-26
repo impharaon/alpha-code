@@ -2988,3 +2988,52 @@ for (const handled of [true, false]) packageIt.live(`package elicitation ${handl
   expect(rows[0]).toMatchObject({ mode: "form", message: "SDK fixture input", requested_schema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] } })
   if (!handled) expect(rows[1]).toMatchObject({ action: "accept", content: { answer: "native response" } })
 })))
+
+packageIt.live("real SessionEnd runs the package hook and closes its remote transport before the parentPort reply", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const sent: unknown[] = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  const hubBridge = createHubBridge({ postMessage: message => { sent.push(message) }, on: (_, listener) => { listeners.push(listener) } })
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  yield* packageJourney(Effect.gen(function* () {
+    const { sessionMcpHandler } = yield* Effect.promise(() => import("../../core/test/fixture/mcp-echo"))
+    const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+    const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
+    const handler = yield* Effect.promise(sessionMcpHandler)
+    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: handler.fetch })
+    yield* Effect.addFinalizer(() => Effect.sync(() => { server.stop(true) }))
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+    for (const event of ["SessionEnd", "Elicitation"]) for (const group of hooks.hooks[event]) for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.writeFileSync('session-end.json',JSON.stringify(input))"]
+    }
+    const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { SessionEnd: hooks.hooks.SessionEnd, Elicitation: hooks.hooks.Elicitation } }) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Session end lifetime", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    yield* sessions.prompt({ sessionID: session.id, text: "Start the real session" })
+    yield* sessions.wait(session.id)
+    const mcp = yield* Mcp.Service
+    yield* mcp.add("session-end-remote", new ConfigMCP.Remote({ type: "remote", url: server.url.href, oauth: false }))
+    yield* mcp.awaitStartup()
+    yield* mcp.callTool({ server: "session-end-remote", name: "echo", sessionID: session.id })
+    expect(handler.counts).toEqual({ opened: 2, closed: 0 })
+    for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 1776, sessionId: session.id, action: "leave", reason: "clear" } })
+    yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 1776)))
+    expect(sent.find(message => (message as { id?: number }).id === 1776)).toEqual({ id: 1776, ok: true })
+    expect(handler.counts).toEqual({ opened: 2, closed: 1 })
+    expect(JSON.parse(readFileSync(join(location.directory, "session-end.json"), "utf8"))).toMatchObject({ hook_event_name: "SessionEnd", session_id: session.id, reason: "clear" })
+    for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 1777, sessionId: session.id, action: "leave", reason: "clear" } })
+    yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 1777)))
+    expect(handler.counts.closed).toBe(1)
+  }))
+}))

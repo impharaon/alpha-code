@@ -619,62 +619,15 @@ test("connector diagnostics continue observing a real MCP process after connecti
 for (const runner of ["uv-tool", "npm-exec"] as const)
   test(`${runner} environment keeps bundled runtimes ahead of old PATH and binds current business inputs`, () => {
     const launchers = launcherEnvironment(path.resolve("owned-runtime"))
-    const input = {
-      runner,
-      launchers,
-      key: "d".repeat(64),
-      inherited: {
-        PATH: "/old/bin:/shared/bin",
-        HOME: "/own/home",
-        NODE_OPTIONS: "--require old-host",
-        PYTHONHOME: "/old/python",
-        PYTHONPATH: "/old/modules",
-        VIRTUAL_ENV: "/old/venv",
-        UV_CACHE_DIR: "/r1/cache",
-        XDG_CONFIG_HOME: "/user/config",
-        NPM_CONFIG_IGNORE_SCRIPTS: "false",
-      },
-      declared: {
-        PATH: "/declared/bin:/shared/bin",
-        PRIVATE_KEY: "current-secret",
-        npm_config_registry: "https://registry.invalid",
-        npm_config_ignore_scripts: "false",
-        NODE_OPTIONS: "--require declared-module",
-      },
-      packageBins: ["/prepared/bin"],
-      python: "/pinned/python/bin/python3",
-    }
+    const input = { runner, launchers, key: "d".repeat(64), inherited: { PATH: "/old/bin:/shared/bin", HOME: "/own/home", NODE_OPTIONS: "--require old-host", PYTHONHOME: "/old/python", PYTHONPATH: "/old/modules", VIRTUAL_ENV: "/old/venv", UV_CACHE_DIR: "/r1/cache", XDG_CONFIG_HOME: "/user/config", NPM_CONFIG_IGNORE_SCRIPTS: "false" }, declared: { PATH: "/declared/bin:/shared/bin", PRIVATE_KEY: "current-secret", npm_config_registry: "https://registry.invalid", npm_config_ignore_scripts: "false", NODE_OPTIONS: "--require declared-module" }, packageBins: ["/prepared/bin"], python: "/pinned/python/bin/python3" }
     const before = structuredClone(input)
     const env = connectorRunnerEnvironment(input)
-    expect(env.PATH?.split(":")).toEqual([
-      "/prepared/bin",
-      path.dirname(input.launchers.uv),
-      "/pinned/python/bin",
-      "/declared/bin",
-      "/shared/bin",
-      "/old/bin",
-    ])
-    expect(env).toMatchObject({
-      HOME: "/own/home",
-      NODE_OPTIONS: "--require declared-module",
-      PRIVATE_KEY: "current-secret",
-      npm_config_registry: "https://registry.invalid",
-      UV_CACHE_DIR: "/r1/cache",
-      XDG_CONFIG_HOME: "/user/config",
-      UV_PYTHON: "3.12.16",
-    })
+    expect(env.PATH?.split(":")).toEqual(["/prepared/bin", path.dirname(input.launchers.uv), "/pinned/python/bin", "/declared/bin", "/shared/bin", "/old/bin"])
+    expect(env).toMatchObject({ HOME: "/own/home", NODE_OPTIONS: "--require declared-module", PRIVATE_KEY: "current-secret", npm_config_registry: "https://registry.invalid", UV_CACHE_DIR: "/r1/cache", XDG_CONFIG_HOME: "/user/config", UV_PYTHON: "3.12.16" })
     for (const key of ["PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"]) expect(env).not.toHaveProperty(key)
-    if (runner === "uv-tool")
-      expect(env).toMatchObject({
-        UV_TOOL_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/tools"),
-        UV_TOOL_BIN_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/bin"),
-      })
+    if (runner === "uv-tool") expect(env).toMatchObject({ UV_TOOL_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/tools"), UV_TOOL_BIN_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/bin") })
     if (runner === "npm-exec") {
-      expect(env).toMatchObject({
-        npm_config_prefer_offline: "true",
-        npm_config_ignore_scripts: "true",
-        npm_config_update_notifier: "false",
-      })
+      expect(env).toMatchObject({ npm_config_prefer_offline: "true", npm_config_ignore_scripts: "true", npm_config_update_notifier: "false" })
       expect(env).not.toHaveProperty("NPM_CONFIG_IGNORE_SCRIPTS")
       expect(env).not.toHaveProperty("UV_TOOL_DIR")
     }
@@ -685,31 +638,9 @@ for (const runner of ["uv-tool", "npm-exec"] as const)
   })
 
 test("Windows runner environment merges case-insensitive keys and PATH without retaining old runtime controls", () => {
-  const launchers = {
-    ...launcherEnvironment(path.resolve("owned-runtime")),
-    platform: "win32-x64" as const,
-    runtimeRoot: "C:\\app-data\\connector-runtime",
-    uv: "C:\\app-data\\uv\\uv.exe",
-    node: "C:\\app-data\\node\\node.exe",
-  }
-  const env = connectorRunnerEnvironment({
-    runner: "npm-exec",
-    launchers,
-    key: "e".repeat(64),
-    inherited: {
-      Path: "C:\\old;C:\\shared",
-      Node_Options: "--require old",
-      pythonpath: "C:\\old-modules",
-      Home: "C:\\own-home",
-      KEY: "old-secret",
-    },
-    declared: { PATH: "c:\\shared;C:\\declared", key: "current-secret" },
-    packageBins: ["C:\\prepared\\bin"],
-    python: "C:\\python\\python.exe",
-  })
-  expect(env.PATH).toBe(
-    "C:\\prepared\\bin;C:\\app-data\\uv;C:\\app-data\\node;C:\\python;c:\\shared;C:\\declared;C:\\old",
-  )
+  const launchers = { ...launcherEnvironment(path.resolve("owned-runtime")), platform: "win32-x64" as const, runtimeRoot: "C:\\app-data\\connector-runtime", uv: "C:\\app-data\\uv\\uv.exe", node: "C:\\app-data\\node\\node.exe" }
+  const env = connectorRunnerEnvironment({ runner: "npm-exec", launchers, key: "e".repeat(64), inherited: { Path: "C:\\old;C:\\shared", Node_Options: "--require old", pythonpath: "C:\\old-modules", Home: "C:\\own-home", KEY: "old-secret" }, declared: { PATH: "c:\\shared;C:\\declared", key: "current-secret" }, packageBins: ["C:\\prepared\\bin"], python: "C:\\python\\python.exe" })
+  expect(env.PATH).toBe("C:\\prepared\\bin;C:\\app-data\\uv;C:\\app-data\\node;C:\\python;c:\\shared;C:\\declared;C:\\old")
   expect(env).toMatchObject({ key: "current-secret", Home: "C:\\own-home" })
   for (const key of ["Path", "KEY", "Node_Options", "pythonpath"]) expect(env).not.toHaveProperty(key)
 })
@@ -822,9 +753,7 @@ test("connector preparation runs before permits and publishes progress before th
           prepare: ({ preparing: report, runtimeDep }) =>
             Effect.gen(function* () {
               expect(runtimeDep.missing).toEqual([])
-              const available = Option.isSome(
-                yield* startPermits.withPermitsIfAvailable(START_CONCURRENCY)(Effect.void),
-              )
+              const available = Option.isSome(yield* startPermits.withPermitsIfAvailable(START_CONCURRENCY)(Effect.void))
               report("python", { unit: "bytes", completed: 42, total: 100 })
               yield* Deferred.succeed(preparing, available)
               yield* Deferred.await(ready)
@@ -1052,25 +981,14 @@ test("connector missing workspace is reported before package preparation or serv
   const root = connectionRoot()
   const snapshots: LaunchSnapshot[] = []
   const spawns: ChildProcess.Command[] = []
-  await Effect.runPromise(
-    Effect.scoped(
-      Effect.gen(function* () {
-        const current = yield* launchConnection({
-          root,
-          snapshots,
-          spawns,
-          cwd: path.join(root, "missing"),
-          prepare: () => Effect.die("must not prepare without a workspace"),
-        })
-        yield* current.connection.start
-        expect(spawns).toHaveLength(0)
-        expect(snapshots.at(-1)?.state).toMatchObject({
-          phase: "failed",
-          failure: { kind: "workspace", reason: "missing" },
-        })
-      }),
-    ).pipe(Effect.provide(hostEnvironmentLayer)),
-  )
+  await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+    const current = yield* launchConnection({ root, snapshots, spawns, cwd: path.join(root, "missing"),
+      prepare: () => Effect.die("must not prepare without a workspace"),
+    })
+    yield* current.connection.start
+    expect(spawns).toHaveLength(0)
+    expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: "workspace", reason: "missing" } })
+  })).pipe(Effect.provide(hostEnvironmentLayer)))
 })
 
 // Integration layer, affected PR/nightly. These THREE sources + LICENSE are unmodified
@@ -1088,69 +1006,32 @@ function npmDeclarationFixture() {
   const util = createRequire(new URL("../../util/package.json", import.meta.url))
   const config = util.resolve("@npmcli/config/package.json")
   symlinkSync(path.dirname(config), path.join(npm, "node_modules/@npmcli/config"), "dir")
-  symlinkSync(
-    path.dirname(util.resolve("npm-package-arg/package.json")),
-    path.join(npm, "node_modules/npm-package-arg"),
-    "dir",
-  )
-  symlinkSync(
-    path.dirname(createRequire(config).resolve("abbrev/package.json")),
-    path.join(npm, "node_modules/abbrev"),
-    "dir",
-  )
+  symlinkSync(path.dirname(util.resolve("npm-package-arg/package.json")), path.join(npm, "node_modules/npm-package-arg"), "dir")
+  symlinkSync(path.dirname(createRequire(config).resolve("abbrev/package.json")), path.join(npm, "node_modules/abbrev"), "dir")
   copyFileSync(new URL("../../util/package.json", import.meta.url), path.join(root, "package.json"))
   mkdirSync(path.join(root, "home"))
   return {
     root,
-    launchers: {
-      ...launcherEnvironment(root),
-      node: process.execPath,
-      npmCli: path.join(npm, "bin/npm-cli.js"),
-      npxCli: path.join(npm, "bin/npx-cli.js"),
-    },
+    launchers: { ...launcherEnvironment(root), node: process.execPath, npmCli: path.join(npm, "bin/npm-cli.js"), npxCli: path.join(npm, "bin/npx-cli.js") },
     environment: { HOME: path.join(root, "home"), PATH: process.env.PATH! },
   }
 }
 test("official npx boolean switches preserve the service argument boundary and repeated package specs", async () => {
   const input = npmDeclarationFixture()
-  const parse = (args: string[]) =>
-    Effect.runPromise(
-      Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: args })).pipe(
-        Effect.provide(hostEnvironmentLayer),
-      ),
-    )
+  const parse = (args: string[]) => Effect.runPromise(Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: args })).pipe(Effect.provide(hostEnvironmentLayer)))
   const implicit = await parse(["--yes", "one@1.2.3", "--package=business-argument"])
   expect(implicit.arguments).toEqual(["one@1.2.3", "--package=business-argument"])
   expect(implicit.packages).toEqual([])
-  const explicit = await parse([
-    "--yes",
-    "-p",
-    "@scope/one@1.2.3",
-    "--package=two@npm:three@^4",
-    "--",
-    "my-bin",
-    "--package=service-flag",
-  ])
+  const explicit = await parse(["--yes", "-p", "@scope/one@1.2.3", "--package=two@npm:three@^4", "--", "my-bin", "--package=service-flag"])
   expect(explicit.arguments).toEqual(["my-bin", "--package=service-flag"])
-  expect(explicit.packages).toEqual([
-    { specification: "@scope/one@1.2.3", name: "@scope/one", type: "version" },
-    { specification: "two@npm:three@^4", name: "two", type: "alias" },
-  ])
+  expect(explicit.packages).toEqual([{ specification: "@scope/one@1.2.3", name: "@scope/one", type: "version" }, { specification: "two@npm:three@^4", name: "two", type: "alias" }])
 })
 
 test("official npm exec aliases and call syntax are parsed without executing the service", async () => {
   const input = npmDeclarationFixture()
   const marker = path.join(input.root, "must-not-execute")
-  writeFileSync(
-    path.join(input.root, ".npmrc"),
-    "@private:registry=https://registry.example.invalid/\n//registry.example.invalid/:_authToken=own-fixture-secret\n",
-  )
-  const parse = (args: string[]) =>
-    Effect.runPromise(
-      Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npm-exec", arguments: args })).pipe(
-        Effect.provide(hostEnvironmentLayer),
-      ),
-    )
+  writeFileSync(path.join(input.root, ".npmrc"), "@private:registry=https://registry.example.invalid/\n//registry.example.invalid/:_authToken=own-fixture-secret\n")
+  const parse = (args: string[]) => Effect.runPromise(Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npm-exec", arguments: args })).pipe(Effect.provide(hostEnvironmentLayer)))
   const call = await parse(["exec", "--package=one@1.2.3", "--call", `printf ran > ${marker}`])
   expect(call.call).toBe(`printf ran > ${marker}`)
   expect(call.arguments).toEqual([])

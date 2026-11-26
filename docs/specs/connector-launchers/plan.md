@@ -581,3 +581,33 @@ readNpmLaunchDeclaration 新增 transient resolutionOptions：向 Config 传入�
 红例 8bd85cc37b 为 0 PASS / 2 FAIL（`/tmp/connector-r6-npm-relative-red.log`）；保留其全部断言后 2 PASS / 9 assertions（`/tmp/connector-r6-npm-relative-green.log`）。新增例覆盖相对 age 稳定、exclude 生效、固定日期覆盖、CLI relative 覆盖低层 before、0 清除；没有时钟 mock、sleep 或计时断言。第一轮 green 暴露**夹具输入版本差异**：共享 Config10.8.1 无 exclude 且拒绝 before/min-release-age 并存，而产品随包10.13.0允许优先级组合。没有放宽断言、为生产添加旧版兼容或升级依赖；只在此用例解包完整钉住 Config 的原始 lib/package.json/LICENSE，复用原有已安装依赖。
 
 新增字面读取 `test/fixture/npm-launch/npm-config-source.json.gz` 是15个 upstream 原文件的 gzip JSON 容器，40423 bytes，sha256 `76a49a961d79df277407bf54b560d22d4eb0231091a012ab651e9318c281e743`。逐文件 byte 比对 upstream 原件全相同，LICENSE 在容器内；不把原库4566行复制为可执行生产代码，不更改仓库依赖/门控。实际随包 Node26.13.1 / npm11.20.0 / Config10.13.0 一次性 `gate slot -- bun /tmp/connector-r5-npm-proof/npm-relative-r6.ts` exit 0（`/tmp/connector-r6-npm-relative-proof.log`），同样全部语义与稳定 key 通过。它补齐上文所列 relative-age **读侧**缺口；requirements/本地源内容到 facts、npm install 与总 prepare 的余项仍在。
+
+
+### r6 最终收据与准确续接边界
+
+依据：SPEC v1、冻结 DESIGN v2.2 与 r6 槽位摘要裁定；已核：Codex / GPT-6，结论 **PARTIAL**。裁定实现完成，没有未决设计问题：只把已严格匹配的 host-only Node/cache token 保留到绑定事实，声明 arg/env/cwd 与非首方变化仍重绑。没有修改 store/公共 HTTP/Protocol、process-fence、其它规格或其它仓，没有迁移、应用/窗口、push/PR/merge。主表与实物下载的 r1/r2/r4 已接受证据继承，本轮不重复下载。
+
+- **r6 裁定 / AC-10 子链**：真磁盘 identity 两条红例保留 enabled 与变更重问，2 PASS / 23 assertions；完整 identity 21 PASS，相关策略组138 PASS。Node/cache 重锚不把 host 路径写进摘要；这不是打包应用离线重启验收。
+- **AC-04/05/10 准备子链**：官方 uv/npx 语法、非秘密 key primitive、真实 npm 默认/显式 bin、uv metadata/entry、Python stdlib 不加载 site，及 uv 产品 install 已具名证明；真实随包 uv/Python 安装 pip26.3、随包 Node/npm 安装 semver7.8.5 后产品 capture→publish→read 均 cache hit，直接入口分别输出 pip26.3/Python3.12 与 1.2.3。只有 uv 的安装已成为产品 helper；npm install 仍仅一次性 probe，不能当完整 prepare/第三方 MCP 已连上。
+- **AC-08 同链**：URL 编码密码与凭据引用/版本在 key、stderr、日志、持久诊断一致排除/遮密，两个红例0/2转2/0；完整 stderr、command/exit 转交的 r4/r5 证据继承。AC-06/07/08 的 production controller/renderer 两入口组装仍未装到 root。
+- **AC-01/02/03/04/05/06/07/08/09/10 正式验收**：没有新增打包/干净账户/真围栏/北京/限速/Windows/离线应用重启结论；依赖真实启动装配的部分仍待 #1759 后验收。
+
+最终相关验证（未运行全层/全套或 timing/scale；只列唯一计数，不重复累计末次遮密单例）：
+1. core：`bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2` → **39 PASS / 214 assertions**（`/tmp/connector-r6-core-final.log`）。新增12个 core 模块/组件例、2个 ext 真盘策略例；全在既有文件，没有全局 setup/gate 输入扩展。
+2. core：`bun test test/codepuppy-mcp-runtime.test.ts -t 'Office declarations bind|bundled slots bind|bundled declarations reject|the failed status the desktop reads|a local server that writes a secret to stderr and exits' --max-concurrency=2` → **5 PASS / 62 assertions，30 filtered**（`/tmp/connector-r6-core-runtime-related.log`）。URL 遮密变动后只重跑其中真实 crash 单例 →1 PASS /4 assertions（`/tmp/connector-r6-runtime-secret-final.log`）。新 npm/uv/key exports 的 grep 消费者只有准备模块测试；没有遗漏另外的 mock。
+3. ext：`bun test src/policy/identity.test.ts src/policy/resolver.test.ts src/policy/register-policy.test.ts src/policy/tool-policy-rpc.test.ts src/policy/unattended.test.ts --max-concurrency=2` → **138 PASS /484 assertions**（`/tmp/connector-r6-ext-related.log`）。
+4. ui-mac：`bun test src/main/connector-launchers.test.ts --max-concurrency=2` → **22 PASS /104 assertions**（`/tmp/connector-r6-main-related.log`）。以上合计204 PASS /864 assertions。
+5. core 与 ext 各 `bun typecheck` → exit0（core2068 files/2 projects；`/tmp/connector-r6-core-typecheck-final.log`、`/tmp/connector-r6-ext-typecheck-final.log`）。没有独立包 lint 命令，`git diff --check` 通过。
+
+移除臂共11项：槽位摘要、声明环境、key凭据、key业务输入、uv Unicode、run→install转换、npm官方默认 bin、npm入口所属目录，分别由命名例 exit1（各0 PASS/1 FAIL），日志 `/tmp/connector-r6-removal-{slot_binding,declared_environment,key_credentials,key_invocation,uv_unicode,uv_install_conversion,npm_default_bin,npm_owned_bin}.log`；uv site隔离移除时实物命令因 .pth 标记断言 exit1，uv所属目录移除时实物负例意外得到带 outside-entry 的 ready，预期失败 Effect.flip 变为失败 exit1（`...removal-uv_{site_isolation,owned_entry}.log`）；npm relative语义移除时命名例0/1（`...removal-npm_relative_clock.log`）。所有 scoped restore 后恢复；既有 uv 环境的最终正/反例命令 `gate slot -- bun /tmp/connector-r5-npm-proof/uv-capture-existing-r6.ts` exit0（`/tmp/connector-r6-uv-existing-final.log`），没有重跑真实安装或计时场景。
+
+`affected-tests --list` exit0：**affected tests: 380 of 742 test files**（`/tmp/connector-r6-affected-final.scope` / `.list`），无 fallback，和r5范围一致；新 gzip 夹具由字面 URL 读入，仅选择本模块。四项 npm/bin 原 fixture 与归档原件 byte-identical（641/1938/741/6597 bytes），Config gzip15原文件亦逐字相同且含 LICENSE。清除了 prettier 对旧测试代码的13处无关纯排版变动；`bun /tmp/connector-r6-format-proof.ts` 确认清理前后 Bun 输出 JavaScript byte-identical，没有删除/放松断言，不需要再跑行为用例。
+
+**独立余项，仍归 #1760 实现**：
+1. 官方解析输出→完整规范化需求与非秘密配置内容 facts：uv 的 Local/Remote/Stdin requirements/constraints/overrides/build-constraints、项目 source/解析选项；npm 隐式/显式包 spec、local/git 内容身份与来源配置。relative-age 读侧已补，不再列为未做。原配置/Debug/业务路径/凭据不能直接作为 key。
+2. npm 产品 `install --prefix` 完整解析选项传递（不能复用共享 _npx）；默认/显式/npm --call 平台 shell、JS/native/cmd/ps1、uv console/legacy scripts 的最终命令绑定；uv env-file/根 --directory 等本次执行语义。
+3. 完整 frozen prepareConnectorLaunch：resolveAssets/单一 Python pin→安装/查找、内容 key、有效 ready 快路径、miss安装/捕获/发布、当前 argv/cwd/业务密钥/环境重绑、错误/egress/取消及进度组合，接到 r5 的 localLaunch.packagePreparation。不能用空 stub 或把未适配的合法声明拒成不支持第三方。
+
+**#1759 后机械接线，接口清单仍是前表**：最后只读复核 HEAD 为 ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f；同一次 planPackageManagerCaches 的绑定 env/cacheEnv/rules/locations/excluded 进入 fence与 bootstrap；resolvePackageManagerLocations 只是候选；最终 spawn 由 R2 的 installPackageManagerEnvironment / packageManagerEnvironment / refreshPackageManagerEnvironment / projectPackageManagerEnvironment / createPackageManagerEnvironmentRequester 单一所有者投影。main bootstrap.launchers mandatory、launch assets/download Host、sidecar publishConnectorLaunchHost→index/Slot/localLaunch、Node boot re-anchor、当前 identity 的状态/诊断/重试 controller、createConnectorLaunchState 返回值的 bindDocumentRuntime→runtime.retry()、renderer root 与正式包验收依此前组装表完成。不复制候选 env 为绑定结果，不另造缓存目录、下载器或任意安装 main RPC。
+
+遗留去向：上述独立余项→#1760续接；R1/R2/生产组装→#1759合入后本表接线；docs/README.md:1 index.stale 等既有仓级文档结果→文档治理（r5与本轮均56 errors/251 warnings，本 plan 0 findings）；Office compileall→documents已路由，本轮未工作。OPTIONAL：无。当前时间核对2026-11-26T20:12:36Z，自起始约68分钟，原预期约90分钟；范围没有扩到其它票或新依赖。

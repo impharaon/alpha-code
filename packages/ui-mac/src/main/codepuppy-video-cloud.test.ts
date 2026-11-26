@@ -32,7 +32,7 @@ const call: VideoCall = {
   callID: "call",
   messageID: "message",
 }
-async function harness() {
+async function harness(originalPath = "/project/speech.mp4") {
   const models = decodeContract("VideoModelsV1", await fixture("models-test-price"), "cloud-http"),
     input = decodeContract("VideoUnderstandingInputV1", await fixture("input"), "cloud-http"),
     answer = decodeContract("VideoUnderstandingResultV1", await fixture("result"), "cloud-http")
@@ -71,13 +71,13 @@ async function harness() {
         sourceId,
         sourceRange: { startMs: range.start_ms, endMs: range.end_ms },
         clip,
-        sensitivity: { originalName: "speech.mp4", originalPath: "/project/speech.mp4" },
+        sensitivity: { originalName: "speech.mp4", originalPath },
       },
       [target],
     )
     await writeJson(path.join(root, "sources", `${sourceId}.json`), {
       sourceId,
-      path: "/project/speech.mp4",
+      path: originalPath,
       name: "speech.mp4",
       bytes: clip.bytes,
       aliases: [],
@@ -323,7 +323,7 @@ test("video equal media bytes retain independent completion records for differen
     started = await service.start(call, request)
   expect((await state(service, started.requestId)).result).toBeDefined()
 })
-test("video disconnection continues the original admission and cancellation resolves a lost acknowledgement with the same key", async () => {
+test.each([false,true])("video cancel only recovers fully sent unknown admissions (%s)", async (fullySent) => {
   const h = await harness(),
     normal = h.deps.dispatch
   let disconnected = true
@@ -331,6 +331,7 @@ test("video disconnection continues the original admission and cancellation reso
     if (disconnected) {
       disconnected = false
       h.requests.push(input)
+      if(fullySent) await input.progress(input.clip.bytes)
       return { error: "network" }
     }
     return normal(input)
@@ -339,13 +340,15 @@ test("video disconnection continues the original admission and cancellation reso
     started = await service.start(call, await h.prepared())
   for (let i = 0; !h.requests.length && i < 100; i++) await Bun.sleep(1)
   await service.cancel(started.requestId, call)
-  for (let i = 0; !h.cancelled.length && i < 1000; i++) await Bun.sleep(1)
-  expect(h.requests).toHaveLength(2)
-  expect(h.requests[1]!.envelopeJson).toBe(h.requests[0]!.envelopeJson)
-  expect(h.requests[1]!.manifestJson).toBe(h.requests[0]!.manifestJson)
-  expect(h.cancelled).toContain("job_video_2")
-  expect((await service.query(started.requestId, call)).state.error).toBe("cancelled")
   const file = path.join(root, "cloud", (await readdir(path.join(root, "cloud")))[0]!)
+  for(let i=0;i<1000;i++) { const record=JSON.parse(await readFile(file,"utf8"));if(record.attempts[0].state === "cancelled")break;await Bun.sleep(1) }
+  expect(h.requests).toHaveLength(fullySent ? 2 : 1)
+  if(fullySent){
+    expect(h.requests[1]!.envelopeJson).toBe(h.requests[0]!.envelopeJson)
+    expect(h.requests[1]!.manifestJson).toBe(h.requests[0]!.manifestJson)
+    expect(h.cancelled).toContain("job_video_2")
+  }else expect(h.cancelled).toEqual([])
+  expect((await service.query(started.requestId, call)).state.error).toBe("cancelled")
   for (let i = 0; i < 100; i++) {
     const record = JSON.parse(await readFile(file, "utf8"))
     if (record.attempts[0].state === "cancelled") {
@@ -355,4 +358,18 @@ test("video disconnection continues the original admission and cancellation reso
     await Bun.sleep(1)
   }
   throw new Error("cancel acknowledgement not persisted")
+})
+
+
+test("video privacy-card cancellation never dispatches media",async()=>{
+ const h=await harness("/project/.ssh/speech.mp4"),service=createMainVideoService(h.deps)
+ const started=await service.start(call,await h.prepared())
+ for(let i=0;!h.deps.upload.videoPreviews(1).length && i<1000;i++)await Bun.sleep(1)
+ const preview=h.deps.upload.videoPreviews(1)[0]
+ expect(preview).toBeDefined()
+ h.deps.upload.cancel(1,preview!.requestId)
+ expect((await state(service,started.requestId)).error).toBe("cancelled")
+ const file=path.join(root,"cloud",(await readdir(path.join(root,"cloud")))[0]!)
+ for(let i=0;i<1000;i++){if(JSON.parse(await readFile(file,"utf8")).attempts[0].state === "cancelled")break;await Bun.sleep(1)}
+ expect(h.requests).toHaveLength(0)
 })

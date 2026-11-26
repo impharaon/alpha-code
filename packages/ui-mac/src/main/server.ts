@@ -1,4 +1,6 @@
 import type { CodePuppySidecarHost } from "./hub-view"
+import { HOMEBREW_PREFIXES } from "./platform/darwin"
+import { readHomebrewInstallations, homebrewFenceLocations } from "./homebrew-installation"
 import { engineAuthorization } from "./engine-authorization"
 import { toV1PermissionRequest } from "../engine-adapter/opencode2/v1-shapes"
 import type { WriteScopeRequest, WriteScopeReply } from "./codepuppy-sidecar-messages"
@@ -57,7 +59,7 @@ import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
 // sidecar 在 import 引擎之前 apply。计划做不出来 = 拒绝 fork(fail-closed,原因可读),不静默无围栏。
-import { plannedWritableTarget, planPackageManagerCaches, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
+import { plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
 import { trialCompileProfile } from "./process-fence-compile"
 import type { ProcessFenceStartInput } from "./process-fence-apply"
 // REQ-137 `#1337`:网络出网的强制半场接线。围栏(profile N1–N4)把 sidecar 那棵树的出网收成 loopback 上**一个**端口,
@@ -360,29 +362,32 @@ export function preplanConfigFenceRoots(input: { env: Record<string, string | un
 async function planProductionFence(input: ProductionFenceInput): Promise<PlannedFence | undefined> {
   if (process.platform !== "darwin") return undefined
   if (input.egressProxyPort === undefined) throw new Error("process fence plan: no egress proxy port on darwin — the fence's only outbound door is unknown, refusing to plan")
+  const egressProxyPort = input.egressProxyPort
   const moduleDir = dirname(fileURLToPath(import.meta.url))
   const info = tryGetCodePuppyEnvironment()
   if (!info) throw new Error("package manager cache: application environment not initialized")
   const exported = usableExportedPaths({ env: input.sidecarEnv, home: homedir(), log: (line) => getLogger()?.warn(line) })
   const roots = resolveEngineRoots(exported.env, exported.home)
-  const prepareCaches = (goInstallBin: string | null) => planPackageManagerCaches({ platform: "darwin", goInstallBin, home: roots.home, userDataPath: input.userDataPath, configHome: roots.configHome,
+  const locationInput = { platform: "darwin" as const, goInstallBin: null, home: roots.home, userDataPath: input.userDataPath, configHome: roots.configHome,
     appData: electronNs.app.getPath("appData"), localAppData: join(roots.home, "Library", "Caches"), truthPath: writableLocationTruthPath(info.casBaseRoot, info.environment),
     eligibility: { homeDir: roots.home, appStateRoot: info.casBaseRoot, configFenceRoots: () => preplanConfigFenceRoots({ env: input.sidecarEnv, home: roots.home, userDataPath: input.userDataPath, appStateRoot: info.casBaseRoot, codepuppyGlobalRoot: codepuppyGlobalRoot() }), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory() },
-  })
+  } satisfies Parameters<typeof planPackageManagerCaches>[0]
+  const prepareCaches = (goInstallBin: string | null) => planPackageManagerCaches({ ...locationInput, goInstallBin })
   const caches = prepareCaches(null)
   const originalEnv = { ...input.sidecarEnv }
-  const plan = planProcessFence(
+  const makePlan = (homebrewFence: Parameters<typeof planProcessFence>[0]["homebrewFence"], userWritableLocations: Parameters<typeof planProcessFence>[0]["userWritableLocations"]) => planProcessFence(
     {
+      userWritableLocations,
       userDataPath: input.userDataPath,
       packageManagerCaches: caches.rules,
       sidecarEnv: input.sidecarEnv,
       addon: { packaged: electronNs.app.isPackaged, resourcesPath: process.resourcesPath, moduleDir, exists: existsSync },
-      egressProxyPort: input.egressProxyPort,
+      egressProxyPort,
       carriedWorkspaces: input.carriedWorkspaces,
       engineConfigDirectory: input.engineConfigDirectory,
       ...(input.envFile ? { envFile: input.envFile } : {}),
       // DESIGN-stored-credentials-fence §4.5:C1 的存放点与 T1 / P / T2 的表同一份清单
-      homebrewFence: [], credentialStores: mainCredentialStores(input.userDataPath),
+      homebrewFence, credentialStores: mainCredentialStores(input.userDataPath),
     },
     {
       homeDir: () => roots.home,
@@ -418,6 +423,13 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
       log: (line) => getLogger()?.log(line),
     },
   )
+  // Discover from the existing fenced write set, before adding any global-bin permissions.
+  const initial = makePlan([], [])
+  const installations = readHomebrewInstallations(HOMEBREW_PREFIXES, processFenceWriteRules(initial.profile).allow)
+  const protectedInstallations = planProtectedLocations(homebrewFenceLocations(installations), undefined, { realpath: realpathSync.native }).configFence.filter((rule) => rule.kind !== "dat-files")
+  const userLocations = planUserWritableLocations(locationInput)
+  if (userLocations.excluded.length) getLogger()?.warn(`process fence: excluded fixed writable locations ${JSON.stringify(userLocations.excluded)}`)
+  const plan = makePlan(protectedInstallations, userLocations.rules)
   const cancellation = new AbortController()
   let target: Awaited<ReturnType<typeof queryGoInstallTarget>> = null
   let projected = caches

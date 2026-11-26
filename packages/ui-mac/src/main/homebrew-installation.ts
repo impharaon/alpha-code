@@ -5,6 +5,7 @@ import { processFenceRulesCover, type ConfigFenceRule, type ProcessFenceWriteRul
 type HomebrewNode = { path: string; realPath: string; dev: string; ino: string }
 export type HomebrewInstallation = {
   prefix: string
+  prefixIdentity: HomebrewNode
   launcher: HomebrewNode
   repository: HomebrewNode
   library: HomebrewNode
@@ -20,7 +21,7 @@ export function readHomebrewInstallations(prefixes: readonly string[], writable:
       const library = homebrewNode(join(repository.realPath, "Library", "Homebrew"))
       if (!statSync(library.realPath).isDirectory() || !statSync(join(library.realPath, "brew.sh")).isFile()) return []
       if ([repository, library, launcher].some((node) => processFenceRulesCover({ allow: [...writable], deny: [] }, node.realPath, "file"))) return []
-      return [{ prefix: resolve(prefix), launcher, repository, library }]
+      return [{ prefix: resolve(prefix), prefixIdentity: homebrewNode(prefix), launcher, repository, library }]
     } catch { return [] }
   })
 }
@@ -28,7 +29,7 @@ export function readHomebrewInstallations(prefixes: readonly string[], writable:
 export function homebrewFenceLocations(installations: readonly HomebrewInstallation[]): readonly Exclude<ConfigFenceRule, { kind: "dat-files" }>[] {
   return installations.flatMap((installation) => [
     { kind: "literal" as const, path: join(installation.prefix, "bin", "brew") },
-    ...[installation.launcher, installation.repository].flatMap((node) => [node.path, node.realPath].map((path) => ({ kind: "literal" as const, path }))),
+    ...[installation.prefixIdentity, installation.launcher, installation.repository].flatMap((node) => [node.path, node.realPath].map((path) => ({ kind: "literal" as const, path }))),
     ...[installation.library.path, installation.library.realPath].map((path) => ({ kind: "subpath" as const, path })),
   ])
 }

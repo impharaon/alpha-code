@@ -70,6 +70,10 @@ mock.module("./codepuppy-keychain-backend", () => ({
 // <tempdir>/codepuppy-secrets,无 ALPHA 密钥环境变量时 no-op,afterEach 清理)。全局 mock.module 会跨文件
 // 泄漏残缺导出面,撞坏 codepuppy-secret-files.test.ts 的 `import { secretFileRef, ... }`(2026-07-21 Linux CI 实锤)。
 
+// The host's two system prefixes are not test fixtures; keep all new preparation in isolated HOME.
+const fencePlanner = { ...await import("./process-fence-plan") }
+mock.module("./process-fence-plan", () => ({ ...fencePlanner, planUserWritableLocations: (input: Parameters<typeof fencePlanner.planUserWritableLocations>[0]) => fencePlanner.planUserWritableLocations({ ...input, eligibility: { ...input.eligibility, configFenceRoots: () => [...input.eligibility.configFenceRoots(), "/opt/homebrew", "/usr/local"] } }) }))
+
 const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./codepuppy-secret-files")
 const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")

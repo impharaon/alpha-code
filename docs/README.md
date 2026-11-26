@@ -387,6 +387,7 @@ status.
 | `SPEC-custom-provider-keychain` | [specs/custom-provider-keychain/spec.md](specs/custom-provider-keychain/spec.md) | 自定义模型密钥由系统安全存储保护，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-desktop-navigation` | [specs/desktop-navigation/spec.md](specs/desktop-navigation/spec.md) | 新对话、项目切换和搜索入口真正可用，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-document-authoring-guidance` | [specs/document-authoring-guidance/spec.md](specs/document-authoring-guidance/spec.md) | 文档任务使用完整的产出质量指导，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `DESIGN-document-output-quality` | [specs/document-output-quality/design.md](specs/document-output-quality/design.md) | 固定引入 Anthropic 技能并适配随包运行环境，以 LibreOffice、PDFium 和内置 Chromium 生成自检图；复用固定文件下载与云端识图，归并 Excel 操作，保留中文模板和离线成品。 | frozen |
 | `SPEC-draft-to-session` | [specs/draft-to-session/spec.md](specs/draft-to-session/spec.md) | 未发送草稿可在正式路由里转成对话，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `DESIGN-engine-config-fence` | [specs/engine-config-fence/design.md](specs/engine-config-fence/design.md) | INT-safety I-13:围栏末尾只拒写的 CF 块(Code Puppy 状态根、合成的引擎配置、登录 shell 环境快照、端点钉选、连接记录、界面设置存储、引擎全局配置目录、整个 ~/.opencode、工具策略文档)连同真实目标与上级目录节点;运行期放行认得 CF;删 W10/W19 两个 shell 出口;计划目录移到引擎数据目录、整个 ~/.opencode 受保护;原围栏内写者移到主进程;引擎库里已存批准、会话行放行规则与 wellknown 缓存文档不再生效 | approved |
 | `PLAN-error-message-lifetime` | [specs/error-message-lifetime/plan.md](specs/error-message-lifetime/plan.md) | alpha-code#1687 两段:弹出提示的去留与同因合并;未恢复问题入口与启动静默 | active |

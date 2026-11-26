@@ -73,8 +73,9 @@ export async function framesOf(source: Source, selection: FrameSelection, runtim
               "info",
               "-i",
               input,
-              "-vf",
-              `select='gt(scene,${selection.threshold})',showinfo`,
+              "-filter_complex",
+              `[0:v]split[scenes][timeline];[scenes]select='gt(scene,${selection.threshold})',showinfo,nullsink;[timeline]null[progress]`,
+              "-map", "[progress]",
               "-an",
               "-f",
               "null",
@@ -85,7 +86,7 @@ export async function framesOf(source: Source, selection: FrameSelection, runtim
             async chunk=>{
               progressBuffer+=chunk
               const lines=progressBuffer.split(/\r?\n/);progressBuffer=lines.pop() ?? ""
-              for(const line of lines){const time=/^out_time_us=(\d+)$/.exec(line);if(time)await runtime.progress({phase:"frames",completed:Math.min(info.durationMs,Math.max(0,Math.round(Number(time[1])/1000)-info.startMs)),total:info.durationMs,unit:"ms"})}
+              for(const line of lines){const count=/^frame=(\d+)$/.exec(line);if(count)await runtime.progress({phase:"frames",completed:Number(count[1]),unit:"items"})}
             },
           )
         : undefined

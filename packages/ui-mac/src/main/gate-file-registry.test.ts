@@ -766,6 +766,12 @@ describe("--from-reports:从测试报告判条数 (ADR-0014)", () => {
       const inScope = Array.from({ length: ROWS_N - 1 }, (_, i) => name(i + 1))
       writeFileSync(join(root, "selected-tests"), inScope.map((file) => `packages/pkg/${file}`).join("\n") + "\n")
 
+      for (const args of [
+        ["init", "-q"],
+        ["add", "scripts", "packages"],
+        ["-c", "user.name=Gate", "-c", "user.email=gate@example.invalid", "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fixture registry"],
+        ["update-ref", "refs/remotes/origin/alpha", "HEAD"],
+      ]) expect(Bun.spawnSync(["git", ...args], { cwd: root, env }).exitCode).toBe(0)
       const green = run(report(inScope))
       expect(green.code, green.out).toBe(0)
       expect(green.out).toContain(`本次范围外:packages/pkg/${name(ROWS_N)}(未被 affected-tests 选中)`)
@@ -787,12 +793,6 @@ describe("--from-reports:从测试报告判条数 (ADR-0014)", () => {
 
       // A registry-only count edit must be checked even when its scenario file is outside PR selection.
       writeFileSync(join(root, "packages", "pkg", name(4)), testBody(1))
-      for (const args of [
-        ["init", "-q"],
-        ["add", "scripts", "packages"],
-        ["-c", "user.name=Gate", "-c", "user.email=gate@example.invalid", "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fixture registry"],
-        ["update-ref", "refs/remotes/origin/alpha", "HEAD"],
-      ]) expect(Bun.spawnSync(["git", ...args], { cwd: root, env }).exitCode).toBe(0)
       const cleanReports = report(inScope)
       const manifest = join(root, "scripts", "gate-files.tsv")
       writeFileSync(manifest, `# probe registry\n${rows.map((row, i) => i === ROWS_N - 1 ? row.replace(/^1\t/, "2\t") : row).join("\n")}\n`)

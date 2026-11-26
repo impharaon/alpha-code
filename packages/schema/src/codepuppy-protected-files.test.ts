@@ -379,3 +379,12 @@ function sourceSelects(file: string, input: ProtectedFiles.ProtectedRoots): bool
     return !source.exclude.some(matches) && source.include.some(matches)
   })
 }
+
+test("protected root directories are not credential files", () => {
+  for (const sample of [roots, windows]) {
+    const api = sample.platform === "win32" ? path.win32 : path.posix
+    expect(ProtectedFiles.match({ path: api.join(sample.home, ".ssh"), roots: sample })).toBeUndefined()
+    expect(ProtectedFiles.match({ path: api.join(sample.home, ".ssh", "id_ed25519"), roots: sample })?.profile).toBe("private-key")
+  }
+  expect(ProtectedFiles.match({ path: path.join(roots.home, "Library", "Keychains"), roots })).toBeUndefined()
+})

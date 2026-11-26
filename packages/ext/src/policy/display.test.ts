@@ -64,7 +64,7 @@ test("error metadata updates retain the incoming engine constructor and cause", 
       authority: { kind: "not-asserted" },
     })
     if (kind === "write") attachWriteDenied(event, "/project")
-    if (kind === "network") attachNetFailure(event, {}, undefined)
+    if (kind === "network") attachNetFailure(event, {}, "")
     if (kind === "unattended") attachUnattendedDenial(event, {
       version: 1,
       reason: "readonly",

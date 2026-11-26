@@ -13,12 +13,12 @@
 // ── 父目录必须由未被围栏的一方预先建好(勘破 §6.3.1 第 3 条)────────────────────────
 // `(subpath "<X>/.local/share/opencode")` 放行的是该目录**之下**;`<X>/.local/share` 不存在时,
 // 被围栏的引擎 `mkdir -p` 会在父层 EPERM —— 而 packages/core/src/global.ts 在**模块装载时**就
-// mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5/W7 建好;W3 由 main 的 boot 序早已建好;
+// mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5 建好;W3 由 main 的 boot 序早已建好;
 // `~/code-puppy` 走 ensureUserWorkspaceDir(唯一的 lazy 供给点)。受保护配置集里的目录(状态根、环境根、引擎配置目录、连接记录、
 // 两个引擎全局配置目录 —— 后者就是原来的 W6 —— 与工具策略目录 CF-11)由 planConfigFence 预建:它们与每一级上级目录节点都被末尾的拒写块冻结,引擎与子进程在
 // 其中只能得到 EEXIST(SPEC-engine-config-fence I4)。
 // **刻意不建** `~/.opencode`:它整个是受保护配置位置 CF-9,任何进程都不建它(BR-07;W16 已删,计划目录在引擎数据目录下,
-// 这里本来就预建数据目录,`plan` 由写文件工具懒建);W17/W18(dev-only)也不建。
+// 这里本来就预建数据目录,`plan` 由写文件工具懒建)。
 
 import { lstatSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
@@ -176,6 +176,7 @@ export type ProcessFencePlan = {
 }
 
 export type PlanProcessFenceInput = {
+  packageManagerCaches?: readonly ProcessFenceWriteRule[]
   userDataPath: string
   /** createSidecarEnv() 的输出 —— XDG_* / HOME 从**这一份**取,它才是引擎将看到的 env。 */
   sidecarEnv: Record<string, string | undefined>
@@ -364,7 +365,6 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   for (const dir of [
     join(roots.dataHome, "opencode"),
     join(roots.cacheHome, "opencode"),
-    join(home, ".npm"),
     ...(stateHome === input.userDataPath ? [] : [join(stateHome, "opencode")]),
   ]) {
     deps.mkdirp(dir)
@@ -404,7 +404,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   // DESIGN-stored-credentials-fence §4.5:存放点落到真实路径(userData 的真实路径求不出 ⇒ 抛 ⇒ 拒 fork)
   const credentialRules = planCredentialStores(input.credentialStores, deps)
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
+    { workspaces: union.selected, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)

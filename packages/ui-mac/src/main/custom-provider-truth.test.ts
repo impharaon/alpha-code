@@ -80,7 +80,7 @@ const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<Proces
   })
 
 /** 可写集的固定行(`#1383` 基线 §1.1「18 条静态行」;W10/W19 后由 D15 删掉,W2/W6 由 SPEC-engine-config-fence D2 删掉,W16 由同一规格 D13 删掉),手写 —— 将来加一行,这里先红,再回答「它罩不罩得到真源」。 */
-const FIXED_ROW_IDS = ["W3", "W4", "W5", "W7", "W8", "W11", "W12", "W13", "W14", "W15", "W17", "W18"]
+const FIXED_ROW_IDS = ["W3", "W4", "W5", "W8", "W11", "W12", "W13", "W14", "W15"]
 
 describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可写集任何固定行之下", () => {
   test("路径 = <casBaseRoot>/custom-providers/<env>.json;与三个 env 根、cas/、fence-workspaces/ 同级(相对每个都以 .. 开头)", () => {
@@ -95,10 +95,10 @@ describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可�
     }
   })
 
-  test("固定行的枚举是完备的:WRITABLE_ROOT_IDS 去掉 W1 与 X1 = 手写的 12 个 id(+W3 的 XDG_STATE_HOME 形态仍是 W3)= 渲染出的 profile 里的 id 集合", () => {
+  test("固定行的枚举是完备的:WRITABLE_ROOT_IDS 去掉 W1、X1 与按 R7 输入的 W20 = 手写的 9 个 id(+W3 的 XDG_STATE_HOME 形态仍是 W3)= 渲染出的 profile 里的 id 集合", () => {
     // W1 (start-time union) and X1 (runtime grant class, its own extension line outside the block) are runtime
     // membership, not fixed rows; X1 is registered so the write-site registry can name the probe's root W1+X1.
-    expect(Object.keys(WRITABLE_ROOT_IDS).filter((id) => id !== "W1" && id !== "X1").sort()).toEqual([...FIXED_ROW_IDS].sort())
+    expect(Object.keys(WRITABLE_ROOT_IDS).filter((id) => id !== "W1" && id !== "X1" && id !== "W20").sort()).toEqual([...FIXED_ROW_IDS].sort())
     for (const stateHome of [USER_DATA, `${HOME}/.local/state`]) {
       const ids = [...new Set(fileWriteRules(profileFor(DEFAULT_STATE_ROOT, "prod", { stateHome })).map((r) => r.id))]
       expect(ids.filter((id) => id !== "W1").sort(), `stateHome=${stateHome}`).toEqual([...FIXED_ROW_IDS].sort())
@@ -114,7 +114,7 @@ describe("真源位置(I2):<casBaseRoot>/custom-providers/<env>.json 不在可�
       for (const stateHome of [USER_DATA, `${HOME}/.local/state`]) {
         const rules = fileWriteRules(profileFor(stateRoot, env, { stateHome })).filter((r) => r.id !== "W1")
         // 至少要真的看过 17 条规则以上,否则「没覆盖」是空集上的真
-        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBeGreaterThanOrEqual(15)
+        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBe(stateHome === USER_DATA ? 13 : 14)
         const truth = customProviderTruthPath(stateRoot, env)
         const dir = join(stateRoot, "custom-providers")
         expect(rules.filter((r) => covers(r, truth)).map(describeRule), `truth file ${truth}`).toEqual([])

@@ -262,15 +262,12 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       `(subpath "${HOME}/Library/Application Support/ai.opencode.desktop")`,
       `(subpath "${HOME}/.local/share/opencode")`,
       `(subpath "${HOME}/.cache/opencode")`,
-      `(subpath "${HOME}/.npm")`,
       `(regex #"^/Users/alpha/\\.zsh_history")`,
       `(subpath "/private/tmp")`,
       `(subpath "/private/var/folders")`,
       `(literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")`,
       `(literal "/dev/tty") (regex #"^/dev/fd/")`,
       `(literal "/dev/ptmx") (regex #"^/dev/ttys")`,
-      `(subpath "${HOME}/Library/Caches/bun")`,
-      `(subpath "${HOME}/.cache/bun")`,
       ")",
       '(allow file-write* (extension "app.codepuppy.workspace-write"))',
       '(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "app.codepuppy.workspace-write"))',
@@ -359,14 +356,14 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
 
   test("每一行都带 §8.2 的 id 注释,且 id 集合 = WRITABLE_ROOT_IDS 的键(登记簿只能点名存在的行)", () => {
     const ids = new Set(
-      renderProcessFenceProfile(base)
+      renderProcessFenceProfile({ ...base, packageManagerCaches: [{ kind: "literal", value: `${HOME}/.cargo/.package-cache` }] })
         .split("\n")
         // X2 is a deny rule, not a writable root.
         .map((l) => /;\s*(W\d+|X1)\b/.exec(l)?.[1])
         .filter((x): x is string => !!x),
     )
     expect([...ids].sort()).toEqual(Object.keys(WRITABLE_ROOT_IDS).sort())
-    expect(Object.keys(WRITABLE_ROOT_IDS).sort()).toEqual(["W1", "W11", "W12", "W13", "W14", "W15", "W17", "W18", "W3", "W4", "W5", "W7", "W8", "X1"])
+    expect(Object.keys(WRITABLE_ROOT_IDS).sort()).toEqual(["W1", "W11", "W12", "W13", "W14", "W15", "W20", "W3", "W4", "W5", "W8", "X1"])
   })
 
   test("XDG 根跟着 env 走:用户导出 XDG_DATA_HOME 时 W4 指向它,不再是 ~/.local/share", () => {
@@ -406,7 +403,6 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
     { kind: "subpath", value: "/Users/alpha/Library/Application Support/ai.opencode.desktop" },
     { kind: "subpath", value: "/Users/alpha/.local/share/opencode" },
     { kind: "subpath", value: "/Users/alpha/.cache/opencode" },
-    { kind: "subpath", value: "/Users/alpha/.npm" },
     { kind: "regex", value: "^/Users/alpha/\\.zsh_history" },
     { kind: "subpath", value: "/private/tmp" },
     { kind: "subpath", value: "/private/var/folders" },
@@ -417,8 +413,6 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
     { kind: "regex", value: "^/dev/fd/" },
     { kind: "literal", value: "/dev/ptmx" },
     { kind: "regex", value: "^/dev/ttys" },
-    { kind: "subpath", value: "/Users/alpha/Library/Caches/bun" },
-    { kind: "subpath", value: "/Users/alpha/.cache/bun" },
   ]
 
   test("E9 往返:生产渲染(含受保护集)→ 解析 ⇒ allow 逐条还原写块(W13 一行三条、W14/W15 literal + regex),deny 与渲染输入(规则 + 上级目录)逐条相等;X1 扩展行不算规则", () => {

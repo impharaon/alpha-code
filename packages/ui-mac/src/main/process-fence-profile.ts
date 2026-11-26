@@ -9,7 +9,7 @@
 // 两者差两条,其中 zsh 存历史走 `.zsh_history.new` 再改名 —— 照 §7.6 原文立闸,用户每开一次终端
 // 看一条 `failed to write history file`。逐行消融结论(§8.2 表):W2/W3/W4/W5/W6/W15 去掉引擎/注入/
 // 终端直接死,W7 去掉 **静默**(provider 装不上而 health 仍 200),W8 去掉每开终端一条报错;
-// W11–W14 / W17–W18 本轮**未证伪 ≠ 可删**,删减各自要实测(基线 I1)。本文件不做那个判定。W16(`~/.opencode`)已删:计划目录移到引擎数据目录,
+// W11–W14 的删减各自要实测(基线 I1)。#1759 将缓存迁到 W3 下的 package-managers,撤 W7/W17/W18。W16(`~/.opencode`)已删:计划目录移到引擎数据目录,
 // 围栏里再没有写者要它,它整个是受保护配置位置 CF-9(DESIGN-engine-config-fence D13)。
 //
 // ── 与 REQ-138 那层的关系:替换,不叠加 ─────────────────────────────────────────────
@@ -56,18 +56,16 @@ export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
  */
 export const WRITABLE_ROOT_IDS = {
   W1: "工作区(启动时并集,每个工作区一条 subpath)",
-  W3: "<userDataPath>(opencode/locks/**、engine-scratch-cwd、uv-cache …;其中的受保护配置位置由 profile 末尾的拒写块拿回)",
+  W3: "<userDataPath>(opencode/locks/**、engine-scratch-cwd、package-managers …;其中的受保护配置位置由 profile 末尾的拒写块拿回)",
   W4: "<XDG_DATA_HOME>/opencode:上游引擎 log / *.db / -wal / -shm / repos / plan(其中的工具策略目录由 profile 末尾的拒写块拿回,CF-11)",
   W5: "<XDG_CACHE_HOME>/opencode:bin / models.json / packages",
-  W7: "<HOME>/.npm:@npmcli/arborist 的 cacache,不随 XDG",
   W8: "<HOME>/.zsh_history*(regex):登录 shell 存历史含 .zsh_history.new(§8.5 坑一)",
   W11: "/private/tmp",
   W12: "/private/var/folders($TMPDIR)",
   W13: "/dev/null /dev/stdout /dev/stderr",
   W14: "/dev/tty ^/dev/fd/",
   W15: "/dev/ptmx ^/dev/ttys:PTY 靠它(§6.4)",
-  W17: "<HOME>/Library/Caches/bun(dev-only)",
-  W18: "<HOME>/.cache/bun(dev-only)",
+  W20: "R1/R7 绑定的包管理器缓存;Cargo 原生 Home 的精确缓存/锁/数据库",
   X1: "用户本次应用运行亲手打开的项目(主进程绑定当前引擎签发的私有类扩展)",
 } as const
 export type WritableRootId = keyof typeof WRITABLE_ROOT_IDS
@@ -159,6 +157,7 @@ export function configFenceLocations(input: {
 export type ProcessFenceProfileInput = {
   /** W1:启动时并集,顺序即优先级(裁剪从尾部丢)。 */
   workspaces: readonly string[]
+  packageManagerCaches?: readonly ProcessFenceWriteRule[]
   /** 当前环境根:W2 删掉之后不再渲染进放行块,它作为 CF-1 的一条由计划器放进 configFence(冻结设计「既有字段不变」)。 */
   codepuppyGlobalRoot: string
   userDataPath: string
@@ -348,19 +347,17 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     "(deny file-write*)",
     "(allow file-write*",
     ...ws.map((w) => `  (subpath "${w}")                                  ; W1`),
+    ...(input.packageManagerCaches ?? []).map((rule) => `  (${rule.kind} ${rule.kind === "regex" ? "#" : ""}"${assertSeatbeltSafePath(rule.value, "package manager cache")}") ; W20`),
     `  (subpath "${userDataPath}")                             ; W3`,
     ...(stateHome === userDataPath ? [] : [`  (subpath "${join(stateHome, "opencode")}")               ; W3 (XDG_STATE_HOME)`]),
     `  (subpath "${join(dataHome, "opencode")}")               ; W4`,
     `  (subpath "${join(cacheHome, "opencode")}")               ; W5`,
-    `  (subpath "${join(home, ".npm")}")                                ; W7`,
     `  (regex #"^${homeRe}/\\.zsh_history")                       ; W8`,
     `  (subpath "/private/tmp")                               ; W11`,
     `  (subpath "/private/var/folders")                       ; W12`,
     `  (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")   ; W13`,
     `  (literal "/dev/tty") (regex #"^/dev/fd/")              ; W14`,
     `  (literal "/dev/ptmx") (regex #"^/dev/ttys")            ; W15`,
-    `  (subpath "${join(home, "Library", "Caches", "bun")}")                  ; W17`,
-    `  (subpath "${join(home, ".cache", "bun")}")                       ; W18`,
     ")",
     `(allow file-write* (extension "${WORKSPACE_WRITE_EXTENSION_CLASS}"))                       ; X1 用户本次运行亲手打开的项目`,
     `(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "${WORKSPACE_WRITE_EXTENSION_CLASS}")) ; X2 围栏内五种方式都签不出本类`,

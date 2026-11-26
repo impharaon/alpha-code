@@ -23,6 +23,7 @@ import { buildEngineServerOptions } from "./engine-server-options"
 import { withEngineAuthorization } from "./engine-authorization"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
 import { acceptCodePuppyBootstrap, assertEngineReadsBootstrap } from "./sidecar-bootstrap-gate"
+import { parsePackageManagerEnvironment } from "../shared/package-manager-environment"
 // `#1713` 契约 C:引擎配置闸门问「这个项目文件夹用户允许过没有」,读法是 #1709 的同一个。
 import { answerProjectConfigView } from "./sidecar-project-config-view"
 import { parseProjectConfigViewRequest, type ProjectConfigViewRequest, type ProjectConfigViewReply } from "./project-config-view-message"
@@ -103,6 +104,7 @@ type StartCommand = {
    * 坏了走与「darwin 缺围栏」同一条响亮失败路。
    */
   bootstrap: unknown
+  packageManagerEnvironment: unknown
   /**
    * DESIGN-stored-credentials-fence §4.2 T1:Code Puppy 凭据存放点的整表(`{}` 合法)。只在内存里;`start()` 在注入与 import 引擎之前解析并发布,
    * 坏了走与「darwin 缺围栏」同一条响亮失败路。
@@ -182,6 +184,7 @@ async function start(command: StartCommand) {
     installCodePuppyCredentialSource(() => credentials.pull())
     // `#1698`(§4.2 第 2 步):解析并发布启动文档 —— 之后本进程里的注入、ext 与引擎只从它读 main 的决定。
     const bootstrap = acceptCodePuppyBootstrap(command.bootstrap)
+    const packageManagerEnvironment = parsePackageManagerEnvironment(command.packageManagerEnvironment)
     // #613:注入结果必须捕获并随 ready 上报 —— 注入失败 = 引擎起来了但整份 alpha 配置丢失
     // (模型全灰),不上报则 main/renderer 无从与「引擎未就绪」区分。`#1667`:注入不再经环境变量交给引擎
     // (H1 下引擎核心不读 `OPENCODE_CONFIG_CONTENT` 一类变量),结果里带着要放进 `start()` 选项的配置。
@@ -227,6 +230,7 @@ async function start(command: StartCommand) {
         platform: process.platform,
       }),
       {
+        packageManagerEnvironment,
         onDispatch: (dispatch) => {
           inProcess = withEngineAuthorization(dispatch, command.password)
           publishInProcessEngine(inProcess)
@@ -351,6 +355,7 @@ function parseCommand(value: unknown): SidecarCommand | undefined {
     port: command.port,
     password: command.password,
     ...(fence ? { fence } : {}),
+    packageManagerEnvironment: command.packageManagerEnvironment,
     bootstrap: command.bootstrap,
     credentials: command.credentials,
   }

@@ -51,7 +51,7 @@ const engine = await startEngine(
     filewatcher: false,
     platform: process.platform,
   }),
-  { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, input.password)), projectTrust: engineProjectTrust },
+  { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, input.password)), packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
 )
 await assertExtPluginActive(fetch!, bootstrap.paths.initialDirectory, bootstrap.paths.extPlugin)
 console.log(`LISTENING ${engine.url} node=${process.versions.node} electron=${process.versions.electron}`)

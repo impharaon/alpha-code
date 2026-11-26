@@ -11,7 +11,7 @@ import { join, resolve } from "node:path"
 import { planConfigFence, planPackageManagerCaches, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
 import { writableLocationTruthPath } from "./process-fence-workspaces"
 import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
-import { processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
+import { renderProcessFenceProfile, processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
 import { credentialStores } from "./codepuppy-secret-files"
 
@@ -198,6 +198,33 @@ describe("package manager cache planning", () => {
       expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
     })
   })
+  test.skipIf(process.platform !== "darwin")("package manager cache rules deny old HOME caches and preserve CF/C1", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const caches = planPackageManagerCaches(input)
+      const project = join(disk.root, "project")
+      mkdirSync(project)
+      const protectedFile = join(caches.env.GOCACHE!, "protected")
+      const credentialFile = join(caches.env.UV_CACHE_DIR!, "credential")
+      for (const file of [protectedFile, credentialFile]) writeFileSync(file, "own-before")
+      const profile = renderProcessFenceProfile({ workspaces: [project], packageManagerCaches: caches.rules,
+        roots: { home: disk.home, configHome: input.configHome, dataHome: join(disk.home, ".local/share"), cacheHome: join(disk.home, ".cache") },
+        userDataPath: input.userDataPath, stateHome: input.userDataPath, codepuppyGlobalRoot: disk.state, egressProxyPort: 4443,
+        configFence: [{ kind: "literal", path: protectedFile }], credentialStores: [{ kind: "literal", path: credentialFile }],
+      })
+      const attempt = (file: string) => spawnSync(SANDBOX_EXEC, ["-p", profile, "/bin/sh", "-c", 'printf changed > "$1"', "probe", file], { encoding: "utf8" })
+      for (const file of [join(caches.env.GOCACHE!, "positive"), join(disk.home, ".cargo/registry/positive"), join(disk.home, ".cargo/.package-cache"), join(project, "positive")]) expect(attempt(file).status).toBe(0)
+      for (const dir of [".npm", ".cache/bun", "Library/Caches/bun", ".cargo/bin"]) {
+        const parent = join(disk.home, dir)
+        mkdirSync(parent, { recursive: true })
+        expect(attempt(join(parent, "negative")).status, dir).not.toBe(0)
+        expect(existsSync(join(parent, "negative"))).toBe(false)
+      }
+      for (const file of [protectedFile, credentialFile]) expect(attempt(file).status).not.toBe(0)
+      expect(readFileSync(protectedFile, "utf8")).toBe("own-before")
+    })
+  })
   test("Cargo preserves original files, binds external cache links and rejects reserved targets", () => {
     withLocationDisk((disk) => {
       const input = inputFor(disk)
@@ -338,7 +365,7 @@ describeDarwin("planProcessFence", () => {
     expect(h.logs.some((l) => /credentialStores=8 rules/.test(l))).toBe(true)
   })
 
-  test("正向:并集 = 默认 → recent → tab 栏;父目录 W4/W5/W7 与受保护目录预建;addonPath 解析到 extraResources;日志一行账", () => {
+  test("正向:并集 = 默认 → recent → tab 栏;父目录 W4/W5 与受保护目录预建;addonPath 解析到 extraResources;日志一行账", () => {
     const h = harness()
     const plan = planProcessFence(h.input, h.deps)
     expect(plan.workspaces).toEqual([`${HOME}/code-puppy`, `${HOME}/proj-b`, `${HOME}/proj-a`])
@@ -348,7 +375,7 @@ describeDarwin("planProcessFence", () => {
     expect(plan.profileBytes).toBe(Buffer.byteLength(plan.profile))
     // SPEC-engine-config-fence I4:围栏冻结的每个目录节点在 fork 前已存在(引擎 Global 的 mkdir 只会得到 EEXIST);~/.opencode 谁都不建
     expect(h.made).toEqual([
-      `${HOME}/.local/share/opencode`, `${HOME}/.cache/opencode`, `${HOME}/.npm`,
+      `${HOME}/.local/share/opencode`, `${HOME}/.cache/opencode`,
       STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`,
       // CF-11(片 ③):工具策略目录,像其它目录位置一样预建
       `${HOME}/.local/share/opencode/codepuppy-tool-policy`,

@@ -55,6 +55,7 @@ async function start(name: string, content = "{}") {
     onDispatch: (dispatch) => {
       published = withEngineAuthorization(dispatch, PASSWORD)
     },
+    packageManagerEnvironment: {},
     projectTrust: engineProjectTrust,
   })
   engines.push(engine)

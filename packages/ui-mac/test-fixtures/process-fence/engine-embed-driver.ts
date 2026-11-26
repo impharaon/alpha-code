@@ -48,7 +48,7 @@ const engine = await startEngine(
     filewatcher: false,
     platform: process.platform,
   }),
-  { onDispatch: (dispatch) => void (mode === "in-process" && publishInProcessEngine(withEngineAuthorization(dispatch, password))), projectTrust: engineProjectTrust },
+  { onDispatch: (dispatch) => void (mode === "in-process" && publishInProcessEngine(withEngineAuthorization(dispatch, password))), packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
 )
 if (mode === "tcp")
   publishInProcessEngine(async (request) => {

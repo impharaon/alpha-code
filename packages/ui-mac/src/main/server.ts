@@ -307,7 +307,7 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
  * The plan's own W1 list (the authority that rendered the profile) travels with it; required when fenceRun is set.
  * `configFenceRoots`: the protected configuration directories that same plan rendered (eligibility reads them, below).
  */
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[] }
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; cacheEnv?: Readonly<Record<string, string>> }
 
 type ProductionFenceInput = {
   userDataPath: string
@@ -351,13 +351,23 @@ export function preplanConfigFenceRoots(input: { env: Record<string, string | un
 }
 
 /** 生产计划器:把 electron / store / fs 接进 electron-free 的 planProcessFence。 */
-function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | undefined {
+function planProductionFence(input: ProductionFenceInput): (ProcessFencePlan & { cacheEnv: Readonly<Record<string, string>> }) | undefined {
   if (process.platform !== "darwin") return undefined
   if (input.egressProxyPort === undefined) throw new Error("process fence plan: no egress proxy port on darwin — the fence's only outbound door is unknown, refusing to plan")
   const moduleDir = dirname(fileURLToPath(import.meta.url))
-  return planProcessFence(
+  const info = tryGetCodePuppyEnvironment()
+  if (!info) throw new Error("package manager cache: application environment not initialized")
+  const exported = usableExportedPaths({ env: input.sidecarEnv, home: homedir(), log: (line) => getLogger()?.warn(line) })
+  const roots = resolveEngineRoots(exported.env, exported.home)
+  const caches = planPackageManagerCaches({ platform: "darwin", home: roots.home, userDataPath: input.userDataPath, configHome: roots.configHome,
+    appData: electronNs.app.getPath("appData"), localAppData: join(roots.home, "Library", "Caches"), truthPath: writableLocationTruthPath(info.casBaseRoot, info.environment),
+    eligibility: { homeDir: roots.home, appStateRoot: info.casBaseRoot, configFenceRoots: () => preplanConfigFenceRoots({ env: input.sidecarEnv, home: roots.home, userDataPath: input.userDataPath, appStateRoot: info.casBaseRoot, codepuppyGlobalRoot: codepuppyGlobalRoot() }), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory() },
+  })
+  Object.assign(input.sidecarEnv, caches.env)
+  const plan = planProcessFence(
     {
       userDataPath: input.userDataPath,
+      packageManagerCaches: caches.rules,
       sidecarEnv: input.sidecarEnv,
       addon: { packaged: electronNs.app.isPackaged, resourcesPath: process.resourcesPath, moduleDir, exists: existsSync },
       egressProxyPort: input.egressProxyPort,
@@ -368,7 +378,7 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
       credentialStores: mainCredentialStores(input.userDataPath),
     },
     {
-      homeDir: homedir,
+      homeDir: () => roots.home,
       codepuppyGlobalRoot,
       // `#1390`:应用状态根 = 冻结环境快照的 casBaseRoot(index.ts 在任何根消费方之前 initCodePuppyEnvironment,失败即 app.exit)。
       // 没有快照就没有可信的状态根 ⇒ 不做计划(fail-closed,与别的计划失败同一条「拒 fork」路),不拿 CODEPUPPY_GLOBAL_DIR 反推。
@@ -401,6 +411,7 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
       log: (line) => getLogger()?.log(line),
     },
   )
+  return { ...plan, cacheEnv: caches.cacheEnv }
 }
 
 export function getDefaultServerUrl(): string | null {
@@ -447,15 +458,8 @@ export async function prepareShellProbeFence(): Promise<ShellProbeFenceContext> 
   // A probe may not take the engine planner's missing-truth fallback.
   readWorkspaceTruthOrThrow(fenceWorkspaceTruthPath(info.casBaseRoot, info.environment), { readFileSync })
   const snapshot = resolveShellProbeRoots({ env: { ...process.env }, home: homedir(), userDataPath })
-  const caches = planPackageManagerCaches({
-    platform: process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux",
-    home: snapshot.roots.home, userDataPath, configHome: snapshot.roots.configHome,
-    appData: electronNs.app.getPath("appData"), localAppData: process.platform === "darwin" ? join(snapshot.roots.home, "Library", "Caches") : snapshot.roots.cacheHome,
-    truthPath: writableLocationTruthPath(info.casBaseRoot, info.environment),
-    eligibility: { homeDir: snapshot.roots.home, appStateRoot: info.casBaseRoot, configFenceRoots: () => preplanConfigFenceRoots({ env: snapshot.env, home: snapshot.roots.home, userDataPath, appStateRoot: info.casBaseRoot, codepuppyGlobalRoot: codepuppyGlobalRoot() }), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory() },
-  })
   const port = process.platform === "darwin" ? (await ensureEgressPolicyProxy()).port : undefined
-  const env = { ...snapshot.env, ...caches.env, ...(port === undefined ? {} : sidecarEgressProxyEnv(port)) }
+  const env = { ...snapshot.env, ...(port === undefined ? {} : sidecarEgressProxyEnv(port)) }
   const fence = planProductionFence({ userDataPath, sidecarEnv: env, egressProxyPort: port, carriedWorkspaces: [], engineConfigDirectory: snapshot.roots.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
   return { ...snapshot, env, profile: fence?.profile ?? "" }
 }
@@ -594,8 +598,6 @@ export async function spawnLocalServer(
   // 与上面 codepuppy-secrets sync 失败同一条 fail-closed 路径)。env 先算好:计划要读的 XDG_* / HOME
   // 必须是 sidecar 将拿到的那一份,不是 main 自己的 process.env。
   const sidecarEnv = createSidecarEnv()
-  // uv's default ~/.cache/uv is outside the fence; keep Office dependencies under the existing W3 root.
-  sidecarEnv.UV_CACHE_DIR = join(options.userDataPath, "uv-cache")
   // DESIGN-domestic-cloud-connectivity §4.8:随包 ripgrep 的目录追加在 PATH 末尾 —— 用户自己装的 rg 照旧优先;没有时引擎的 which
   // 找到随包这一份,不再从 GitHub 下载。它因此也在用户 shell 命令与 MCP 子进程的 PATH 末尾(只在用户没有 rg 时被用到)。
   sidecarEnv.PATH = [sidecarEnv.PATH, join(resourcesRoot(), "ripgrep")].filter(Boolean).join(delimiter)
@@ -927,6 +929,7 @@ export async function spawnLocalServer(
       port,
       password,
       bootstrap,
+      packageManagerEnvironment: fence?.cacheEnv ?? {},
       credentials,
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。
       ...(fence ? { fence: { profile: fence.profile, addonPath: fence.addonPath } } : {}),

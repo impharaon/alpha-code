@@ -304,7 +304,7 @@ export function codepuppyEngine(options: HostOptions) {
         filewatcher: options.filewatcher ?? false,
         platform: process.platform,
       }),
-      { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), projectTrust: options.projectTrust ?? engineProjectTrust },
+      { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), packageManagerEnvironment: {}, projectTrust: options.projectTrust ?? engineProjectTrust },
     )
     const send = async (method: string, route: string, body?: unknown) => {
       const response = await fetch!(

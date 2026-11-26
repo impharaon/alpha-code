@@ -29,6 +29,10 @@ export const ENGINE_BUNDLE = "engine.mjs"
 const entry = path.join(uiMac, "engine", "engine-embed.ts")
 const v1Migration = path.resolve(uiMac, "..", "core", "src", "database", "v1-migration.bun.ts")
 const bunSqliteShim = path.join(uiMac, "engine", "bun-sqlite-shim.ts")
+const packageManagerAdapters = [
+  { specifier: "@opencode/util/cross-spawn-spawner", original: path.resolve(uiMac, "../util/src/cross-spawn-spawner.ts"), adapter: path.join(uiMac, "engine/package-manager-spawner.ts") },
+  { specifier: "@opencode/util/npm-config", original: path.resolve(uiMac, "../util/src/npm-config.ts"), adapter: path.join(uiMac, "engine/package-manager-npm-config.ts") },
+]
 
 const target = nodeTarget(process.platform, process.arch)
 const assets = await collectNodeAssets(target)
@@ -54,7 +58,13 @@ config.plugins = [
   {
     name: "codepuppy:v1-migration-on-node",
     enforce: "pre" as const,
-    resolveId(id: string) {
+    resolveId(id: string, importer?: string) {
+      if (id === "#pty") return path.join(uiMac, "engine/package-manager-pty.ts")
+      for (const entry of packageManagerAdapters) {
+        if (importer && [entry.original, entry.adapter].includes(path.resolve(importer))) continue
+        const relative = importer && id.startsWith(".") ? path.resolve(path.dirname(importer), id).replace(/\.(?:js|ts)$/, "") : undefined
+        if (id === entry.specifier || relative === entry.original.slice(0, -3)) return entry.adapter
+      }
       if (id === "#v1-migration") return v1Migration
       if (id === "bun:sqlite") return bunSqliteShim
     },

@@ -349,9 +349,9 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
     expect(String(bare!.configShell ?? "")).not.toContain(join(globalRoot, "bin"))
   })
 
-  test("计划器在真 sandbox-exec 上一次编过;围栏下引擎的 provider 缓存根(W4/W5/W6/W7)都被预建", () => {
+  test("计划器在真 sandbox-exec 上一次编过;围栏下引擎的 provider 缓存根(W4/W5 及引擎配置目录)都被预建", () => {
     expect(planLog.some((l) => /process fence planned: workspaces=1 .*compile attempts=1/.test(l))).toBe(true)
-    for (const d of [join(home, ".local", "share", "opencode"), join(home, ".cache", "opencode"), join(home, ".config", "opencode"), join(home, ".npm")])
+    for (const d of [join(home, ".local", "share", "opencode"), join(home, ".cache", "opencode"), join(home, ".config", "opencode")])
       expect(existsSync(d), d).toBe(true)
   })
 

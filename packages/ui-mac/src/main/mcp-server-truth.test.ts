@@ -109,7 +109,7 @@ describe("真源位置(I2):<casBaseRoot>/mcp-servers/<env>.json 不在可写集�
     ] as const) {
       for (const stateHome of [USER_DATA, `${HOME}/.local/state`]) {
         const rules = fileWriteRules(profileFor(stateRoot, env, { stateHome })).filter((r) => r.id !== "W1")
-        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBeGreaterThanOrEqual(15)
+        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBe(stateHome === USER_DATA ? 13 : 14)
         const truth = mcpServerTruthPath(stateRoot, env)
         const dir = join(stateRoot, "mcp-servers")
         expect(rules.filter((r) => covers(r, truth)).map(describeRule), `truth file ${truth}`).toEqual([])

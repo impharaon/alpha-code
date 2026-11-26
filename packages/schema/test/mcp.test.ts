@@ -35,3 +35,12 @@ describe("Mcp resources", () => {
     })
   })
 })
+
+
+test("remote MCP transport preserves explicit HTTP or SSE and leaves the default absent", () => {
+  for (const transport of [undefined, "http", "sse"]) {
+    const source = { type: "remote", url: "https://example.invalid/mcp", ...(transport ? { transport } : {}) }
+    expect(Schema.encodeSync(Mcp.RemoteConfig)(Schema.decodeUnknownSync(Mcp.RemoteConfig)(source))).toEqual(source)
+  }
+  expect(() => Schema.decodeUnknownSync(Mcp.RemoteConfig)({ type: "remote", url: "https://example.invalid/mcp", transport: "auto" })).toThrow()
+})

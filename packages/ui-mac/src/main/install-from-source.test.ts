@@ -854,3 +854,18 @@ test("connector version selection preserves the source argv when pinned or clear
     expect(bound).toMatchObject({ type: "local", command: ["npx", "-y", version ? "xcodebuildmcp@2.0.0" : "xcodebuildmcp@latest", "mcp"] })
   }
 }))
+
+
+test("remote plugin declarations retain explicit transport in their installed MCP projection", async () => {
+  const { pluginMcpConfig } = await import("../shared/plugin-mcp-config")
+  const { validMcpConfigLeaf } = await import("../shared/plugin-install")
+  const converted = await convertPluginTree(await captureStandardFixture("claude:cloudinary"))
+  for (const entry of converted.package.entries) {
+    if (entry.kind !== "mcp" || entry.transport === "stdio") continue
+    for (const transport of ["http", "sse"] as const) {
+      const leaf = pluginMcpConfig({ ...entry, transport })
+      expect(leaf).toMatchObject({ type: "remote", transport })
+      expect(validMcpConfigLeaf(leaf)).toBe(true)
+    }
+  }
+})

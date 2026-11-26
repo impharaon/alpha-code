@@ -290,3 +290,12 @@ test("phase MCP timeouts override the shared timeout without losing cwd or OAuth
   expect(projectServerConfig({ type: "local", command: ["program with spaces", "-p", "literal argument"], cwd: "/workspace", timeout: 9000, timeouts: { startupMs: 30000, executionMs: 120000 } })).toEqual({ type: "local", command: ["program with spaces", "-p", "literal argument"], cwd: "/workspace", timeout: { startup: 30000, catalog: 9000, execution: 120000 } })
   expect(projectServerConfig({ type: "remote", url: "https://mcp.example/mcp", oauth: { clientId: "client" }, timeouts: { catalogMs: 20000 } })).toEqual({ type: "remote", url: "https://mcp.example/mcp", oauth: { client_id: "client" }, timeout: { catalog: 20000 } })
 })
+
+
+test("remote MCP projection preserves explicit transport without inventing a default", () => {
+  for (const transport of [undefined, "http", "sse"]) {
+    const source = { type: "remote", url: "https://example.invalid/mcp", ...(transport ? { transport } : {}) }
+    expect(projectServerConfig(source)).toEqual(source)
+    expect(toServerConfig(source)).toEqual(source)
+  }
+})

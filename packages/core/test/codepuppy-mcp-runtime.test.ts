@@ -735,3 +735,18 @@ testEffect(Layer.empty).live("plugin local MCP uses its private proxy for HTTP s
   expect(requests.length).toBeGreaterThan(0)
   expect(requests.every(request => (request as { proxy?: { headers: Record<string, string>; respectNoProxy: boolean } }).proxy?.headers["Proxy-Authorization"] === binding.proxyAuthorization && (request as { proxy: { respectNoProxy: boolean } }).proxy.respectNoProxy === false)).toBe(true)
 }))
+
+
+testEffect(Layer.empty).live("explicit SSE opens the declared GET URL and never probes HTTP codemode", () => Effect.gen(function* () {
+  const { Schema } = yield* Effect.promise(() => import("effect"))
+  const seen: Array<{ method: string; path: string; authorization: string | null }> = []
+  const endpoint = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch(request) {
+    seen.push({ method: request.method, path: new URL(request.url).pathname + new URL(request.url).search, authorization: request.headers.get("authorization") })
+    return new Response(null, { status: 403 })
+  } })
+  yield* Effect.addFinalizer(() => Effect.promise(() => endpoint.stop(true)))
+  const config = Schema.decodeUnknownSync(ConfigMCP.Remote)({ type: "remote", url: `http://127.0.0.1:${endpoint.port}/events?source=plugin`, transport: "sse", oauth: false, headers: { Authorization: "Bearer invalid-sse-test" } })
+  const result = yield* McpClient.connect({ server: "sse", config, directory: ROOT }).pipe(Effect.provide(hostEnvironmentLayer), Effect.scoped, Effect.exit)
+  expect(Exit.isFailure(result)).toBe(true)
+  expect(seen).toEqual([{ method: "GET", path: "/events?source=plugin", authorization: "Bearer invalid-sse-test" }])
+}))

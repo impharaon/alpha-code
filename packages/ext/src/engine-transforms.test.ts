@@ -8,7 +8,7 @@ import { join } from "node:path"
 import { ConfigNormalize } from "../../core/src/config/normalize.ts"
 import { ConfigMigrateV1 } from "../../core/src/v1/config/migrate.ts"
 import { Permission } from "../../core/src/permission.ts"
-import { agentSampling, applyAgents, projectServerConfig, removeAgents, RETIRED_PROVIDER_IDS } from "./engine-transforms"
+import { agentSampling, applyAgents, projectServerConfig, toServerConfig, removeAgents, RETIRED_PROVIDER_IDS } from "./engine-transforms"
 
 /**
  * `applyAgents` 写进编辑器的结果(编辑器按 2.x `AgentEditor` 的 get / update / remove 形状;新 agent 从 `Agent.Info.default` 的

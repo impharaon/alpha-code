@@ -284,3 +284,14 @@ describe("写模块与 main 侧读改写模块不在 sidecar 的 import 闭包�
     expect(records).not.toContain("packages/ui-mac/src/main/mcp-server-lifecycle.ts")
   })
 })
+
+
+test("remote MCP truth persists explicit transport without adding it to default records", () => {
+  const root = mkdtempSync(join(tmpdir(), "mcp-transport-"))
+  try {
+    const file = join(root, "truth.json")
+    const servers = [{ ...A, transport: "sse" as const }, B]
+    writeMcpServerTruth(file, servers, fs)
+    expect(readMcpServerTruth(file, { ...fs, log: () => {} })).toEqual({ ok: true, absent: false, servers })
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})

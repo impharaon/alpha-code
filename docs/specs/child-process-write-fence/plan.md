@@ -455,3 +455,75 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 ### 偏离记录
 
 暂无。
+
+## #1759：包管理器缓存与受围栏环境探针（切片二）
+
+- 依据：[spec v5 / BR-07、AC-09](spec.md)（`834e269da977f6b4888c3b7a6a268bfe835d9cf5`）；[冻结设计](design.md)（`d4a849e5247e7a149457a1b03bbcfc70bbbb389f`）v4 §4.1 R1/R2 与 Cargo 读取桥、§4.3.1 R7、§4.4.1 R8、§5、§6、§10 的 U1/U2 及 R1-F6/F7/P0 处置；v5 既定边界继续有效。首片 `a82428f6fb`、`31c0127e07`、`66ce5df7dc` 已由编排者 Claude Opus 5.5 接受，本片直接消费其 resolver、身份真源和七个坏臂收据。读码基线为 `66ce5df7dc`。
+- 核对：待编排者核对；首个 IMPLEMENT 提交从续接 brief 的 `Phase:` 行补入本计划提交及检查方/模型、结论。
+
+本节为 architecture/decision 类实施计划，本次 PLAN 只追加本节。切片三至五的名称、顺序与 AC 归属沿首片总表；本片接通缓存及启动/派生环境，目录审批、全局安装与用户配置清单的启用仍归各自切片。下述命令和证明均未在本 PLAN 执行。
+
+### 改动
+
+`main/`、`shared/` 相对于 `packages/ui-mac/src/`；`engine/`、`scripts/`、`test-fixtures/` 相对于 `packages/ui-mac/`。
+
+| 文件 | 改什么 |
+| --- | --- |
+| `main/process-fence-plan.ts`、`main/process-fence-workspaces.ts` | planner 消费首片 R1/R7 的 cache 候选，校验 C 与每个缓存目标仍在可信应用数据锚内，预建/记录后才返回同一份位置及环境给 probe/fork；真源路径继续由既有 owner 提供。Cargo 读取桥的 main 写者落在 planner 内，按原文件是否存在准备 config/config.toml、credentials/credentials.toml 链接，不读取/复制其内容。本片不扩展 R7 的冻结签名。 |
+| `main/process-fence-profile.ts` | 最终接线完成的提交撤 W7/W17/W18 的实际 allow 与现用 ID，保留历史编号说明；其余写规则、X1、CF/C1 的顺序保持。缓存继续落于 W3，安装与普通用户配置候选本片不进入生产 allow。 |
+| `main/server.ts`、`main/index.ts` | 实现 R8 `prepareShellProbeFence` 和可信根快照；安排 canonical 环境初始化、既有必须同步的 DB/钥匙串步骤、工作区真源准备在探针依赖之前，再取得真实代理端口并规划 probe。`preferAppEnv` 的缓存/同步/异步三种合并都消费同一根快照；`currentConfigFenceRoots`、bootstrap、planner、fork 复用它。替换旧 uv 单点赋值，白名单之后注入 R1 环境。 |
+| `main/shell-env.ts`、`main/shell-env-cache.ts` | 两类探针接冻结 context，在执行第一条 rc 前装同一已试编译策略；缓存命中后的后台刷新走同路。复用已有模式、超时和缓存语义，根合并只改 R8 点名的边界；PATH/代理等非根值仍按既有合并规则消费。 |
+| `main/sidecar-env.ts`、`main/sidecar.ts`、`main/env.d.ts` | R2 的本代缓存投影随既有 start 消息进入 sidecar，再交嵌入式引擎内部启动接缝；类型与两端解析同提交。父环境仍使用 R1 完整默认值，最终 spawn 的覆盖集合从 R1 的 cache 规则与 env 对应关系导出，避免第二份键名单；不开放整组工具环境前缀。 |
+| `shared/package-manager-environment.ts`（新增） | R2 的纯数据校验/合成及引擎内本代投影持有者；只接主进程交来的 cache 子集，无路径模板、秘密或登记/签发能力。供窄适配共同消费，保持 main/profile 的位置权威。 |
+| `engine/package-manager-spawner.ts`、`engine/package-manager-pty.ts`、`engine/package-manager-npm-config.ts`（新增）；`engine/engine-embed.ts`、`scripts/build-engine.ts` | 复用当前桌面 Node 构建的精确模块解析入口，把 R2 接在上游 CrossSpawnSpawner、`#pty` 与 NpmConfig 的薄适配处；调用原实现，保留 stdin/stream/退出、管道、`extendEnv`/删除键、进程组和 PTY 行为。引擎启动先接收本代投影。NpmConfig 适配只在 load 失败所得结果缺 cache 时补同一投影，保留正常配置优先级。适配模块以相对入口调用原模块，避免解析回自身；共享/上游公共签名不变。 |
+| `main/process-fence-{profile,plan,workspaces}.test.ts`、`main/sidecar-env.test.ts`、`main/shell-env.fast.test.ts`、`main/shell-env-cache.test.ts`、`main/server.test.ts`、`main/process-fence-wiring.test.ts` | 在模块既有文件补位置接线、锚/重指、Cargo 桥、context 与可信根合并用例，替换明确编码旧 uv 路径或旧 HOME 缓存 allow 的断言。fast 文件只放纯逻辑。 |
+| `shared/package-manager-environment.test.ts`（新增）、`main/package-manager-environment.test.ts`（新增）、`main/shell-env.test.ts`（新增） | 新模块的 fast/集成层：纯合成与校验；最终真实子进程/PTY 环境与 Node 构建适配；同步/异步探针的生产 planner + 真 sandbox-exec。新文件按模块命名，各只承担原文件没有的模块/层，不按票或 AC 命名。 |
+| `main/sidecar-engine-host.cases.ts` 及其现有宿主；`main/keychain-boot-order.test.ts`、`main/naming-migration-wiring.test.ts` | 补真实 embed 交接与旧宿主的新输入；启动顺序检查保住既有同步步骤先于新增异步边界。`index.ts` 既有 Bun 链接限制沿 constraints 中的证据边界，顺序源码检查不冒充整机启动验收。 |
+| `main/custom-provider-truth.test.ts`、`main/mcp-server-truth.test.ts`、`main/egress-grant-truth.test.ts`、`main/process-fence-write-sites.test.ts` | 机械同步撤掉的 W 行/ID 枚举与由此改变的确切规则数，保持正反判据；不能保留旧 allow 让旧断言通过，也不能把计数改为空泛下限。 |
+| `test-fixtures/process-fence/engine-embed-driver.ts`、`engine-fence-preload.ts`、`engine-parent-port-preload.ts`；`main/process-fence-engine` 模块的 scenario 层宿主/用例（新增层按模块命名） | 复用既有隔离主机与真实引擎路径，补本代投影/生产构建适配接线及轻量持续场景；真实包管理器完整安装矩阵作为下述一次性 scenario 证据，不加入每步或 PR 常跑集合。 |
+| 仓库根 `scripts/process-fence-write-sites.tsv`、`scripts/gate-files.tsv`、`main/process-fence-write-sites.ts`；本文件本节 | 只同步实际新增/改变且确在扫描闭包中的写入签名，以及实际宿主的条数/文件登记；main-only 写者保留闭包判据，不为未登记通路开豁免，不改门的选择/层级/判定逻辑。首个实现提交填核对行，实际偏离随对应提交记录。 |
+
+**已核实的接线事实。** `core/src/shell.ts:284-313` 在 hook/prepare 后交 Environment spawner；`core/src/mcp/stdio.ts:108-120` 用同一 spawner 合并配置环境；`core/src/pty.ts:171-184` 在 `input.env` 合并后调用 `#pty`。桌面 `scripts/build-engine.ts:49-66` 已有窄解析适配入口，原模块的 provider/PTY 接口可复用。`util/src/npm-config.ts:33` 失败给空配置，而本机 Arborist 9.4.0 `lib/arborist/index.js:104` 的默认 cache 是 HOME 下 `.npm/_cacache`，故需同调用链的缺 cache 对照与薄适配。以上只是本次文件选择的读码依据，不修改这些上游文件或其契约；不在本票恢复/另建 LSP 服务，LSP 沿已接受的创建原语证据边界。
+
+### 顺序
+
+1. **缓存规划、C 锚与 Cargo 桥。** 在 plan/workspaces 既有测试先加定向用例，再实现 main 的准备与返回值；本步先交付可调用规划结果，最终生产注入及撤旧 allow 在步骤 3 一起落地。覆盖 C、缓存子目录首次/再次规划、指到锚外或 HOME 的软链、坏/写失败真源；Cargo 四种原文件组合、链接读取与原文件未变。步骤末跑实际变动的 profile/plan/workspaces 文件一次；发现既有缺陷时按 red-first 单独提交回归再修复。
+2. **R8 启动依赖与两类探针。** 接可信快照、`prepareShellProbeFence`、同步/缓存命中刷新路径及所有根合并出口；生产 context 来自同一 planner/真代理。DB/钥匙串等既有必须同步的步骤不跨新增的 await。以隔离 rc 真实写盘和 export 作证，保持 PATH 可发现工具；加入撤探针围栏、撤根固定两个坏臂。步骤末只跑本步变动的 probe/cache/server/启动顺序文件，不启动窗口。
+3. **R2 最终派生接线与缓存启用。** 引擎内接收主进程投影，精确构建适配调用原 spawner/PTY/NpmConfig；先用自有小进程真实回报最终 env，再从助手 Shell、PTY、MCP 到同一入口。覆盖调用方缓存覆盖、`extendEnv`/删除键和非缓存值；验证无 npm 配置的缺 cache 回落不碰 HOME。接 server fork/env 与 profile 撤 W7/W17/W18，同步旧行为断言及枚举，保留 W8/CF/C1。步骤末跑变动行为的文件及 host 对应子用例，不重复步骤 2 未变的整组。
+4. **一次真实安装与返回。** 在独立 scenario 进程跑下表真实工具矩阵与已知坏臂一次，保存命令/版本/来源/摘要/退出/落盘结果；永久套件只保留容易回归的最小接线场景。运行一次较宽相关集合、涉及包的类型检查、旧名/文档检查与 diff 检查；本节记录实际偏离及一次性证据位置后提交。只交切片二，不开始切片三。
+
+### 风险
+
+- **启动环与异步顺序。** probe 不能依赖其自身输出才能建围栏；在源码中核对初始化、工作区真源和同步迁移步骤的位置，并用可独立调用的生产协调函数测缺代理/坏真源/编译失败时零未围栏探针。`index.ts` 不可执行的旧限制如实报告，不顺带修复。
+- **默认值、显式覆盖与 rc 是不同入口。** 最终 spawn 覆盖只消费 R1 的 cache 子集，不能清掉 PATH、代理、registry/凭据或自行接管用户安装位置。PTY rc 执行后的再次 export 按冻结 R1-F6 单独记录实际结果，不改 rc、不把这一残留报成已覆盖；pnpm `.tools` 钉版及版本管理器全局安装仍归切片四。
+- **C 原本在 W3 下，读取桥也在那里。** C 与每个实际缓存目标都要先核可信锚再过 R7；重指不能获得锚外新目标。Cargo 链只指向模拟/真实用户原位置的原文件，bridge 准备不读取值；原 credentials 不增加写 allow，CF/C1 最终优先。测试不能把“symlink 可读”当成 Cargo 配置/认证已成功。
+- **构建与源码 harness 有差异。** 窄适配必须由当前生产构建产物真正消费，直接跑原 upstream 源码的绿不能证明 R2。按 Node/native ABI 选择隔离运行时，必要时在 scratch 准备官方 Node 工具链；不借 Electron 或源码字符串替换证明。正式签名进程树的 R8 证据仍需可执行该形态的验收环境；本机禁启动 Electron 的约束继续有效，返回时单列未证部分，不将 headless 证据冒充签名产物。
+- **下载与文件系统判官。** 本次 PATH 未找到 Go/Cargo/rustup/Yarn。实施从官方发行物在 scratch 准备工具链并核版本/摘要，所有 HOME/prefix/cache/venv/RUSTUP_HOME 都隔离；registry/网络/POSIX 失败与围栏失败分开。场景树位于 worktree 的 `node_modules/.cache`，先校准 HOME cache/逃逸目标确实不在 W11/W12/W1 中，围栏外核对内容。
+
+### 证明
+
+| AC / 义务 | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-09：缓存规划及 HOME 旧口关闭 | `process-fence-plan.test.ts -t "package manager cache planning"`、`process-fence-profile.test.ts -t "package manager cache rules"`：真实 C 锚/缓存重指、预建、R7、生产 profile；已有真源测试继续消费首片。 | 跳过锚/R7 会接纳锚外新目标或使用未记录路径；恢复 W7/W17/W18 时旧 HOME 缓存写入反例落盘。只改 env 而留旧口不算完成。 |
+| AC-09：probe 先围栏、根不漂移 | 新 `shell-env.test.ts -t "fenced shell probes"`、既有 cache/server 用例 `trusted probe roots`：生产 planner/context，真实 `/bin/zsh` 的 `-il/-l`，同步/命中缓存的异步刷新都尝试在外部目录写 marker 并回吐恶意 XDG/OPENCODE 根；检查 PATH、bootstrap、CF-8/CF-11、data/state。 | 撤 sandbox 包装后外部 marker 出现；仅保留包装、撤根固定后同一 env 输出移动根；漏缓存/异步出口则相应臂漂移。context/代理/profile 不可用时实际探针 spawn 必须为零。 |
+| AC-09：最终 spawn 消费同一投影 | `shared/package-manager-environment.test.ts`、新 `main/package-manager-environment.test.ts -t "package manager spawn environment"`、既有 sidecar host/wiring 对应 case；真实构建的 Shell、PTY、MCP 进程输出其最终 env，普通值/删除键/输出/退出仍符合原接口。 | 在任一调用方合并后漏接投影，显式缓存覆盖会回到模拟 HOME；只接 Shell 或只接父 env 会漏 PTY/MCP。拿掉构建适配后同一 case 必红；误覆盖普通键、破坏 `extendEnv` 或传输也有正例失败。 |
+| AC-09 / U1：八种真实工具、bun/go/cargo 对照 | 一次性 scenario `package manager cache isolation`：生产 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence → 助手 shell/PTY` 的最终环境与真实引擎。bun、pnpm、Yarn、npm、项目 venv pip、uv、cargo、go 各一个真实依赖安装；两入口各覆盖，逐工具记录项目产物与 HOME 旧缓存前后树/摘要、C 实际写入。Yarn Classic/现代缓存语义、Bun transpiler 缓存、npm 三条已接受警告一并记录。 | 各臂用独立冷缓存和同源输入；撤注入的 bun/go/cargo 同命令必须失败。依赖未落项目、任一旧缓存新增/修改、缓存写到 C 之外或被隐藏的错误均失败；退出 0 或 config 查询不替代落盘。 |
+| U2：Cargo 的真实配置/认证读取 | 同一一次性场景的 `cargo configuration bridge`：真实 Cargo/rustup shim、本地/项目配置合并与相对路径、全局配置双读、credential-provider、隔离认证 registry；核原 config/credentials 摘要、读取桥目标及项目依赖结果。元数据/归档来自真实 registry 样本，认证材料为隔离测试值，不输出。 | 撤 config/credentials 中任一所需读取桥，分别使配置、依赖解析或认证失败；只链接 config 不会通过认证臂。桥导致相对路径/双读错误也由实际构建结果检出，不能用普通 cat 成功代替。 |
+| AC-09 / U2：npm 配置加载失败 | 构建适配集成用例 `npm cache after config load failure`，真实 Npm 服务/Arborist 与隔离项目；仅用失败样本触发现有 load 失败结果，检查 cache 与实际依赖。 | 去缺 cache 的投影后，当前 Arborist 默认写模拟 HOME `.npm/_cacache`，围栏拒绝或 HOME 对照变更；通过保留 W7 让它安装成功同样判红。正常 npmrc/registry 优先级的正例不变。 |
+| 保护回归 | 既有 `process-fence-config-fence`、credential-store、zsh-startup 的相关用例；先用较便宜的规则/接线测试，真实保护矩阵只在本片最终接线后跑一次。 | 新 cache/bridge allow 若盖过 CF/C1 或恢复两处 shell 缓存，会使受保护替身被写；普通项目与缓存正例同时成功，防止“全部拒写”假绿。 |
+
+**一次性场景执行与来源。** 工具项目由真实 `init`/`venv`/`cargo new`/`go mod init` 产生；包及 metadata 取官方 registry/发行物，保留来源和摘要，沿设计 P07/P10/P11 样本，不手写外部协议替身。使用自有生命周期脚本观测继承环境时，先由真实 CLI 生成 manifest，再只改自身脚本字段并记明差异。Cargo 认证样本从真实 sparse-index/归档及官方 credential-provider 样本取得，派生差异注明，值不入日志。
+
+所有证明在独立隔离 HOME/prefix/cache 树进行；对照臂保持相同命令、输入、权限与围栏，仅撤被测接线，并各自冷启动/冷缓存。一次性 runner/日志留在 scratch，返回中给出完整命令、每工具退出与输出位置；不加入八工具的常跑测试矩阵。真引擎 headless/生产模块接线、transport 替身和签名 utilityProcess 的证据分开列；未运行不标通过。Windows 与 #1760 launcher 不在本轮。
+
+**相关检查（实施时，从包目录运行）。** 迭代只用上述命名 case；步骤末跑该步变动文件全文件一次。真实工具矩阵及其坏臂只在步骤 4 一次运行。
+
+- 主逻辑：`cd packages/ui-mac && bun test src/main/process-fence-profile.test.ts src/main/process-fence-plan.test.ts src/main/process-fence-workspaces.test.ts`，按实际变动分配到步骤末，不在每步重复整组。
+- 探针/根：同包 `bun test src/main/shell-env.fast.test.ts src/main/shell-env.test.ts src/main/shell-env-cache.test.ts src/main/server.test.ts src/main/keychain-boot-order.test.ts src/main/naming-migration-wiring.test.ts`；R2：`bun test src/shared/package-manager-environment.test.ts src/main/package-manager-environment.test.ts src/main/sidecar-env.test.ts src/main/sidecar-engine-host.test.ts src/main/process-fence-wiring.test.ts`。
+- 返回前一次较宽集合：同包 `bun test src/main/process-fence-write-sites.test.ts src/main/custom-provider-truth.test.ts src/main/mcp-server-truth.test.ts src/main/egress-grant-truth.test.ts src/main/process-fence-credential-stores.test.ts src/main/sidecar-env-otel.test.ts src/main/codepuppy-sidecar-wiring.test.ts`。用 `rg` 查变动导出的 mocks、旧 uv 位置、W7/W17/W18 枚举，只补跑实际受影响的现有宿主并报告；真实保护矩阵仅指定 config-fence/zsh-startup 两个宿主一次，其他 scenario 只跑本片命名场景。
+- 类型/边界：`cd packages/ui-mac && bun typecheck`；精确构建当前 engine 验证适配解析；`bash scripts/north-star-guard.sh` 核对实际改动仍在自有面。源码接线检查与编译不替代真实运行。
+- 收口：同包 `bun test src/main/old-name-scan.test.ts`；Alpha profile 的只读文档契约与已接受基线比较；`git diff --check`。实际写点/测试计数只作必要同步，不改 gate、不跑 `bin/check`/`gate run`/全包 suite；机器有 gate 时并发上限 2。
+
+### 偏离记录
+
+暂无。

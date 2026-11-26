@@ -646,3 +646,5 @@ B6 red：一次真实 generator 入口探针克隆固定 2.3.2 wheel，仅将 wo
 B6 green：真实 generator 重生 161 份源，Python 结果字节未变，sources.json 补 scan xmlns 适配出处；缺锚点的真实入口拒绝，office-excel 文件 13 PASS（B6-green.log）。全部 save/digest 适配以唯一 anchor 为前提，不再静默省略。
 
 B7 cache red：原 office-excel 文件两个原生 Python 子进程用例，以真实原稿/LO 缓存 fixture、受控执行边界验证原子写入。修正子脚本缩进后真实 red 为权限 0640→0600 以及 SIGTERM 留下临时文件（B7-cache-red.log，2 FAIL），不是以子进程语法错误充当证据。下一提交只保护缓存 commit 的权限与终止清理。
+
+B7 cache green：office-excel 文件 15 PASS（B7-cache-green.log）。同一原子替换前保留源权限，commit 临界区 SIGTERM 转为退出并执行 finally 删除临时文件，随后恢复原处理器；真实缓存与原稿保真断言保留。Windows ACL/实机验证仍归既有平台验收。

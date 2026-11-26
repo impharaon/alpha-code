@@ -115,14 +115,19 @@ def recalculate(path):
         content,count,errors=merge_caches(source,snapshot)
         if file_digest(source)!=source_hash:return {'status':'failed','code':'source-changed','detail':'workbook changed during calculation'}
         # No LO-rewritten workbook replaces the user's package: only merged cache parts do.
-        handle,temp_name=tempfile.mkstemp(prefix='.~recalculate-',suffix='.tmp',dir=source.parent)
+        def terminate(signum,_frame):raise SystemExit(128+signum)
+        previous_termination=signal.signal(signal.SIGTERM,terminate)
+        temp_name=None
         try:
+            handle,temp_name=tempfile.mkstemp(prefix='.~recalculate-',suffix='.tmp',dir=source.parent)
             with os.fdopen(handle,'wb') as output:output.write(content)
+            os.chmod(temp_name,source.stat().st_mode)
             read_projection(binding)
             if file_digest(source)!=source_hash:return {'status':'failed','code':'source-changed','detail':'workbook changed before cache commit'}
             os.replace(temp_name,source)
         finally:
-            if Path(temp_name).exists():Path(temp_name).unlink()
+            if temp_name is not None:Path(temp_name).unlink(missing_ok=True)
+            signal.signal(signal.SIGTERM,previous_termination)
         result={'status':'recalculated','id':identifier,'path':str(source),'sourceSha256':source_hash,'resultSha256':hashlib.sha256(content).hexdigest(),'formulaCount':count,'errors':errors,'diagnostics':[]}
         (job/'receipt.json').write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8')
         return result

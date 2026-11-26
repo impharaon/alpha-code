@@ -16,7 +16,9 @@ do {
     let lines = (request.results ?? []).compactMap { observation -> Line? in
         guard let candidate = observation.topCandidates(1).first else { return nil }
         let box = observation.boundingBox
-        return Line(text: candidate.string, box: [box.minX, 1 - box.maxY, box.width, box.height])
+        let clamp = { (value: Double) in min(1.0, max(0.0, value)) }
+        let x = clamp(box.minX), y = clamp(1 - box.maxY)
+        return Line(text: candidate.string, box: [x, y, max(0, clamp(box.maxX) - x), max(0, clamp(1 - box.minY) - y)])
     }
     let output = Output(text: lines.map(\.text).joined(separator: "\n"), lines: lines)
     FileHandle.standardOutput.write(try JSONEncoder().encode(output))

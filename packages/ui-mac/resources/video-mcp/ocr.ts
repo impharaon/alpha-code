@@ -6,7 +6,9 @@ import type { Frame } from "./contracts"
 type Ocr = Frame["ocr"]
 
 export function ocrBox(left:number,top:number,right:number,bottom:number,width:number,height:number): [number,number,number,number] {
-  return [left/width,top/height,(right-left)/width,(bottom-top)/height]
+  const clamp=(value:number)=>Math.min(1,Math.max(0,value))
+  const x=clamp(left/width),y=clamp(top/height)
+  return [x,y,Math.max(0,clamp(right/width)-x),Math.max(0,clamp(bottom/height)-y)]
 }
 
 export function tesseractLines(tsv: string, width: number, height: number): Ocr {
@@ -47,6 +49,7 @@ export async function readFrameText(
   if (runtime.platform === "darwin-arm64") {
     const result = await runComponent(helper.path, [image], runtime)
     const parsed = JSON.parse(result.stdout) as Ocr
+    if(Array.isArray(parsed.lines))for(const line of parsed.lines)if(Array.isArray(line.box) && line.box.length === 4)line.box=ocrBox(line.box[0],line.box[1],line.box[0]+line.box[2],line.box[1]+line.box[3],1,1)
     if (
       typeof parsed.text !== "string" ||
       !Array.isArray(parsed.lines) ||

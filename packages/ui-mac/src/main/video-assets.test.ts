@@ -126,7 +126,7 @@ test("SDK nested preparation stays associated with the original call and propaga
     expect(result.isError).toBe(true)
     if (result.content[0]?.type === "text") expect(JSON.parse(result.content[0].text).code).toBe("disk_full")
     expect(requests[0]).toEqual({
-      ids: ["ffmpeg/" + `${process.platform}-${process.arch}` + "/9.1-openh264-2.7.0"],
+      ids: ["ffmpeg/" + `${process.platform}-${process.arch}` + "/9.1-openh264-2.7.0-dav1d-1.5.3"],
       _meta: params._meta,
     })
     const controller = new AbortController()

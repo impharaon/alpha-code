@@ -33,7 +33,9 @@
 #      必须**仍然**产生 `Cannot find module 'bun:test'` 这一类错误。少了这条,[2/6] 会**空对空地绿**
 #      ——「这台机器碰巧哪里都能解析」和「bootstrap 起作用了」在只看 [2/6] 时长得一模一样。
 #  [2/6] 正向:经 bootstrap 建出来的 worktree,ui-mac typecheck **exit 0 且零条模块解析错误**。
-#      摘掉 bootstrap 里的 `bun install` ⇒ 这条转红。
+#      摘掉 bootstrap 里的 `bun install` ⇒ 这条转红。三个围栏测试不在这里跑,在 [4/6] 重跑之后跑**一次**:
+#      [4/6] 先断言重跑没动 Electron 与 addon 的产物(inode / mtime / ctime 不变),那一次的绿就是这次 bootstrap 备好的
+#      产物的绿;bootstrap 不备产物 ⇒ 那一次红,只在重跑时才备 ⇒ 产物身份变了、红。
 #  [3/6] 不污染共享树:跑完**共享** `.git/config` 的 `core.hooksPath` 必须没变(husky 的
 #      `prepare` 每次 install 都改它,而在 worktree 里改的是所有 worktree 共用的那份)。
 #      本条先把值**设成 `.githooks`** 再跑 —— 不设的话,机器上本来就漂成 `.husky/_` 时
@@ -46,7 +48,7 @@
 #      **不**直接采样共享配置:它是所有 lane 共用的,别的 lane 的 install 会写进我们的样本 ——
 #      实测 2026-10-30 第二轮门,我们的 install 带着 HUSKY=0,样本里仍出现并发 lane 写的 `.husky/_`,
 #      直采版本身就成了一个新的假红来源。
-#  [4/6] 幂等:对**已存在且已装好**的 worktree 重跑必须 exit 0,**且重跑之后 typecheck 仍绿**
+#  [4/6] 幂等:对**已存在且已装好**的 worktree 重跑必须 exit 0,**且重跑之后 typecheck 与三个围栏测试仍绿**
 #      —— 只断重跑的退出码会被「重跑时把树删了再报 0」满足。
 #  [5/6] **非网络原因的失败必须仍然拦住**(owner 点名要补的那条)。让 `bun install` 真的失败
 #      (PATH 里没有 bun —— 真实可达:精简过的 cron/CI shell 就是这个形状),断言三件事:
@@ -63,9 +65,11 @@
 #          (未验证档,exit 2),真离线 ⇒ 未验证。恒 'network' 的退化实现复测不会改口,
 #          在健康网络下**确定性**仍然硬红 —— 两个方向都留着判据,[6/6] 不是摆设。
 #      (b) registry 指向不可达地址时必须判 `network`(杀掉「一律算真失守」——那等于没有豁免);
-#      (c) 报告契约:把整个探针**套跑一遍**并注入不可达 registry,断言它 **exit 2**、
-#          输出里**有「未验证」**、且**没有**那句「新建 worktree 自己就能跑出可信 typecheck」。
-#          嵌套跑靠 CODEPUPPY_WT_PROBE_NESTED=1 断掉递归(只关掉 (c) 自己,不关任何真判据)。
+#      (c) 报告契约:注入不可达 registry 时,本探针里**每一个**按 registry 可达性下结论的判点
+#          (install 失败的 note_bootstrap_failure、[5/6] 的判别复核、[6/6](a))各在一个子壳里单独跑,
+#          再走同一个结局 finish,断言 **exit 2**、输出里**有「未验证」**、且**没有**那句
+#          「新建 worktree 自己就能跑出可信 typecheck」。逐个判点跑:合在一起时,一个判点忘了记「未验证」
+#          会被别的判点盖住(此前把整个探针嵌套重跑一遍就是这样,而且要多建三棵树、多跑一次 typecheck)。
 #
 # 一条载重的实现事实:[1/6] 显式调用跑本脚本的已安装树(其次主 checkout)里的 `tsgo`,
 # cwd 仍是未 bootstrap 的探针包,模块解析仍由探针自己的依赖状态决定。不能靠 `bun run`
@@ -102,7 +106,6 @@ bash "$SWEEP"
 # 跑 codepuppy-check 时,量到的是共享树上的旧版本(而本票的全部意义就是「别去量别人的树」)。
 SELF_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 BOOTSTRAP="$SELF_ROOT/scripts/worktree-bootstrap.sh"
-SELF="$SELF_ROOT/scripts/assert-worktree-bootstrap.sh"
 [ -f "$BOOTSTRAP" ] || { echo "✗ 找不到 $BOOTSTRAP" >&2; exit 1; }
 
 NEG_TSGO=""
@@ -121,7 +124,6 @@ fi
 # 探针树一律从 HEAD 建:判的是**当前这棵树上的**脚本与配置,不是某个远端 ref 的历史版本。
 BASE_SHA="$(git rev-parse HEAD 2>/dev/null)" || { echo "✗ 读不到 HEAD" >&2; exit 1; }
 
-NESTED="${CODEPUPPY_WT_PROBE_NESTED:-0}"
 DEFAULT_REGISTRY="https://registry.npmjs.org"
 UNREACHABLE_REGISTRY="http://127.0.0.1:9"
 
@@ -140,7 +142,7 @@ HOOKS_ORIGINAL="$(git -C "$MAIN" config --local --get core.hooksPath 2>/dev/null
 # · **pid 级 INT 被 bash 3.2 整个丢弃**(前台子进程正常退出后继续跑;`wait` 内建同样,连 trap
 #   都不进)。子进程挪进独立进程组后,终端 Ctrl-C 只打到本进程 ⇒ 必须显式 trap INT,并用轮询
 #   代替裸 `wait`,否则 Ctrl-C 变哑。
-# 修法:每个**会写共享配置**的子进程(三次 bootstrap + 一次嵌套自跑)都跑在自己的进程组里并
+# 修法:每个**会写共享配置**的子进程(bootstrap 与围栏反向探针的 install)都跑在自己的进程组里并
 # 登记 pid;cleanup 的第一步是收割它(TERM 整组 → 限时等死 → 兜底 KILL),**然后**才还原共享
 # 配置、删探针树。顺序从此确定:子进程的 restore(若跑)永远落在父还原之前。
 OWNED_PID=""
@@ -201,6 +203,19 @@ trap 'echo "  ✗ 被 Ctrl-C 打断 —— 收割子进程并还原共享 core.h
 fail=0
 unverified=0
 red() { echo "    ✗ $*" >&2; fail=1; }
+# 结局:真失守 ⇒ 1;本次未验证 ⇒ 2(说「未验证」,不说全绿话);否则 0。[6/6](c) 的报告契约走的也是它。
+finish() {
+  if [ "$fail" -ne 0 ]; then
+    echo "    ✗ worktree bootstrap 能力判据失守" >&2
+    exit 1
+  fi
+  if [ "$unverified" -ne 0 ]; then
+    echo "    ⚠️  worktree bootstrap 能力**本次未验证**(见上面的未验证行)—— 不拦 push,但这一跑不构成证据"
+    exit 2
+  fi
+  echo "    ✓ 新建 worktree 自己就能跑出可信 typecheck(不必碰共享主 checkout)"
+  exit 0
+}
 
 # ── 判别依据 ──────────────────────────────────────────────────────────────────────
 # bun 会用哪个 registry。**任何一处声明了我们没算进来的 registry ⇒ 返回 1**(⇒ 不给豁免)。
@@ -330,6 +345,66 @@ note_bootstrap_failure() {
   fi
 }
 
+# [5/6] 的判别:刚发生的是一个**非网络**失败,判别依据必须说 `real`(返回 0)。说了别的 ⇒ 硬红之前先复核(`#941`):
+# 单发探测在代理半通不通时会与判别依据落在矛盾的两侧,拿它当真相会把健康的仓库判成「判据失守」。返回 1。
+judge_nonnetwork_failure_verdict() {
+  [ "$(classify_bootstrap_failure)" = real ] && return 0
+  case "$(adjudicate_network_verdict)" in
+    degraded)
+      # 前后两轮独立探测全可达、判别依据复测仍说 network ⇒ 豁免成了万能挡箭牌:
+      # bootstrap 真坏掉的那天也会被当成网络放行,这道门从此永不失守。
+      red "非网络失败(bun 缺失)被判别依据归成 'network' 且复测不改口,而前后两轮独立探测 registry 全可达 —— 判别依据退化,豁免成了万能挡箭牌"
+      ;;
+    offline)
+      # 这台机器这一刻真的连不上 registry:`real` 与 `network` 本来就分不开(判别依据只有
+      # 可达性这一个输入)。如实降级,不许当绿,也不冤枉判红。
+      unverified=1
+      echo "    ⚠️  未验证:registry 这一刻不可达,本条分不出 real / network(判别依据只看可达性)"
+      ;;
+    *)
+      unverified=1
+      echo "    ⚠️  未验证:可达性探测前后矛盾(网络半通不通)—— 本次测量作废,本条分不出 real / network"
+      ;;
+  esac
+  return 1
+}
+
+# [6/6](a):可达 registry 必须判 real —— 直接杀掉「一律算网络」。
+# `#941`:「可达」不许由单发探测断言(半通不通时它与判别依据各落矛盾一侧,健康仓库被硬红)。
+# 先对可达性取共识;共识可达而判别依据仍说 network 时,再复核一轮才许硬红。
+judge_live_registry_verdict() {
+  local live_registry
+  live_registry="$(resolve_registry 2>/dev/null || true)"
+  case "$(registry_reachability_consensus)" in
+    reachable)
+      if [ "$(classify_bootstrap_failure)" = real ]; then
+        echo "    ✓ 可达 registry($live_registry)⇒ real"
+      else
+        case "$(adjudicate_network_verdict)" in
+          degraded)
+            red "registry($live_registry)前后两轮独立探测全可达,判别依据复测仍说 'network' —— 判别依据退化,一律算网络 = 这道门永不失守"
+            ;;
+          *)
+            # 复核期间结论翻了(判别依据改口 real,或独立探测不再一致可达)⇒ 网络在抖,
+            # 不存在可信的地面真相 —— 本次测量作废,不给判决。
+            unverified=1
+            echo "    ⚠️  未验证:可达性结论前后矛盾(网络半通不通)—— 本次测量作废,'可达 ⇒ real' 这一半证不了"
+            ;;
+        esac
+      fi
+      ;;
+    unreachable)
+      # 本机这一刻真的连不上 registry:判别力这一条**证不了**,如实降级,不许当绿。
+      unverified=1
+      echo "    ⚠️  未验证:registry 这一刻不可达,'可达 ⇒ real' 这一半本次证不了"
+      ;;
+    *)
+      unverified=1
+      echo "    ⚠️  未验证:可达性探测结果前后不一(半通不通)—— 本次测量作废,'可达 ⇒ real' 这一半证不了"
+      ;;
+  esac
+}
+
 typecheck_in() {
   (cd "$MAIN/.worktrees/$1" && bun run --cwd packages/ui-mac typecheck 2>&1)
 }
@@ -370,7 +445,7 @@ fence_tests_in() {
   return "$rc"
 }
 
-echo "  · 探针 id=$ID,base=$BASE_SHA${NESTED:+ ,nested=$NESTED}"
+echo "  · 探针 id=$ID,base=$BASE_SHA"
 
 # ── [3/6] 的前置:把共享 core.hooksPath 设成一个**确定**的值,再跑任何 install ──────────
 # 放在 [1/6] 之前:[1/6] 的围栏反向探针也跑一次 bare `bun install`,它的样本同样要判。
@@ -437,11 +512,7 @@ else
   if [ "$(uname -s)" = Darwin ] && [ -f "$SELF_ROOT/packages/ui-mac/scripts/build-fence-addon.ts" ]; then
     grep -Fqx -- '-Rc' "$COPY_PROBE/cp.calls" && grep -Fqx -- '-R' "$COPY_PROBE/cp.calls" ||
       red "Electron 没有先尝试 clone 并回退普通复制"
-    if fence_tests_in "$POS"; then
-      echo "    ✓ bootstrap 后:三个围栏测试文件全绿(Electron 镜像不可达,clone 失败后普通复制)"
-    else
-      red "bootstrap 后围栏测试仍红"
-    fi
+    # 三个围栏测试在 [4/6] 重跑之后跑一次(理由见文件头 [2/6])。
   fi
 fi
 
@@ -485,7 +556,13 @@ else
     "$MAIN/.worktrees/$POS/packages/ui-mac/node_modules/electron/dist/version" \
     "$MAIN/.worktrees/$POS/packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node" 2>/dev/null || true)"
   [ "$fence_before" = "$fence_after" ] || red "重跑重复复制 Electron 或编译 addon(产物身份/时间变了)"
-  fence_tests_in "$POS" || red "重跑后围栏测试反而坏了"
+  # 产物身份没变 ⇒ 这一次跑的就是 [2/6] 那次 bootstrap 备好的 Electron 与 addon:一次同时判「bootstrap 后」与「重跑后」。
+  if fence_tests_in "$POS"; then
+    [ "$(uname -s)" = Darwin ] && [ -f "$SELF_ROOT/packages/ui-mac/scripts/build-fence-addon.ts" ] &&
+      echo "    ✓ bootstrap 与重跑之后:三个围栏测试文件全绿(Electron 镜像不可达,clone 失败后普通复制;产物身份未变)"
+  else
+    red "bootstrap 与重跑之后围栏测试红 —— bootstrap 没备好 Electron / addon,或重跑把它们弄坏了"
+  fi
 fi
 
 # AC2:复制两路都失败时,已存在的树保留,但不能留下半装的 Electron。
@@ -547,31 +624,10 @@ else
   else
     # ★ owner 点名要补的那半:这是一个**非网络**失败,判别依据必须说 `real`。
     #   少了它,「一律算网络」这个错误实现能满足上面两条 ⇒ 豁免变成万能挡箭牌 ⇒ 这道门永不失守。
-    verdict_real="$(classify_bootstrap_failure)"
-    if [ "$verdict_real" = real ]; then
+    if judge_nonnetwork_failure_verdict; then
       # `${FAIL}` 必须带花括号:紧跟其后的是 CJK 顿号,UTF-8 locale 下 bash 会把那几个字节
       # 一起当成变量名 ⇒ `FAIL<0xe3><0x80><0x81>: unbound variable`(set -u 下当场炸)。
       echo "    ✓ 非零退出(rc=$boot_rc)、没留下 .worktrees/${FAIL}、且判成 real(会拦住)"
-    else
-      # 判别依据把一个**非网络**失败说成 network。硬红之前先复核(`#941`):单发探测在代理
-      # 半通不通时会与判别依据落在矛盾的两侧,拿它当真相会把健康的仓库判成「判据失守」。
-      case "$(adjudicate_network_verdict)" in
-        degraded)
-          # 前后两轮独立探测全可达、判别依据复测仍说 network ⇒ 豁免成了万能挡箭牌:
-          # bootstrap 真坏掉的那天也会被当成网络放行,这道门从此永不失守。
-          red "非网络失败(bun 缺失)被判别依据归成 'network' 且复测不改口,而前后两轮独立探测 registry 全可达 —— 判别依据退化,豁免成了万能挡箭牌"
-          ;;
-        offline)
-          # 这台机器这一刻真的连不上 registry:`real` 与 `network` 本来就分不开(判别依据只有
-          # 可达性这一个输入)。如实降级,不许当绿,也不冤枉判红。
-          unverified=1
-          echo "    ⚠️  未验证:registry 这一刻不可达,本条分不出 real / network(判别依据只看可达性)"
-          ;;
-        *)
-          unverified=1
-          echo "    ⚠️  未验证:可达性探测前后矛盾(网络半通不通)—— 本次测量作废,本条分不出 real / network"
-          ;;
-      esac
     fi
   fi
 fi
@@ -585,70 +641,45 @@ if [ "$verdict_net" != network ]; then
 else
   echo "    ✓ 不可达 registry ⇒ network"
 fi
-# (a) 可达 registry 必须判 real —— 直接杀掉「一律算网络」。
-# `#941`:「可达」不许由单发探测断言(半通不通时它与判别依据各落矛盾一侧,健康仓库被硬红)。
-# 先对可达性取共识;共识可达而判别依据仍说 network 时,再复核一轮才许硬红。
-live_registry="$(resolve_registry 2>/dev/null || true)"
-case "$(registry_reachability_consensus)" in
-  reachable)
-    verdict_live="$(classify_bootstrap_failure)"
-    if [ "$verdict_live" = real ]; then
-      echo "    ✓ 可达 registry($live_registry)⇒ real"
-    else
-      case "$(adjudicate_network_verdict)" in
-        degraded)
-          red "registry($live_registry)前后两轮独立探测全可达,判别依据复测仍说 'network' —— 判别依据退化,一律算网络 = 这道门永不失守"
-          ;;
-        *)
-          # 复核期间结论翻了(判别依据改口 real,或独立探测不再一致可达)⇒ 网络在抖,
-          # 不存在可信的地面真相 —— 本次测量作废,不给判决。
-          unverified=1
-          echo "    ⚠️  未验证:可达性结论前后矛盾(网络半通不通)—— 本次测量作废,'可达 ⇒ real' 这一半证不了"
-          ;;
-      esac
-    fi
-    ;;
-  unreachable)
-    # 本机这一刻真的连不上 registry:判别力这一条**证不了**,如实降级,不许当绿。
-    unverified=1
-    echo "    ⚠️  未验证:registry 这一刻不可达,'可达 ⇒ real' 这一半本次证不了"
-    ;;
-  *)
-    unverified=1
-    echo "    ⚠️  未验证:可达性探测结果前后不一(半通不通)—— 本次测量作废,'可达 ⇒ real' 这一半证不了"
-    ;;
-esac
-# (c) 报告契约:套跑一遍并注入不可达 registry —— 必须 exit 2 + 说「未验证」+ 不说那句全绿话
-if [ "$NESTED" = "1" ]; then
-  echo "    · 嵌套运行:跳过报告契约自检(断递归)"
+# (a) 可达 registry 必须判 real(判点见 judge_live_registry_verdict)。
+judge_live_registry_verdict
+# (c) 报告契约(文件头 [6/6](c)):注入不可达 registry,按可达性下结论的三个判点各在一个子壳里单独跑、走同一个 finish ——
+# 必须 exit 2、说「未验证」、不说那句全绿话。子壳装着同一个 cleanup EXIT trap,退出码走的是真跑结束时的同一条路;
+# 所以 (c) 必须是最后一臂:第一个子壳退出时 cleanup 就清掉探针树,结局那一遍是空操作。
+# 判点分派写在函数里:bash 3.2 把 `$( … )` 里 case 分支的 `)` 当成命令替换的结尾(实测:整段被切断、去执行别的命令)。
+contract_judge() {
+  trap cleanup EXIT
+  fail=0
+  unverified=0
+  export BUN_CONFIG_REGISTRY="$UNREACHABLE_REGISTRY"
+  case "$1" in
+    install-failure) note_bootstrap_failure "报告契约自检:注入的 install 失败" ;;
+    nonnetwork-failure) judge_nonnetwork_failure_verdict ;;
+    live-registry) judge_live_registry_verdict ;;
+  esac
+  finish
+}
+# 夹具(worktree-probe-sweep.scenario.test.ts)判的是清理与 `#941` 的共识,不是 (c):它们用 CODEPUPPY_WT_PROBE_SKIP_CONTRACT=1
+# 关掉 (c) 自己(不可达地址上的这三个结论每次都一样,每跑一次多花 ~2s 的共识间隔),不关任何真判据。
+if [ "${CODEPUPPY_WT_PROBE_SKIP_CONTRACT:-0}" = 1 ]; then
+  echo "    · 跳过报告契约自检(CODEPUPPY_WT_PROBE_SKIP_CONTRACT=1)"
 else
-  # 嵌套自跑也是一个会写共享配置的子进程(它自己的 cleanup 会还原到**它**看到的基线)——
-  # 一样要登记收割,否则父被打断时它就是下一个晚到的覆写者。输出改走临时文件(run_owned
-  # 走后台进程组,命令替换接不到)。
-  nested_tmp="$(mktemp "${TMPDIR:-/tmp}/codepuppy-wt-nested.XXXXXX")"
-  run_owned env CODEPUPPY_WT_PROBE_NESTED=1 BUN_CONFIG_REGISTRY="$UNREACHABLE_REGISTRY" bash "$SELF" >"$nested_tmp" 2>&1
-  nested_rc=$?
-  nested_out="$(cat "$nested_tmp" 2>/dev/null)"
-  rm -f "$nested_tmp"
-  if [ "$nested_rc" -ne 2 ]; then
-    red "注入不可达 registry 后整个探针的退出码是 $nested_rc,应为 2(0=谎报绿;1=网络一抖就拦 push)"
-  elif ! grep -aq "未验证" <<<"$nested_out"; then
-    red "网络档没有在输出里说「未验证」—— 把「没验成」读成「验过了」正是这一档要消掉的东西"
-  elif grep -aq "新建 worktree 自己就能跑出可信 typecheck" <<<"$nested_out"; then
-    red "网络档仍然打印了那句全绿结论 —— 不许报绿"
-  else
-    echo "    ✓ 网络档:exit 2、说「未验证」、不报绿"
-  fi
+  contract_ok=0
+  for judge in install-failure nonnetwork-failure live-registry; do
+    contract_out="$(contract_judge "$judge" 2>&1)"
+    contract_rc=$?
+    if [ "$contract_rc" -ne 2 ]; then
+      red "网络档($judge):注入不可达 registry 后退出码是 $contract_rc,应为 2(0=谎报绿;1=网络一抖就拦 push)"
+    elif ! grep -aq "未验证" <<<"$contract_out"; then
+      red "网络档($judge)没有在输出里说「未验证」—— 把「没验成」读成「验过了」正是这一档要消掉的东西"
+    elif grep -aq "新建 worktree 自己就能跑出可信 typecheck" <<<"$contract_out"; then
+      red "网络档($judge)仍然打印了那句全绿结论 —— 不许报绿"
+    else
+      contract_ok=$((contract_ok + 1))
+    fi
+  done
+  [ "$contract_ok" -eq 3 ] && echo "    ✓ 网络档:install 失败、[5/6] 判别复核、[6/6](a) 三个判点各自 exit 2、说「未验证」、不报绿"
 fi
 
 # ── 结局 ──────────────────────────────────────────────────────────────────────────
-if [ "$fail" -ne 0 ]; then
-  echo "    ✗ worktree bootstrap 能力判据失守" >&2
-  exit 1
-fi
-if [ "$unverified" -ne 0 ]; then
-  echo "    ⚠️  worktree bootstrap 能力**本次未验证**(见上面的未验证行)—— 不拦 push,但这一跑不构成证据"
-  exit 2
-fi
-echo "    ✓ 新建 worktree 自己就能跑出可信 typecheck(不必碰共享主 checkout)"
-exit 0
+finish

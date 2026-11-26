@@ -329,7 +329,7 @@ echo "▶ [9/14] worktree bootstrap 能力(新建 worktree 自己就能跑出可
 # 判据本体在 scripts/assert-worktree-bootstrap.sh —— 它**不**断言「脚本在」「软链在」
 # 「文件里写着 bun install」(按本仓定义那是假闸门),而是真建 worktree、真跑 typecheck,
 # 并且**先证明没 bootstrap 的树确实会红**,再用同一个探针判 bootstrap 过的树绿。
-# 代价:本机实测约 40s(3 棵探针树 + 一次 `bun install` 9.5s + 三次 ui-mac typecheck);2026-11-25 满载的 PR 门里 282s,所以 PR 门只在
+# 代价:本机空闲实测 211s(2026-11-25,I-08 去掉嵌套自跑与第二遍围栏测试之前 241s;大头是两次 process-fence-wiring:反向 ~55s、新树里冷跑 ~84s);满载的 PR 门里 282s(I-08 之前),所以 PR 门只在
 # 本分支碰到它的输入时跑(I-06)。
 # 退出码三档(与第 [10/14] 步同形):0 已验证 / 1 真失守拦住 / 2 本次未验证不拦。
 # 第 2 档的理由(owner 裁决,`#916` R2):`bun install` **依赖网络**(实测:已装好的树指向

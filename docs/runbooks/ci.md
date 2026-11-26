@@ -31,7 +31,7 @@ gate run
 > worktree、在里面跑真的 typecheck,断言它**自己**就能给出可信结论。CI 的每个 job 都是一次
 > 全新 `actions/checkout` + `bun install`,**结构上不存在 worktree**,所以这条能力只能在本地判。
 > 它守的是多 lane 并行:worktree 里拿不到真 typecheck ⇒ 每条 lane 都得去动**共享**主 checkout
-> ⇒ 谁先跑谁量到别人的树。本机实测约 50s;2026-11-25 满载的 PR 门里 282s。所以 PR 门只在本分支碰到它的输入时跑:
+> ⇒ 谁先跑谁量到别人的树。本机空闲实测 211s(2026-11-25;去掉嵌套自跑与第二遍围栏测试之前 241s,满载的 PR 门里 282s)。所以 PR 门只在本分支碰到它的输入时跑:
 > bootstrap 与判据脚本、依赖清单(只改 `"version"` 行的发版不算)与 `bun.lock`、`tsconfig*.json` / `bunfig.toml` / `.npmrc` /
 > `patches/`、husky、围栏 addon 的 C 源与构建脚本、它当探针跑的三个围栏测试与 `process-fence-apply.ts`(清单在
 > `scripts/codepuppy-check.sh` 的 `WORKTREE_BOOTSTRAP_INPUTS`);`--full`(夜间)总跑,registry、bun 版本这类环境漂移归夜间抓。

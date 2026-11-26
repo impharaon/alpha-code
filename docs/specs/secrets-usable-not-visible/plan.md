@@ -386,7 +386,7 @@ bun --eval 'import { stripAnsi } from "../session-ui/src/tools/ansi.ts"; for (co
 ## ⑤ 真引擎与平台验收证据
 
 - 依据：规格 v4 AC-01..10 / BR-01..07；冻结设计 v3.3 @ `f988de5eb1` §2/§4/§5/§10；①②③及 SC-02 已接受收据、④ `60b58554c6` 与真实退出状态修正 `44849a0fe2`；#1758。Windows 真机只在 win32-x64 包发布时验，不含 Intel Mac。
-- 核对：待编排器核对本节计划后续派实施；r7 本轮只追加⑤计划，不运行本节场景、不预填验收结论。
+- 核对：Phase: IMPLEMENT — 5511eceef3 · orchestrator / Claude Opus 5.5 · ⑤ plan PASS (every AC-01..10 has a named real-engine row with a failing condition; files limited to composer-tier-matrix cases, the scenario host row and plan.md; no frozen decision changed).
 
 ### 改动
 
@@ -405,7 +405,7 @@ bun --eval 'import { stripAnsi } from "../session-ui/src/tools/ansi.ts"; for (co
 3. **程序可用、命令与结构化文件（第二提交）**。AC-02 原样 cat，AC-03 Node 官方 dotenv fixture + 原 write/edit/patch 恢复后脚本发送到 127.0.0.1 临时 HTTP 接收端（端口由 listen(0) 分配），测试侧核收到真实值/重复 RHS、引擎侧看不到值。AC-04 使用现有 private-key fixture/真实 ssh-keygen 生成的临时测试钥匙（来源注释指向既有 provenance），只在 sandbox 放私钥/authorized_keys/host key；运行本机现有 OpenSSH sshd、临时配置与高位回环端口。用 internal-sftp/测试根验证私钥认证成功，不启动用户登录 shell/rc，不读 owner SSH 配置或 agent；client 使用明确的测试 identity、已知主机表与空配置。`/usr/sbin/sshd -V` 本轮只读确认 OpenSSH 10.2p1；无特权服务能力留实施时在临时目录验证，不请求 root/安装依赖来假定成功。AC-10 直接复制②已记录来源的真实 AWS/云配置格式，打印 package.json 与配置，核凭据字段消失而 json、端口/开关仍在。此处不重做解析器证明。
 4. **故障、Code Mode 与唯一一分钟（第三提交）**。借既有测试 probe 的 Context 注册同一个 capture hook 作一次故障注入：start（首 publish 前）、chunk（已 publish 后）、end、实际 capture 路径 IO 阻断四行。记录注入确实发生，命令仍完成副作用/真实退出码；终态 API、文件、记录、模型和卡片全部只含固定说明与运行状态。IO 例在 start 把本次临时 capture 路径占为目录，验证说明文件也不能落盘时仍无旧引用；finally 只清本次测试材料。Code Mode 行跑真实 child 结果/错误及根取消路径，用真实事件/记录证明没有原值，不以 direct snapshot 替代模型请求。长 escape 行只用一个固定 1 MiB 样本：先有密文残段、后无效 escape，在同一回调释放安全帧；不做 RSS 阈值、容量/seed 扫描。AC-09 的一分钟行在结束前观察卡片及运行文件，结束后观察模型/记录/最终文件；迭代时先不跑这行，最后经宿主一次跑完，不为同一代码再跑一分钟。
 5. **一次性反证，不加产品开关**。①②③④已有低层移除臂继承；本段另在隔离的新进程中按 AC 跑最小真实反臂。对 AC-01/02/04 去对应规则/遮盖后观察原值确实出现；AC-06 临时只向 Schema 的 PROJECT 家族加 `vault.custom` 并把同一个联合用例的文件名改成它，三处仍通过，再分别旁路 read、普通结果遮盖、risk probe，各一臂变红；不用导出/可注入名单。AC-08 的对照只移除故障隐藏并恢复原文 fallback，注入仍须命中且原值出现；AC-09 的对照延迟 publish 到 end，结束前观察失败；AC-10 把实际配置全文当匹配单位，普通 json 被遮使断言红。每次保存命令、原始输出、输入提交/差异和观察 boolean，结束后精确恢复并比对字节；不用常驻变异测试或修改旧记录。源/模块缓存不能跨臂复用，反例不得因旧 retained values 或另一消费者再次遮盖而假绿。
-6. **运行与交付**。每次真引擎、SSH、1 MiB 和一分钟均经 `gate slot --`；不跑 gate/bin/check/whole suites。迭代只跑刚变的具名行：从 `packages/ui-mac` 执行 `gate slot -- bun test --max-concurrency 2 --timeout 90000 src/main/composer-tier-matrix.engine.cases.ts -t '<具名行>'`，不包含一分钟。结束步骤只一次从同包运行 `gate slot -- bun test --max-concurrency 2 src/main/engine-cases.scenario.test.ts -t '三档 × R1'`，现有行执行全部 48 例并校验精确数/0 fail/一文件；不另跑直达 cases 全文件或宿主其它 6 行。对照一分钟为不同变异代码，只跑该臂一次，失败后用现有 Shell remove/宿主 close 在 finally 清理，不留进程。若实施中的新改动确实需要重验已跑的重例，记录新版本/原因，不重复 unchanged run。
+6. **运行与交付**。每次真引擎、SSH、1 MiB 和一分钟均经 `gate slot --`；不跑 gate/bin/check/whole suites。迭代只跑刚变的具名行：从 `packages/ui-mac` 执行 `gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/composer-tier-matrix.engine.cases.ts -t '<具名行>'`，不包含一分钟。结束步骤只一次从同包运行 `gate slot -- bun test --max-concurrency 2 src/main/engine-cases.scenario.test.ts -t '三档 × R1'`，现有行执行全部 48 例并校验精确数/0 fail/一文件；不另跑直达 cases 全文件或宿主其它 6 行。对照一分钟为不同变异代码，只跑该臂一次，失败后用现有 Shell remove/宿主 close 在 finally 清理，不留进程。若实施中的新改动确实需要重验已跑的重例，记录新版本/原因，不重复 unchanged run。
 7. 最后只一次 grep 实际改动 helper/mock/枚举消费者，跑未跑过的必要相关文件；当前预计无需改共享 helper，pure engine-adapter/run-machine 消费者已在④核过，不因写计划重跑。ui-mac `bun typecheck`、实际改动 TS scoped oxlint、`affected-tests --list`（只列范围）、Alpha profile 本次文档检查和 `git diff --check`。核宿主表仍 7 行、实际新增 static imports/literal fixture 路径可被选择器追踪；不修当前缺 `.gate-tests` 的独立输入。分上述三单元提交，只返编排器，不 push/PR/merge。
 
 ### 风险
@@ -437,4 +437,50 @@ bun --eval 'import { stripAnsi } from "../session-ui/src/tools/ansi.ts"; for (co
 
 ### 偏离记录
 
-暂无。⑤ PLAN 作者核对：Codex / GPT-6，只读检查了上述现有引擎沙箱、模型桩、生产注入/Ext 入口、scenario 宿主行、卡片投影与 OpenSSH 二进制；未运行本节重例，未改生产/测试/gate，平台与 SSH 服务实际能力没有伪报通过。下一步为编排器核对本计划后续派实施。
+r8 开始于 2026-11-26 10:41:43 UTC。直达 `.cases.ts` 命令增加 `./`（当前 Bun 否则不识别为测试路径）；fixture 的 SSH 私钥使用既有 isolation preload 钉定的 `os.homedir()`，通过 `TEST_ROOT_KEY` / `isInside` 断言其仍在受控临时根，避免把 engineSandbox 二次改写的 HOME 误当实际 Ext home。八个显式路径变量仍全部在 sandbox。生产/共享 helper/gate 未因此改动。
+
+### r8 Core shell 基线排除
+
+- `packages/core/test/tool-shell.test.ts` 既有红：按 r8 明确授权，在同一工作树隔离替换 `7908e11402` 的 Core `src/shell.ts` + 整测试文件，随后 HEAD 恢复并逐字节核对；两次均从 core 执行 `gate slot -- bun test --max-concurrency 2 --reporter=junit --reporter-outfile <evidence>/current.xml test/tool-shell.test.ts`。base exit 1 / 36 pass / 11 skip / 23 fail / 19 errors；HEAD exit 1 / 41 pass / 11 skip / 23 fail / 19 errors。23 个 JUnit 失败名称集合完全相同，HEAD-only 0、base-only 0；两边另有 19 次无 testcase 名称的 `Unhandled error between tests`（TimeoutError），JUnit 不产生 error 节点，不把它们伪造为额外具名失败。日志、XML、退出码及 comparison.json 位于 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r8-tool-shell-ntcdlfbe`；本轮不改既有 shell 语义，遗留去向为编排器已知上游问题。
+
+两边共有（23）：
+
+- `ShellTool compound syntax approval compatibility > bash: printf %s "$(probe() case value in (value) printf hello;; esac; probe)"`
+- `ShellTool compound syntax approval compatibility > bash: probe() for value in a b; do printf %s "$value"; done; probe`
+- `ShellTool compound syntax approval compatibility > zsh: for value ($(printf a)) do printf %s "$value"; done`
+- `ShellTool compound syntax approval compatibility > zsh: for value (a b) printf %s "$value"`
+- `ShellTool compound syntax approval compatibility > zsh: for value (a b) { printf %s "$value"; }`
+- `ShellTool conditional process substitution > conditional substitutions respect always`
+- `ShellTool conditional process substitution > conditional substitutions respect once`
+- `ShellTool ordinary shell syntax > bash: ANSI-C quoting reuses existing approvals`
+- `ShellTool ordinary shell syntax > bash: arithmetic statement reuses existing approvals`
+- `ShellTool ordinary shell syntax > bash: function and case reuses existing approvals`
+- `ShellTool ordinary shell syntax > bash: heredoc substitution reuses existing approvals`
+- `ShellTool ordinary shell syntax > bash: loop with a conditional reuses existing approvals`
+- `ShellTool ordinary shell syntax > bash: parameter fallback reuses existing approvals`
+- `ShellTool ordinary shell syntax > bash: quoted heredoc reuses existing approvals`
+- `ShellTool ordinary shell syntax > zsh: ANSI-C quoting reuses existing approvals`
+- `ShellTool ordinary shell syntax > zsh: arithmetic statement reuses existing approvals`
+- `ShellTool ordinary shell syntax > zsh: function and case reuses existing approvals`
+- `ShellTool ordinary shell syntax > zsh: heredoc substitution reuses existing approvals`
+- `ShellTool ordinary shell syntax > zsh: loop with a conditional reuses existing approvals`
+- `ShellTool ordinary shell syntax > zsh: parameter fallback reuses existing approvals`
+- `ShellTool ordinary shell syntax > zsh: quoted heredoc reuses existing approvals`
+- `ShellTool scanner permissions > declarations reuse approvals while substitutions retain reject/once/always behavior`
+- `ShellTool scanner permissions > pipeline redirect keeps the redirect target visible to exact approval and denial`
+
+仅 HEAD：无（0）。仅 base：无（0）。新增五个 capture 例均 PASS。
+
+### r8 静态检查与选择范围
+
+- `bun typecheck`（ui-mac）exit 0；scoped `bunx --no-install oxlint packages/ui-mac/src/main/composer-tier-matrix.engine.cases.ts packages/ui-mac/src/main/engine-cases.scenario.test.ts` exit 0；`git diff --check` exit 0。
+- 一次 wider-related 搜索 `rg -n 'composer-tier-matrix|engine-cases\.scenario' packages/ui-mac scripts --glob '*test.ts' --glob '*cases.ts'`，宿主枚举消费者为 `gate-file-registry.test.ts`；从 ui-mac 运行 `bun test --max-concurrency 2 src/main/gate-file-registry.test.ts` exit 0，25 pass / 0 fail。共享 helper 没有修改，无新增 mock/export 消费者要重跑。
+- `affected-tests --list` exit 2：`No such file or directory: '<worktree>/.gate-tests'`，无 scope line；本轮不改被冻结的 gate 输入。新增病例仍在现有 scenario 宿主，常驻 nightly；literal imports / fixture URL 保持可追踪，没有把重例移到 PR。
+- Alpha profile 的 `check_docs_contract.py.check_repo(..., changed_since='HEAD')` 返回本次 plan.md 0 finding；既有文档 finding 留原归属，不扩查/修复。
+
+### r8 场景实施单元
+
+- 代码单元合并原先三个编写单元的同一 case 模块/宿主计数（共享观察器需要完整接通）；本轮采用“场景与初步收据 / 最终重例和移除臂收据”两个提交。没有增加文件、生产配置/接口、依赖、gate 或冻结决定；首提交填入⑤核对行。
+- 引擎本身按模型选择 writer：非 GPT 列 edit/write、GPT 列 patch（Core `tool/plugin/patch.ts` 的既有 context hook）。AC-03 通过现成 `platformModels` fixture 提供 `gpt-fixture`，前两个 writer 后经原 `session.switchModel` 路由切换再调用 patch，未注入/替换 writer。三个阶段都核 duplicate keys 的实际原 RHS，最终接收端真实收到原值。独立命名检查 exit 0 / 1 pass（`/tmp/secrets-r8-writers-green.log`）。
+- 原 R3 裸权限断言的 readonly 期望改为 allow，真实 read 的三档安全视图由新 AC-01 行负责；原 `/goal` 外读 build 从 ask 改 allow，对应 BR-05。readonly 的 read 包装错误只有 `Unable to read`，该旧观察器补查同一权限服务的具名 `external_directory` deny，再认定拒绝；没有把任意错误认作 deny。旧断言先红（`/tmp/secrets-r8-replaced.log`），修订后的 `/goal` 已单独 PASS（`/tmp/secrets-r8-input-green.log`）。
+- 迭代证据：读三档 + 普通外读三档为 6 PASS；联合名单行、真实 SSH 为 2 PASS（`/tmp/secrets-r8-program-fix.log`，同批 AC-03 旧 fixture 断言红另行修正）；cat 与真实 AWS 格式行为为 2 PASS（`/tmp/secrets-r8-programs.log`）；capture 四相故障与 Code Mode 为 5 PASS（`/tmp/secrets-r8-closure.log`）。这些分次结果不冒充完整宿主结果；完整 48 行、一分钟与 1 MiB 及移除臂由后续收据记实际结果。

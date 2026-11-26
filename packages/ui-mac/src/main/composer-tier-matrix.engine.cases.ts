@@ -26,11 +26,33 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
+import os from "node:os"
+import { randomUUID } from "node:crypto"
+import type { OpenCodeEvent } from "@opencode/client/promise"
+import type { ShellCapture } from "@opencode/plugin/promise/shell"
+import { ProtectedFiles } from "../../../schema/src/codepuppy-protected-files"
+import { TEST_ROOT_KEY, isInside } from "../../../../scripts/test-isolation/env"
+import type { Part } from "../engine-adapter/contract/v1"
+import { createReceiptLedger } from "../engine-adapter/contract/receipts"
+import { createProjector } from "../engine-adapter/opencode2/events"
+import { createShellRunState, shellRunProps, transitionShellRun, viewShellRun } from "../../../session-ui/src/tools/run-machine"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { allowProject, codepuppyEngine, fakeMainReceived, policyStore, probe, scriptedModel, textOf, type Running } from "../../test-component/codepuppy-engine"
 import { watchExplicitSources } from "./engine-explicit-config"
 
 const sandbox = engineSandbox()
+// Exhaustive input on the published domain axis; never inherit a host credential location.
+const protectedPaths: Record<ProtectedFiles.ProtectedPathVariable, string> = {
+  AWS_SHARED_CREDENTIALS_FILE: path.join(sandbox.home, ".aws", "credentials"),
+  AWS_CONFIG_FILE: path.join(sandbox.home, ".aws", "config"),
+  DOCKER_CONFIG: path.join(sandbox.home, ".docker"),
+  KUBECONFIG: path.join(sandbox.home, ".kube", "config"),
+  GNUPGHOME: path.join(sandbox.home, ".gnupg"),
+  GOOGLE_APPLICATION_CREDENTIALS: path.join(sandbox.home, "gcp.json"),
+  CLOUDSDK_CONFIG: path.join(sandbox.home, ".config", "gcloud"),
+  AZURE_CONFIG_DIR: path.join(sandbox.home, ".azure"),
+}
+Object.assign(process.env, protectedPaths)
 const FACTORY_SKILLS = path.join(sandbox.root, "factory-skills")
 const MCP_CALLS = path.join(sandbox.root, "tiers-mcp-calls.log")
 const BUILD = "build"
@@ -50,12 +72,15 @@ const send = (method: string, route: string, body?: unknown) => running!.send(me
 
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
+  // Bun's default os export is pinned by the isolation preload, before engineSandbox's nested HOME.
+  expect(isInside(process.env[TEST_ROOT_KEY]!, os.homedir())).toBe(true)
   // R2:出厂技能目录(main 启动时算好,`#1698` 起经启动文档的 skills.factoryDirs 交给注入与 ext)
   fs.mkdirSync(FACTORY_SKILLS, { recursive: true })
   const host = codepuppyEngine({
     sandbox,
     name: "tiers",
     modelBaseURL: model.baseURL,
+    platformModels: { m: { name: "m" }, "gpt-fixture": { name: "gpt-fixture" } },
     factoryDirs: [FACTORY_SKILLS],
     // R10:用户在 Code Puppy 里加的本地 MCP,真 stdio MCP 服务器,只列一个 echo 工具
     mcpCallLog: MCP_CALLS,
@@ -189,7 +214,7 @@ function undefinedPaths(value: unknown, at = "$"): string[] {
 describe("能力轴:真注入的三档规则 + 引擎底座 + ext 的 evaluate 钩子(R1 R3 R4 R5 R6a R8)", () => {
   const cells: Array<[string, string, string, Record<Tier, Outcome>]> = [
     ["R1 工作区内读", "read", "a.txt", expected({ build: "allow", "codepuppy-ask": "allow", "codepuppy-readonly": "allow" })],
-    ["R3 读 .env", "read", ".env", expected({ build: "ask", "codepuppy-ask": "ask", "codepuppy-readonly": "deny" })],
+    ["R3 裸能力断言读 .env(安全读视图另判)", "read", ".env", expected({ build: "ask", "codepuppy-ask": "ask", "codepuppy-readonly": "allow" })],
     ["R4 改文件", "edit", "a.txt", expected({ build: "allow", "codepuppy-ask": "ask", "codepuppy-readonly": "deny" })],
     ["R5 运行命令", "shell", "ls", expected({ build: "allow", "codepuppy-ask": "ask", "codepuppy-readonly": "deny" })],
     ["R6a 派给其它助手", "subagent", "general", expected({ build: "allow", "codepuppy-ask": "ask", "codepuppy-readonly": "deny" })],
@@ -516,6 +541,386 @@ describe("ext 造出的每一种待批请求都能经引擎路由列出,且 JSON
   }, 30_000)
 })
 
+// Scenario/nightly: real engine, production event projector and card state, no renderer/window.
+const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
+async function eventually(check: () => boolean | Promise<boolean>, label: string, timeout = 8000) {
+  for (const until = Date.now() + timeout; Date.now() < until; await Bun.sleep(25)) if (await check()) return
+  throw new Error(`Timed out: ${label}`)
+}
+
+async function protectedRow(agent: Tier, files: Record<string, string>, run: (row: Awaited<ReturnType<typeof observeProtected>>) => Promise<void>) {
+  const directory = fs.mkdtempSync(path.join(sandbox.root, "protected-project-"))
+  for (const [file, content] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true })
+    fs.writeFileSync(path.join(directory, file), content)
+  }
+  const row = await observeProtected(directory, agent)
+  try { await run(row) } finally { await row.close() }
+}
+
+async function observeProtected(directory: string, agent: Tier) {
+  const { OpenCode } = await import("@opencode/client/promise")
+  const api = OpenCode.make({ baseUrl: running!.url, fetch: ((input, init) => running!.fetch(new Request(input, init))) as typeof fetch })
+  const request = async (method: string, route: string, body?: unknown) => {
+    const response = await running!.fetch(new Request(new URL(route, running!.url), {
+      method, headers: { "content-type": "application/json", "x-opencode-directory": directory },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    }))
+    expect(response.status < 300, `${method} ${route}`).toBe(true)
+    return response
+  }
+  const created = await request("POST", "/api/session", { location: { directory }, agent, model: { id: "m", providerID: "codepuppy" } })
+  const id = (await created.json()).data.id as string
+  await request("POST", `/api/session/${id}/prompt`, { text: "hello" })
+  await request("POST", `/api/experimental/session/${id}/wait`)
+  const context = probe().ctx
+  const captures: Array<{ id: string; file: string; phase: string }> = []
+  await context.shell.hook("capture", (event: ShellCapture) => { captures.push({ id: event.id, file: event.file, phase: event.phase }) })
+  const parts: Extract<Part, { type: "tool" }>[] = []
+  const events: OpenCodeEvent[] = []
+  const project = createProjector(api, (_directory, event) => {
+    if (event.type === "message.part.updated" && event.properties.part.type === "tool") parts.push(event.properties.part)
+  }, createReceiptLedger())
+  const controller = new AbortController()
+  const ready = Promise.withResolvers<void>()
+  const reader = (async () => {
+    for await (const event of api.event.subscribe({ signal: controller.signal })) {
+      if (event.type === "server.connected") ready.resolve()
+      if ("sessionID" in event.data && event.data.sessionID === id) {
+        events.push(event)
+        await project(event)
+      }
+    }
+  })()
+  await ready.promise
+  const before = modelRequests.length
+  let turns = 0
+  const start = async (name: string, args: Record<string, unknown>) => {
+    await request("POST", `/api/session/${id}/prompt`, { text: `CP-CALL ${JSON.stringify({ name, args })}` })
+    turns++
+    return { settled: request("POST", `/api/experimental/session/${id}/wait`) }
+  }
+  const call = async (name: string, args: Record<string, unknown>, approve = false) => {
+    const turn = await start(name, args)
+    const asked: Awaited<ReturnType<typeof pendingOf>> = []
+    let done = false
+    void turn.settled.then(() => { done = true })
+    while (!done) {
+      const list = (await (await request("GET", `/api/session/${id}/permission`)).json()).data as typeof asked
+      for (const item of list) {
+        asked.push(item)
+        await request("POST", `/api/session/${id}/permission/${item.id}/reply`, { decision: approve ? "once" : "reject" })
+      }
+      await Bun.sleep(25)
+    }
+    await turn.settled
+    return asked
+  }
+  const snapshot = async () => {
+    await eventually(() => new Set(parts.filter((part) => part.state.status === "completed" || part.state.status === "error").map((part) => part.id)).size >= turns, "current turn terminal card")
+    const messages = await api.message.list({ sessionID: id })
+    return {
+      model: JSON.stringify(modelRequests.slice(before).flatMap((item) => item.messages.filter((message) => message.role === "tool"))),
+      records: JSON.stringify(messages), cards: JSON.stringify(parts), messages,
+    }
+  }
+  const card = () => {
+    const part = parts.filter((part) => part.tool === "shell").at(-1)
+    if (!part || part.state.status === "pending") return undefined
+    const state = part.state
+    const props = shellRunProps({ status: state.status, input: state.input, metadata: state.metadata ?? {}, output: "output" in state ? state.output : state.metadata?.output }, () => state.status === "running")
+    return viewShellRun(transitionShellRun(createShellRunState(props), { type: "sync", props }))
+  }
+  return {
+    id, directory, api, context, captures, parts, events, request, call, start, snapshot, card,
+    close: async () => {
+      await request("POST", `/api/session/${id}/interrupt`)
+      for (const shell of (await api.shell.list({ location: { directory } })).data)
+        await api.shell.remove({ id: shell.id, location: { directory } })
+      controller.abort()
+      await reader
+    },
+  }
+}
+
+function hidden(surfaces: Record<string, unknown>, values: readonly string[]) {
+  for (const [name, surface] of Object.entries(surfaces))
+    for (const value of values) expect(JSON.stringify(surface).includes(value), `${name} contains a protected value`).toBe(false)
+}
+
+describe("protected files", () => {
+  for (const [tier, name] of [[BUILD, "build"], [ASK, "ask"], [READONLY, "readonly"]] as const) {
+    test(`protected files read ${name}`, async () => {
+      const value = randomUUID()
+      // Node's dotenv grammar (same source as secret-values.test.ts); generated RHS only.
+      const multiline = randomUUID()
+      await protectedRow(tier, { ".env": `KEY=${value}\nPORT=3000\nLONG='${"x".repeat(2500)}'\nMULTI="${multiline}\ncontinued"\n` }, async (row) => {
+        expect(await row.call("read", { path: ".env", limit: 2 })).toEqual([])
+        const first = await row.snapshot()
+        hidden(first, [value, multiline])
+        for (const text of [first.model, first.records, first.cards]) {
+          expect(text.includes("KEY=[REDACTED]")).toBe(true)
+          expect(text.includes("PORT=3000")).toBe(true)
+        }
+        expect(await row.call("read", { path: ".env", offset: 3, limit: 2 })).toEqual([])
+        const page = await row.snapshot()
+        hidden(page, [value, multiline, "x".repeat(50)])
+        expect(page.model.includes("LONG=")).toBe(true)
+        expect(page.model.includes("MULTI=")).toBe(true)
+      })
+    })
+    test(`protected files ordinary outside read ${name}`, async () => {
+      const file = path.join(fs.mkdtempSync(path.join(sandbox.root, "ordinary-outside-")), "plain.txt")
+      fs.writeFileSync(file, "ordinary-outside-content\n")
+      await protectedRow(tier, {}, async (row) => {
+        const asked = await row.call("read", { path: file })
+        expect(asked.length).toBe(tier === ASK ? 1 : 0)
+        const result = await row.snapshot()
+        expect(result.model.includes("ordinary-outside-content")).toBe(tier === BUILD)
+        if (tier === READONLY) expect(row.parts.some((part) => part.state.status === "error")).toBe(true)
+      })
+    })
+  }
+
+  test("protected files one rule reaches three consumers", async () => {
+    const file = "secret.env"
+    const value = randomUUID()
+    await protectedRow(BUILD, { [file]: `KEY=${value}\nPORT=3000\n` }, async (row) => {
+      await row.context.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({
+        name: "echo_protected", description: "protected fixture", options: { codemode: false }, input: { type: "object", properties: {} },
+        execute: async (_input, context) => {
+          await row.context.permission.assert({ sessionID: context.sessionID, action: "edit", resources: [file], save: [], metadata: { file } })
+          return { content: fs.readFileSync(path.join(row.directory, file), "utf8") }
+        },
+      }))
+      expect(await row.call("read", { path: file })).toEqual([])
+      const read = await row.snapshot()
+      hidden(read, [value])
+      expect(read.model.includes("KEY=[REDACTED]")).toBe(true)
+      expect(read.model.includes(ProtectedFiles.PROTECTED_FILE_TEXT)).toBe(true)
+      await row.context.agent.transform((editor: import("@opencode/plugin/promise/agent").AgentEditor) => editor.update(BUILD as never, (draft) => {
+        draft.permissions.push({ action: "edit", resource: "*", effect: "ask" })
+      }))
+      const asked = await row.call("echo_protected", {}, true)
+      expect(asked.some((item) => item.metadata?.codepuppyRisk?.facts?.signals.includes("credential-path"))).toBe(true)
+      const echoed = await row.snapshot()
+      hidden(echoed, [value])
+      expect(echoed.model.includes("PORT=3000")).toBe(true)
+    })
+  })
+
+  test("protected files shell model records and card", async () => {
+    const value = randomUUID()
+    await protectedRow(BUILD, { ".env": `KEY=${value}\nPORT=3000\n` }, async (row) => {
+      expect(await row.call("shell", { command: "cat .env" })).toEqual([])
+      const result = await row.snapshot()
+      const disk = fs.readFileSync(row.captures[0]!.file, "utf8")
+      hidden({ ...result, disk, card: row.card() }, [value])
+      for (const text of [result.model, result.records, result.cards, disk, row.card()?.output ?? ""]) {
+        expect(text.includes("KEY=[REDACTED]")).toBe(true)
+        expect(text.includes("PORT=3000")).toBe(true)
+      }
+    })
+  })
+
+  test("protected files restored env reaches local receiver", async () => {
+    const values = [randomUUID(), randomUUID()]
+    const original = `KEY='${values[0]}'\nKEY="${values[1]}"\nPORT=3000\n`
+    const received: string[] = []
+    const receiver = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) { received.push(await request.text()); return new Response("received") } })
+    try {
+      await protectedRow(BUILD, {
+        ".env": original,
+        "send.mjs": `import fs from 'node:fs'; import {parseEnv} from 'node:util'; const raw=fs.readFileSync('.env','utf8'); await fetch('http://127.0.0.1:${receiver.port}',{method:'POST',body:JSON.stringify({value:parseEnv(raw).KEY,raw})}); console.log(raw);`,
+      }, async (row) => {
+        const masked = "KEY=[REDACTED]\nKEY=[REDACTED]\nPORT=3000\n"
+        expect(await row.call("write", { path: ".env", content: masked })).toEqual([])
+        expect(fs.readFileSync(path.join(row.directory, ".env"), "utf8") === original).toBe(true)
+        expect(await row.call("edit", { path: ".env", oldString: masked.trimEnd(), newString: masked.replace("3000", "3001").trimEnd() })).toEqual([])
+        expect(fs.readFileSync(path.join(row.directory, ".env"), "utf8") === original.replace("3000", "3001")).toBe(true)
+        // The engine exposes patch for GPT models and edit/write for other models. Select its real branch.
+        await row.request("POST", `/api/session/${row.id}/model`, { model: { id: "gpt-fixture", providerID: "codepuppy" } })
+        expect(await row.call("patch", { patchText: "*** Begin Patch\n*** Update File: .env\n@@\n KEY=[REDACTED]\n KEY=[REDACTED]\n-PORT=3001\n+PORT=3002\n*** End Patch" })).toEqual([])
+        const expected = original.replace("3000", "3002")
+        expect(fs.readFileSync(path.join(row.directory, ".env"), "utf8") === expected).toBe(true)
+        expect(await row.call("shell", { command: "node send.mjs" })).toEqual([])
+        expect(received.length).toBe(1)
+        const body = JSON.parse(received[0]!) as { value: string; raw: string }
+        expect(body.value === values[1] && body.raw === expected).toBe(true)
+        hidden(await row.snapshot(), values)
+        expect(row.card()?.output.includes("KEY='[REDACTED]'")).toBe(true)
+        expect(row.card()?.output.includes('KEY="[REDACTED]"')).toBe(true)
+      })
+    } finally { await receiver.stop(true) }
+  })
+
+  test("protected files cloud fields keep ordinary values", async () => {
+    // Actual AWS CLI-format fixtures, provenance.json records the CLI writer/version.
+    const credentials = fs.readFileSync(new URL("../../../ext/src/fixtures/secret-files/aws-credentials.ini", import.meta.url), "utf8")
+    const config = fs.readFileSync(new URL("../../../ext/src/fixtures/secret-files/aws-config.ini", import.meta.url), "utf8")
+    const value = randomUUID()
+    const cloud = credentials.replace("fixture-secret-key", value) + config.replace("[default]", "[profile ordinary]")
+    fs.mkdirSync(path.dirname(protectedPaths.AWS_SHARED_CREDENTIALS_FILE), { recursive: true })
+    fs.writeFileSync(protectedPaths.AWS_SHARED_CREDENTIALS_FILE, cloud)
+    await protectedRow(BUILD, { "package.json": '{"type":"module","output":"json","port":3000,"enabled":true}\n' }, async (row) => {
+      expect(await row.call("shell", { command: `cat package.json ${quote(protectedPaths.AWS_SHARED_CREDENTIALS_FILE)}` })).toEqual([])
+      const result = await row.snapshot()
+      hidden(result, [value, "fixture-access-key"])
+      for (const text of [result.model, result.records, result.cards, row.card()?.output ?? ""]) {
+        for (const ordinary of ["output = json", "3000", "true", "region = us-east-1"]) expect(text.includes(ordinary), ordinary).toBe(true)
+        expect(text.includes("aws_secret_access_key = [REDACTED]")).toBe(true)
+      }
+    })
+  })
+
+  test("protected files private key authenticates over SSH", async () => {
+    const root = fs.mkdtempSync(path.join(sandbox.root, "sshd-"))
+    const key = path.join(os.homedir(), ".ssh", "id_ed25519")
+    fs.mkdirSync(path.dirname(key), { recursive: true, mode: 0o700 })
+    for (const target of [key, path.join(root, "host")]) {
+      const child = Bun.spawn(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", target], { stdout: "ignore", stderr: "pipe" })
+      expect(await child.exited).toBe(0)
+    }
+    const net = await import("node:net")
+    const port = await new Promise<number>((resolve) => {
+      const listener = net.createServer()
+      listener.listen(0, "127.0.0.1", () => { const port = (listener.address() as import("node:net").AddressInfo).port; listener.close(() => resolve(port)) })
+    })
+    fs.copyFileSync(`${key}.pub`, path.join(root, "authorized_keys"))
+    fs.writeFileSync(path.join(root, "config"), `Port ${port}\nListenAddress 127.0.0.1\nHostKey ${path.join(root, "host")}\nPidFile ${path.join(root, "pid")}\nAuthorizedKeysFile ${path.join(root, "authorized_keys")}\nStrictModes no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nPermitUserRC no\nForceCommand internal-sftp -d ${root}\nSubsystem sftp internal-sftp\nLogLevel VERBOSE\n`)
+    fs.writeFileSync(path.join(root, "known_hosts"), `[127.0.0.1]:${port} ${fs.readFileSync(path.join(root, "host.pub"), "utf8")}`)
+    fs.writeFileSync(path.join(root, "client"), "")
+    fs.writeFileSync(path.join(root, "batch"), "pwd\nquit\n")
+    const server = Bun.spawn(["/usr/sbin/sshd", "-D", "-e", "-f", path.join(root, "config")], { stdout: "ignore", stderr: "pipe" })
+    let serverLog = ""
+    const log = new Response(server.stderr).text().then((text) => { serverLog = text })
+    try {
+      await Bun.sleep(300)
+      const privateKey = fs.readFileSync(key, "utf8")
+      await protectedRow(BUILD, {}, async (row) => {
+        expect(await row.call("read", { path: key })).toEqual([])
+        expect(await row.call("shell", { command: `cat ${quote(key)}` })).toEqual([])
+        const printed = await row.snapshot()
+        hidden(printed, [privateKey, privateKey.split("\n")[1]!])
+        expect(printed.model.includes(ProtectedFiles.PROTECTED_FILE_TEXT)).toBe(true)
+        if (server.exitCode !== null) { await log; throw new Error(`AC-04 machine prerequisite: unprivileged loopback sshd: ${serverLog}`) }
+        const command = `sftp -F ${quote(path.join(root, "client"))} -b ${quote(path.join(root, "batch"))} -i ${quote(key)} -P ${port} -o IdentityAgent=none -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${quote(path.join(root, "known_hosts"))} ${quote(`${os.userInfo().username}@127.0.0.1`)}`
+        expect(await row.call("shell", { command })).toEqual([])
+        const result = await row.snapshot()
+        hidden(result, [privateKey, privateKey.split("\n")[1]!])
+        expect(row.card()?.output.includes(`Remote working directory: ${root}`)).toBe(true)
+        expect(row.parts.some((part) => part.tool === "shell" && part.state.status === "completed" && part.state.metadata.exit === 0)).toBe(true)
+      })
+    } finally { server.kill(); await server.exited; await log }
+    expect(serverLog.includes("Accepted publickey")).toBe(true)
+  })
+
+  for (const phase of ["start", "chunk", "end", "io"] as const) test(`protected files capture failure ${phase}`, async () => {
+    const value = randomUUID()
+    await protectedRow(BUILD, {
+      ".env": `KEY=${value}\nPORT=3000\n`,
+      "fail.mjs": "import fs from 'node:fs'; console.log('safe-prefix'); console.log(fs.readFileSync('.env','utf8')); await new Promise(r=>setTimeout(r,100)); fs.writeFileSync('completed','yes'); process.exit(7);",
+    }, async (row) => {
+      let injected = false
+      let published = false
+      let blocked = ""
+      await row.context.shell.hook("capture", (event: ShellCapture) => {
+        if (injected || event.phase !== (phase === "io" ? "start" : phase)) return
+        injected = true
+        if (phase === "io") { fs.mkdirSync(event.file); blocked = event.file; return }
+        if (phase === "chunk") published = fs.readFileSync(event.file, "utf8").includes("safe-prefix")
+        throw new Error("injected capture failure")
+      })
+      try {
+        expect(await row.call("shell", { command: "node fail.mjs" })).toEqual([])
+        expect(injected).toBe(true)
+        if (phase === "chunk") expect(published).toBe(true)
+        expect(fs.readFileSync(path.join(row.directory, "completed"), "utf8") === "yes").toBe(true)
+        const result = await row.snapshot()
+        hidden(result, [value])
+        expect(row.parts.some((part) => part.tool === "shell" && part.state.status === "completed" && part.state.metadata.exit === 7)).toBe(true)
+        for (const text of [result.model, result.records, row.card()?.output ?? ""]) {
+          expect(text.includes(ProtectedFiles.MASKING_FAILED_TEXT)).toBe(true)
+          expect(text.includes("safe-prefix") || text.includes("PORT=3000")).toBe(false)
+        }
+        if (phase !== "io") expect(fs.readFileSync(row.captures[0]!.file, "utf8") === ProtectedFiles.MASKING_FAILED_TEXT).toBe(true)
+        if (phase === "io") expect(result.model.includes(row.captures[0]!.file)).toBe(false)
+      } finally { if (blocked) fs.rmdirSync(blocked) }
+    })
+  })
+
+  test("protected files Code Mode results errors and cancelled progress", async () => {
+    const value = "1234"
+    await protectedRow(BUILD, { ".env": `PASSWORD=${value}\n` }, async (row) => {
+      await row.context.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => {
+        editor.add({ name: "mask_value", description: "credential fixture", input: { type: "object", properties: { note: { type: "string" }, fail: { type: "boolean" } } }, execute: async (input: { fail?: boolean }) => {
+          if (input.fail) throw new Error(value)
+          return { content: value }
+        } })
+        editor.add({ name: "mask_wait", description: "cancellable fixture", input: { type: "object", properties: { note: { type: "string" } } }, execute: async (_input: unknown, context: import("@opencode/plugin/promise/tool").ToolContext) => new Promise<{ content: string }>((resolve) => {
+          context.signal.addEventListener("abort", () => resolve({ content: "cancelled" }), { once: true })
+        }) })
+      })
+      expect(await row.call("execute", { code: "return await tools.mask_value({note:String(1230+4)})" })).toEqual([])
+      expect(await row.call("execute", { code: "return await tools.mask_value({note:String(1230+4),fail:true})" })).toEqual([])
+      const result = await row.snapshot()
+      hidden({ ...result, events: row.events }, [value])
+      expect(result.model.includes(ProtectedFiles.REDACTED)).toBe(true)
+      const start = row.events.length
+      const turn = await row.start("execute", { code: "return await tools.mask_wait({note:String(1230+4)})" })
+      await eventually(() => row.events.slice(start).some((event) => event.type === "session.tool.progress"), "outer Code Mode progress")
+      expect((await (await row.request("POST", `/api/session/${row.id}/interrupt`)).json()).interrupted).toBe(true)
+      await turn.settled
+      hidden({ ...(await row.snapshot()), events: row.events }, [value])
+      expect(JSON.stringify(row.events.slice(start)).includes(ProtectedFiles.REDACTED)).toBe(true)
+    })
+  })
+
+  test("protected files minute live output", async () => {
+    const value = randomUUID()
+    await protectedRow(BUILD, {
+      ".env": `KEY=${value}\nPORT=3000\n`,
+      "minute.mjs": "import fs from 'node:fs'; console.log(fs.readFileSync('.env','utf8')); const timer=setInterval(()=>console.log('still-running'),1000); await new Promise(r=>setTimeout(r,60000)); clearInterval(timer);",
+    }, async (row) => {
+      const turn = await row.start("shell", { command: "node minute.mjs", timeout: 80000 })
+      await eventually(() => Boolean(row.card()?.pending && row.card()?.output.includes("KEY=[REDACTED]")), "live minute card")
+      const capture = row.captures[0]!
+      expect(row.captures.some((event) => event.phase === "end")).toBe(false)
+      const disk = fs.readFileSync(capture.file, "utf8")
+      const live = await row.api.shell.output({ id: capture.id, location: { directory: row.directory } })
+      hidden({ disk, live, card: row.card(), events: row.events }, [value])
+      expect(disk.includes("PORT=3000") && live.data.output.includes("KEY=[REDACTED]")).toBe(true)
+      await turn.settled
+      hidden({ ...(await row.snapshot()), disk: fs.readFileSync(capture.file, "utf8") }, [value])
+      expect(row.card()?.output.includes("KEY=[REDACTED]")).toBe(true)
+    })
+  }, 90_000)
+
+  test("protected files invalid escape publishes streamed residue", async () => {
+    const value = randomUUID()
+    await protectedRow(BUILD, {
+      ".env": `KEY=${value}\n`,
+      "escape.mjs": "import fs from 'node:fs'; import {parseEnv} from 'node:util'; const wait=async f=>{while(!fs.existsSync(f)) await new Promise(r=>setTimeout(r,10))}; process.stdout.write('\\x1b]'+parseEnv(fs.readFileSync('.env','utf8')).KEY+'x'.repeat(1024*1024)); await wait('invalid'); process.stdout.write('\\x1bXvisible-tail'); await wait('finish');",
+    }, async (row) => {
+      const turn = await row.start("shell", { command: "node escape.mjs", timeout: 80000 })
+      await eventually(() => row.captures.some((event) => event.phase === "chunk"), "encrypted escape capture")
+      const capture = row.captures[0]!
+      await eventually(() => fs.readdirSync(path.dirname(capture.file)).filter((name) => name.startsWith(path.basename(capture.file) + ".pending.")).some((name) => fs.statSync(path.join(path.dirname(capture.file), name)).size > 1024 * 1024), "one MiB encrypted residue")
+      expect(fs.statSync(capture.file).size).toBe(0)
+      for (const name of fs.readdirSync(path.dirname(capture.file)).filter((name) => name.startsWith(path.basename(capture.file) + ".pending.")))
+        expect(fs.readFileSync(path.join(path.dirname(capture.file), name)).includes(Buffer.from(value))).toBe(false)
+      fs.writeFileSync(path.join(row.directory, "invalid"), "")
+      await eventually(() => Boolean(row.card()?.pending && row.card()?.output.includes("visible-tail")), "same-flush live residue card")
+      const disk = fs.readFileSync(capture.file, "utf8")
+      expect(disk.includes(ProtectedFiles.REDACTED) && disk.includes("visible-tail")).toBe(true)
+      hidden({ disk, parts: row.parts, events: row.events }, [value])
+      fs.writeFileSync(path.join(row.directory, "finish"), "")
+      await turn.settled
+      hidden({ ...(await row.snapshot()), disk: fs.readFileSync(capture.file, "utf8") }, [value])
+    })
+  }, 90_000)
+})
+
 // ── R2:用户自己的规则照 v1 胜出;技能翻代不必重新注入 ─────────────────────────────────────────────────────
 // 这一组各起各的引擎(放在文件最后:新引擎的探针插件会接管 probe())。v1:用户配置里的 `external_directory` 排在引擎默认规则
 // 之后(`merge(defaults, user)`),所以用户写的放行生效;只读档自己的 deny 在它的 agent 规则里,放不开。
@@ -569,7 +974,7 @@ describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部
   // 不经过普通 prompt。每档各起一台引擎,`/goal` 是它收到的第一句、也是唯一一句;目标里的 `CP-CALL` 让模型桩在开场那一轮就读一个
   // 工作区外的文件(read 工具先断言 external_directory)。结局看引擎的待批列表(询问)与模型下一次收到的工具消息(放行 = 文件内容到了模型,
   // 拒绝 = 具名拒绝)。已知的坏(改之前实测):规则等第一句普通 prompt 才注册 ⇒ 全部批准与请求审批两档直接放行。
-  test("第一句是 /goal(经 session.synthetic 起第一轮)⇒ 读工作区外的文件:全部批准 / 请求审批先问,只读拒绝", async () => {
+  test("第一句是 /goal(经 session.synthetic 起第一轮)⇒ 读工作区外的文件:全部批准直接读,请求审批先问,只读拒绝", async () => {
     const outsideDir = path.join(sandbox.root, "goal-outside")
     fs.mkdirSync(outsideDir, { recursive: true })
     const outsideFile = path.join(outsideDir, "note.txt")
@@ -600,6 +1005,15 @@ describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部
             .join("\n")
           if (toolText.includes(CONTENT)) outcome = "allow"
           else if (/Permission denied: external_directory/.test(toolText)) outcome = "deny"
+          else if (tier === READONLY && toolText.includes(`Unable to read ${outsideFile}`)) {
+            // Read wraps its failure; retain the actual denial assertion rather than accepting any tool error.
+            const denial = await Promise.resolve(probe().ctx.permission.assert({ sessionID, agent: tier, action: "external_directory", resources: [`${outsideDir}/*`], save: [] })).then(
+              () => "allowed",
+              (error: unknown) => String((error as { message?: string })?.message ?? error),
+            )
+            expect(denial).toContain("Permission denied: external_directory")
+            outcome = "deny"
+          }
         }
         // 判官自检:这一轮确实由 goal 的开场白(synthetic)起的,模型桩收到过它
         expect(model.requests.slice(before).some((request) => request.messages.some((message) => message.role === "user" && textOf(message.content).includes("CP-CALL")))).toBe(true)
@@ -609,7 +1023,7 @@ describe("R2:用户在四处写的 external_directory 放行照 v1 胜出(全部
         await engine.close()
       }
     }
-    expect(got).toEqual(expected({ build: "ask", "codepuppy-ask": "ask", "codepuppy-readonly": "deny" }))
+    expect(got).toEqual(expected({ build: "allow", "codepuppy-ask": "ask", "codepuppy-readonly": "deny" }))
   }, 120_000)
 
   test("技能翻代:新一代的目录不必重新注入就放行(sidecar 的监听重写显式文件 ⇒ 引擎重载配置 ⇒ ext 的变换重算)", async () => {

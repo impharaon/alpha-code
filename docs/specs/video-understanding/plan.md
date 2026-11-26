@@ -743,3 +743,64 @@ bun test src/project-config.test.ts src/register.test.ts
 文档影响落在同一 plan 与 modules map。调用 canonical `check_frontmatter/check_id_references/check_local_links` 检查这两文件：frontmatter/ID 与 plan 链接无问题；modules 的链接检查为红，13 个失效目标全部在 `129df72433:docs/architecture/modules.md` 原样存在（一次基线确认）。`docs/architecture/modules.md:24`（以及 25/28/29/30/31/37/38/43/47/49/56/60）— 旧包/目录链接已不存在 — 建议去向：编排器后续 docs governance，当前只记录，不在本票修复。此前全仓文档检查的既有错误不据此清理。`git diff --check` exit 0。
 
 已定勿重开：本地/平台分工、实际库/许可证路线、VIDEO-L1-v2、FIRST-PARTY-NODE-v2.1 和唯一 pinned-file authority。下一步由编排器安排 D3 PLAN；#1760 接入后补真实身份/冷 Node/自动注入，D3 后补上表实际组件/样本证据，D4/D5 分别负责进度投影/平台答案。无新增设计分叉或 OPTIONAL 产品项。
+
+## r9 · code review R1 修正收据
+
+输入：本次 r9 brief 处置的 A1–A10、B1–B8；两位 Claude Opus 5.5 auditor 的范围为 `f7424aa452..f466f83581`。本节覆盖此前实施收据中取消重放、来源敏感事实和缓存键的描述；历史命令结果保留。已核 Codex / GPT-6，实施开始 2026-11-26 10:52:45 UTC；未重开设计、合并/rebase、推送、收费调用、发布或启动应用窗口。
+
+### 逐项改动、提交和证明
+
+以下 `bun test` 命令从 `packages/ui-mac` 执行，ext 项从 `packages/ext` 执行；均带 `--max-concurrency 2`。fast / integration 用例留在行为模块的原测试文件，import 和字面 fixture 路径可由 selector 追踪；没有新增 runner/global 面或 scenario/容量/计时测试。
+
+| 项 | 提交（先测试，后修正；同项的必要续交列在后面） | 具名命令与红 → 绿证据 |
+| --- | --- | --- |
+| B1 取消不补发未完整发送的 body | `0ff8198cef` → `fde5ca74f3` / `eabc099808`；流边界补强 `ec5601a2fe` → `febcffd3e2`；落盘竞态 `a70b7f17c6` → `ffa668a83f` | `bun test src/main/codepuppy-video-cloud.test.ts -t 'cancel only\|privacy-card cancellation'`：旧代码 2 FAIL，分别应 1 次实际 2 次、应 0 次实际 1 次派发；修正后完整 cloud/transport 文件 12 PASS。attempt 持久化 `bodyFullySent`；progress 在媒体块交给 stream 消费者之后才报告，达到实际 clip.bytes 后落盘。`bun test src/main/codepuppy-video-transport.test.ts` 的“媒体尚未被拉取却标 full”先 1 FAIL 后 1 PASS。未完整发送的 attempt 取消后零恢复请求；只有已完整发送的未知回执沿原控制字节取回 ID，再走原 cancel。新标记的落盘与 cancel 交错也实测复现：应 cancelled:true 却被旧快照盖成 false（1 FAIL）；同一 Work 的 root 写入串行后完整文件 15 PASS，迟到 prepare 在 abort 后不再发布旧快照 |
+| B2 同 attempt 复用已签发同意 | `11bfc0e7da` → `1ee5cbf408` | `bun test src/main/codepuppy-video-cloud.test.ts -t 'network retry reuses'`：重复卡片断言先 1 FAIL；随后完整文件 12 PASS。同意按 attemptKey 存于本次 Work 的内存 map，原 send 沿原身份/manifest/attempt 重试，不落 token 到磁盘、不再次 prepareVideo |
+| B3 上传清单不发完整本机路径 | `10fac25919` → `43c78d5af7` / `11d9f40ba4` | `bun test src/main/codepuppy-upload-manifest.test.ts -t 'video manifest'`：原 path 为 Users/person/...，1 FAIL；完整文件修正后 5 PASS。完整本机路径只用于原 classifier；清单为项目相对路径，项目外来源用 basename。一次遗漏现有 path import 的编译/运行错误另交修正，没有把它算作红臂证据 |
+| B4 敏感事实绑定已核验的调用引用 | `482ff3d9a6` → `f1f60af550` | `bun test src/main/codepuppy-video-cloud.test.ts src/main/codepuppy-video-call.test.ts -t 'sensitivity follows\|main verifies'`：原 verify 不返回引用、别名把敏感路径冲掉，两处断言红；完整文件 14 PASS。verifyVideoCall 从 engine 已铸的 path/index 绑定返回绝对引用，main 私有参数传递并持久化；split 继续用它判断敏感性，不用 sources/<id>.json 的最后 alias 代替。id 形式仍由已核验 id 的原持久 source 引用恢复，不增模型参数 |
+| B5 已付费结果 revision 变化仍交付 | `04903a2f3d` → `f732d8ac7c` | `bun test src/main/codepuppy-video-cloud.test.ts -t 'success cache'`：原结果 undefined/contract-incompatible，1 FAIL；完整文件 12 PASS。保留实际 model_revision，attempt 完成；只在实际 revision 全部符合本次 catalog 时写成功 cache。model/range 的原校验保留 |
+| B6 完成/命中缓存的卡片保留上传事实 | `52b58dae4b` → `47f704fec4` | `bun test src/main/codepuppy-video-cloud.test.ts src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.test.ts -t 'success cache\|completed and cached'`：2 FAIL → 完整两文件 73 PASS；ext `bun test src/video-understanding.test.ts` 2 PASS。main 汇出 file、根 sourceRange 与实际发出 attempt 的 bytes，cache-hit 同样恢复；ext 写同一工具 metadata，既有卡片投影显示事实。新增中英文“已上传视频”仅为既有行文案 |
+| B7 释放没有活订阅的工作 | `c6961bbb16` → `b3f8ba815a` | `bun test src/main/codepuppy-video-cloud.test.ts -t 'start receipt lost'`：后续 cancel 因死订阅未取消，1 FAIL；完整 cloud/host 两文件 34 PASS，ext 2 PASS。复用原 start→query 流：start 先回持久 receipt，首次原 query 才确认订阅/启动；丢掉 start receipt 的调用不占 Work.requests。ext 带 requestId 的失败/超时退出会 cancel；主进程 host 断开也清订阅、abort 并取消已知 job，旧连接的迟到 exit 不影响新连接。没有新增用户等待阶段、租约/失效时长或付费重试键 |
+| B8 具体错误、inline 边界、真实 frame text | `d191e8e3ef` → `dd4b8cbfe3` / `9e6cc39cfc` | `bun test src/main/hub-view.test.ts -t 'video requests'`：component_download_failed 原变 cloud_failed，1 FAIL；完整 host/transport 21 PASS。加入 `inline_media_bytes_exclusive == bytes` 必须拒绝的边界（现有逻辑本已正确，测试补强无产品修正）。cloud-vision fixture 按 tools.ts 实际顺序加入每帧 text，再按真实位置检查原转义/时间/引用断言；没有放松 OCR 或 vision 行为，最终 ext 两文件 27 PASS |
+| A1 定位单帧及场景进度 | 实物 fixture `cbf6838312`，断言 `4cfac3238f` → `02a972c7b1`；无切换场景的进度断言 `7aead7163e` / `b4df80cd9b` → `89f3da1afd`；进程握手 `89ca2804a0` | `bun test src/main/video-frames.test.ts -t 'timestamp pick'`：旧代码请求 -show_frames，被实际调用边界断言拦下，1 FAIL；seek + 同次提取的 PTS 修正后 3 PASS。`bun test src/main/video-process.test.ts` 4 PASS。从命中的关键帧开始解码，trim 到请求边界，末张 JPEG 与 showinfo PTS 同源，不再预先整轨枚举。场景扫描仍一次解码全片，split 的未过滤时间线提供实际 decoded frame count；过滤后的分支只取切换点。真实 ffmpeg 的 copyts/null out_time_us 为零，未把它当处理时间；原 frame=0 → 未过滤 frame=5 的真实捕获使无切换进度先红后绿 |
+| A2 OSD 名称与未匹配脚本 | `49928d709a` → `aa11bd1601` | `bun test src/main/video-assets.test.ts -t 'OSD script'`：原无 pin 导致未请求组件，1 FAIL；完整文件 5 PASS。Korean→Hangul，Hiragana/Katakana→Japanese；找不到 pin 时取原 chi_sim+chi_tra+eng，OCR 的 -l 同时使用规范化名称，下载/安装仍仅经原 pinned-file authority |
+| A3 无 VAD 讲话块不经 LID | 边界命名 `9850e3f56e`，`7f0b1c98f7` → `b965e15637` | `bun test src/main/video-transcript.test.ts -t 'worker routes'`：原 worker 路由在空 speech 上调用识别并返回 fr，1 FAIL；完整文件当时 2 PASS。用例导入 speech-worker 的实际 chunkLanguage 路由，覆盖空、边界不重叠和相交块；不只是 createVideoRuntime 的模型选择。块仍完整送 SenseVoice，并用其实际 language/und 记录结果，没有删掉静音/漏检域；未运行真实模型评分或 574 MB 下载 |
+| A4 下载格式与不可解码错误 | `736b120644` → `870587f97d`（同一 downloader 参数边界的提取为 `ef0732e663`） | `bun test src/main/video-tools.test.ts src/main/video-process.test.ts -t 'site download prefers\|unavailable media decoder'`：2 FAIL → 完整两文件 8 PASS。yt-dlp `-S vcodec:h264`；实际进程不可解码诊断映射 format_unsupported，并给转换 action。未增加 dav1d、decoder library 或新依赖；本机 AV1 支持仍交设计方处置 |
+| A5 PCM 读取不构造整轨 Buffer | `809147779b`；边界补强 `dff5e87c72` / `3e77d0e865` | `bun test src/main/video-transcript.test.ts -t 'bounded file reads'`：68 KB 自有 Float32 PCM 跨实际读取边界，整块 Buffer API 被置为 ERR_FS_FILE_TOO_LARGE 仍正确读取；重引整轨 readFile 的移除对照 exit 1、expect 红，恢复后完整文件 3 PASS。原始私有 recognize 依赖真实模型，本轮不跑 >2 GiB 容量/整轨模型用例；没有声称做了真实 2 GiB red-first 复现。实现预分配 Float32Array，有限块直接读入对应视图 |
+| A6 下载缓存归应用根 | `5e99148722` → `2233e96b2b` | `bun test src/main/video-tools.test.ts -t 'site download keeps'`：缺 --cache-dir，1 FAIL；完整文件 4 PASS。参数为 `<cacheRoot>/yt-dlp`，不使用家目录缓存 |
+| A7 按处理资产和签名前身份取 key | `f3a87578d1` → `37683252a2`；native inventory/signing 及 codec 隔离补强包含于 `dff5e87c72` | `bun test src/main/video-assets.test.ts -t 'processing recipes'`：无关 bundled 字节变化使原 recipe 变化，1 FAIL；assets/transcript/runtime/tools 17 PASS，签名终结文件 3 PASS。最后补强的 assets/transcript 两文件 9 PASS：ffmpeg pin 变化不改 speech key、会改 frames key；native speech 变化不改 frame key；签名终结前后 buildIdentities 恒定而验签 files digest 变化。当前 own pinned-file list 尚无 yt-dlp 项，未编造其 DTO/版本；原按所有 pins 取 key 的路径已去掉 |
+| A8 附件异步时长 | 本收据的 #1760 集成项 | `composer-media-attachment.ts:18` 仍诚实返回 durationMs:null；`resources/video-mcp/assets.ts` 的 ffprobe 路径仅能从带原 tool-call association 的 VIDEO-L1-v2 ensure 结果取得。本基线 main 没有 launcher/pinned readiness 消费实现（`rg --files src/main` 的 launcher/pinned 名无项），附件先于工具调用，不能自推宿主缓存布局或用开发机 PATH。按 r9 允许处置明确挂到 #1760：提供已准备 ffprobe 的只读路径/就绪事实后，注册媒体立即完成，再异步 probe 并更新同一附件 metadata；cold 不下载、不阻塞 3 秒附上。未实现、未把 duration 测量记 PASS |
+| A9 损坏/不支持的集成区分 | `d51c3da593` | `bun test src/main/video-source.test.ts -t 'real failing probe'`：真实 speech-en.wav 截断副本、真实文本和真实非零退出 probe 程序；断言 code/action，当前原实现本已正确，新增测试即 PASS，不为制造 red 改坏代码。完整文件当时 3 PASS，加入并发记录用例后 4 PASS |
+| A10 导出、坐标、源记录并发 | 导出 `bdd40182ad` → `35f1b5cc69`；坐标边界 `75ec947fcb`、测试 `9e3b14c921` → `23546e8cd7` / `ffbd408e89`；source 写者 `eb33b901c8`，测试 `fb6e293918` → `60bee2463c` | `bun test src/main/video-export.test.ts -t 'filesystems without'` 1 FAIL → 完整文件 3 PASS；`video-frames.test.ts -t 'OCR helper'` 1 FAIL → 完整文件 2 PASS；`video-source.test.ts -t 'serializes concurrent'` 1 FAIL → 完整文件 4 PASS。原导出已复制到 pending，硬链接 EPERM/ENOTSUP/EXDEV 后以 wx 独占保留名字再 rename，原重名/源保护保留；无效目标用 export_target_invalid/action。Swift 和 OCR adapter 在 helper 边界夹取坐标，TSV 先在像素域处理避免新增浮点差。sourceOf 和 mediaInfo 的读改写共用 updateSource 的同一 source lock，不让别名被 probe 的旧快照覆盖 |
+
+### inferred 前提的有界确认
+
+- **A2**：本轮读取 D3 已固定的 Tesseract **5.5.2** 源码 `src/ccmain/osdetect.cpp:441-449`：`add_script("Katakana")`、`add_script("Hiragana")`、`add_script("Hangul")`、`add_script("Korean")`，Korean 确为伪脚本，不是假定语言名。一次 pinned-file 查询输出：Korean false / Hangul true / Hiragana false / Katakana false / Japanese true / Common false。前提成立；映射与默认回退均实施。
+- **A3**：worker 原路由经重命名的实际边界跑 `video-transcript.test.ts -t 'worker routes'`，空 VAD span 输入得到 **fr 而非 undefined**；回调实际被调用，确认无讲话块确会路由 LID/其它语种。该确认使用 worker 层路由函数，不冒充真引擎/子线程 ASR 或准确率测量。
+- **A4**：D3 pinned `ffmpeg/darwin-arm64/9.1-openh264-2.7.0` 的 `-decoders` **列出 av1**，但没有 dav1d/libaom 软件 decoder；仅凭“列表有 av1”不能断言支持。继续核同一锁定 FFmpeg **9.1** 的 `libavcodec/av1dec.c:715-719`：无 hwaccel 时打印 `Your platform doesn't support hardware accelerated AV1 decoding.` 并返回 **ENOSYS**；D3 build 禁用 autodetect，没有增加 AV1 库。由此确认本构建的缺口；不可解码分类测试使用该实际诊断，未编造 ffprobe JSON。
+
+上述源码/二进制来自既有 D3 临时构建根，无新大模型下载，临时路径不写入运行配置。
+
+### 真实小样本及构建证据
+
+A1 新 `fixtures/video/{frame-source.mp4,frame-sample.jpg,frame-control.json}` 全由既有真实 platform-sample.mp4 经 D3 pinned ffmpeg 产生；原命令、采集字段、SHA 在原 `fixtures/video/provenance.json`，没有手写容器、showinfo、ffprobe 或 OCR 返回。79 ms 提取只保留从关键帧到请求边界的 JPEG，showinfo 的实际最后 PTS 为 **40 ms**；对无切换五帧样本，过滤分支原 `frame=0`，未过滤进度分支 **frame=5**。frame-control 保存的是实际原行/原 JSON；回归用例只替换进程 I/O，仍走实际 framesOf 的顺序、参数、发布与 PTS 读取。
+
+一次真实 `bun /tmp/video-r9-real-frames.ts` 消费实际 pinned ffmpeg/ffprobe 与重编译的 Mac Vision helper，输出：`{"requestedMs":79,"actualMs":40,"frames":1,"scanProgress":[{"phase":"frames","completed":5,"unit":"items"}]}`（工具日志 `/tmp/video-r9-live-frames.log`）。这是本机小样本证明，不是长视频计时/质量/Windows 验收。
+
+`/usr/bin/swiftc -O -target arm64-apple-macosx12.0 resources/video-mcp/helpers/vision.swift -o native/video-runtime/build/mac-arm64/helpers/vision` exit 0。沿原 `writeVideoRuntimeInventory` 重写本机 unsigned build inventory：darwin-arm64 **60 files / speech identities 4 / frame identities 1**，win32-x64 **61 / 5 / 1**；Windows native bytes 未重编、未运行。`bun scripts/build-video-mcp.ts`、`bun scripts/gen-office-mcp-tools.ts` exit 0；同步清单提交 `0668d53f85`，未发布资产。
+
+### 偏离与 authority
+
+**orchestrator ruling（r9 brief，设计 §5 的 intent）**：transcript key 按 speech pins（ASR/VAD/LID/diarization）及 sherpa/whisper native library identities；frame key 按 ffmpeg 与 OCR helper/model identities；用签名前的 build-lock 身份，不用签名后 file digests。实现把既有 runtime inventory 的 native 构建身份按 speech/frames 固定在 `buildIdentities`，finalizeVideoSignatures 只更新既有 files/清单验签哈希；同一个 inventory 写者拥有两者，没有另建资产清单。VideoRuntime.recipe 改成 speech/frames/media 的类型化领域轴；clip 只取 ffmpeg 的 media key。算法名和 pin 仍来自原 authority，不保存路径、价目或自选余量。
+
+必要同链文件超出 finding 的单行锚点：`scripts/video-runtime-artifacts.ts` 捕获签名前身份；`video-mcp/runtime.ts` / `transcript.ts` / `clip.ts` 及原 runtime 构造用例机械消费 recipe 轴；`video-mcp/process.ts` 在实际子进程仍运行时交付 stderr 进度，并沿既有错误出口分类 codec；`video-mcp/contracts.ts` 登记导出目标错误；`shared/video-understanding.ts` 仅携带 main 汇出的上传事实；`cloud-ipc.ts` / `ext-ipc.ts` 传递已核验引用和连接断开；原 i18n 两个同义文案。不改平台 VideoUnderstandingV1、结算、launcher producer、gate、其它仓或视觉结构。
+
+A5 原私有整轨入口在不跑真实模型/容量的约束内没有先行 2 GiB 复现；后续补了有限样本的 API 失败边界与重引 readFile 的 expect 红臂，未把它混称原始容量 red-first。A9 为缺测试的补证，原分类已绿。B8 的 inline 等号边界也本已正确。其它表内 red 均为具名行为断言，未拿 import 失败、超时或 typo 代替证据；中途实际输出否定的 out_time_us 前提已改用有实际输出的 frame count，没有放松进度必须前进的断言。
+
+### 返回前相关检查及遗留
+
+最终相关命令：ui-mac `bun test src/main/codepuppy-upload-manifest.test.ts src/main/codepuppy-upload.test.ts src/main/codepuppy-video-call.test.ts src/main/codepuppy-video-cloud.test.ts src/main/codepuppy-video-transport.test.ts src/main/hub-view.test.ts src/main/video-assets.test.ts src/main/video-assets.fast.test.ts src/main/video-cache.test.ts src/main/video-contracts.fast.test.ts src/main/video-export.test.ts src/main/video-frames.test.ts src/main/video-process.test.ts src/main/video-runtime-artifacts.test.ts src/main/video-service.test.ts src/main/video-source.test.ts src/main/video-tools.test.ts src/main/video-transcript.test.ts src/main/office-mcp-tools-snapshot.test.ts src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.test.ts --max-concurrency 2` → **153 PASS / 0 FAIL（20 文件）**。随后同一文件的 Buffer/codec 隔离补强：assets/transcript **9 PASS**，PCM 文件最后 **3 PASS**；没有扩到整包或层。ext `bun test src/cloud-vision.test.ts src/video-understanding.test.ts --max-concurrency 2` → **27 PASS / 0 FAIL**。两包 `bun typecheck` exit 0；`git diff --check` exit 0。
+
+`affected-tests --list` exit 2：本基线仍缺 `.gate-tests`，**无 scope line**；保持 gate 冻结，交 gate owner。#1760 真身份/准备/ready path 与 A8 异步 duration → 原依赖集成；Windows 实机、长视频/真实模型评分与收费结算场景 → orchestrator 的既有验收；本轮不套用本机小样本结果。A4 增加本地 AV1 decoder → 原 designer/编排器，按 r9 明确排除；未增加产品限制。无新增其它 ARCH/OPTIONAL 工作。
+
+本次 canonical docs-contract 核对仍为既有 **69 errors / 253 warnings**，本 plan **0 finding**；未顺修文档基线。`affected-tests --list` 的原输出为 `affected-tests: [Errno 2] No such file or directory: <worktree>/.gate-tests`，未运行 gate。所有前台命令已结束；提交仅在分配的分支，未推送。

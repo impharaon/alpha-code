@@ -4,10 +4,11 @@
 // 试编译丢尾、原生模块缺失即拒、默认工作区不在盘上即拒。真编译器与真 profile 的判据在别的文件。
 
 import { describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { planConfigFence, planProcessFence, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
+import { planConfigFence, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
+import { writableLocationTruthPath } from "./process-fence-workspaces"
 import { processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
 import { credentialStores } from "./codepuppy-secret-files"
@@ -21,6 +22,132 @@ const GLOBAL = `${HOME}/Library/Application Support/codepuppy-state/env/prod`
 const STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
 const ADDON = "/App/Contents/Resources/codepuppy-fence/codepuppy_fence.node"
 const OFFICIAL_RUNTIME = "/private/var/folders/xy/T/codepuppy-connectors-501-ab"
+
+function withLocationDisk(run: (disk: { root: string; home: string; state: string; protected: string; truthPath: string; eligibility: Parameters<typeof planWritableLocations>[0]["eligibility"] }) => void) {
+  const base = resolve(import.meta.dir, "../../node_modules/.cache")
+  mkdirSync(base, { recursive: true })
+  const root = realpathSync(mkdtempSync(join(base, "writable-locations-")))
+  const home = join(root, "home")
+  const state = join(root, "state")
+  const protectedRoot = join(home, ".config", "opencode")
+  for (const dir of [home, state, protectedRoot]) mkdirSync(dir, { recursive: true })
+  try {
+    run({ root, home, state, protected: protectedRoot, truthPath: writableLocationTruthPath(state, "dev"), eligibility: { homeDir: home, appStateRoot: state, configFenceRoots: () => [protectedRoot], realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(), stat: (path) => statSync(path, { bigint: true }) } })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+describe("planWritableLocations", () => {
+  test("binds concrete directories and missing literal files without creating user files", () => {
+    withLocationDisk((disk) => {
+      const candidates = [{ sourcePath: join(disk.home, ".bun", "bin"), kind: "directory" as const }, { sourcePath: join(disk.home, ".config", "git", "config"), kind: "file" as const }]
+      const result = planWritableLocations({ candidates: [...candidates, candidates[0]!], truthPath: disk.truthPath, eligibility: disk.eligibility })
+      expect(result).toEqual({ locations: candidates.map((candidate) => ({ ...candidate, targetPath: candidate.sourcePath })), excluded: [] })
+      expect(statSync(candidates[0]!.sourcePath).isDirectory()).toBe(true)
+      expect(existsSync(candidates[1]!.sourcePath)).toBe(false)
+      expect(statSync(join(disk.home, ".config", "git")).isDirectory()).toBe(true)
+      const before = readFileSync(disk.truthPath, "utf8")
+      expect(planWritableLocations({ candidates, truthPath: disk.truthPath, eligibility: disk.eligibility })).toEqual(result)
+      expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+      expect(planWritableLocations({ candidates: [], truthPath: disk.truthPath, eligibility: disk.eligibility }).locations).toEqual([])
+      expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+    })
+  })
+
+  test("accepts an initial legal symlink but never follows a re-point across planning calls", () => {
+    withLocationDisk((disk) => {
+      const a = join(disk.root, "a")
+      const b = join(disk.root, "b")
+      for (const dir of [a, b]) mkdirSync(dir)
+      const sourcePath = join(disk.home, ".bun")
+      symlinkSync(a, sourcePath)
+      const input = { candidates: [{ sourcePath, kind: "directory" as const }], truthPath: disk.truthPath, eligibility: disk.eligibility }
+      const first = planWritableLocations(input)
+      expect(first.locations).toEqual([{ sourcePath, targetPath: a, kind: "directory" }])
+      const before = readFileSync(disk.truthPath, "utf8")
+      for (const target of [b, disk.home, disk.state, disk.protected]) {
+        unlinkSync(sourcePath)
+        symlinkSync(target, sourcePath)
+        expect(planWritableLocations({ ...input, candidates: [] }).locations).toEqual([])
+        expect(planWritableLocations(input), target).toEqual({ locations: [], excluded: [sourcePath] })
+        expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+      }
+      unlinkSync(sourcePath)
+      symlinkSync(a, sourcePath)
+      expect(planWritableLocations(input)).toEqual(first)
+    })
+  })
+
+  test("checks a missing directory below a symlink before creating it", () => {
+    withLocationDisk((disk) => {
+      const a = join(disk.root, "a")
+      const b = join(disk.root, "b")
+      for (const dir of [a, b]) mkdirSync(dir)
+      const link = join(disk.home, ".bun")
+      symlinkSync(a, link)
+      const sourcePath = join(link, "bin")
+      const input = { candidates: [{ sourcePath, kind: "directory" as const }], truthPath: disk.truthPath, eligibility: disk.eligibility }
+      expect(planWritableLocations(input).locations).toEqual([{ sourcePath, targetPath: join(a, "bin"), kind: "directory" }])
+      unlinkSync(link)
+      symlinkSync(b, link)
+      expect(planWritableLocations(input)).toEqual({ locations: [], excluded: [sourcePath] })
+      expect(existsSync(join(b, "bin"))).toBe(false)
+    })
+  })
+
+  test("file identities survive atomic replacement and reject symlink re-point", () => {
+    withLocationDisk((disk) => {
+      const file = join(disk.home, "shell-config")
+      writeFileSync(file, "before")
+      const sourcePath = join(disk.home, ".zshrc")
+      symlinkSync(file, sourcePath)
+      const input = { candidates: [{ sourcePath, kind: "file" as const }], truthPath: disk.truthPath, eligibility: disk.eligibility }
+      const first = planWritableLocations(input)
+      expect(first.locations).toEqual([{ sourcePath, targetPath: file, kind: "file" }])
+      writeFileSync(`${file}.tmp`, "after")
+      renameSync(`${file}.tmp`, file)
+      expect(planWritableLocations(input)).toEqual(first)
+      const other = join(disk.home, "other")
+      writeFileSync(other, "unchanged")
+      unlinkSync(sourcePath)
+      symlinkSync(other, sourcePath)
+      expect(planWritableLocations(input)).toEqual({ locations: [], excluded: [sourcePath] })
+      expect(readFileSync(other, "utf8")).toBe("unchanged")
+    })
+  })
+
+  test("protected targets are excluded before mkdir and an ordinary HOME file remains eligible", () => {
+    withLocationDisk((disk) => {
+      const candidates = [
+        { sourcePath: disk.home, kind: "directory" as const },
+        { sourcePath: disk.root, kind: "directory" as const },
+        { sourcePath: join(disk.state, "new"), kind: "directory" as const },
+        { sourcePath: join(disk.protected, "new"), kind: "directory" as const },
+        { sourcePath: join(disk.protected, "config.json"), kind: "file" as const },
+      ]
+      const result = planWritableLocations({ candidates: [...candidates, { sourcePath: join(disk.home, ".gitconfig"), kind: "file" }], truthPath: disk.truthPath, eligibility: disk.eligibility })
+      expect(result.excluded).toEqual(candidates.map((candidate) => candidate.sourcePath))
+      expect(result.locations).toEqual([{ sourcePath: join(disk.home, ".gitconfig"), targetPath: join(disk.home, ".gitconfig"), kind: "file" }])
+      expect(existsSync(join(disk.state, "new"))).toBe(false)
+      expect(existsSync(join(disk.protected, "new"))).toBe(false)
+    })
+  })
+
+  test("invalid or unreadable truth stops before preparing candidates", () => {
+    withLocationDisk((disk) => {
+      mkdirSync(join(disk.state, "fence-workspaces"))
+      const sourcePath = join(disk.home, "not-created", "bin")
+      const input = { candidates: [{ sourcePath, kind: "directory" as const }], truthPath: disk.truthPath, eligibility: disk.eligibility }
+      writeFileSync(disk.truthPath, "broken")
+      expect(() => planWritableLocations(input)).toThrow("writable location truth")
+      expect(readFileSync(disk.truthPath, "utf8")).toBe("broken")
+      expect(existsSync(sourcePath)).toBe(false)
+      expect(() => planWritableLocations({ ...input, truthPath: disk.state })).toThrow("writable location truth")
+      expect(existsSync(sourcePath)).toBe(false)
+    })
+  })
+})
 
 function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new Set<string>([ADDON])) {
   const made: string[] = []

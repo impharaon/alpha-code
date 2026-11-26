@@ -20,12 +20,13 @@
 // **刻意不建** `~/.opencode`:它整个是受保护配置位置 CF-9,任何进程都不建它(BR-07;W16 已删,计划目录在引擎数据目录下,
 // 这里本来就预建数据目录,`plan` 由写文件工具懒建);W17/W18(dev-only)也不建。
 
-import { lstatSync } from "node:fs"
-import { basename, dirname, join, resolve } from "node:path"
+import { lstatSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
 import {
   assertSeatbeltSafePath,
   configFenceLocations,
+  checkWorkspaceDirectory,
   resolveEngineRoots,
   selectWorkspaceUnion,
   trimUntilCompiles,
@@ -36,6 +37,85 @@ import {
   type WorkspaceExclusion,
   type WorkspaceDirectoryInput,
 } from "./process-fence-profile"
+import { readWritableLocationTruth, writeWritableLocationTruth, type WritableLocationTruth } from "./process-fence-workspaces"
+
+/** Main-only identity planning. New locations are usable only after the truth is committed. */
+export function planWritableLocations(input: {
+  candidates: readonly { sourcePath: string; kind: "directory" | "file" }[]
+  truthPath: string
+  eligibility: WorkspaceDirectoryInput
+}): { locations: WritableLocationTruth["entries"]; excluded: readonly string[] } {
+  if (!isAbsolute(input.truthPath)) throw new Error("writable location truth: expected an absolute truthPath")
+  for (const candidate of input.candidates)
+    if (!isAbsolute(candidate.sourcePath) || (candidate.kind !== "directory" && candidate.kind !== "file")) throw new Error("writable location truth: invalid candidate")
+  const fs = { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync }
+  const read = readWritableLocationTruth(input.truthPath, fs)
+  if (!read.ok && !read.absent) throw new Error(`writable location truth: ${read.reason}`)
+  const candidates = [...new Map(input.candidates.map((candidate) => [JSON.stringify([candidate.sourcePath, candidate.kind]), candidate])).values()]
+  const entries = read.ok ? [...read.entries] : []
+  const locations: WritableLocationTruth["entries"][number][] = []
+  const excluded: string[] = []
+  for (const candidate of candidates) {
+    const known = entries.find((entry) => entry.sourcePath === candidate.sourcePath && entry.kind === candidate.kind)
+    try {
+      const planned = plannedWritableTarget(candidate.sourcePath, input.eligibility.realpath)
+      if (!planned.missing.has(planned.target) && input.eligibility.isDirectory(planned.target) !== (candidate.kind === "directory")) {
+        excluded.push(candidate.sourcePath)
+        continue
+      }
+      const check = checkWritableTarget(input.eligibility, planned)
+      if (!check.eligible || (known && known.targetPath !== check.directory)) {
+        excluded.push(candidate.sourcePath)
+        continue
+      }
+      // Create the canonical target, never a wider ancestor grant or an unverified source symlink.
+      mkdirSync(candidate.kind === "directory" ? check.directory : dirname(check.directory), { recursive: true })
+      const prepared = checkWritableTarget(input.eligibility, plannedWritableTarget(candidate.sourcePath, input.eligibility.realpath))
+      if (!prepared.eligible || prepared.directory !== check.directory) {
+        excluded.push(candidate.sourcePath)
+        continue
+      }
+      const entry = { ...candidate, targetPath: prepared.directory }
+      if (!known) entries.push(entry)
+      locations.push(entry)
+    } catch {
+      excluded.push(candidate.sourcePath)
+    }
+  }
+  if (!read.ok || JSON.stringify(read.entries) !== JSON.stringify(entries)) writeWritableLocationTruth(input.truthPath, { v: 1, entries }, fs)
+  return { locations, excluded }
+}
+
+/** Resolve through the deepest existing parent; an unresolved symlink is not a missing directory. */
+function plannedWritableTarget(source: string, realpath: WorkspaceDirectoryInput["realpath"]): { target: string; missing: Set<string> } {
+  try {
+    return { target: resolve(realpath(source)), missing: new Set() }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT" || dirname(source) === source) throw error
+    try {
+      lstatSync(source)
+    } catch (missing) {
+      if ((missing as NodeJS.ErrnoException)?.code !== "ENOENT") throw missing
+      const parent = plannedWritableTarget(dirname(source), realpath)
+      const target = join(parent.target, basename(source))
+      parent.missing.add(target)
+      return { target, missing: parent.missing }
+    }
+    throw new Error("writable location target is an unresolved symlink")
+  }
+}
+
+function checkWritableTarget(input: WorkspaceDirectoryInput, planned: { target: string; missing: Set<string> }) {
+  const stat = input.stat ?? ((path: string) => statSync(path, { bigint: true }))
+  // Preview only the not-yet-created nodes through the existing identity predicate. Existing ancestors
+  // keep their real device/inode; a file is checked as one node, without granting its parent directory.
+  return checkWorkspaceDirectory({
+    ...input,
+    realpath: (path) => planned.missing.has(resolve(path)) ? resolve(path) : input.realpath(path),
+    stat: (path) => planned.missing.has(resolve(path)) ? { dev: "planned", ino: resolve(path) } : stat(path),
+    isDirectory: (path) => path === planned.target || input.isDirectory(path),
+  }, planned.target)
+}
 
 export type ProcessFencePlan = {
   profile: string

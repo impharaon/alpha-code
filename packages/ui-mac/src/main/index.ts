@@ -1,3 +1,4 @@
+import { stopPackageManagerExecutions } from "./package-manager-execution"
 import { createDirectoryWriteApproval } from "./directory-write-approval"
 import type { WorkspaceWritableChanged } from "./workspace-write-probe"
 import { clearOfficialConnectorRuntimeOnExit } from "./official-connector-resources"
@@ -553,6 +554,7 @@ const main = Effect.gen(function* () {
     },
   )
   const stopSidecars = async () => {
+    await stopPackageManagerExecutions()
     await killSidecar()
     wslServers.stopAll()
   }
@@ -756,11 +758,18 @@ const main = Effect.gen(function* () {
   // #1753:macOS 点程序坞图标 ⇒ 把(关窗时隐藏的)同一个窗口带回来。
   app.on("activate", () => revealWindow(productWindows()))
 
-  app.on("before-quit", () => {
+  let quitCleanup: Promise<void> | undefined
+  let quitReady = false
+  app.on("before-quit", (event) => {
     windowClose.markQuitting() // #1753:退出期的关窗不再被拦成"隐藏"
     quittingApp = true // B5:退出期的 sidecar exit 不触发自愈
     if (selfHealTimer) clearTimeout(selfHealTimer)
-    void stopSidecars()
+    if (quitReady) return
+    event.preventDefault()
+    quitCleanup ??= stopSidecars().then(() => { quitReady = true; app.quit() }, (error) => {
+      writeLog("utility", "application child cleanup failed", { error: String(error) }, "error")
+      quitCleanup = undefined
+    })
   })
 
   app.on("will-quit", () => {

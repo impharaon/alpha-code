@@ -8,7 +8,7 @@ export type PackageManagerCommand = {
   nodeID: string; start: number; end: number; program: string; argv: readonly string[]; cwd: string
   assignments: readonly PackageManagerAssignment[]
   leafStart: number; leafEnd: number; redirects: readonly { start: number; end: number }[]
-  prefix: string; exec: boolean
+  prefix: string; exec: boolean; wrapper: string
 }
 type State = { cwd: string | null; env: Readonly<Record<string, string | null>>; assignments: readonly PackageManagerAssignment[] }
 type Outcome = { success?: State; failure?: State }
@@ -52,7 +52,9 @@ export function planPackageManagerExecution(input: {
     if (program === "export") {
       const next = leaf.words.slice(index + 1).reduce((current, raw) => {
         const parsed = assignment(raw, state, "export")
-        return parsed ? assigned(current, parsed) : current
+        if (parsed) return assigned(current, parsed)
+        const name = /^([A-Za-z_][A-Za-z0-9_]*)=/.exec(raw.raw)?.[1]
+        return name ? { ...current, env: { ...current.env, [name]: null }, assignments: current.assignments.filter((entry) => entry.name !== name) } : current
       }, state)
       return invert({ success: next }, leaf.negated)
     }
@@ -77,6 +79,7 @@ export function planPackageManagerExecution(input: {
         leafStart: first, leafEnd: last, redirects: leaf.redirects,
         prefix: [...prefixes.map((raw) => raw.raw), ...leaf.words.slice(leaf.builtin + 1, index).map((raw) => raw.raw)].join(" "),
         exec: leaf.words.slice(leaf.command, leaf.builtin).some((raw) => raw.value === "exec"),
+        wrapper: leaf.words.slice(leaf.command, leaf.builtin).filter((raw) => raw.value === "time" || raw.value === "coproc").map((raw) => raw.raw).join(" "),
       })
     }
     return { success: state, failure: state }
@@ -88,7 +91,12 @@ export function planPackageManagerExecution(input: {
       const event = events[index]
       if (event.kind === "separator") { operator = event.value; continue }
       const incoming = operator === "&&" ? result.success : operator === "||" ? result.failure : join(result.success, result.failure)
-      if (!incoming) continue
+      if (!incoming) {
+        // Unreached static nodes still have one-time credentials; skipped assignments do not affect later nodes.
+        const skipped = join(result.success, result.failure)
+        if (skipped) visit(event, skipped)
+        continue
+      }
       const pipeline: Leaf[] = [event]
       while (events[index + 1]?.kind === "separator" && ["|", "|&"].includes((events[index + 1] as { value: string }).value) && events[index + 2] && events[index + 2].kind !== "separator") {
         pipeline.push(events[index + 2] as Leaf)
@@ -137,7 +145,7 @@ export function packageManagerExecutionSource(input: {
     // Attach the pipe to a shell group before copying it: zsh attaches a command's pipe after its redirects.
     const stdin = `${writer} | { ${helper} 9<&0 0<&8 8<&-; }`
     const closed = `${writer} | { ${helper} 9<&0 0<&- 8<&-; }`
-    const leaf = `{ if true 2>/dev/null 8<&0; then { ${stdin}; } 8<&0; else ${closed}; fi;${node.exec ? ' exit "$?";' : ""} } ${node.redirects.map((redir) => input.command.slice(redir.start, redir.end)).join(" ")}`
+    const leaf = `${node.wrapper ? node.wrapper + " " : ""}{ if true 2>/dev/null 8<&0; then { ${stdin}; } 8<&0; else ${closed}; fi;${node.exec ? ' exit "$?";' : ""} } ${node.redirects.map((redir) => input.command.slice(redir.start, redir.end)).join(" ")}`
     return source.slice(0, node.leafStart) + leaf + source.slice(node.leafEnd)
   }, input.command)
   return prelude + source

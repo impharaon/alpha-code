@@ -1,4 +1,4 @@
-import { realpathSync, statSync } from "node:fs"
+import { accessSync, constants, realpathSync, statSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { processFenceRulesCover, type ConfigFenceRule, type ProcessFenceWriteRule } from "./process-fence-profile"
 
@@ -38,4 +38,25 @@ function homebrewNode(path: string): HomebrewNode {
   const realPath = realpathSync.native(path)
   const stat = statSync(realPath, { bigint: true })
   return { path: resolve(path), realPath, dev: String(stat.dev), ino: String(stat.ino) }
+}
+
+/** Refresh metadata only beneath this generation's protected installation anchors. */
+export function resolveHomebrewExecutable(input: { program: string; cwd: string; env: Readonly<Record<string, string>>; installations: readonly HomebrewInstallation[] }): { executable: string; installation: HomebrewInstallation } | undefined {
+  const candidates = input.program.includes("/") ? [resolve(input.cwd, input.program)] : (input.env.PATH ?? "").split(":").map((entry) => resolve(input.cwd, entry, input.program))
+  for (const candidate of candidates) {
+    try {
+      accessSync(candidate, constants.X_OK)
+      if (!statSync(candidate).isFile()) continue
+      const node = homebrewNode(candidate)
+      // PATH selects the first executable, even if it is an untrusted shadow.
+      for (const installation of input.installations) {
+        const current = readHomebrewInstallations([installation.prefix], [])[0]
+        if (!current) continue
+        const anchors = ["prefixIdentity", "repository", "library"] as const
+        if (!anchors.every((key) => current[key].realPath === installation[key].realPath && current[key].dev === installation[key].dev && current[key].ino === installation[key].ino)) continue
+        if (node.realPath === current.launcher.realPath && node.dev === current.launcher.dev && node.ino === current.launcher.ino) return { executable: current.launcher.realPath, installation: current }
+      }
+      return
+    } catch { /* Missing PATH candidates do not become installations. */ }
+  }
 }

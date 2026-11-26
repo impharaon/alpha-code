@@ -15,6 +15,8 @@ import {
 } from "./scripts/target-arch"
 import { assertReleaseSource } from "./scripts/release-source"
 import { isReleaseBuild } from "./scripts/build-identity"
+import { signPackageManagerHelper } from "./scripts/build-package-manager-helper"
+import { PACKAGE_MANAGER_HELPER } from "./src/main/package-manager-helper"
 
 // REQ-089 AC3: the OS protocol list has exactly one source. The installer metadata that makes a
 // cold-start deep link reach the app at all is derived from the same manifest the runtime
@@ -184,7 +186,7 @@ const getBase = (appId: string): Configuration => ({
           {
             from: "native/codepuppy-fence/build/",
             to: "codepuppy-fence/",
-            filter: ["codepuppy_fence.node"],
+            filter: ["codepuppy_fence.node", PACKAGE_MANAGER_HELPER],
           },
           // #1564:Word/Excel/PowerPoint/PDF 四个文档工具的随包运行时(prebuild 里 scripts/build-office-runtime.ts
           // 按 resources/office-runtime/ 的两架构 lock 产出,只装目标架构那一份)。落点 <resources>/office-runtime/,
@@ -228,6 +230,8 @@ const getBase = (appId: string): Configuration => ({
     gatekeeperAssess: false,
     entitlements: "resources/entitlements.plist",
     entitlementsInherit: "resources/entitlements.plist",
+    // This helper must retain its strict signature without Electron JIT/injection entitlements.
+    signIgnore: [`/codepuppy-fence/${PACKAGE_MANAGER_HELPER}$`],
     // null => electron-builder skips signing (no Developer ID, local builds); the local ad-hoc signature comes from
     // electronFuses.resetAdHocDarwinSignature right after the fuse flip (I-14). When signing, auto-discover the
     // "Developer ID Application" cert from the keychain (override with CODEPUPPY_SIGN_IDENTITY).
@@ -255,6 +259,17 @@ const getBase = (appId: string): Configuration => ({
       resourcesDir: path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources"),
       packingArch: Arch[context.arch],
     })
+    const helper = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources", "codepuppy-fence", PACKAGE_MANAGER_HELPER)
+    if (shouldSign) {
+      // Reuse the packager's identity resolution and temporary keychain; no second signing configuration.
+      const packager = context.packager
+      if (!("codeSigningInfo" in packager) || !("helper" in packager)) throw new Error("Mac signing context missing")
+      const keychainFile = (await packager.codeSigningInfo.value).keychainFile
+      const config = packager.platformSpecificBuildOptions
+      const identity = await packager.helper.findSigningIdentity(false, config.type === "development", config.identity ?? undefined, keychainFile, config)
+      if (!identity) throw new Error("package-manager helper signing identity missing")
+      signPackageManagerHelper(helper, identity.hash, keychainFile ?? undefined)
+    } else signPackageManagerHelper(helper, "-")
   },
   dmg: {
     sign: shouldSign,

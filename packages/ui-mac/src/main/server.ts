@@ -1,5 +1,7 @@
 import type { CodePuppySidecarHost } from "./hub-view"
 import { HOMEBREW_PREFIXES } from "./platform/darwin"
+import { packageManagerHelperPath } from "./package-manager-helper"
+import type { HomebrewInstallation } from "./homebrew-installation"
 import { readHomebrewInstallations, homebrewFenceLocations } from "./homebrew-installation"
 import { engineAuthorization } from "./engine-authorization"
 import { toV1PermissionRequest } from "../engine-adapter/opencode2/v1-shapes"
@@ -326,7 +328,7 @@ function capturePackageManagerUserEnvironment(userDataPath: string, source: Reco
   return snapshot
 }
 
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void }
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[] }
 
 type ProductionFenceInput = {
   userDataPath: string
@@ -443,7 +445,8 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
   const protectedInstallations = planProtectedLocations(homebrewFenceLocations(installations), undefined, { realpath: realpathSync.native }).configFence.filter((rule) => rule.kind !== "dat-files")
   const userLocations = planUserWritableLocations(locationInput)
   if (userLocations.excluded.length) getLogger()?.warn(`process fence: excluded fixed writable locations ${JSON.stringify(userLocations.excluded)}`)
-  const plan = makePlan(protectedInstallations, userLocations.rules)
+  const helperProtection = planProtectedLocations([{ kind: "literal", path: packageManagerHelperPath(initial.addonPath) }], undefined, { realpath: realpathSync.native }).configFence.filter((rule) => rule.kind !== "dat-files")
+  const plan = makePlan([...protectedInstallations, ...helperProtection], userLocations.rules)
   const cancellation = new AbortController()
   let target: Awaited<ReturnType<typeof queryGoInstallTarget>> = null
   let projected = caches
@@ -464,7 +467,7 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
   }
   await refreshGoEnvironment()
   Object.assign(input.sidecarEnv, projected.env)
-  return { ...plan, cacheEnv: projected.cacheEnv, refreshGoEnvironment, cancelGoQuery: () => cancellation.abort() }
+  return { ...plan, homebrewInstallations: installations, cacheEnv: projected.cacheEnv, refreshGoEnvironment, cancelGoQuery: () => cancellation.abort() }
 }
 
 export function getDefaultServerUrl(): string | null {
@@ -676,6 +679,7 @@ export async function spawnLocalServer(
   refreshConfiguredEgressDestinations(options.userDataPath)
   // REQ-137:策略代理先于计划 —— 端口要渲染进 profile(N4)并改写进 sidecar env。起不来 = 拒 fork(fail-closed)。
   // 只在 darwin:围栏只在那里;别的平台既没有强制层也不装策略层(sidecar env 的代理变量照旧 = 用户导出的值)。
+  const originalProxies = Object.fromEntries(Object.keys(sidecarEgressProxyEnv(1)).map((key) => [key, sidecarEnv[key]]))
   let egressProxyPort: number | undefined
   if (process.platform === "darwin") {
     try {
@@ -751,6 +755,24 @@ export async function spawnLocalServer(
     throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
   if (fence?.configFenceRoots) plannedConfigFenceRoots = fence.configFenceRoots
 
+  const packageManagerEnvironment = { ...sidecarEnv, ...fence?.cacheEnv }
+  for (const [key, value] of Object.entries(originalProxies)) {
+    if (value === undefined) delete packageManagerEnvironment[key]
+    else packageManagerEnvironment[key] = value
+  }
+  // Lazy import keeps the virtual scanner in the production build, out of ordinary server-test startup.
+  let packageManagers: ReturnType<typeof import("./package-manager-execution").openPackageManagerGeneration> | undefined
+  const packageManagerControl: import("./codepuppy-sidecar-messages").PackageManagerControlHandler = async (request) => {
+    if (exited || !fence || egressProxyPort === undefined) return { ok: false, error: "unavailable" }
+    if (request.op === "authorize") Object.assign(packageManagerEnvironment, await (fence.refreshGoEnvironment?.() ?? Promise.resolve(fence.cacheEnv ?? {})))
+    if (!packageManagers) {
+      const { openPackageManagerGeneration } = await import("./package-manager-execution")
+      // A generation can exit while its first authorization is awaiting a Go query/import.
+      if (exited) return { ok: false, error: "unavailable" }
+      packageManagers ??= openPackageManagerGeneration({ env: packageManagerEnvironment, installations: fence.homebrewInstallations ?? [], port: egressProxyPort, addon: fence.addonPath })
+    }
+    return packageManagers.control(request)
+  }
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   rotateServerLogs()
   const runtimeGeneration = tryGetCodePuppyEnvironment() ? restoreCommittedOfficialConnectors() : []
@@ -919,7 +941,7 @@ export async function spawnLocalServer(
       return
     }
     if (receiveToolPolicyWrite(message, { baseDir: toolPolicyBaseDir, post: (reply) => child.postMessage(reply), log: (line) => getLogger()?.warn(line) })) return
-    options.codepuppySidecar?.receive(message, postCodePuppy, readWriteScope, async () => ({ ok: false, error: "unavailable" }))
+    options.codepuppySidecar?.receive(message, postCodePuppy, readWriteScope, packageManagerControl)
   })
   let detachCodePuppy: ((reason: string) => void) | undefined
   // 实现期修订 1:读不出的条目、软链条目每代只记一次(拉取每次装载都来)
@@ -937,6 +959,7 @@ export async function spawnLocalServer(
     if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
     exited = true
     fence?.cancelGoQuery?.()
+    void packageManagers?.close().catch((error) => getLogger()?.error("package-manager generation cleanup failed", error))
     electronNs.app.off("child-process-gone", onProcessGone)
     projectConfigViews.close()
     writeProbes.close(`sidecar exited with code ${code}`)

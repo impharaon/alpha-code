@@ -240,6 +240,10 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   }
 
   const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/codepuppy/package-manager/process") {
+      void import("./package-manager-execution").then(({ handlePackageManagerProcess }) => handlePackageManagerProcess(req, res)).catch(() => res.destroy())
+      return
+    }
     // 明文 HTTP 的绝对 URI 形式(`GET http://host/ …`)—— 本代理不做明文转发,fail-closed。
     log({ event: "egress.connect", id: ++seq, at: new Date().toISOString(), method: req.method ?? "", authority: req.url ?? "", verdict: "deny", reason: "method-not-connect", status: 405 })
     const body = denialBody("method-not-connect", `${req.method ?? ""} ${req.url ?? ""}`)
@@ -247,6 +251,9 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
     // `Connection: close` 是给客户端看的;实际把连接收掉这件事不交给运行时的 keep-alive 策略(bun 实测不关)。
     res.end(body, () => res.socket?.end())
   })
+
+  // Helper stdin is a live duplex stream, governed by the original Shell timeout.
+  server.requestTimeout = 0
 
   server.on("connect", (req, duplex, head) => {
     const id = ++seq

@@ -16,6 +16,8 @@ import os from "node:os"
 import path from "node:path"
 
 import { Arch } from "electron-builder"
+import { buildPackageManagerHelper } from "../../scripts/build-package-manager-helper"
+import { PACKAGE_MANAGER_HELPER } from "./package-manager-helper"
 
 import {
   ENGINE_ASSETS_DIR,
@@ -444,6 +446,7 @@ async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode
     fs.mkdirSync(path.join(resources, "ripgrep"), { recursive: true })
     fs.writeFileSync(path.join(resources, "ripgrep", "rg"), opts.ripgrep?.bytes ?? thin(opts.arch), { mode: opts.ripgrep?.mode ?? 0o755 })
   }
+  if (process.platform === "darwin") buildPackageManagerHelper(path.join(resources, "codepuppy-fence", PACKAGE_MANAGER_HELPER))
   return { resources, appOutDir: path.join(dir, "app") }
 }
 
@@ -490,6 +493,8 @@ describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
     const { getConfig } = await import("../../electron-builder.config")
     const config = getConfig("prod")
     expect(config.asarUnpack).toEqual([`${ENGINE_ASSETS_DIR}/**`])
+    expect(config.mac?.signIgnore).toContain(`/codepuppy-fence/${PACKAGE_MANAGER_HELPER}$`)
+    expect(config.extraResources).toContainEqual({ from: "native/codepuppy-fence/build/", to: "codepuppy-fence/", filter: ["codepuppy_fence.node", PACKAGE_MANAGER_HELPER] })
     const afterPack = config.afterPack as (ctx: unknown) => Promise<void>
     const context = (appOutDir: string) => ({ electronPlatformName: "darwin", appOutDir, arch: Arch.arm64, packager: { appInfo: { productFilename: "Code Puppy" } } })
     const packed = await packagedResources({ arch: "arm64", unpack: false })

@@ -33,7 +33,7 @@ import {
   UNVERIFIED_MCP_OWNERSHIP,
   type McpOwnership,
 } from "./cloud-websearch-kill"
-import { createHubBridge, processParentPort, type HubBridge } from "./hub-bridge"
+import { createHubBridge, delegatePackageManagerShell, processParentPort, type HubBridge } from "./hub-bridge"
 import { createHubTools, HUB_READ_ACTIONS } from "./hub-tools"
 import { TOOL_POLICY_DEFAULT } from "./policy/catalog"
 import { createReloadScheduler, type ReloadScheduler } from "./reload-scheduler"
@@ -135,6 +135,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       await context.shell.hook("create.before", (event) => {
         event.env.CODEPUPPY_GLOBAL_DIR = codepuppyBootstrap().paths.globalRoot
       })
+      if (process.platform === "darwin" && processParentPort()) await delegatePackageManagerShell(context.shell as typeof context.shell & Parameters<typeof delegatePackageManagerShell>[0], hubBridge)
       const projectRootFor = (target: string): ProjectRoot | null => {
         const identity = projectDirectoryIdentity(target)
         return identity.status === "project" ? identity : null

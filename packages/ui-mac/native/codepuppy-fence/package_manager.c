@@ -172,12 +172,12 @@ static void stop_service(pm_service *service) {
   pthread_join(service->thread,NULL);
   mach_port_deallocate(mach_task_self(),service->port);
 }
+static void cleanup_service(void *data) { stop_service(data); }
 static void service_finalizer(napi_env env,void *data,void *hint) {
-  (void)env;(void)hint; pm_service *service=data; stop_service(service);
+  (void)hint; pm_service *service=data; napi_remove_env_cleanup_hook(env,cleanup_service,service); stop_service(service);
   pm_service **entry=&services; while(*entry && *entry!=service) entry=&(*entry)->next; if(*entry) *entry=service->next;
   CFRelease(service->code_hash); CFRelease(service->identifier); pthread_mutex_destroy(&service->lock); free(service);
 }
-static void cleanup_services(void *data) { (void)data; for(pm_service *service=services;service;service=service->next) stop_service(service); }
 static napi_value start_service(napi_env env,napi_callback_info info) {
   size_t argc=3; napi_value argv[3],name,external;
   napi_get_cb_info(env,info,&argc,argv,NULL,NULL);
@@ -209,7 +209,8 @@ static napi_value start_service(napi_env env,napi_callback_info info) {
   napi_unref_threadsafe_function(env,service->callback); atomic_init(&service->running,1);
   if(pthread_create(&service->thread,NULL,receive_claims,service)!=0) { atomic_store(&service->running,0); napi_release_threadsafe_function(service->callback,napi_tsfn_abort); mach_port_mod_refs(mach_task_self(),service->port,MACH_PORT_RIGHT_RECEIVE,-1); mach_port_deallocate(mach_task_self(),service->port); CFRelease(service->code_hash); CFRelease(service->identifier); free(service); return fail(env,"package-manager receive thread failed"); }
   service->next=services; services=service;
-  napi_create_external(env,service,service_finalizer,NULL,&external); return external;
+  napi_create_external(env,service,service_finalizer,NULL,&external);
+  napi_add_env_cleanup_hook(env,cleanup_service,service); return external;
 }
 static napi_value close_service(napi_env env,napi_callback_info info) {
   size_t argc=1; napi_value argv[1],result; void *data=NULL;
@@ -248,5 +249,5 @@ napi_value register_package_manager_exports(napi_env env,napi_value exports) {
     {"packageManagerBoundDescendant",NULL,bound_descendant,NULL,NULL,NULL,napi_default,NULL},
   };
   napi_define_properties(env,exports,sizeof properties/sizeof properties[0],properties);
-  napi_add_env_cleanup_hook(env,cleanup_services,NULL); return exports;
+  return exports;
 }

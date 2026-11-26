@@ -8,11 +8,11 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, renameSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { readHomebrewInstallations, homebrewFenceLocations } from "./homebrew-installation"
+import { readHomebrewInstallations, homebrewFenceLocations, resolveHomebrewExecutable } from "./homebrew-installation"
 import { planProtectedLocations } from "./process-fence-plan"
 import {
   COMPILE_BYTE_WALL,
@@ -116,6 +116,16 @@ describe("package manager locations", () => {
       expect(installs).toHaveLength(1)
       expect(installs[0]!.launcher.realPath).toBe(join(repository, "bin/brew"))
       expect(readHomebrewInstallations([prefix], [{ kind: "subpath", value: root }])).toEqual([])
+      chmodSync(join(repository, "bin/brew"), 0o755)
+      const selected = (program = "brew", path = `${prefix}/bin:/usr/bin:/bin`) => resolveHomebrewExecutable({ program, cwd: root, env: { PATH: path }, installations: installs })?.executable
+      expect(selected()).toBe(join(repository, "bin/brew"))
+      expect(selected(join(prefix, "bin/brew"))).toBe(join(repository, "bin/brew"))
+      const shadow = join(root, "shadow")
+      mkdirSync(shadow); writeFileSync(join(shadow, "brew"), "shadow", { mode: 0o755 })
+      expect(selected("brew", `${shadow}:${prefix}/bin`)).toBeUndefined()
+      renameSync(join(repository, "bin/brew"), join(repository, "bin/brew-old"))
+      writeFileSync(join(repository, "bin/brew"), "updated launcher", { mode: 0o755 })
+      expect(selected()).toBe(join(repository, "bin/brew"))
       const deny = planProtectedLocations(homebrewFenceLocations(installs), undefined, { realpath: realpathSync.native }).configFence
       const profile = renderProcessFenceProfile({ ...base, workspaces: [], homebrewFence: deny.filter((rule) => rule.kind !== "dat-files"), userWritableLocations: [{ kind: "subpath", value: join(prefix, "bin") }, { kind: "subpath", value: join(repository, "Library") }] })
       const rules = processFenceWriteRules(profile)

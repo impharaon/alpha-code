@@ -11,7 +11,7 @@ export const frameSelection = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("scenes"), range: timeRange.optional(), threshold: z.number().min(0).max(1).default(0.05) }),
 ])
 export const frame = z.strictObject({ id: z.string(), requestedMs: milliseconds.nullable(), actualMs: milliseconds, path: z.string(), mime: z.literal("image/jpeg"), width: z.int().positive(), height: z.int().positive(), ocr: z.strictObject({ text: z.string(), lines: z.array(z.strictObject({ text: z.string(), box: z.tuple([z.number(), z.number(), z.number(), z.number()]) })) }) })
-export const failure = z.strictObject({ code: z.enum(["source_missing", "source_unreadable", "source_changed", "format_unsupported", "media_corrupt", "disk_full", "component_download_failed", "processing_failed", "range_invalid", "no_video_stream", "site_unavailable", "site_requires_access", "network_denied", "cancelled", "cloud_failed"]), message: z.string(), action: z.string(), retryable: z.boolean() })
+export const failure = z.strictObject({ code: z.enum(["export_target_invalid", "source_missing", "source_unreadable", "source_changed", "format_unsupported", "media_corrupt", "disk_full", "component_download_failed", "processing_failed", "range_invalid", "no_video_stream", "site_unavailable", "site_requires_access", "network_denied", "cancelled", "cloud_failed"]), message: z.string(), action: z.string(), retryable: z.boolean() })
 export type MediaRef = z.infer<typeof mediaRef>
 export type TimeRange = z.infer<typeof timeRange>
 export type TranscriptSegment = z.infer<typeof transcriptSegment>

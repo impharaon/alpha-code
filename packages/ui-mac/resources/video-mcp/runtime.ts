@@ -21,6 +21,7 @@ export class VideoError extends Error {
 }
 
 const actions: Record<MediaFailure["code"], string> = {
+  export_target_invalid:"Choose a writable destination inside the current project and retry the export.",
   source_missing: "Select the original file again, or ask about its already cached content.",
   source_unreadable: "Check access to the original file and try again.", source_changed: "Wait for the file to finish changing, then try again.",
   format_unsupported: "Use a supported media container or ask to convert the original file.", media_corrupt: "Replace the original file or download it again.",

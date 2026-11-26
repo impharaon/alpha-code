@@ -1,5 +1,5 @@
 import { constants } from "node:fs"
-import { copyFile, link, lstat, mkdir, readdir, realpath, rm, writeFile } from "node:fs/promises"
+import { copyFile, link, lstat, open, rename, mkdir, readdir, realpath, rm, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import path from "node:path"
 import { projectDirectoryIdentity } from "../../src/shared/project-directory-identity"
@@ -50,7 +50,7 @@ export async function writeProjectOutput(
 ) {
   const project = projectDirectoryIdentity(runtime.directory)
   if (project.status !== "project")
-    fail("source_unreadable", "The current project location cannot be confirmed for this export.")
+    fail("export_target_invalid", "The current project location cannot be confirmed for this export.")
   const desired = path.resolve(project.directory, destination)
   const directory = await lstat(desired)
     .then((info) => (info.isDirectory() ? desired : path.dirname(desired)))
@@ -63,7 +63,7 @@ export async function writeProjectOutput(
     project.directory,
     path.relative(project.directory, directory),
   )
-  if (!target) fail("source_unreadable", "The export target escapes the current project.")
+  if (!target) fail("export_target_invalid", "The export target escapes the current project.")
   await mkdir(target, { recursive: true })
   const name = directory === desired ? fallbackName : path.basename(desired)
   const rawName = sanitizeArtifactName(name, fallbackName)
@@ -83,7 +83,7 @@ export async function writeProjectOutput(
         project.directory,
         path.relative(project.directory, output),
       )
-      if (current !== output) fail("source_unreadable", "The export target changed while writing.")
+      if (current !== output) fail("export_target_invalid", "The export target changed while writing.")
       for (const original of source.aliases) {
         if (path.resolve(original.path) === output)
           fail("source_changed", "An export cannot overwrite its source media.")
@@ -93,7 +93,13 @@ export async function writeProjectOutput(
           fail("source_changed", "An export cannot overwrite its source media.")
       }
       try {
-        await link(pending, output)
+        await link(pending, output).catch(async(error:NodeJS.ErrnoException)=>{
+          if(!["EPERM","ENOTSUP","EXDEV"].includes(error.code ?? ""))throw error
+          // The completed copy already lives in pending. Reserve the final name exclusively before rename.
+          const reservation=await open(output,"wx")
+          await reservation.close()
+          try{await rename(pending,output)}catch(error){await rm(output,{force:true});throw error}
+        })
         return { path: output, bytes: (await lstat(output)).size }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error

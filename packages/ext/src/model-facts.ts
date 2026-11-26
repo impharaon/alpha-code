@@ -9,7 +9,7 @@
 import type { Plugin } from "@opencode/plugin"
 import type { Invocation, ModelHint } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 
-export async function resolvePackageModel(context: Pick<Plugin.Context, "model">, hint: ModelHint | undefined): Promise<string | undefined> {
+export async function resolvePackageModel(context: Pick<Plugin.Context, "model">, hint: ModelHint | undefined, log: (line: string) => void): Promise<string | undefined> {
   if (!hint) return
   const models = (await context.model.list()).data
   const preferred = (await context.model.default()).data
@@ -17,7 +17,10 @@ export async function resolvePackageModel(context: Pick<Plugin.Context, "model">
     ? [model.family, model.id, model.name].some(value => value?.toLowerCase().includes(hint.alias.toLowerCase()))
     : model.providerID === hint.providerID && model.id === hint.modelID)
   const model = matching.find(model => model.providerID === preferred?.providerID) ?? matching[0]
-  if (!model) throw new Error("dependency_missing: model " + ("alias" in hint ? hint.alias : hint.providerID + "/" + hint.modelID))
+  if (!model) {
+    log("Package model hint " + ("alias" in hint ? hint.alias : hint.providerID + "/" + hint.modelID) + " is unavailable; using the current default")
+    return
+  }
   return model.providerID + "/" + model.id
 }
 

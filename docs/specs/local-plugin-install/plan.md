@@ -1024,3 +1024,5 @@ A9-origin：66b9bc8ce4 初次 fixture 带旧 transaction id，被正确 exact-re
 A9-marketplace 观察按 r9 原裁决保留：design v3.1 §4.8 定义 portable/Claude/Codex manifest 合并，但未定义同一仓库根同时有 plugin 与 marketplace manifest 时的 prepareCapture 分流；§4.14–4.16 也未补该选择。`plugin-sources.ts:356–357` 的 manifest && !plugin 仍将这种输入作为 plugin。未自行增产品选择/DTO 或改源行为；编排器/设计承接该输入定义。其余 A9 继续本车道。
 
 A9-layer：将原 core runtime 的私有 HTTP 代理用例移到 ui-mac 原 plugin-mcp-proxy.test.ts，保留真实 SDK HTTP 会话、GET/POST/DELETE、tools/list/call、每请求 bearer、服务端无私密头的断言，入口改走真实 McpConnection；SDK server 从 core 已安装依赖解析，无新依赖或 MCP 模仿格式。原 core 文件已无 ui-mac import（`rg ui-mac packages/core/test/codepuppy-mcp-runtime.test.ts` 无匹配）。原 UI proxy 文件 3 pass / 0 fail（`/tmp/plugin-standard-r11-A9-proxy-move.log`）。这是测试归属修正，无产品行为可单独红；A4 移除臂同样验证新的连接入口，core 原容量/计时案例仍不运行。
+
+B3：b396ce1cab 原位真实 host 回归先红（未知 hint 拒绝 command，0 pass / 1 fail，`/tmp/plugin-standard-r11-B3-red.log`）。model-facts 未匹配时复用调用链 log 记录具体 hint 并返回 undefined；command 与 delegation 保留当前/default 模型，不引入新的模型要求。具名绿 1 pass，原 host 文件 67 pass / 0 fail（`/tmp/plugin-standard-r11-B3-complete.log`），同例实际走 command 和子助手；两次日志均点名 missing-model-hint。gate-files 精确 66→67。变更仅 ext 私有解析与现有消费者，无新增 engine 接管。

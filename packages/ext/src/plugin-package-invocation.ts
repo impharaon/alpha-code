@@ -254,7 +254,7 @@ export async function registerPackageInvocations(
         ? incoming.model
         : parent.model
           ? `${parent.model.providerID}/${parent.model.id}${parent.model.variant && parent.model.variant !== "default" ? "#" + parent.model.variant : ""}`
-          : await resolvePackageModel(context, item.entry.invocation.model)
+          : await resolvePackageModel(context, item.entry.invocation.model, input.log)
     const background =
       item.entry.invocation.background ??
       (typeof incoming.background === "boolean"
@@ -339,7 +339,7 @@ export async function registerPackageInvocations(
           const text = await prepared(item, invocation.prompt.text)
           bind(invocation.sessionID, item, text, "command")
           const session = await context.session.get({ sessionID: invocation.sessionID })
-          const suggestion = !session.model && (await resolvePackageModel(context, item.entry.invocation.model))
+          const suggestion = !session.model && (await resolvePackageModel(context, item.entry.invocation.model, input.log))
           if (suggestion) {
             const [providerID, ...id] = suggestion.split("/")
             await context.session.switchModel({

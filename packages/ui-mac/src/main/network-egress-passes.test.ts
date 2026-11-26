@@ -1,5 +1,5 @@
-import { afterEach, expect, test } from "bun:test"
-import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { afterEach, expect, spyOn, test } from "bun:test"
+import { appendFileSync, chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import http from "node:http"
@@ -20,7 +20,10 @@ async function fixture() {
   const file = egressPassPath(root, "dev")
   mkdirSync(dirname(file), { recursive: true })
   // The real append binding is tested here with a temp user root; the records themselves come from CONNECT.
-  const store = { read: () => readEgressPasses(file, { readFileSync, log: () => {} }), append: (pass: unknown) => appendFileSync(file, JSON.stringify(pass) + "\n") }
+  const store = { read: () => readEgressPasses(file, { readFileSync, log: () => {} }), append: (pass: unknown, repairBytes?: number) => {
+    if (repairBytes !== undefined) truncateSync(file, repairBytes)
+    appendFileSync(file, JSON.stringify(pass) + "\n")
+  } }
   const messages: string[] = []
   const passes = createEgressPassLog(store, (line) => messages.push(line))
   const activity = createNetworkEgressActivity()
@@ -105,4 +108,30 @@ test("每次重新读取完整活动档位，混入 ask 时真实 CONNECT 出卡
   expect(await pending).toContain("403")
   expect(f.requests).toHaveLength(1)
   expect(f.passes.snapshot().passes[0]?.count).toBe(1)
+})
+
+test("日志追加不重读历史；启动只读取一次完整性状态", async () => {
+  const f = await fixture()
+  const read = spyOn(f.store, "read")
+  try {
+    expect(await f.request()).toContain("pass-ok")
+    expect(await f.request()).toContain("pass-ok")
+    expect(read).not.toHaveBeenCalled()
+    createEgressPassLog(f.store, () => {})
+    expect(read).toHaveBeenCalledTimes(1)
+  } finally { read.mockRestore() }
+})
+
+test("重启后追加截断半行尾巴，保留完整记录并继续记录", async () => {
+  const f = await fixture()
+  await f.request()
+  const before = readFileSync(f.file, "utf8")
+  await f.request()
+  const records = f.logs.filter((record) => record.event === "egress.policy-pass")
+  truncateSync(f.file, Buffer.byteLength(before))
+  appendFileSync(f.file, before.slice(0, 20))
+  const restarted = createEgressPassLog(f.store, () => {})
+  restarted.record(records[1]!)
+  expect(readFileSync(f.file, "utf8")).toBe(before + JSON.stringify(records[1]) + "\n")
+  expect(restarted.snapshot()).toMatchObject({ persistence: "ok", passes: [{ count: 2 }] })
 })

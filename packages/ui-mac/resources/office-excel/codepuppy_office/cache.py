@@ -1,5 +1,6 @@
 """Merge computed caches into the original OOXML package, never the LO rewrite."""
 from copy import deepcopy
+from decimal import Decimal
 import hashlib
 import datetime as dt
 from openpyxl.utils.datetime import to_excel
@@ -38,7 +39,14 @@ def expression(value):
     parts=re.split(r'("(?:""|[^"])*")',text)
     text=''.join(part if index%2 else re.sub(r'#(?:REF!|DIV/0!|VALUE!|NAME\?|N/A|NUM!|NULL!|SPILL!|CALC!)',lambda match:match[0].upper(),part,flags=re.IGNORECASE) for index,part in enumerate(parts))
     tokens=Tokenizer(text if text.startswith('=') else '='+text).items
-    return ''.join(re.sub(r'^(?:_xlfn\.|_xlws\.)+','',t.value) if t.type=='FUNC' else t.value for t in tokens)
+    output=[]
+    for token in tokens:
+        value=token.value
+        if token.type=='FUNC':value=re.sub(r'^(?:_xlfn\.|_xlws\.)+','',value,flags=re.IGNORECASE).upper()
+        if token.type=='OPERAND' and token.subtype=='NUMBER':value=Decimal(value)
+        if token.type=='OPERAND' and token.subtype=='RANGE':value=re.sub(r"'((?:[^']|'')*)'!",lambda match:match[1].replace("''", "'")+"!",value).upper()
+        output.append((token.type,token.subtype,value))
+    return tuple(output)
 
 
 def cached_value(cell, shared):

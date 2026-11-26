@@ -626,3 +626,5 @@ B8 确认：冻结 §4.3:146 明确首次文档 environment 查询才触发准�
 B8 green：runtime 20 PASS（B8-green.log）；发布投影仅提供本地环境，不触发大文件准备，文档 environment/补查的 query 保持。源码 §4.3 已作首次使用裁定，不按推断保留 eager 行为。
 
 B2 一次实物确认：共享 gate slot 运行 5 个公式的小工作簿，实际 LO 26.8.3.1 将 =0.10+A1→=0.1+A1、=sum('Sales'!a1)→=SUM(Sales!A1)、='Sales'!$a$1→=Sales!$A$1，双引号 MiXeD 保持，#REF! 改为 #ref!。命令/原稿/计算副本/输出在 `/tmp/alpha-1761-r11/formula-confirmation/facts.json`，未再跑第二次 LO 或把它加为慢测试。原 Excel 文件三个 normalization 用例均 red（B2-red.log），并保留字符串大小写/不同数值不能等价的反例。下一提交以 Decimal 和 tokenizer 类型规范化，不改原稿公式或未知公式的完整性错误。
+
+B2 green：同一三项实物规范化及字符串/数值负对照不改，office-excel 文件 12 PASS（B2-green.log）。只规范 token 语义，Decimal 不引入浮点误差，原 XML 公式与非目标 parts 的真实 fixture 断言仍通过。

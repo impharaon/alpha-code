@@ -336,7 +336,7 @@ UI：`connector-launch-presentation.ts` 为行和 BackgroundProblemWatcher 的�
 ## 三：r4 Python 安装裁定与持久准备
 
 - 依据：r4 编排器裁定（Claude Opus 5.5，2026-11-27），继续冻结 v1 §4.3/4.4、v2.2；设计 §10 的传播由编排器负责，本文不改设计。
-- 核对：Phase: IMPLEMENT；本段先计划提交，再红例提交，首次实现提交补计划 SHA。Codex / GPT-6。
+- 核对：Phase: IMPLEMENT；本段先计划提交，再红例提交，计划 `a1205e0af8`；首次实现按 Phase: IMPLEMENT 核对。Codex / GPT-6。
 - 本轮起始：2026-11-26T16:40:15Z，预计约 90 分钟；不启动应用/窗口，不跑整层/计时测试。
 
 ### 文件与顺序
@@ -353,3 +353,5 @@ UI：`connector-launch-presentation.ts` 为行和 BackgroundProblemWatcher 的�
 
 ### 偏离记录
 暂无。
+
+r4 安装步骤基线：先落当前 Location spawner 的固定 uv python install 命令与有工具时保持原 PATH 的正例；下一个提交单独保留无工具 marker 红例，再收敛该步骤 PATH。无生产 root 调用者，未把缺工具策略记为完成。

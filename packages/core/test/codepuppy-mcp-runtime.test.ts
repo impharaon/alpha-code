@@ -876,3 +876,27 @@ testEffect(Layer.empty).live("stdio native form keeps its request owner through 
     expect(seen).toEqual(["before:" + sessionID, "after:" + sessionID])
   }).pipe(Effect.provide(mcpLayer({ local: local({}, { protocol: "legacy" }) })))
 }))
+
+testEffect(Layer.empty).live("withdrawing the matching package handlers releases only owned remote transports on reload", () => Effect.gen(function* () {
+  const { sessionMcpHandler } = yield* Effect.promise(() => import("./fixture/mcp-echo"))
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const { Session } = yield* Effect.promise(() => import("@opencode/schema/session"))
+  const handler = yield* Effect.promise(sessionMcpHandler)
+  const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: handler.fetch })
+  yield* Effect.addFinalizer(() => Effect.sync(() => { server.stop(true) }))
+  let enabled = true
+  const registration = runtime.registerPackageRuntime({ directory: ROOT }, { ...packageElicitationHandlers({ beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer }), hasElicitationHandlers: () => enabled })
+  yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+  yield* Effect.gen(function* () {
+    const mcp = yield* Mcp.Service
+    yield* connected("remote")
+    yield* mcp.callTool({ server: "remote", name: "echo", sessionID: Session.ID.make("ses_handler_off") })
+    expect(handler.counts).toEqual({ opened: 2, closed: 0 })
+    enabled = false
+    yield* mcp.reload()
+    expect(handler.counts).toEqual({ opened: 2, closed: 1 })
+    yield* mcp.callTool({ server: "remote", name: "echo", sessionID: Session.ID.make("ses_handler_off") })
+    expect(handler.counts).toEqual({ opened: 2, closed: 1 })
+  }).pipe(Effect.provide(mcpLayer({ remote: new ConfigMCP.Remote({ type: "remote", url: server.url.href, oauth: false }) })), Effect.scoped)
+  expect(handler.counts).toEqual({ opened: 2, closed: 2 })
+}))

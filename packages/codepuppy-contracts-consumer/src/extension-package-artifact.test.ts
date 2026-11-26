@@ -45,9 +45,9 @@ describe("alpha-web extension package producer artifact pin", () => {
 
     expect(lock).toMatchObject({
       repo: "jinjunnn/alpha-web",
-      commit: "a7f79c667c71b03a4ae54350dd061a116a2c4080",
+      commit: "b9979b8696414658b0ac3f60926a2eb78bc9c8f7",
       artifactPath: "contracts/extension-package/artifact",
-      artifactSha256: "bd082405e97b433f4148869bbf70b772e2d426767db723b53d738e2afadfdb87",
+      artifactSha256: "b3b9bc150a93fa68a7c966d13f55cf81f4b58250c941db0e2d76d6eac0aa2a6c",
     })
     // 固定条数,不留余量:上游悄悄少发一个语料文件时,只比对「lock ↔ manifest 两边一致」是
     // 抓不到的 —— 两边会一起变小并保持自洽。
@@ -59,7 +59,8 @@ describe("alpha-web extension package producer artifact pin", () => {
     // `#1527` / alpha-web#270:40 → 40,同上(宿主 registry 多了 cloud@1,producer 语料不增不撤)。
     // alpha-web#283(6154104):40 → 42,带进 alpha-web#270 编译器半场的 cloud 正向语料与期望产物;
     // 40520ef 按改名后的宿主合同重生语料,42 → 42;a7f79c6 两份 schema 改名为 codepuppy-package-*,42 → 42。
-    expect(lock.files.length).toBe(42)
+    // #1762: 42 -> 43, including the producer's published Codex conversion rules.
+    expect(lock.files.length).toBe(43)
     expect(lock.files.map((file) => file.path).sort()).toEqual(
       [...manifest.files.map((file) => file.path), "extension-package-producer-artifact.v1.json"].sort(),
     )
@@ -163,6 +164,7 @@ describe("alpha-web extension package producer artifact pin", () => {
       "command",
       "mcp-local",
       "mcp-remote",
+      "plugin-package",
       "skill",
     ])
     // 合同 v2 (`#749`) 把两个 capability 转正。Phase 4 (`#807`) 一度再登记 `engine:config` /
@@ -197,6 +199,7 @@ describe("alpha-web extension package producer artifact pin", () => {
       "legacy-projection",
       "managed-plugin",
       "nested-bundle",
+      "plugin-package",
       "provider-adapter",
       "publish-wrapper",
     ])

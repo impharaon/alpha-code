@@ -1,0 +1,313 @@
+{
+  "agentsYaml": "agents/openai.yaml (plugin root or a selected skill) is provider configuration, never an asset. Top-level keys of a block mapping (plain or quoted) or of a single top-level flow mapping are classified: interface → interface.not-converted, policy / dependencies → agents-policy.not-converted, any other key → manifest-field-unknown. Any other structure is reported as agents-policy.not-converted (review-required), because it may carry policy that cannot be seen",
+  "boundsEnforcement": "every emitted declaration is compiled through compileCodePuppyPackageDeclarationV1 with its derived assets before the adapter returns",
+  "fieldMapOnly": {
+    "codepuppy.codex.claude-manifest-not-read": ".claude-plugin/plugin.json present and ignored",
+    "codepuppy.codex.identity.import-spec": "identity and presentation taken from the import spec (subset conversion)",
+    "codepuppy.codex.identity.manifest": "identity and presentation taken from the manifest (full conversion)",
+    "codepuppy.codex.license-attached": "plugin-root licence bytes attached to the skill as LICENSE",
+    "codepuppy.codex.manifest.mcpServers": "manifest mcpServers resolved to a {mcpServers} file of the input",
+    "codepuppy.codex.manifest.metadata": "author / homepage / keywords / license / repository kept as metadata",
+    "codepuppy.codex.manifest.skills": "manifest skills resolved to a directory of the input"
+  },
+  "findings": {
+    "codepuppy.codex.agents-policy.not-converted": {
+      "disposition": "review-required",
+      "reason": "agents/openai.yaml policy.* (implicit invocation) and dependencies.* (tool dependencies) are Codex provider settings"
+    },
+    "codepuppy.codex.app-connector.not-converted": {
+      "disposition": "review-required",
+      "reason": ".app.json / manifest apps: connector authorization has no Alpha equivalent"
+    },
+    "codepuppy.codex.component-not-selected": {
+      "disposition": "review-required",
+      "reason": "a component of the source package is not part of this conversion (not selected, or its name cannot be represented)"
+    },
+    "codepuppy.codex.hooks.not-converted": {
+      "disposition": "review-required",
+      "reason": "root hooks.json, hooks/ or manifest hooks: Alpha publishes no engine hooks"
+    },
+    "codepuppy.codex.interface.not-converted": {
+      "disposition": "review-required",
+      "reason": "manifest interface and agents/openai.yaml interface are Codex presentation fields"
+    },
+    "codepuppy.codex.manifest-field-unknown": {
+      "disposition": "review-required",
+      "reason": "unknown manifest or agents/openai.yaml field"
+    },
+    "codepuppy.codex.manifest-path-unresolved": {
+      "disposition": "review-required",
+      "reason": "manifest skills / mcpServers points at a path absent from the input; nothing under it is selectable and the conversion is a subset (R-13)"
+    },
+    "codepuppy.codex.mcp-config-shape.not-converted": {
+      "disposition": "review-required",
+      "reason": "manifest mcpServers is an inline object, the referenced file is a bare map, or a server entry is not an object; those servers are not selectable"
+    },
+    "codepuppy.codex.mcp-config-unreferenced.not-converted": {
+      "disposition": "review-required",
+      "reason": "a root .mcp.json the manifest does not reference; its servers are not selectable"
+    },
+    "codepuppy.codex.mcp-cwd.not-converted": {
+      "disposition": "review-required",
+      "reason": "MCP cwd is not converted"
+    },
+    "codepuppy.codex.mcp-field.not-converted": {
+      "disposition": "review-required",
+      "reason": "MCP field or MCP config top-level key without an Alpha mapping (includes env_vars)"
+    },
+    "codepuppy.codex.mcp-floating-version.blocked": {
+      "disposition": "blocked",
+      "reason": "MCP install recipe fails the catalog's exact-version gate (assertPinnedInstallSpec); the report is never wider than the gate"
+    },
+    "codepuppy.codex.mcp-local": {
+      "disposition": "mapped",
+      "reason": "selected stdio server → mcp-local (command + args; literal env as environment, credential-reference env targets as requiredSecrets)"
+    },
+    "codepuppy.codex.mcp-oauth.not-converted": {
+      "disposition": "review-required",
+      "reason": "provider-specific MCP OAuth settings (client ids, scopes, oauth_resource, auth) are not converted; generic login readiness uses the existing mcp-oauth prerequisite"
+    },
+    "codepuppy.codex.mcp-relative-command.blocked": {
+      "disposition": "blocked",
+      "reason": "MCP command contains / but is not absolute; it points into the provider package; the component is not produced"
+    },
+    "codepuppy.codex.mcp-remote": {
+      "disposition": "mapped",
+      "reason": "selected type:\"http\" server with url → mcp-remote (credential header templates and secret prerequisites, or existing MCP OAuth readiness)"
+    },
+    "codepuppy.codex.mcp-timeout.not-converted": {
+      "disposition": "review-required",
+      "reason": "MCP startup/tool timeouts are not converted"
+    },
+    "codepuppy.codex.mcp-version-pinned": {
+      "disposition": "review-required",
+      "reason": "a floating version was replaced by the exact version from importSpec.pins (R-12)"
+    },
+    "codepuppy.codex.skill": {
+      "disposition": "mapped",
+      "reason": "selected skills/<name>/ directory → skill@1 (targetDir codepuppy-skills); assets = every file except agents/openai.yaml"
+    },
+    "codepuppy.codex.skill-name-mismatch.blocked": {
+      "disposition": "blocked",
+      "reason": "SKILL.md frontmatter name is missing or differs from the directory name; the host refuses such a skill"
+    },
+    "codepuppy.codex.skill-reference.not-converted": {
+      "disposition": "review-required",
+      "reason": "skill text names a Codex built-in tool (frozen vocabulary, whole word) or another skill of the same package as $<name>; these do not exist under Alpha"
+    },
+    "codepuppy.codex.skill-script-runtime.not-converted": {
+      "disposition": "review-required",
+      "reason": "skill directory carries a script-class file (intake classifyFile); its runtime is not provisioned"
+    },
+    "codepuppy.codex.skills-unreferenced.not-converted": {
+      "disposition": "review-required",
+      "reason": "a skills/ directory exists but the manifest does not reference it; its skills are not selectable"
+    }
+  },
+  "graph": {
+    "leaves": "every other component, required: false",
+    "root": "first component by class order skill, mcp — byte order inside a class"
+  },
+  "groundTruth": "real packages: every plugin in openai/plugins uses .codex-plugin/plugin.json; layouts without a real sample are refused, not guessed",
+  "hostContract": {
+    "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
+    "artifactSha256": "1123e4f0837fbe98660aa3e90b47b3323fe117ab57ba9c82657d9e1794a1c245",
+    "commit": "c4f213f461e6c93142155a22f028e783fb0f44ec",
+    "repo": "jinjunnn/alpha-code"
+  },
+  "identity": {
+    "components": "component id skill:<name> / mcp:<name>; component version = package version",
+    "full": "manifest name / description; the import spec only fills what is missing; displayName defaults to the package name",
+    "subset": "select is a proper subset of the selectable components, or a manifest path is unresolved → packageName, displayName and description come from the import spec (R-09)",
+    "version": "manifest.version; importSpec.version only when the manifest has none (a malformed manifest value is refused)"
+  },
+  "inlineSecret": {
+    "error": "E_CODEX_INLINE_SECRET — the path is reported, the value never",
+    "literal": "a non-empty string that is not a reference; references are exactly ${NAME}, $NAME, {NAME}, optionally after Bearer / Basic / Token and one space (case-insensitive prefix)",
+    "nameNormalization": "insert _ between a lowercase letter or digit and an uppercase letter; - . and space → _; uppercase; then the intake secret-word test (isSecretishParamName)",
+    "notCovered": [
+      "positional secrets without a name hint (cmd sk-…)",
+      "value-shape detection (sk-, ghp_ prefixes, entropy)",
+      "secrets in skill text and non-MCP files",
+      "names without a secret word (PAT, DSN); URL credentials in their values are still S3"
+    ],
+    "rules": {
+      "S1": "env.<NAME> secret-like name with a literal value",
+      "S2": "headers / http_headers entry named authorization, proxy-authorization, cookie, or a secret-like name, with a literal value",
+      "S3": "any string value that is an absolute URL with userinfo, or with a secret-like query parameter carrying a literal; an absolute URL that cannot be parsed is refused because it cannot be shown to carry no credentials",
+      "S4": "args --<name>=<v> / -<name>=<v> with a secret-like name and a literal v",
+      "S5": "args --<name> / -<name> followed by a literal that does not start with -",
+      "S6": "args <NAME>=<v> (env A=B form) with a secret-like name and a literal v",
+      "S7": "args single <Header-Name>: <v> with an S2 name and a literal v",
+      "S8": "any object key at any depth except the structural key names, secret-like with a literal value; keys normalizing to *_ENV_VAR, *_ENV_VARS, ENV_VARS, ENV_HTTP_HEADERS are exempt (their values are variable names)"
+    },
+    "scope": "every server object of every captured MCP config: the referenced file, an inline manifest object, a bare map, an unreferenced root .mcp.json",
+    "structuralKeys": [
+      "args",
+      "auth",
+      "bearer_token_env_var",
+      "command",
+      "cwd",
+      "env",
+      "headers",
+      "http_headers",
+      "oauth",
+      "oauth_resource",
+      "scopes",
+      "startup_timeout_ms",
+      "startup_timeout_sec",
+      "timeout",
+      "tool_timeout_sec",
+      "type",
+      "url"
+    ]
+  },
+  "layout": {
+    "accepted": ".codex-plugin/plugin.json present and no root plugin.json",
+    "claudeManifest": ".claude-plugin/plugin.json is not read (fieldMap only); use adapt-claude-code explicitly",
+    "mcpServers": "manifest.mcpServers \"./<file>\", or root .mcp.json when the manifest omits mcpServers, shaped {mcpServers:{…}} → its servers are selectable; the field facts of every server in that file (cwd, timeouts, OAuth, other unmapped fields) are reported whether or not the server is selected, mappable, or nameable",
+    "refused": {
+      "E_CODEX_MANIFEST_LAYOUT": "a root plugin.json exists (alone or beside .codex-plugin/plugin.json); manifests are never merged",
+      "E_CODEX_MANIFEST_MISSING": "no .codex-plugin/plugin.json"
+    },
+    "skills": "manifest.skills \"./<dir>/\" with <dir> in the input → each direct child holding SKILL.md is selectable",
+    "unresolved": "manifest skills / mcpServers path absent from the input → manifest-path-unresolved; the conversion is a subset (R-13)"
+  },
+  "limits": {
+    "maxCaptureFiles": 512,
+    "maxComponents": 32,
+    "maxFileBytes": 16777216,
+    "maxJsonDepth": 64,
+    "maxJsonNodes": 4096,
+    "maxManifestBytes": 65536,
+    "maxSelect": 32
+  },
+  "manifestPath": ".codex-plugin/plugin.json",
+  "mapping": {
+    "http": "type \"http\" + url → mcp-remote url; headers / http_headers → headersTemplate with {VAR} references + requiredSecrets; bearer_token_env_var → Bearer Authorization and env_http_headers → named header templates with required secrets; without credential headers use existing labelled optional mcp-oauth readiness",
+    "metadata": [
+      "author",
+      "homepage",
+      "keywords",
+      "license",
+      "repository"
+    ],
+    "pins": "importSpec.pins maps a selected server to an exact semver that replaces the version of the single non-exact <pkg>@<v> token; zero or several such tokens, a key that is not a selected floating server, or a non-exact value → E_CODEX_PIN_INVALID",
+    "skill": "skill@1, targetDir codepuppy-skills; assets = the whole directory minus agents/openai.yaml; a plugin-root LICENSE / LICENSE.md / LICENSE.txt is attached as LICENSE when the directory has no licence file",
+    "stdio": "command + args → behavior.command; literal env (names ^[A-Z_][A-Z0-9_]{0,127}$) → behavior.environment; whole credential references → requiredSecrets targeting the source env key"
+  },
+  "profile": "codex.v1",
+  "schema": "codepuppy.provider-adapter.codex.rules.v1",
+  "toolVocabulary": {
+    "excluded": [
+      "test_sync_tool (test only)",
+      "code mode tools (no literal in the pinned source)",
+      "hosted web search (no literal name)",
+      "shell (a parameter name and an ordinary word)"
+    ],
+    "match": "whole word — no [A-Za-z0-9_] on either side — over the full text of every .md asset of a selected skill (frontmatter, prose, code); $<other skill of the same package> by the same rule",
+    "name": "codexToolNamesV1",
+    "names": [
+      {
+        "at": "codex-rs/core/src/tools/handlers/apply_patch_spec.rs:19",
+        "name": "apply_patch"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/shell_spec.rs:89",
+        "name": "exec_command"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/shell_spec.rs:139",
+        "name": "write_stdin"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/shell_spec.rs:173",
+        "name": "request_permissions"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/plan_spec.rs:43",
+        "name": "update_plan"
+      },
+      {
+        "at": "codex-rs/protocol/src/models.rs:1934",
+        "name": "view_image"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/mcp_resource_spec.rs:29",
+        "name": "list_mcp_resources"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/mcp_resource_spec.rs:61",
+        "name": "list_mcp_resource_templates"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/mcp_resource_spec.rs:93",
+        "name": "read_mcp_resource"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs:92",
+        "name": "spawn_agent"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs:193",
+        "name": "send_input"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs:222",
+        "name": "send_message"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs:255",
+        "name": "followup_task"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs:275",
+        "name": "resume_agent"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs:292",
+        "name": "wait_agent"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs:325",
+        "name": "list_agents"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs:346",
+        "name": "close_agent"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/multi_agents_spec.rs:370",
+        "name": "interrupt_agent"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/request_user_input_spec.rs:9",
+        "name": "request_user_input"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/get_context_remaining_spec.rs:10",
+        "name": "get_context_remaining"
+      },
+      {
+        "at": "codex-rs/core/src/tools/handlers/new_context_window_spec.rs:8",
+        "name": "new_context"
+      },
+      {
+        "at": "codex-rs/tools/src/tool_discovery.rs:6",
+        "name": "tool_search"
+      },
+      {
+        "at": "codex-rs/tools/src/tool_discovery.rs:8",
+        "name": "list_available_plugins_to_install"
+      },
+      {
+        "at": "codex-rs/tools/src/tool_discovery.rs:9",
+        "name": "request_plugin_install"
+      }
+    ],
+    "source": {
+      "commit": "c0cc9fc820f62e4dbdde68214dd6d792d6c8a7ee",
+      "repository": "openai/codex"
+    }
+  }
+}

@@ -297,7 +297,10 @@ export function probe(input: { text: string; roots: ProtectedRoots }): readonly 
   return [
     ...new Set(
       candidates.flatMap((token) => {
-        const value = token.replace(/^(?:--?[\w-]+|[a-zA-Z_]\w*)=/, "").replace(/^@/, "")
+        const value = token
+          .replace(/^(?:--?[\w-]+|[a-zA-Z_]\w*)=/, "")
+          .replace(/^@/, "")
+          .replace(/^\$(?:HOME|\{HOME\})(?=[/\\]|$)/, () => input.roots.home)
         const item = match({ path: value, roots: input.roots })
         return item ? [item.rule] : []
       }),

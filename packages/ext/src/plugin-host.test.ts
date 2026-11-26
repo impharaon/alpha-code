@@ -2352,3 +2352,33 @@ packageIt.live("the real hookify PostToolUse rule adds context after the native 
   expect(JSON.stringify(requests[1])).toContain("Sensitive file detected")
   expect(readFileSync(join(location.directory, "credentials.txt"), "utf8")).toBe("not a real secret")
 })))
+
+
+packageIt.live("the real security PermissionRequest hook denies before a native approval card", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:claude-security"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.py")))
+  const question = source.match(/START_CONFIRMATION = \(([\s\S]*?)\n\)/)![1]!.trim().split("\n").map(line => JSON.parse(line.trim())).join("")
+  // Keep the real handler and protocol; omit only its one-minute delay from this wiring regression.
+  const sample = yield* invocationSample("claude:claude-security", { "hooks/hooks.py": source.replace("UNANSWERED_AFTER_S = 60", "UNANSWERED_AFTER_S = 0") })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Security permission hook", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const running = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_security_ask" as never, call: { type: "tool-call", name: "question", id: "call_security_ask", input: { questions: [{ question, header: "Start", options: [{ label: "Yes", description: "Start the fixture scan" }] }] } } }).pipe(Effect.exit, Effect.forkChild)
+  const permission = yield* Permission.Service
+  let cards = 0
+  for (let waited = 0; waited < 3000 && !running.pollUnsafe(); waited += 10) {
+    for (const request of yield* permission.forSession(parent.id)) { cards++; yield* permission.reply({ requestID: request.id, reply: "reject" }) }
+    yield* Effect.sleep("10 millis")
+  }
+  const exit = yield* Fiber.join(running)
+  expect(Exit.isFailure(exit)).toBe(true)
+  expect(cards).toBe(0)
+  expect(JSON.stringify(exit)).toContain("No answer after 0 seconds")
+}), { id: "security-native-ask", setup: async context => {
+  await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "question", resource: "*", effect: "ask" })))
+} }))

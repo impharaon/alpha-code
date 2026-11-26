@@ -28,7 +28,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { Client, InMemoryTransport, fromJsonSchema, type MetaObject } from "@modelcontextprotocol/client"
 import { Server } from "@modelcontextprotocol/server"
 import { registerPinnedFilesHandler } from "@opencode/core/mcp/codepuppy-pinned-files"
-import type { ConnectorLaunchHost, PinnedPreparationProgress } from "@opencode/util/codepuppy-connector-launch"
+import type { ConnectorLaunchHost, LaunchSnapshot, PinnedPreparationProgress } from "@opencode/util/codepuppy-connector-launch"
 import { publishConnectorLaunchHost } from "@opencode/util/codepuppy-connector-launch"
 import { Tool } from "@opencode/schema/tool"
 import { createHash } from "node:crypto"
@@ -53,6 +53,8 @@ const { Integration } = await import("@opencode/core/integration")
 const { Location } = await import("@opencode/core/location")
 const { Mcp } = await import("@opencode/core/mcp/index")
 const { McpClient } = await import("@opencode/core/mcp/client")
+const { McpConnection } = await import("@opencode/core/mcp/connection")
+const { Environment } = await import("@opencode/core/environment/index")
 const { classifyStartFailure } = await import("@opencode/core/mcp/codepuppy-startup")
 const { McpPool } = await import("@opencode/core/mcp/pool")
 const { declaredListedTools, declaredFirstPartyTools, expandFirstPartyCommand, commandMatchesTemplate, listsDeclaration } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
@@ -898,43 +900,53 @@ test("managed pinned waiters cancel with their original call and reject late pro
   } finally { await f.close() }
 })
 
-test("production MCP client registers pinned requests only for its verified managed context", async () => {
+// Integration, affected PR/nightly: actual connection constructs the binding, real stdio/SDK
+// sends the nested request. Host is the frozen port, not the #1759-dependent app root.
+test("production MCP connection registers pinned requests only for its verified managed context", async () => {
   const id = "speech-model/any/own-production-fixture" as const
-  const tools = [{ name: "own", inputSchema: { type: "object" as const } }]
-  const server = new Server({ name: "owned-production-server", version: "1" }, { capabilities: { tools: {} } })
+  const tools = [{ name: "echo", description: "echo", inputSchema: { type: "object" as const, properties: { text: { type: "string" } } } }]
   const calls: unknown[] = []
   const updates: PinnedPreparationProgress[] = []
-  const binding = { identity: { directory: ROOT, server: "own", attempt: crypto.randomUUID() }, sidecarGeneration: "owned-generation", entry: { type: "local" as const, command: ["owned-service"] }, declarationSha256: "a".repeat(64), recipeSha256: "b".repeat(64) }
-  // The publication contract is once per process. This test is the only publisher; unmanaged clients never read it.
-  publishConnectorLaunchHost({
-    ensureFile: async () => { throw Error("unused") }, changed: () => { throw Error("unused") }, runtimeDependencies: async () => { throw Error("unused") }, beginEgress: async () => { throw Error("unused") }, egressEvidence: async () => { throw Error("unused") }, endEgress: () => { throw Error("unused") }, resolveAssets: async () => { throw Error("unused") },
+  const snapshots: LaunchSnapshot[] = []
+  const config = local({}, { protocol: "legacy" })
+  const launchers: LauncherEnvironment = { platform: "darwin-arm64", pinSet: "a".repeat(64), uv: path.join(ROOT, "uv"), uvx: path.join(ROOT, "uvx"), node: process.execPath, npmCli: path.join(ROOT, "npm.js"), npxCli: path.join(ROOT, "npx.js"), runtimeRoot: path.join(ROOT, "runtime"), pythonFileId: "python/darwin-arm64/3.12.16-20261124", packageManagerEnv: {}, environment: {}, firstPartyCacheRoots: {} }
+  const declaration = { tools, recipe: [{ id, archive: "file" as const, entry: "model", required: ["model"] }], declarationSha256: "a".repeat(64), recipeSha256: "b".repeat(64) }
+  const unused = async (): Promise<never> => { throw Error("unused host port") }
+  const host: ConnectorLaunchHost = {
+    ensureFile: unused,
+    changed: (snapshot) => { snapshots.push(structuredClone(snapshot)) },
+    runtimeDependencies: async () => ({ runtimeDep: [], executables: {}, missing: [] }),
+    beginEgress: unused, egressEvidence: unused, endEgress() {}, resolveAssets: async () => launchers,
     prepareFiles: async (input, signal, progress) => {
       calls.push(input)
       expect(signal.aborted).toBe(false)
       progress({ id, phase: "ready", sequence: 500 })
       return { ok: true, files: [{ id, path: "/owned/production-model" }] }
     },
-  })
-  server.setRequestHandler("tools/list", () => ({ tools }))
-  server.setRequestHandler("tools/call", async (_request, ctx) => {
-    const result = await server.request({ method: "codepuppy/pinned-files.ensure", params: { ids: [id], _meta: ctx.mcpReq._meta } }, fromJsonSchema({ type: "object" }))
-    return { content: [{ type: "text", text: JSON.stringify(result) }] }
-  })
-  const [left, right] = InMemoryTransport.createLinkedPair()
-  await server.connect(right)
-  try {
-    const output = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-      const connection = yield* McpClient.connect({ server: "own", config: { type: "attached", transport: left }, directory: ROOT, managedFirstParty: { binding, declaration: { tools, recipe: [{ id, archive: "file", entry: "model", required: ["model"] }], declarationSha256: binding.declarationSha256, recipeSha256: binding.recipeSha256 } } })
-      expect(calls).toEqual([])
-      yield* connection.tools()
-      expect(calls).toEqual([])
-      const callContext = yield* Effect.context()
-      return yield* connection.callTool({ name: "own", preparation: { callID: Tool.CallID.make("owned-production-call"), report: (update) => Effect.runPromiseWith(callContext)(Effect.sync(() => { updates.push(update) })) } })
-    })).pipe(Effect.provide(hostEnvironmentLayer)))
-    expect(output.content).toEqual([{ type: "text", text: JSON.stringify({ ok: true, files: [{ id, path: "/owned/production-model" }] }) }])
-    expect(calls).toEqual([{ binding, ids: [id] }])
-    expect(updates).toEqual([{ id, phase: "ready", sequence: 1 }])
-  } finally { await server.close() }
+  }
+  // The publication contract remains once per process. This is still the only publisher.
+  publishConnectorLaunchHost(host)
+  const output = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+    const environment = yield* Environment.Service
+    const scope = yield* Effect.scope
+    const connection = McpConnection.make({
+      name: "own", config, directory: ROOT, environment, scope, fetch: globalThis.fetch,
+      authProvider: Effect.succeed(undefined), elicitation: { create: () => Effect.die("unused"), complete: () => Effect.void },
+      lock: (effect) => effect, callbacks: (effect) => Effect.runFork(effect), fork: (effect) => Effect.runFork(effect),
+      localLaunch: { sidecarGeneration: "owned-generation", runtimeRoot: launchers.runtimeRoot, secrets: [], host, firstParty: { launchers, declaration } },
+      events: { connecting: Effect.void, connected: Effect.void, failed: () => Effect.die("must connect"), settled: Effect.void, closed: () => Effect.void, changed: () => Effect.void },
+    })
+    expect(calls).toEqual([])
+    yield* connection.start
+    expect(connection.client).toBeDefined()
+    expect(calls).toEqual([])
+    const callContext = yield* Effect.context()
+    return yield* connection.client!.callTool({ name: "echo", args: { ensure_pin: id }, preparation: { callID: Tool.CallID.make("owned-production-call"), report: (update) => Effect.runPromiseWith(callContext)(Effect.sync(() => { updates.push(update) })) } })
+  })).pipe(Effect.provide(hostEnvironmentLayer)))
+  expect(output.content).toEqual([{ type: "text", text: JSON.stringify({ ok: true, files: [{ id, path: "/owned/production-model" }] }) }])
+  expect(snapshots.map((row) => row.state.phase)).toEqual(["preparing", "connecting", "connected"])
+  expect(calls).toEqual([{ binding: { identity: snapshots[0]!.identity, sidecarGeneration: "owned-generation", entry: { type: "local", command: config.command, environment: config.environment, cwd: config.cwd }, declarationSha256: declaration.declarationSha256, recipeSha256: declaration.recipeSha256 }, ids: [id] }])
+  expect(updates).toEqual([{ id, phase: "ready", sequence: 1 }])
 })
 
 test("ordinary MCP client exposes no managed pinned-file request handler", async () => {

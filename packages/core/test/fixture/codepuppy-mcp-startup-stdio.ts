@@ -14,6 +14,7 @@ import { spawn } from "node:child_process"
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
 import { Server } from "@modelcontextprotocol/server"
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio"
+import { fromJsonSchema } from "@modelcontextprotocol/client"
 
 const env = process.env
 if (env.CODEPUPPY_MCP_LAUNCH_FILE)
@@ -60,6 +61,10 @@ server.setRequestHandler("tools/call", async (request, context) => {
   }
   if (env.CODEPUPPY_MCP_CALL_LOG) appendFileSync(env.CODEPUPPY_MCP_CALL_LOG, `${request.params.name}\n`)
   const args = (request.params.arguments ?? {}) as Record<string, unknown>
+  if (typeof args.ensure_pin === "string") {
+    const result = await server.request({ method: "codepuppy/pinned-files.ensure", params: { ids: [args.ensure_pin], _meta: context.mcpReq._meta } }, fromJsonSchema({ type: "object" }))
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] }
+  }
   if (request.params.name === "video_progress") {
     const token = context.mcpReq._meta?.progressToken
     if (typeof token === "string" || typeof token === "number") {

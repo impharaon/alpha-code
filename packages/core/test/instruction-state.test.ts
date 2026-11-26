@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test"
 import { and, asc, eq } from "drizzle-orm"
-import { Effect, Schema } from "effect"
+import { Deferred, Effect, Fiber, Schema } from "effect"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -107,6 +107,41 @@ describe("InstructionState", () => {
       expect(calls).toHaveLength(2)
       expect(calls[1]).toMatchObject({ sessionID, filePath: "/project/.claude/rules/style.md", memoryType: "Project", loadReason: "nested_traversal", committed: 2 })
       expect(calls[0]!.occurrenceId).not.toBe(calls[1]!.occurrenceId)
+    }),
+  )
+
+  it.effect("informational instruction hooks do not hold admission or serialize source notifications", () =>
+    Effect.gen(function* () {
+      const sessionID = SessionSchema.ID.make("ses_instruction_async_hooks")
+      const { db, events } = yield* setup(sessionID)
+      const discovery = yield* InstructionDiscovery.Service
+      const entered = yield* Deferred.make<void>()
+      let release = () => {}
+      const held = new Promise<void>(resolve => { release = resolve })
+      const calls: string[] = []
+      const runtime = registerPackageRuntime({ directory: "/project" }, {
+        hasElicitationHandlers: () => false, beforeConfigChange: async () => ({ apply: true }),
+        instructionsLoaded: async input => {
+          calls.push(input.filePath)
+          await Effect.runPromise(Deferred.succeed(entered, undefined))
+          await held
+        },
+        beforeCompaction: async () => ({ proceed: true }), afterCompaction: async () => {},
+        beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer,
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(() => { release(); runtime.dispose() }))
+      yield* discovery.transform(editor => {
+        for (const name of ["CLAUDE.md", ".claude/rules/style.md"])
+          editor.add(new InstructionDiscovery.File({ path: "/project/" + name, content: "admitted guidance", source: { sourcePath: "/project/" + name, scope: "Project" } }))
+      })
+      const admission = yield* InstructionState.prepare(db, events, yield* discovery.load(), sessionID).pipe(Effect.forkScoped)
+      yield* Deferred.await(entered)
+      yield* Effect.yieldNow
+      expect(admission.pollUnsafe()).toBeDefined()
+      expect(calls.toSorted()).toEqual(["/project/.claude/rules/style.md", "/project/CLAUDE.md"].toSorted())
+      expect(yield* instructionEvents(db, sessionID)).toHaveLength(1)
+      release()
+      yield* Fiber.join(admission)
     }),
   )
 

@@ -2912,6 +2912,39 @@ packageIt.live("InstructionsLoaded runs actual package handlers after admission 
   expect(readFileSync(log, "utf8").trim().split("\n")).toHaveLength(1)
 })))
 
+packageIt.live("a held InstructionsLoaded process cannot delay native prompt admission or the model", () => packageJourney(Effect.gen(function* () {
+  const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+  for (const group of source.hooks.InstructionsLoaded) {
+    delete group.matcher
+    for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');await Bun.stdin.json();fs.writeFileSync('instruction-observer-started','');while(!fs.existsSync('instruction-observer-release'))await Bun.sleep(10);fs.writeFileSync('instruction-observer-completed','')"]
+    }
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { InstructionsLoaded: source.hooks.InstructionsLoaded } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const discovery = yield* InstructionDiscovery.Service
+  const filePath = join(location.directory, "CLAUDE.md")
+  yield* discovery.transform(editor => editor.add(new InstructionDiscovery.File({ path: filePath, content: "ASYNC_ADMITTED_SOURCE", source: { sourcePath: filePath, scope: "Project" } })))
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Async instruction observer", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* Effect.addFinalizer(() => Effect.sync(() => writeFileSync(join(location.directory, "instruction-observer-release"), "")))
+  const admission = yield* sessions.prompt({ sessionID: session.id, text: "Use the admitted instructions" }).pipe(Effect.forkScoped)
+  yield* ext.finish(Effect.promise(() => Bun.file(join(location.directory, "instruction-observer-started")).exists()))
+  yield* ext.finish(Effect.sync(() => admission.pollUnsafe() !== undefined))
+  yield* sessions.wait(session.id)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "instruction-observer-completed")).exists())).toBe(false)
+  expect(JSON.stringify(yield* (yield* TestLLM.Test).requests())).toContain("ASYNC_ADMITTED_SOURCE")
+  writeFileSync(join(location.directory, "instruction-observer-release"), "")
+  yield* ext.finish(Effect.promise(() => Bun.file(join(location.directory, "instruction-observer-completed")).exists()))
+  yield* Fiber.join(admission)
+})))
+
 const subagentHookSample = (matcher?: string) => Effect.gen(function* () {
   const agent = yield* invocationSample("claude:feature-dev")
   const agentMembership = JSON.parse(readFileSync(join(agent.root, "skills-enabled.json"), "utf8"))

@@ -1,6 +1,7 @@
 // Integration: actual -I Office Python, app modules and OOXML. LO journeys are one-time acceptance.
 import { beforeAll, describe, expect, test } from "bun:test"
 import { join } from "node:path"
+import { statSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import { installOfficeExcel, officeRuntimeDir } from "../../scripts/build-office-runtime"
 import { officePythonPath } from "../shared/document-resources"
@@ -193,3 +194,14 @@ else:
  assert result.returncode!=0
  assert path.read_bytes()==original.read_bytes(),'termination replaced the source'
 `))
+
+
+test("reinstalling the same pinned Excel snapshot preserves reader-visible modules", () => {
+  const python = officePythonPath(runtime, process.platform)
+  const result = spawnSync(python, ["-I", "-B", "-c", "import sysconfig;print(sysconfig.get_path('purelib'))"], { encoding: "utf8" })
+  expect(result.status, result.stderr).toBe(0)
+  const module = join(result.stdout.trim(), "excel_mcp", "text_budget.py")
+  const before = statSync(module).ino
+  installOfficeExcel(runtime)
+  expect(statSync(module).ino).toBe(before)
+})

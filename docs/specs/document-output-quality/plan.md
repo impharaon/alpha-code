@@ -738,3 +738,5 @@ bun.lock 随 origin 改变，`bun install --frozen-lockfile` exit 0（2 packages
 r14 NUL green（c）：沿原 BINARY_SUFFIXES 登记实际 docx/pptx/xlsx/pdf 格式，沿 EXCLUDED_PREFIXES 仅登记两份真实 Mach-O/PE 头文件（非整个目录或源文本）。同一 docs_gate_nul 入口 exit 0：5969 个受检文件零 NUL，1333 个已登记二进制、4 个非文本条目及 11260 个原样上游条目跳过；4000 地板未变。首轮漏列 control.pdf/头文件名字不准确已逐项核对后补齐，不把失败轮计为通过。
 
 r14 seed green（b）：片 7 默认技能恢复原独立社区 Excel connector 的明确退役/不可安装事实，保留新首方 Excel 与脚本制作能力；assert-seed-assets 原入口 exit 0，未修改 seed guard 的条件。
+
+r14 Python race red（a）：在既有 office-excel 文件加实际模块 inode 回归；相同已钉住 snapshot 再 install 后 `excel_mcp/text_budget.py` inode 118330632→118330811，1 FAIL（office-reinstall-red.log），证明重复准备会删除正在被并行 reader 导入的模块。下一实现沿已有 .office-excel-stamp 跳过相同已验证 snapshot，并将戳记放到 import 成功后；不新增下载/缓存路径或安装协议。

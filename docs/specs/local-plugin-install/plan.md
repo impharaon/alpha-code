@@ -910,3 +910,29 @@ S-01 实际类型补口供设计镜像：PreparedShellCommand 只取 PreparedIns
 B1/B2/B5 与 S-01 bind-only 已完成；片 5 尚需完成并给证据：调用/工具事件与 scoped hooks、PreToolUse/PermissionRequest 当次 allow/updatedInput、Post/Failure/Stop 与 async/rewake 完整旅程、prompt handler、monitor 的实际触发/通知和生命期、FileChanged/CLAUDE_ENV_FILE、真实 leave/notification、ConfigChange/InstructionsLoaded/Compact/Elicitation 及 PostToolBatch。基础层中已写的相关分支不等于这些 AC 通过。
 
 按 r9 指定顺序，其余 A1–A9（包括 A9 的四项）及 B3/B4/B6/B7/B8 **尚未实施**，没有为它们写或运行红测；A1 的 engine case / gate slot 未执行，不声称冷启动已修复。下一步继续片 5 运行链，再执行这些已接受修正；无需重新裁决 S-01。外仓 consumer pin/vendor 完全未改，交编排器统一 checkpoint；三条 core 旧模型断言未改/未复跑。已核 Codex（GPT-6）；无新增设计决定或 OPTIONAL。
+
+### r9 部分交付收口
+
+本轮产品增量为 `02ea03cbce`；独立红测与 B1/B2/B5、S-01 的修正提交见上文。到 2026-11-26 20:44 UTC+08:00 约 76 分钟，r9 实际 27 个文件、983 additions / 102 deletions（含测试、生成物与本文），保留 r8 所有提交。按本轮执行预算返回 **PARTIAL**，不把尚未接线的运行 AC 或审计项记作完成；没有新的待裁决设计问题。
+
+删除反臂 `/tmp/plugin-standard-r9-removal-results.json` 共 **8 项**各具名 **0 pass / 1 fail**：B1 fenced recognizer、B2 argv 列表、B5 shell env 引用、S-01 不执行、SessionStart 注册、bundle 关闭、process options env、私有 control JSON。分别只移除对应生产行为，运行上文已有同名 case；每次 scoped git restore，恢复字节与提交逐字相同。失败均为行为断言，非类型错误/生成物漂移。没有重跑旧片 3/4 或 r8 的反臂，也没有通过取消失效造成无限进程。恢复后 `git diff --exit-code` exit 0；相关绿集合保持 407 pass、一次性实样 2 pass，不累加反臂或重复运行。
+
+本轮改变的测试文件（相对 r8 receipt `2164b0ecd1`）为：`packages/core/test/codepuppy-command-model-priority.test.ts`；`packages/ext/src/context-injection.test.ts`、`plugin-host.test.ts`、`plugin-package-process.test.ts`、`plugin-setup-order.cases.ts`；`packages/plugin/test/codepuppy-package-runtime.test.ts`；`packages/ui-mac/src/main/install-from-source.test.ts`。新增 process 测试是其新模块的原位测试文件，imports 可追踪；其余均在既有文件，setup 子例仍由原宿主选择。
+
+`affected-tests --list` exit 0 的实际 scope line 是 **all tests: scripts/gate-files.tsv changed (gate or declared global input)**，列出 **678 个 PR 测试文件**（`/tmp/plugin-standard-r9-affected{,-scope}.txt`）。原因是 r9 获准同步的条数所在文件被既有 gate 声明为 global input；没有更改选择器/全局声明，也没有按此清单运行全套。原三条旧断言所在 `packages/core/test/config/command-subagent.test.ts` 仍未选中。此处不沿用 r8 的 359/689。
+
+最终 converter --check 与 artifact --check（20 files）均 exit 0；单仓 docs-contract 仍 **71 errors / 250 warnings**（`/tmp/plugin-standard-r9-docs.json`），含两条已接受 plan unknown-id，未修基线。本文相对链接检查 8 pass；core/plugin/ext/ui-mac 包内 typecheck 均 exit 0，证据如上。A1 的指定 engine slot **NOT RUN**，该 Blocker 尚待修复。
+
+交编排器统一 alpha-web checkpoint 的 host aggregate：**62fa9200debfe9248898c880aeb6e9f71f7ed12fab72e41a0e85504c45c5f79f**。相对新基座 `1db6a3bbf5`，artifact 成员改变恰为以下 9 项（共同前缀 `packages/ui-mac/src/shared/host-extension-package-contract/`）：
+
+- CONTRACT.md
+- generate-artifact.ts
+- plugin-conversion.d.mts
+- plugin-conversion.mjs
+- plugin-hook-events.ts
+- plugin-package.ts
+- profiles/plugin-package.v1.schema.json
+- testvectors/decoder-corpus.v1.json
+- testvectors/plugin-package-description.v1.json
+
+同目录 `host-extension-package-artifact.v1.json` 清单也改变；`plugin-conversion.ts` 是生成源而非 artifact 成员。精确清单及 aggregate 另见 `/tmp/plugin-standard-r9-host-artifact.json`。未修改 consumer pin 或 vendored copies。遗留去向：片 5 运行链及上述 A/B 修正继续本车道 fix now；alpha-web checkpoint 交编排器；旧断言/docs 基线维持原归属。已核 Codex（GPT-6），本轮 PARTIAL；已定 binding/allow-set/SSE 不重开，OPTIONAL 无。

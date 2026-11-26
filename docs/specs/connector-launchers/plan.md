@@ -689,3 +689,12 @@ core `bun typecheck` →exit0、2069 files/2 projects（`/tmp/connector-r7-core-
 **#1759 合入后生产接线（冻结 names/signatures 沿 r3/R5 接口与组装表）**：本轮最后只读复核其 HEAD 仍 ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f，签名未变化。消费同次 planPackageManagerCaches 的 env/cacheEnv/rules/locations/excluded；resolvePackageManagerLocations 只是候选。由 installPackageManagerEnvironment / packageManagerEnvironment / refreshPackageManagerEnvironment / projectPackageManagerEnvironment / createPackageManagerEnvironmentRequester 持有最终绑定和 spawn 投影，不复制。随后接 mandatory bootstrap.launchers、main assets/download Host、sidecar 发布到 index/Slot/localLaunch、Node boot 重锚、当前 identity/代的 controller 与 diagnostic/retry、bindDocumentRuntime→runtime.retry()、renderer root；打包后完成真机器 AC。该表不声称 #1759 合入就自动完成本票实现。
 
 偏离：初始文件表之外的 key schema/diagnostic export/fixture 都是同一内容责任的必要共享，原因见本节；新增 content 模块192行，不加依赖或配置开关。当前总改动9文件（约866增53删，含计划/测试），比单个 helper 的实现范围大，但未跨票。时间核对2026-11-26T21:39Z，自起始约82分钟，原预计90分钟；完整独立余项没有在本轮完成，留精确可续接状态。遗留去向：独立余项→#1760续接；生产装配→#1759合入后本票；Office compileall→documents已路由，本轮未工作；既有文档结果→文档治理。OPTIONAL：无。
+
+## r8｜uv 内容归一、源绑定与准备事务
+
+- 依据：r8 Phase IMPLEMENT；r7 37da012a1d/fc7b90f81c/c83146a951/50f36a9440 已接受。冻结 SPEC v1 / DESIGN v2.2 §4.3–4.7/§5 与既有裁定不重开。
+- 核对：Codex / GPT-6，Phase IMPLEMENT；起始2026-11-26T21:40:48Z，预计90分钟，按子链核对；实际边界随提交更新。
+- 顺序/文件：先在既有 core/mcp/codepuppy-uv-launch.ts、codepuppy-connector-content.ts、codepuppy-connector-key.ts 完成真实解析输出→需求/来源/有效配置内容；再在 codepuppy-connector-launch.ts 完成当前源绑定与完整 frozen prepareConnectorLaunch；connection.ts / diagnostic.ts 仅补同调用链的进度/实际准备挂接。回归放既有 core/test/codepuppy-connector-launch.test.ts，真实格式样本沿既有 fixture/uv-tool-settings.ts 及必要真实源码夹具。没有新的公开接口或依赖，不改 fence。
+- 风险/证明：相同内容跨项目和凭据变化 key 相同，源/约束/有效解析设置改变则失效；editable 当前源与并行 Location 不相互覆盖，原服务 argv/env 不持久化。真实 uv/Python probe 在临时目录通过 gate slot；轻量测试验证事务只在 miss 安装/发布、hit 不解析 registry/下载 Python、失败与取消不留下 ready、准确进度/egress 归属。每项移除应使命名证据失败。
+- 验证：迭代仅命名例；每步完整行为文件一次；返回前实际 export/mock/枚举消费者一次、core bun typecheck、affected-tests --list、文档和 diff 检查。继承其它模块未变证据，不跑全层/全套/时序/容量。
+- #1759：沿 r7 的冻结接口与生产组装表，只读复核分支；不复制 R1/R2 或把候选位置当绑定结果。未决设计分叉才返回 PLAN-READY，其余本轮直接实现。

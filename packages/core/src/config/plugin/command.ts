@@ -247,16 +247,16 @@ function evaluateTemplate(
     const args = parseArguments(input.rawArguments, input.syntax)
     const last = Math.max(0, ...nodes.flatMap(node => node.parts.flatMap(part => "source" in part ? [...part.source.matchAll(/\$([1-9]\d*)/g)].map(match => Number(match[1])) : [])))
     let hasArguments = false
-    const parameter = (token: string): string | undefined => {
+    const parameter = (token: string, kind: TemplateNode["kind"]): string | string[] | undefined => {
       if (input.syntax === "literal") return
-      if (token === "$ARGUMENTS") { hasArguments = true; return input.rawArguments }
+      if (token === "$ARGUMENTS") { hasArguments = true; return kind === "shell" ? args : input.rawArguments }
       const index = token.match(input.syntax === "claude" ? /^\$(?:ARGUMENTS\[(\d+)\]|(\d+))$/ : /^\$([1-9]\d*)$/)
       if (index) {
         hasArguments = true
         const position = Number(index[1] ?? index[2])
         const offset = position - (input.syntax === "claude" ? 0 : 1)
         if (offset >= args.length) return input.syntax === "opencode" ? "" : token
-        return input.syntax === "opencode" && position === last ? args.slice(offset).join(" ") : args[offset]!
+        return input.syntax === "opencode" && position === last ? kind === "shell" ? args.slice(offset) : args.slice(offset).join(" ") : args[offset]!
       }
       if (input.syntax !== "claude") return
       const named = input.arguments.indexOf(token.slice(1))
@@ -284,8 +284,8 @@ function evaluateTemplate(
         }
         for (const match of part.source.matchAll(pattern)) {
           rendered += source(part.source.slice(end, match.index))
-          const argument = parameter(match[0])
-          rendered += argument === undefined ? source(match[0]) : value(argument)
+          const argument = parameter(match[0], node.kind)
+          rendered += argument === undefined ? source(match[0]) : Array.isArray(argument) ? argument.map(value).join(" ") : value(argument)
           end = match.index + match[0].length
         }
         return rendered + source(part.source.slice(end))

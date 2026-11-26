@@ -8,6 +8,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { Portal } from "solid-js/web"
 import { t } from "../i18n"
+import { mediaDurationText } from "../../shared/media-attachment"
 import { MAX_ATTACHMENT_BYTES } from "../../shared/attachment-path"
 import {
   fileRouteOf,
@@ -289,6 +290,9 @@ export function ComposerAttachmentStrip(props: {
                           fallback={
                             <>
                               <span class="a-att-size">{sizeText(a.size)}</span>
+                              <Show when={(a.kind === "video" || a.kind === "audio") && a.durationMs !== null ? { ms: a.durationMs } : undefined}>
+                                {(duration) => <span>{` · ${mediaDurationText(duration().ms)}`}</span>}
+                              </Show>
                               {" · "}
                               <span class="a-att-route" data-route={fileRouteOf(a.kind === "text" ? "text" : "document")}>
                                 {t(a.kind === "text" ? "codepuppy.attach.routeInline" : "codepuppy.attach.routeLocal")}
@@ -371,7 +375,7 @@ export function TimelineAttachments(props: {
               <span class="a-att-text">
                 <span class="a-comp-att-name">{a.name}</span>
                 <span class="a-att-sub" role="status">
-                  <Show when={a.read} fallback={<span class="a-att-size">{a.label}</span>}>
+                  <Show when={a.read} fallback={<span class="a-att-size">{a.localMedia ? [sizeText(a.size), a.localMedia.durationMs === null ? "" : mediaDurationText(a.localMedia.durationMs), t("codepuppy.attach.routeLocal")].filter(Boolean).join(" · ") : a.label}</span>}>
                     {(read) => (
                       <>
                         <StatusIcon tone={READ_TONE[read().kind]} />

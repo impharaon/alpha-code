@@ -43,3 +43,9 @@ export function mediaAttachmentOf(metadata: unknown): MediaAttachment | undefine
 export type MediaAttachmentResult =
   | { ok: true; media: MediaAttachment }
   | { ok: false; reason: "source_missing" | "source_unreadable" | "source_changed" }
+
+export function mediaDurationText(durationMs: number): string {
+  const seconds = Math.floor(durationMs / 1000)
+  const parts = [Math.floor(seconds / 60) % 60, seconds % 60].map((value) => String(value).padStart(2, "0"))
+  return seconds >= 3600 ? [Math.floor(seconds / 3600), ...parts].join(":") : parts.join(":")
+}

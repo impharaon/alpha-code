@@ -5215,3 +5215,65 @@ describe("alpha-code#1739 composer and picker follow the account summary without
     mounted.dispose()
   })
 })
+
+describe("media attachments in the production composer", () => {
+  test.each(["drop", "picker"])("%s attaches large media and sends metadata without reading its contents or waiting for duration", async (entry) => {
+    const sent: unknown[][] = []
+    const media = { kind: "video" as const, path: "/outside/会议.mp4", name: "会议.mp4", bytes: 2_000_000_000, durationMs: null }
+    let reads = 0
+    let stages = 0
+    installApi({ extras: { attachments: {
+      media: async () => ({ ok: true as const, media }),
+      stage: async () => { stages++; throw new Error("media must not be copied") },
+    } } })
+    const mounted = mount(() => createComponent(CodePuppyComposerRuntime, {
+      mode: "home", directory: () => "/project", command, initialText: "总结视频",
+      projects: { ...projects, startChat: async (_directory, _text, parts) => { sent.push(parts ?? []); return "session" } },
+      modelContract: { list: async () => platformModels, current: async () => undefined, switch: async () => {} },
+    }))
+    await waitFor(() => expect(composerModel()).not.toBeNull())
+    const file = new File([], media.name, { type: "video/mp4" })
+    Object.defineProperty(file, "size", { value: media.bytes })
+    file.arrayBuffer = async () => { reads++; throw new Error("media must not be buffered") }
+    if (entry === "drop") {
+      const event = new Event("drop", { bubbles: true, cancelable: true })
+      Object.defineProperty(event, "dataTransfer", { value: { types: ["Files"], files: [file] } })
+      mounted.host.querySelector("[data-codepuppy-composer]")!.dispatchEvent(event)
+    } else {
+      const input = mounted.host.querySelector<HTMLInputElement>('input[type="file"]')!
+      Object.defineProperty(input, "files", { configurable: true, value: [file] })
+      input.dispatchEvent(new Event("change", { bubbles: true }))
+    }
+    await waitFor(() => expect(mounted.host.querySelector('.a-comp-att[data-kind="video"]')).not.toBeNull())
+    expect(mounted.host.textContent).toContain(media.name)
+    expect(mounted.host.textContent).toContain("1907.3 MB")
+    expect({ reads, stages }).toEqual({ reads: 0, stages: 0 })
+    const send = mounted.host.querySelector<HTMLButtonElement>(".a-comp-send")!
+    await waitFor(() => expect(send.disabled).toBe(false))
+    send.click()
+    await waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]).toContainEqual({ type: "text", text: "", synthetic: true, metadata: { "codepuppy.media": media } })
+    expect(JSON.stringify(sent)).not.toContain("file://")
+    mounted.dispose()
+  })
+
+  test("a pending selected media registration belongs to its draft after remount", async () => {
+    const pending = deferred<{ ok: true; media: { kind: "audio"; path: string; name: string; bytes: number; durationMs: null } }>()
+    installApi({ extras: { attachments: { media: () => pending.promise, stage: async () => { throw new Error("not a document") } } } })
+    const snapshot: Array<Parameters<NonNullable<CodePuppyComposerRuntimeProps["onDraftSnapshot"]>>[0]> = []
+    const props = { mode: "home" as const, projects, directory: () => "/project", command,
+      modelContract: { list: async () => platformModels, current: async () => undefined, switch: async () => {} } }
+    const first = mount(() => createComponent(CodePuppyComposerRuntime, { ...props, onDraftSnapshot: (draft) => snapshot.push(draft) }))
+    const input = first.host.querySelector<HTMLInputElement>('input[type="file"]')!
+    Object.defineProperty(input, "files", { value: [new File([], "recording.mp3", { type: "audio/mpeg" })] })
+    input.dispatchEvent(new Event("change", { bubbles: true }))
+    first.dispose()
+    const otherDraft = mount(() => createComponent(CodePuppyComposerRuntime, props))
+    const resumed = mount(() => createComponent(CodePuppyComposerRuntime, { ...props, initialPendingReads: snapshot[0]!.pendingReads }))
+    pending.resolve({ ok: true, media: { kind: "audio", path: "/outside/recording.mp3", name: "recording.mp3", bytes: 0, durationMs: null } })
+    await waitFor(() => expect(resumed.host.querySelector('.a-comp-att[data-kind="audio"]')).not.toBeNull())
+    expect(otherDraft.host.querySelector('.a-comp-att[data-kind="audio"]')).toBeNull()
+    resumed.host.querySelector<HTMLButtonElement>(".a-comp-att-x")!.click()
+    expect(resumed.host.querySelector('.a-comp-att[data-kind="audio"]')).toBeNull()
+  })
+})

@@ -93,7 +93,8 @@ const extensionOf = (name: string) => {
 }
 
 export type AttachmentClass =
-  | { ok: true; kind: "video" | "audio" }
+  | { ok: true; kind: "video" }
+  | { ok: true; kind: "audio" }
   | { ok: true; kind: "image" }
   | { ok: true; kind: "text" }
   | { ok: true; kind: "document"; reader: AttachmentReader; mime: string }

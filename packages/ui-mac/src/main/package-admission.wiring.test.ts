@@ -45,6 +45,7 @@ test("admission decoder, secret failure, MCP adoption, tamper, cancel, stale, re
   // 15 → 17:#827 审计加了「取回失败 ≠ 成功取回 0 字节」的两条控制。
   // 17 → 22:桌面先装后启、装后凭据、整包图驱动组件、同图归属/失败保旧及真实 remote activation 的五条回归。
   // 22 → 24:有效作用域跨已加载 Location 的两条回归。
-  expect(output).toMatch(/\b24 pass\b/)
+  // 24 → 26:#1762 adds signed whole-tree installation and package-dependent MCP diagnostics.
+  expect(output).toMatch(/\b26 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
 }, 120_000)

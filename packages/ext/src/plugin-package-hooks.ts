@@ -60,13 +60,16 @@ export async function registerPackageHooks(
   const directory = mkdtempSync(join(tmpdir(), "codepuppy-plugin-session-"))
   const created = new Set<string>()
   const endings = new Map<string, Promise<void>>()
+  const departed = new Set<string>()
+  const tasks = new Set<string>()
+  const preparing = new Set<string>()
   const continued = new Set<string>()
   const continuing = new Set<string>()
   const starts = new Map<string, Promise<void>>()
   const sessionContexts = new Map<string, Contribution[]>()
   const promptContexts = new Map<string, Contribution[]>()
   const stopTurns = new Map<string, Contribution>()
-  const running = new Map<AbortController, { valid(): boolean; sessionID: string }>()
+  const running = new Map<AbortController, { valid(): boolean; sessionID: string; kind: "decision" | "async" | "watcher" | "monitor" }>()
   const monitors = new Map<string, { controller: AbortController; sessionID: string; valid(): boolean }>()
   const observed = new Set<string>()
   const promptEpoch = new Map<string, number>()
@@ -132,6 +135,9 @@ export async function registerPackageHooks(
   watchFile(membership, { interval: 100, persistent: false }, revoke)
   const events = new AbortController()
   const close = (sessionID: string) => {
+    departed.delete(sessionID)
+    tasks.delete(sessionID)
+    preparing.delete(sessionID)
     closeFileWatches(sessionID)
     dynamicWatches.delete(sessionID)
     const environment = environmentFiles.get(sessionID)
@@ -320,7 +326,7 @@ export async function registerPackageHooks(
         const execute = async (): Promise<HookResult | undefined> => {
           const controller = new AbortController()
           let redact = (text: string) => text
-          running.set(controller, { valid: handler.valid, sessionID })
+          running.set(controller, { valid: handler.valid, sessionID, kind: event === "FileChanged" ? "watcher" : handler.hook.type === "command" && (handler.hook.async || handler.hook.asyncRewake) ? "async" : "decision" })
           watchPackage(handler.installed)
           try {
             if (!handler.valid()) return
@@ -600,7 +606,7 @@ export async function registerPackageHooks(
   const reconcileFileWatches = (sessionID: string) => {
     const lifetime = sessionEpoch.get(sessionID)
     const handlers = handlersFor("FileChanged", sessionID)
-    if (!lifetime || !handlers.length) { closeFileWatches(sessionID); return }
+    if (!lifetime || departed.has(sessionID) || !handlers.length) { closeFileWatches(sessionID); return }
     const state = fileWatches.get(sessionID) ?? { lifetime, paths: new Map<string, (current: Stats, previous: Stats) => void>(), pending: Promise.resolve() }
     fileWatches.set(sessionID, state)
     const dynamic = dynamicWatches.get(sessionID)
@@ -635,15 +641,27 @@ export async function registerPackageHooks(
     )
     await starts.get(sessionID)
   }
+  const finishDeparted = async (sessionID: string) => {
+    if (!departed.has(sessionID) || tasks.has(sessionID) || preparing.has(sessionID)) return
+    const lifetime = sessionEpoch.get(sessionID)
+    await releasePackageSessionMcp(context.location, sessionID)
+    if (departed.has(sessionID) && sessionEpoch.get(sessionID) === lifetime && !tasks.has(sessionID) && !preparing.has(sessionID)) close(sessionID)
+  }
   const endSession = (sessionID: string, reason: Extract<PackageSessionMessage, { action: "leave" }>["reason"]) => {
     const pending = endings.get(sessionID)
     if (pending) return pending
+    if (departed.has(sessionID)) return Promise.resolve()
+    departed.add(sessionID)
     const ending = (async () => {
       try {
         if (sessionEpoch.has(sessionID)) await run("SessionEnd", sessionID, { reason })
       } finally {
-        try { await releasePackageSessionMcp(context.location, sessionID) }
-        finally { close(sessionID) }
+        closeFileWatches(sessionID)
+        for (const [controller, owner] of running)
+          if (owner.sessionID === sessionID && (owner.kind === "monitor" || owner.kind === "watcher")) controller.abort()
+        for (const [key, monitor] of monitors) if (monitor.sessionID === sessionID) monitors.delete(key)
+        await releasePackageSessionMcp(context.location, sessionID)
+        await finishDeparted(sessionID)
       }
     })()
     endings.set(sessionID, ending)
@@ -652,7 +670,7 @@ export async function registerPackageHooks(
   }
   const startMonitors = (sessionID: string, invocation?: InstructionScope) => {
     const lifetime = sessionEpoch.get(sessionID)
-    if (!lifetime) return
+    if (!lifetime || departed.has(sessionID)) return
     for (const installed of allInstalledPluginPackages(input.root).filter(active)) {
       for (const entry of installed.description.entries) {
         if (entry.kind !== "monitor" || !pluginEntryRuntimeAvailable(entry)) continue
@@ -665,7 +683,7 @@ export async function registerPackageHooks(
         const controller = new AbortController()
         const valid = () => !controller.signal.aborted && active(installed) && sessionEpoch.get(sessionID) === lifetime
         monitors.set(key, { controller, sessionID, valid })
-        running.set(controller, { sessionID, valid })
+        running.set(controller, { sessionID, valid, kind: "monitor" })
         watchPackage(installed)
         void Promise.resolve()
           .then(() => {
@@ -796,11 +814,17 @@ export async function registerPackageHooks(
   })
   const subscription = (async () => {
     for await (const event of context.event.subscribe({
-      types: ["session.created", "session.archived", "session.deleted", "session.execution.failed"],
+      types: ["session.created", "session.archived", "session.deleted", "session.execution.started", "session.execution.succeeded", "session.execution.interrupted", "session.execution.failed"],
       signal: events.signal,
     })) {
       if (event.type === "session.created") created.add(event.data.sessionID)
+      else if (event.type === "session.execution.started") tasks.add(event.data.sessionID)
+      else if (event.type === "session.execution.succeeded" || event.type === "session.execution.interrupted") {
+        tasks.delete(event.data.sessionID)
+        void Promise.resolve(endings.get(event.data.sessionID)).then(() => finishDeparted(event.data.sessionID)).catch(error => input.log("runtime-failed: package idle cleanup: " + String(error)))
+      }
       else if (event.type === "session.execution.failed") {
+        tasks.delete(event.data.sessionID)
         void run("StopFailure", event.data.sessionID, {
           error: event.data.error.type,
           error_details: event.data.error.message,
@@ -810,8 +834,9 @@ export async function registerPackageHooks(
               failures.set(event.data.sessionID, [...(failures.get(event.data.sessionID) ?? []), ...contexts])
           })
           .catch((error) => input.log("runtime-failed: package failure hook: " + String(error)))
+          .finally(() => finishDeparted(event.data.sessionID)).catch(error => input.log("runtime-failed: package idle cleanup: " + String(error)))
       } else {
-        void endSession(event.data.sessionID, "other").catch(error => input.log("runtime-failed: package SessionEnd: " + String(error)))
+        void endSession(event.data.sessionID, "other").finally(() => close(event.data.sessionID)).catch(error => input.log("runtime-failed: package SessionEnd: " + String(error)))
       }
     }
   })().catch((error) => {
@@ -873,26 +898,34 @@ export async function registerPackageHooks(
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })
   await context.session.hook("prompt", async (event) => {
-    if (!sessionEpoch.has(event.sessionID)) sessionEpoch.set(event.sessionID, {})
-    if (!batches.has(event.sessionID)) await rememberBatches(event.sessionID)
-    continued.delete(event.sessionID)
-    stopTurns.delete(event.sessionID)
-    promptEpoch.set(event.sessionID, (promptEpoch.get(event.sessionID) ?? 0) + 1)
-    promptContexts.set(event.sessionID, failures.get(event.sessionID) ?? [])
-    failures.delete(event.sessionID)
-    await preparePrompt?.(event)
-    const pending = expansions.get(event.messageID)
-    expansions.delete(event.messageID)
-    if (pending?.length)
-      promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...pending])
-    reconcileFileWatches(event.sessionID)
-    await startSession(event.sessionID, event.messageID)
-    startMonitors(event.sessionID)
-    const contexts = await run("UserPromptSubmit", event.sessionID, {
-      prompt: event.prompt.text ?? "",
-      prompt_id: event.messageID,
-    })
-    promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
+    if (departed.delete(event.sessionID)) starts.delete(event.sessionID)
+    preparing.add(event.sessionID)
+    try {
+      if (!sessionEpoch.has(event.sessionID)) sessionEpoch.set(event.sessionID, {})
+      if (!batches.has(event.sessionID)) await rememberBatches(event.sessionID)
+      continued.delete(event.sessionID)
+      stopTurns.delete(event.sessionID)
+      promptEpoch.set(event.sessionID, (promptEpoch.get(event.sessionID) ?? 0) + 1)
+      promptContexts.set(event.sessionID, failures.get(event.sessionID) ?? [])
+      failures.delete(event.sessionID)
+      await preparePrompt?.(event)
+      const pending = expansions.get(event.messageID)
+      expansions.delete(event.messageID)
+      if (pending?.length)
+        promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...pending])
+      reconcileFileWatches(event.sessionID)
+      await startSession(event.sessionID, event.messageID)
+      startMonitors(event.sessionID)
+      const contexts = await run("UserPromptSubmit", event.sessionID, {
+        prompt: event.prompt.text ?? "",
+        prompt_id: event.messageID,
+      })
+      promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
+    } catch (error) {
+      preparing.delete(event.sessionID)
+      await finishDeparted(event.sessionID)
+      throw error
+    } finally { preparing.delete(event.sessionID) }
   })
   await context.session.hook("context", async (event) => {
     const contexts = await drainToolBatches(event.sessionID)
@@ -968,7 +1001,7 @@ export async function registerPackageHooks(
       const file = environmentFile(sessionID, lifetime, false)
       if (!file) return {}
       const controller = new AbortController()
-      running.set(controller, { sessionID, valid })
+      running.set(controller, { sessionID, valid, kind: "decision" })
       try {
         const variables = await processes.environment({ source: processSource(item.installed, { item }), environment: { CLAUDE_ENV_FILE: undefined }, environmentFile: file, signal: controller.signal })
         if (!valid()) throw Error("runtime-failed: package invocation ended before instruction rendering")
@@ -1039,6 +1072,7 @@ export async function registerPackageHooks(
     },
     dispose: async () => {
       await Promise.all([...sessionEpoch.keys()].map(sessionID => endSession(sessionID, "other").catch(error => input.log("runtime-failed: package SessionEnd cleanup: " + String(error)))))
+      for (const sessionID of sessionEpoch.keys()) close(sessionID)
       disposed = true
       runtime.dispose()
       configResults.clear()

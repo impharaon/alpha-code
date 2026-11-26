@@ -6,3 +6,6 @@ export { ExtensionDetail } from "./extension-detail"
 export { CloudFormBox } from "./cloud-form-box"
 export { resetAuthRecoveryForTests } from "../auth-recovery"
 export { resetPreflightBudgetForTests } from "./cloud-preflight"
+
+export { VideoUploadDialog } from "./video-upload-dialog"
+export { publishActiveSessionIdentity } from "../codepuppy-ui/active-session-directory"

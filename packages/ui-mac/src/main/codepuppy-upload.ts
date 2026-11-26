@@ -14,84 +14,180 @@ import {
 type AccessIdentity = { accessToken: string; tenantId: string }
 type ExplicitUploadBody = ReturnType<typeof createExplicitUploadRequest>
 type UploadSnapshot = Omit<ExplicitUploadSnapshot, "files">
-type SendUpload = (identity: AccessIdentity, consent?: string) => Promise<CloudDispatchResult | {error: string}>
-type PendingUpload = { senderId: number; tenantId: string; snapshot: UploadSnapshot; send: SendUpload; kind: "code-review" | "video-understanding"; consumed: boolean; cancelled: boolean; wait: Promise<CloudUploadResult>; finish: (result: CloudUploadResult) => void }
+type SendUpload = (identity: AccessIdentity, consent?: string) => Promise<CloudDispatchResult | { error: string }>
+type PendingUpload = {
+  senderId: number
+  tenantId: string
+  snapshot: UploadSnapshot
+  send: SendUpload
+  kind: "code-review" | "video-understanding"
+  consumed: boolean
+  cancelled: boolean
+  wait: Promise<CloudUploadResult>
+  finish: (result: CloudUploadResult) => void
+}
 
 export function createMainUploadService(deps: {
   identity: () => AccessIdentity | undefined | Promise<AccessIdentity | undefined>
   issue: (input: { accessToken: string; manifestJson: string; manifestSha256: string }) => Promise<string>
-  dispatch: (input: {accessToken: string; body: ExplicitUploadBody; uploadConsent?: string}) => Promise<CloudDispatchResult | {error: string}>
+  dispatch: (input: {
+    accessToken: string
+    body: ExplicitUploadBody
+    uploadConsent?: string
+  }) => Promise<CloudDispatchResult | { error: string }>
   log: (message: string) => void
   now?: () => Date
   id?: () => string
   classify?: UploadClassifier
 }) {
   const pending = new Map<string, PendingUpload>()
-  const admit = async (senderId: number, identity: AccessIdentity, snapshot: UploadSnapshot, send: SendUpload, kind: PendingUpload["kind"]): Promise<CloudUploadResult> => {
-    if (snapshot.manifest.tenant_id !== identity.tenantId) return fail(deps.log,"not-authenticated")
+  const admit = async (
+    senderId: number,
+    identity: AccessIdentity,
+    snapshot: UploadSnapshot,
+    send: SendUpload,
+    kind: PendingUpload["kind"],
+  ): Promise<CloudUploadResult> => {
+    if (snapshot.manifest.tenant_id !== identity.tenantId) return fail(deps.log, "not-authenticated")
     if (!snapshot.manifest.consent_required) {
       const job = await send(identity)
-      return "error" in job ? fail(deps.log,job.error) : {status:"sent",privacy:"clear",job,directory:snapshot.projectDirectory}
+      return "error" in job
+        ? fail(deps.log, job.error)
+        : { status: "sent", privacy: "clear", job, directory: snapshot.projectDirectory }
     }
-    if (kind === "code-review") for (const [id, value] of pending) if (value.senderId === senderId && value.kind === kind) {value.finish({status:"cancelled"});pending.delete(id)}
-    const requestId = randomUUID(), completion = Promise.withResolvers<CloudUploadResult>()
-    pending.set(requestId,{senderId,tenantId:identity.tenantId,snapshot,send,kind,consumed:false,cancelled:false,wait:completion.promise,finish:completion.resolve})
-    return {status:"consent-required",requestId,preview:snapshot.preview}
+    if (kind === "code-review")
+      for (const [id, value] of pending)
+        if (value.senderId === senderId && value.kind === kind) {
+          value.finish({ status: "cancelled" })
+          pending.delete(id)
+        }
+    const requestId = randomUUID(),
+      completion = Promise.withResolvers<CloudUploadResult>()
+    pending.set(requestId, {
+      senderId,
+      tenantId: identity.tenantId,
+      snapshot,
+      send,
+      kind,
+      consumed: false,
+      cancelled: false,
+      wait: completion.promise,
+      finish: completion.resolve,
+    })
+    return { status: "consent-required", requestId, preview: snapshot.preview }
   }
   return {
-    prepare: async (senderId: number, intent: CloudUploadIntent, selection: UploadSelection): Promise<CloudUploadResult> => {
-      if (!intent || intent.kind !== "code-review") return fail(deps.log,"upload-selection-invalid")
+    prepare: async (
+      senderId: number,
+      intent: CloudUploadIntent,
+      selection: UploadSelection,
+    ): Promise<CloudUploadResult> => {
+      if (!intent || intent.kind !== "code-review") return fail(deps.log, "upload-selection-invalid")
       try {
-        const identity=await deps.identity()
-        if (!identity) return fail(deps.log,"not-authenticated")
-        const snapshot=await createExplicitUploadSnapshot(selection,identity.tenantId,{now:deps.now,id:deps.id,classify:deps.classify})
-        const body=createExplicitUploadRequest(snapshot,{autonomy:"pipeline",kind:"code-review",input:{}})
-        return await admit(senderId,identity,snapshot,(current,uploadConsent)=>deps.dispatch({accessToken:current.accessToken,body,uploadConsent}),"code-review")
-      } catch(error) {return fail(deps.log,error instanceof UploadAdmissionError ? error.code : "upload-selection-invalid")}
+        const identity = await deps.identity()
+        if (!identity) return fail(deps.log, "not-authenticated")
+        const snapshot = await createExplicitUploadSnapshot(selection, identity.tenantId, {
+          now: deps.now,
+          id: deps.id,
+          classify: deps.classify,
+        })
+        const body = createExplicitUploadRequest(snapshot, { autonomy: "pipeline", kind: "code-review", input: {} })
+        return await admit(
+          senderId,
+          identity,
+          snapshot,
+          (current, uploadConsent) => deps.dispatch({ accessToken: current.accessToken, body, uploadConsent }),
+          "code-review",
+        )
+      } catch (error) {
+        return fail(deps.log, error instanceof UploadAdmissionError ? error.code : "upload-selection-invalid")
+      }
     },
     prepareVideo: async (senderId: number, snapshot: UploadSnapshot, send: SendUpload): Promise<CloudUploadResult> => {
-      const identity=await deps.identity()
-      if (!identity) return fail(deps.log,"not-authenticated")
-      return admit(senderId,identity,snapshot,send,"video-understanding")
+      const identity = await deps.identity()
+      if (!identity) return fail(deps.log, "not-authenticated")
+      return admit(senderId, identity, snapshot, send, "video-understanding")
     },
-    videoPreviews: (senderId: number) => [...pending.entries()].filter(([,entry])=>entry.kind === "video-understanding" && entry.senderId === senderId && !entry.consumed).map(([requestId,entry])=>({requestId,preview:entry.snapshot.preview})),
+    videoPreviews: (senderId: number) =>
+      [...pending.entries()]
+        .filter(([, entry]) => entry.kind === "video-understanding" && entry.senderId === senderId && !entry.consumed)
+        .map(([requestId, entry]) => ({ requestId, preview: entry.snapshot.preview })),
     wait: async (requestId: string, signal: AbortSignal): Promise<CloudUploadResult> => {
-      const upload=pending.get(requestId)
-      if (!upload) return {status:"cancelled"}
-      const abort=()=>{upload.consumed=true;upload.cancelled=true;upload.finish({status:"cancelled"})}
-      signal.addEventListener("abort",abort,{once:true})
+      const upload = pending.get(requestId)
+      if (!upload) return { status: "cancelled" }
+      const abort = () => {
+        upload.consumed = true
+        upload.cancelled = true
+        upload.finish({ status: "cancelled" })
+      }
+      signal.addEventListener("abort", abort, { once: true })
       if (signal.aborted) abort()
-      try { return await upload.wait } finally {signal.removeEventListener("abort",abort);pending.delete(requestId)}
+      try {
+        return await upload.wait
+      } finally {
+        signal.removeEventListener("abort", abort)
+        pending.delete(requestId)
+      }
     },
     confirm: async (senderId: number, requestId: string): Promise<CloudUploadResult> => {
-      const upload=pending.get(requestId)
-      if (!upload || upload.senderId !== senderId || upload.consumed) return fail(deps.log,"upload-selection-invalid")
-      upload.consumed=true
-      const result=await (async (): Promise<CloudUploadResult> => {
+      const upload = pending.get(requestId)
+      if (!upload || upload.senderId !== senderId || upload.consumed) return fail(deps.log, "upload-selection-invalid")
+      upload.consumed = true
+      const result = await (async (): Promise<CloudUploadResult> => {
         try {
-          const identity=await deps.identity()
-          if (!identity || identity.tenantId !== upload.tenantId) return fail(deps.log,"not-authenticated")
-          const uploadConsent=await deps.issue({accessToken:identity.accessToken,manifestJson:upload.snapshot.manifestJson,manifestSha256:upload.snapshot.manifestSha256})
-          const claims=decodeUploadConsentClaims(uploadConsent),now=Math.floor((deps.now ?? (()=>new Date()))().getTime()/1000)
-          if (claims.sub !== upload.tenantId || claims.manifest_id !== upload.snapshot.manifest.manifest_id || claims.manifest_sha256 !== upload.snapshot.manifestSha256 || claims.exp <= claims.iat || claims.exp <= now || JSON.stringify(claims.egress) !== JSON.stringify(upload.snapshot.manifest.egress)) return fail(deps.log,"upload-consent-invalid")
+          const identity = await deps.identity()
+          if (!identity || identity.tenantId !== upload.tenantId) return fail(deps.log, "not-authenticated")
+          const uploadConsent = await deps.issue({
+            accessToken: identity.accessToken,
+            manifestJson: upload.snapshot.manifestJson,
+            manifestSha256: upload.snapshot.manifestSha256,
+          })
+          const claims = decodeUploadConsentClaims(uploadConsent),
+            now = Math.floor((deps.now ?? (() => new Date()))().getTime() / 1000)
+          if (
+            claims.sub !== upload.tenantId ||
+            claims.manifest_id !== upload.snapshot.manifest.manifest_id ||
+            claims.manifest_sha256 !== upload.snapshot.manifestSha256 ||
+            claims.exp <= claims.iat ||
+            claims.exp <= now ||
+            JSON.stringify(claims.egress) !== JSON.stringify(upload.snapshot.manifest.egress)
+          )
+            return fail(deps.log, "upload-consent-invalid")
           // Identity can change while consent issuance is in flight.
-          const current=await deps.identity()
-          if (!current || current.tenantId !== upload.tenantId) return fail(deps.log,"not-authenticated")
-          if(upload.cancelled)return {status:"cancelled"}
-          const job=await upload.send(current,uploadConsent)
-          return "error" in job ? fail(deps.log,job.error) : {status:"sent",privacy:"confirmed",job,directory:upload.snapshot.projectDirectory}
-        } catch(error) {return fail(deps.log,error instanceof UploadAdmissionError ? error.code : "upload-consent-issuance-failed")}
+          const current = await deps.identity()
+          if (!current || current.tenantId !== upload.tenantId) return fail(deps.log, "not-authenticated")
+          if (upload.cancelled) return { status: "cancelled" }
+          const job = await upload.send(current, uploadConsent)
+          return "error" in job
+            ? fail(deps.log, job.error)
+            : { status: "sent", privacy: "confirmed", job, directory: upload.snapshot.projectDirectory }
+        } catch (error) {
+          return fail(deps.log, error instanceof UploadAdmissionError ? error.code : "upload-consent-issuance-failed")
+        }
       })()
       upload.finish(result)
       if (upload.kind === "code-review") pending.delete(requestId)
       return result
     },
     cancel: (senderId: number, requestId: string): CloudUploadResult => {
-      const upload=pending.get(requestId)
-      if (upload?.senderId === senderId) {upload.consumed=true;upload.cancelled=true;upload.finish({status:"cancelled"});if(upload.kind === "code-review")pending.delete(requestId)}
-      return {status:"cancelled"}
+      const upload = pending.get(requestId)
+      if (upload?.senderId === senderId) {
+        upload.consumed = true
+        upload.cancelled = true
+        upload.finish({ status: "cancelled" })
+        if (upload.kind === "code-review") pending.delete(requestId)
+      }
+      return { status: "cancelled" }
     },
-    clear: (senderId: number) => {for(const [id,upload] of pending) if(upload.senderId === senderId){upload.finish({status:"cancelled"});pending.delete(id)}},
+    clear: (senderId: number) => {
+      for (const [id, upload] of pending)
+        if (upload.senderId === senderId) {
+          upload.consumed = true
+          upload.cancelled = true
+          upload.finish({ status: "cancelled" })
+          pending.delete(id)
+        }
+    },
   }
 }
 

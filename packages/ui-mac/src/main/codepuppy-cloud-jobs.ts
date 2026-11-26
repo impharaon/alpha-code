@@ -264,7 +264,14 @@ export async function downloadCloudArtifactTo(
 
 // Video understanding consumes its validated full result, not a scrubbed public artifact view.
 export const getVideoCloudJobStatus = (jobId: string): Promise<CloudResult<CloudJobStatus>> =>
-  authed(`${CODEPUPPY_PATHS.cloudJobs}/${encodeURIComponent(jobId)}`, "cloud.read", undefined,
-    text => decodeJsonContract("CloudJobStatusV1", text, "cloud-http"))
-export const getVideoModels = () => authed("/v1/tools/video/models", "cloud.read", undefined,
-  text => decodeJsonContract("VideoModelsV1", text, "cloud-http"), resolveEndpoints().platform)
+  authed(`${CODEPUPPY_PATHS.cloudJobs}/${encodeURIComponent(jobId)}`, "cloud.read", undefined, (text) =>
+    decodeJsonContract("CloudJobStatusV1", text, "cloud-http"),
+  )
+export const getVideoModels = () =>
+  authed(
+    "/v1/tools/video/models",
+    "cloud.read",
+    undefined,
+    (text) => decodeJsonContract("VideoModelsV1", text, "cloud-http"),
+    resolveEndpoints().platform,
+  )

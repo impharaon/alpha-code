@@ -238,21 +238,69 @@ function toUploadCode(error: string): UploadErrorCode {
 
 /** A video snapshot is still owned by the same manifest/sensitivity authority; no binary-as-text scan. */
 export type VideoUploadSnapshot = Omit<ExplicitUploadSnapshot, "files"> & { file: { path: string } }
-export async function createVideoUploadSnapshot(input: {
-  directory: string; path: string; originalPath: string; bytes: number; sha256: string; mime: string
-}, tenantId: string, manifestJson?: string): Promise<VideoUploadSnapshot> {
-  const name = input.originalPath.replace(/\\/g,"/").replace(/^[A-Za-z]:/, "").replace(/^\/+/, "")
-  const sensitivity = classifyUploadContent({path:name,content:""})
-  const manifest = manifestJson ? decodeContract("UploadManifestV1",JSON.parse(manifestJson),"cloud-http") : decodeContract("UploadManifestV1",{
-    schema_version:1, manifest_id:randomUUID(),tenant_id:tenantId,created_at:new Date().toISOString(),retention_class:"standard",consent_required:sensitivity.sensitive,
-    egress:[{egress_class:"explicit.file-upload",enforcement:"required"}],file_count:1,total_bytes:input.bytes,
-    files:[{path:name,size_bytes:input.bytes,sha256:input.sha256,media_type:input.mime}],
-  },"cloud-http")
+export async function createVideoUploadSnapshot(
+  input: {
+    directory: string
+    path: string
+    originalPath: string
+    bytes: number
+    sha256: string
+    mime: string
+  },
+  tenantId: string,
+  manifestJson?: string,
+): Promise<VideoUploadSnapshot> {
+  const name = input.originalPath
+    .replace(/\\/g, "/")
+    .replace(/^[A-Za-z]:/, "")
+    .replace(/^\/+/, "")
+  const sensitivity = classifyUploadContent({ path: name, content: "" })
+  const manifest = manifestJson
+    ? decodeContract("UploadManifestV1", JSON.parse(manifestJson), "cloud-http")
+    : decodeContract(
+        "UploadManifestV1",
+        {
+          schema_version: 1,
+          manifest_id: randomUUID(),
+          tenant_id: tenantId,
+          created_at: new Date().toISOString(),
+          retention_class: "standard",
+          consent_required: sensitivity.sensitive,
+          egress: [{ egress_class: "explicit.file-upload", enforcement: "required" }],
+          file_count: 1,
+          total_bytes: input.bytes,
+          files: [{ path: name, size_bytes: input.bytes, sha256: input.sha256, media_type: input.mime }],
+        },
+        "cloud-http",
+      )
   const file = manifest.files[0]
-  if (manifest.tenant_id !== tenantId || manifest.file_count !== 1 || manifest.files.length !== 1 || manifest.total_bytes !== input.bytes || file?.size_bytes !== input.bytes || file.sha256 !== input.sha256 || file.media_type !== input.mime || sensitivity.sensitive && !manifest.consent_required) throw new UploadAdmissionError("upload-selection-invalid")
+  if (
+    manifest.tenant_id !== tenantId ||
+    manifest.file_count !== 1 ||
+    manifest.files.length !== 1 ||
+    manifest.total_bytes !== input.bytes ||
+    file?.size_bytes !== input.bytes ||
+    file.sha256 !== input.sha256 ||
+    file.media_type !== input.mime ||
+    (sensitivity.sensitive && !manifest.consent_required)
+  )
+    throw new UploadAdmissionError("upload-selection-invalid")
   const json = manifestJson ?? JSON.stringify(manifest)
   if (Buffer.byteLength(json) > CONTROL_ENVELOPE_MAX_BYTES) throw new UploadAdmissionError("upload-control-limit")
-  return {projectDirectory:input.directory,manifest,manifestJson:json,manifestSha256:createHash("sha256").update(json).digest("hex"),file:{path:input.path},preview:{
-    pipeline:"video-understanding",fileCount:1,totalBytes:input.bytes,files:[{path:file.path,sizeBytes:input.bytes,sensitive:manifest.consent_required}],findings:sensitivity.findings.map(kind=>({kind,fileCount:1})),purpose:"artifact.upload",retentionClass:"standard",
-  }}
+  return {
+    projectDirectory: input.directory,
+    manifest,
+    manifestJson: json,
+    manifestSha256: createHash("sha256").update(json).digest("hex"),
+    file: { path: input.path },
+    preview: {
+      pipeline: "video-understanding",
+      fileCount: 1,
+      totalBytes: input.bytes,
+      files: [{ path: file.path, sizeBytes: input.bytes, sensitive: manifest.consent_required }],
+      findings: sensitivity.findings.map((kind) => ({ kind, fileCount: 1 })),
+      purpose: "artifact.upload",
+      retentionClass: "standard",
+    },
+  }
 }

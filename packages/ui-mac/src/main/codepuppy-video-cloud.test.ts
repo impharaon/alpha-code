@@ -349,8 +349,7 @@ test("video disconnection continues the original admission and cancellation reso
   for (let i = 0; i < 100; i++) {
     const record = JSON.parse(await readFile(file, "utf8"))
     if (record.attempts[0].state === "cancelled") {
-      expect(record.attempts[0].state).toBe("cancelled")
-  expect(record.result).toBeUndefined()
+      expect(record.result).toBeUndefined()
       return
     }
     await Bun.sleep(1)

@@ -179,6 +179,8 @@ test("formula report consumes the owning live projection's calculation receipt a
   const report = { ...f.report(receipt), final: true, formulaCheck: { recalculationId: calculation.id, errors } }
   expect((await inspection.check(f.caller, report, f.host)).formulaCheck).toEqual(report.formulaCheck)
   await expect(inspection.check(f.caller, { ...report, formulaCheck: { recalculationId: calculation.id, errors: [] } }, f.host)).rejects.toThrow("actual calculation receipt")
+  await writeDocumentRecord(join(job, "receipt.json"), { ...calculation, path: source.replace(/sales\.xlsx$/, "./sales.xlsx") })
+  expect((await inspection.check(f.caller, report, f.host)).formulaCheck).toEqual(report.formulaCheck)
   projections.dispose()
   f.stored.dispose()
 })

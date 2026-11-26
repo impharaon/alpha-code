@@ -1062,3 +1062,9 @@ core/util/ui-mac/ext 包内 `bun typecheck` 全部 exit 0；最终两项 runtime
 Host artifact aggregate 为 **13d81cbabb1164623595d3ed1aa18dbc1206e55ba8179cd74dadc09cd7d9b795**。相对 r10 本轮仅 artifact 成员 `CONTRACT.md`、`plugin-package.ts`、`plugin-conversion.mjs`，以及 `host-extension-package-artifact.v1.json` 清单改变。相对 1db6a3bbf5 累计恰 9 成员：`CONTRACT.md`、`plugin-package.ts`、`plugin-hook-events.ts`、`plugin-conversion.mjs`、`plugin-conversion.d.mts`、`generate-artifact.ts`、`profiles/plugin-package.v1.schema.json`、`testvectors/plugin-package-description.v1.json`、`testvectors/decoder-corpus.v1.json`；共同前缀 `packages/ui-mac/src/shared/host-extension-package-contract/`。精确快照 `/tmp/plugin-standard-r11-host-artifact.json`，consumer checkpoint 仍交编排器，未改 pins/vendor。
 
 遗留去向：片 5 剩余行为 fix now 续本车道；混合 plugin/marketplace 根输入定义交编排器/设计；consumer checkpoint 交编排器；docs 基线及三条旧 command-subagent 断言沿原归属（未编辑/复跑）。已核 Codex（GPT-6），没有新增依赖、迁移、DTO、engine 接管、ARCH 或 OPTIONAL 项。最终以本节为实际交付范围，前面旧轮次的尚未实施描述只保留历史收据。
+
+## r12 · 片 5 运行闭合
+
+核对：IMPLEMENT，编排器 r12 / Claude Opus 5.5；继承 de4dc535d9，spec v5 / design v3.1 与既定裁决。2026-11-26 22:35 UTC+08:00 起，止于片 5，不开片 7。本轮文档影响为来源语义与运行证据，仍落本计划及本仓既有模块/主权登记。
+
+偏离记录：**orchestrator ruling 2026-11-27（r12，Claude Opus 5.5）**——同根 plugin+marketplace 时作为市场，根插件未列出时追加为可选条目；没有新增用户步骤。6f8a50e225 替换原“只当包”断言并新增缺根变体先红（0 pass / 2 fail，`/tmp/plugin-standard-r12-mixed-red.log`）。固定 CodSpeed 本身已有 `./` 自条目，源解析器现在保留根路径；主进程沿同一 candidate/capture/converter 使每个条目可选，额外根只按根 path 是否已列出追加。第二例仅把固定 frontend-design 树放到该真实 repo 形状的 nested，并将原清单条目指向 nested；两项都能从 issued id 真实转换。原 source/converter 文件 90 pass / 0 fail（`/tmp/plugin-standard-r12-mixed-complete.log`）。没有新 DTO、确认或执行源代码；converter ESM/artifact 同步，consumer pin/vendor 仍由编排器协调。

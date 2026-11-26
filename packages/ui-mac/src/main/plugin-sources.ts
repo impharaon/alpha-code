@@ -352,10 +352,10 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       }
       const manifest = [".claude-plugin/marketplace.json", ".agents/plugins/marketplace.json"].find(path => capture.nodes.some(node => node.kind === "file" && node.path === path))
       const plugin = ["plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json"].some(path => capture.nodes.some(node => node.kind === "file" && node.path === path))
-      if (manifest && !plugin) {
+      if (manifest) {
         const ecosystem = manifest.startsWith(".agents/") ? "codex" : "claude"
         const marketplace = readMarketplace(await capture.readFile(manifest), ecosystem)
-        return { kind: "marketplace", entries: marketplace.entries.flatMap(entry => {
+        const entries = marketplace.entries.flatMap(entry => {
           if (entry.source.kind === "unsupported") return []
           const source = entry.source
           const prefix = source.kind === "path" ? source.path.replace(/\/$/, "") : source.path ?? ""
@@ -373,7 +373,13 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
             return { source: provenance, nodes, readFile: path => capture.readFile(base + path) }
           })
           return [{ id, displayName: entry.name, description: entry.description, source: capture.source.kind === "folder" ? "local-folder" as const : ecosystem === "claude" ? "claude-marketplace" as const : "codex-marketplace" as const }]
-        }) }
+        })
+        if (plugin && !marketplace.entries.some(entry => entry.source.kind === "path" && entry.source.path === ".")) {
+          const id = issue(async () => capture)
+          const converted = await convertCandidate(id)
+          entries.push({ id, displayName: converted.ok ? converted.package.name : "plugin", description: "", source: capture.source.kind === "folder" ? "local-folder" : ecosystem === "claude" ? "claude-marketplace" : "codex-marketplace" })
+        }
+        return { kind: "marketplace", entries }
       }
       const candidateId = issue(async () => capture)
       const converted = await convertCandidate(candidateId)

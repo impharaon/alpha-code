@@ -351,8 +351,8 @@ export function convertMcpServerDefinition(server: Json, source: Source): { pack
 
 function marketplaceSource(value: unknown): MarketplaceEntry["source"] {
   if (typeof value === "string") {
-    const path = value.replace(/^\.\//, "").replace(/\/$/, "")
-    return pluginRelativePath(path) ? { kind: "path", path } : { kind: "unsupported", detail: "Invalid marketplace path" }
+    const path = value === "." || value === "./" ? "." : value.replace(/^\.\//, "").replace(/\/$/, "")
+    return path === "." || pluginRelativePath(path) ? { kind: "path", path } : { kind: "unsupported", detail: "Invalid marketplace path" }
   }
   if (!object(value) || (value.source !== "url" && value.source !== "git-subdir") || typeof value.url !== "string") return { kind: "unsupported", detail: "Source is not a Git repository or local path" }
   const path = typeof value.path === "string" ? value.path.replace(/^\.\//, "").replace(/\/$/, "") : undefined

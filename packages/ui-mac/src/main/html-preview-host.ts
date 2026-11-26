@@ -1,3 +1,4 @@
+import { hardenPreviewSession, hardenPreviewContents } from "./preview-isolation"
 // REQ-096(alpha-code#188)—— 隔离 HTML Artifact Preview:main-owned 一次性静态 host。
 //
 // Host 机制取「session 级自定义协议」而非 127.0.0.1 loopback http server,理由:
@@ -212,31 +213,16 @@ function serveRequest(record: PreviewRecord, request: Request): Response {
 // ---- session / window 硬化 ----
 
 function hardenSession(ses: Session, record: PreviewRecord) {
-  ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
-  ses.setPermissionCheckHandler(() => false)
-  if (typeof ses.setDevicePermissionHandler === "function") ses.setDevicePermissionHandler(() => false)
-  ses.on("will-download", (event) => event.preventDefault())
-  // 默认零网络:该 partition 上除本协议(+ dev 态 devtools 前端)以外的一切请求直接 cancel。
-  ses.webRequest.onBeforeRequest((details, callback) => {
-    const allowed =
-      details.url.startsWith(`${HTML_PREVIEW_SCHEME}://`) || (!electronRef.app.isPackaged && details.url.startsWith("devtools://"))
-    if (!allowed) {
-      recordBlocked(record, safeOrigin(details.url))
-      writeLog("html-preview", "blocked request", { previewId: record.previewId, target: safeOrigin(details.url) }, "warn")
-    }
-    callback({ cancel: !allowed })
-  })
+  hardenPreviewSession(ses, { scheme: HTML_PREVIEW_SCHEME, packaged: electronRef.app.isPackaged, kind: "html", blocked: (url) => {
+    recordBlocked(record, safeOrigin(url))
+    writeLog("html-preview", "blocked request", { previewId: record.previewId, target: safeOrigin(url) }, "warn")
+  } })
   ses.protocol.handle(HTML_PREVIEW_SCHEME, (request) => serveRequest(record, request))
 }
 
 function hardenWebContents(record: PreviewRecord) {
   const wc = record.win.webContents
-  wc.setWindowOpenHandler(() => ({ action: "deny" as const }))
-  // loadURL 程序化导航不触发 will-navigate —— 文档内发起的一切导航/重定向/子 frame 导航全拒。
-  wc.on("will-navigate", (event: ElectronEvent) => event.preventDefault())
-  wc.on("will-redirect", (event: ElectronEvent) => event.preventDefault())
-  wc.on("will-frame-navigate", (event: ElectronEvent) => event.preventDefault())
-  wc.on("will-attach-webview", (event: ElectronEvent) => event.preventDefault())
+  hardenPreviewContents(wc, "html-preview")
   wc.on("render-process-gone", (_event: ElectronEvent, details: RenderProcessGoneDetails) => {
     writeLog(
       "html-preview",

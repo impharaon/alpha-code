@@ -15,8 +15,8 @@ const write = (path: string, end: number, status = "completed") =>
   tool("write", { status, input: { path, filePath: path, content: "x" }, metadata: {}, time: { start: end - 1, end } }, { display: builtin("write") })
 const patchAdd = (files: Array<{ relativePath: string; type: string }>, end: number) =>
   tool("patch", { status: "completed", input: { patchText: "" }, metadata: { files }, time: { start: end - 1, end } }, { display: builtin("patch") })
-const officeInExecute = (path: string, end: number, status = "completed") =>
-  tool("execute", { status: "completed", input: { code: "" }, metadata: { toolCalls: [{ tool: "codepuppy-excel.write_xlsx", status, input: { path } }] }, time: { start: end - 1, end } })
+const documentPart = (sourcePath: string, end: number, status = "completed", artifactPath = sourcePath) =>
+  tool("codepuppy_document", { status, input: { action: "render" }, metadata: { codepuppyDocument: { schemaVersion: 1, artifact: { checkId: "check", kind: artifactPath === sourcePath ? "xlsx" : "design", sourcePath, sourceSha256: "a".repeat(64), artifactPath, artifactSha256: "b".repeat(64) } } }, time: { start: end - 1, end } }, { display: { identity: { source: "plugin", origin: "/bundle/ext/server.js", name: "codepuppy_document" }, technicalId: "codepuppy_document", authority: { kind: "codepuppy-bundled", bindingId: "document-tool", evidenceDigest: "a".repeat(64) }, readable: "codepuppy:document", location: { kind: "local" } } })
 const subagent = (child: string, end: number) =>
   tool("subagent", { status: "completed", input: { agent: "general", subagent_type: "general" }, metadata: { sessionID: child, sessionId: child }, time: { start: end - 1, end } }, { display: builtin("subagent") })
 const page = (...parts: Part[]): SessionMessageWithParts[] => [{ info: { id: "msg", sessionID: "s", role: "assistant" } as never, parts }]
@@ -27,8 +27,8 @@ describe("scanLocalArtifacts", () => {
       DIR,
       "ses",
       page(
-        officeInExecute(`${DIR}/out/q3.xlsx`, 10),
-        officeInExecute(`${DIR}/out/failed.xlsx`, 11, "error"),
+        documentPart(`${DIR}/out/q3.xlsx`, 10),
+        documentPart(`${DIR}/out/failed.xlsx`, 11, "error"),
         write("page.html", 20),
         write("draft.md", 21, "error"),
         tool("write", { status: "completed", input: { path: "fake.md" }, metadata: {}, time: { start: 1, end: 22 } }, { display: { ...builtin("write"), identity: { source: "mcp", origin: "x", name: "write" } } }),
@@ -41,6 +41,19 @@ describe("scanLocalArtifacts", () => {
       ["page.html", "page.html", 20],
       ["notes/plan.md", "plan.md", 30],
     ])
+  })
+
+  test("pending and failed inspections retain actual source/design artifacts, while intermediates and malformed receipts stay hidden", () => {
+    const good = documentPart(`${DIR}/poster.html`, 1, "completed", `${DIR}/poster.png`)
+    const malformed = documentPart(`${DIR}/fake.xlsx`, 2)
+    if (malformed.type !== "tool" || malformed.state.status !== "completed") throw Error("invalid fixture")
+    const metadata = (malformed.state.metadata as { codepuppyDocument: { artifact: { artifactSha256: string } } }).codepuppyDocument
+    metadata.artifact.artifactSha256 = "not-a-hash"
+    const untrusted = documentPart(`${DIR}/spoof.xlsx`, 2)
+    if (untrusted.type !== "tool") throw Error("invalid fixture")
+    untrusted.display = { ...builtin("codepuppy_document"), identity: { source: "mcp", origin: "external", name: "codepuppy_document" } } as never
+    const scan = scanLocalArtifacts(DIR, "ses", page(good, malformed, untrusted, documentPart(`${DIR}/.document-output/check/1/preview.png`, 3), write(".document-output/work.md", 4), documentPart(`${DIR}/sub/.document-output/check/1/preview.png`, 4), tool("shell", { status: "completed", input: { command: "make other.xlsx" }, metadata: {}, time: { start: 1, end: 5 } })))
+    expect(scan.items.map((item) => item.path)).toEqual(["poster.html", "poster.png"])
   })
 
   test("会话目录外与 .. 逃逸不收;代码 / JSON 不收,图片 / CSV / 纯文本 / PDF 收", () => {

@@ -1,3 +1,4 @@
+import { publishDocumentPythonEnvironment } from "../../util/src/codepuppy-document"
 // `#1665`:ext 在 OpenCode 2 真插件宿主里(plugin-host.harness.ts)—— 每条用例装的是生产的默认导出 `CodePuppyExt`,
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
@@ -32,6 +33,9 @@ import { WebSearch } from "../../core/src/websearch.ts"
 import { Session } from "../../schema/src/session.ts"
 import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
+import { subscribeDocumentChecks } from "./document-check"
+import type { DeferredDocumentCheck, DocumentHost } from "../../util/src/codepuppy-document"
+import { codepuppyOfficeInstallCommand } from "../../ui-mac/src/shared/office-advisories"
 import CodePuppyExt, { PROCESS_STATE_KEY } from "./plugin"
 import { codePuppyWebSearchFailureOf } from "./exa-websearch"
 import { buildHubInstallReply, buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
@@ -1613,4 +1617,61 @@ itWithPermission.live("D3/I-10 installing the user's own plugin asks once in eve
   expect(automation.asks).toEqual([])
   expect(Exit.isFailure(automation.exit)).toBe(true)
   expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_create")
+}))
+
+it.effect("shell uses only its Location's document projection and removes inherited host keys", () => Effect.gen(function* () {
+  env({})
+  yield* activate(CodePuppyExt)
+  const location = yield* Location.Service
+  const hooks = yield* PluginHooks.Service
+  const event = { command: "python -I script.py", cwd: location.directory, timeout: 1000, shell: "/bin/sh", env: { CODEPUPPY_DOCUMENT_HOST: "/old/host.json" } as Record<string, string | undefined> }
+  yield* hooks.trigger("shell", "create.before", event)
+  expect(event.env.CODEPUPPY_DOCUMENT_HOST).toBeUndefined()
+  const clear = publishDocumentPythonEnvironment(location, { CODEPUPPY_DOCUMENT_HOST: "/current/host.json" })
+  yield* hooks.trigger("shell", "create.before", event).pipe(Effect.ensuring(Effect.sync(clear)))
+  expect(event.env.CODEPUPPY_DOCUMENT_HOST).toBe("/current/host.json")
+}))
+
+it.live("document ready admission uses the real promise plugin Session API and exact queued synthetic retry", () =>
+  Effect.gen(function* () {
+    const sessions = yield* Sessions.Service
+    let listener!: Parameters<DocumentHost["subscribeReady"]>[1]
+    let location!: Plugin.Context["location"]
+    yield* activate({
+      id: "test.document-admission",
+      setup: async (context) => {
+        location = context.location
+        subscribeDocumentChecks(context, { subscribeReady: (_location, receive) => { listener = receive; return () => {} } } as DocumentHost)
+      },
+    })
+    const session = yield* sessions.create({ location })
+    const notificationID = SessionMessage.ID.create()
+    const path = join(location.directory, "report.docx")
+    const check: DeferredDocumentCheck = { id: "check-admission", location, sessionID: session.id, notificationID, request: { kind: "docx", path }, sourceSha256: "a".repeat(64), artifact: { checkId: "check-admission", kind: "docx", sourcePath: path, artifactPath: path, sourceSha256: "a".repeat(64), artifactSha256: "a".repeat(64) }, revision: 0, state: "admitting" }
+    expect(yield* Effect.promise(() => listener(check))).toEqual({ status: "admitted", checkId: check.id, notificationID })
+    expect(yield* Effect.promise(() => listener(check))).toEqual({ status: "admitted", checkId: check.id, notificationID })
+    yield* sessions.remove(session.id)
+    expect(yield* Effect.promise(() => listener({ ...check, notificationID: SessionMessage.ID.create() }))).toEqual({ status: "session-missing", checkId: check.id })
+  }),
+)
+
+
+it.live("an unavailable document projection cannot invalidate a successfully merged MCP ownership", () => Effect.gen(function* () {
+  const token = join(scratch, "document-unavailable-token")
+  writeFileSync(token, "fixture-token")
+  handOver(token, "fixture-token")
+  const resources = realpathSync(join(import.meta.dir, "../../ui-mac/resources"))
+  env({}, { killSwitch: true, officeMcpManifest: join(resources, "office-mcp/tools.json"), cloudMcp: testCloudMcp("https://cloud.example/mcp", token, "cloud") })
+  const location = yield* Location.Service
+  mkdirSync(join(location.directory, ".codepuppy"), { recursive: true })
+  const command = codepuppyOfficeInstallCommand("word").map((value) => value.replaceAll("{codepuppyResources}", resources).replaceAll("{workspace}", location.directory))
+  writeFileSync(join(location.directory, ".codepuppy/codepuppy.jsonc"), JSON.stringify({ mcp: { "codepuppy-word": { type: "local", command } } }))
+  decide(location.directory, true)
+  const mcp = recordingMcp({ cloud: { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true } })
+  yield* registered("cloud_web_search")
+  yield* activate(CodePuppyExt, { mcp })
+  const governed = yield* before("cloud_web_search")
+  expect(Exit.isFailure(governed)).toBe(true)
+  expect(JSON.stringify(governed)).not.toContain("by name")
+  expect(mcp.servers.get("codepuppy-word")).toMatchObject({ type: "local", command })
 }))

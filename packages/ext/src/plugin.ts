@@ -1,6 +1,9 @@
+import { DOCUMENT_PYTHON_HOST, documentHost, documentPythonEnvironmentFor } from "../../util/src/codepuppy-document"
+import { declaredFirstPartyTools } from "../../core/src/mcp/codepuppy-first-party-mcp"
+import { checkCodePuppyOfficeMcpSafety } from "../../ui-mac/src/shared/office-advisories"
 import { videoUnderstandingTransform } from "./video-understanding"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { Plugin } from "@opencode/plugin"
 import { codepuppyBootstrap, routePlatformUrl } from "../../util/src/codepuppy-bootstrap"
@@ -50,6 +53,8 @@ import { AbsolutePath } from "../../schema/src/schema"
 import { readPackageAllowSet } from "./gen-skill-paths"
 import { managedMcpAllowedHere, managedSkillAllowedHere, managedSkillIdentity } from "./package-scope"
 import { modelFacts } from "./model-facts"
+import { documentSessionActive, recordDocumentPageView } from "./document-register"
+import { cloudVisionToolId } from "./cloud-vision"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
 import { createAgentMentionHooks } from "./agent-mention-hooks"
@@ -138,6 +143,9 @@ export const CodePuppyExt: Plugin.Plugin = {
       requireCodePuppyGlobalRoot(bootstrap.paths.globalRoot)
       // `#1698` R33:随包内容需要的工具 shell 输出只在这里逐项列出;每次建子进程时从文档派生,不写本进程环境。
       await context.shell.hook("create.before", (event) => {
+        const document = documentPythonEnvironmentFor(context.location)
+        if (document) event.env[DOCUMENT_PYTHON_HOST] = document.CODEPUPPY_DOCUMENT_HOST
+        else delete event.env[DOCUMENT_PYTHON_HOST]
         event.env.CODEPUPPY_GLOBAL_DIR = codepuppyBootstrap().paths.globalRoot
       })
       const projectRootFor = (target: string): ProjectRoot | null => {
@@ -166,12 +174,27 @@ export const CodePuppyExt: Plugin.Plugin = {
         for (const tool of createCodePuppyTools({ context, reloads, projectRootFor, readConsent: readProjectExtensionsConsent }))
           editor.add(tool)
         for (const tool of createHubTools(hubBridge, context, policy.askInstall)) editor.add(tool)
+        for (const tool of editor.list()) {
+          const stage = tool.id === "shell" ? "generate" : tool.id === "read" || tool.id === cloudVisionToolId(bootstrap) ? "inspect" : undefined
+          if (!stage) continue
+          editor.update(tool.id, (entry) => {
+            const execute = entry.execute
+            entry.execute = async (value, toolContext) => {
+              if (!documentSessionActive(context.location, toolContext.sessionID)) return execute(value, toolContext)
+              const title = stage === "generate" ? "生成" : "检查"
+              await toolContext.progress({ title, codepuppyDocumentStage: stage })
+              const result = await execute(value, { ...toolContext, progress: (update) => toolContext.progress({ ...update, title, codepuppyDocumentStage: stage }) })
+              return { ...result, metadata: { ...result.metadata, title, codepuppyDocumentStage: stage } }
+            }
+          })
+        }
       })
 
       // `#1419`(REQ-228):看不了图的模型 —— 图片送云端识图,模型可按编号 / 路径追问。登记簿按本 Location 建
       // (#223 R7 的纪律);能力真源是引擎目录里的模型(modelFacts);转写正文跨重启缓存在插件存储里。
       const vision = createCloudVisionHooks({
         directory,
+        documentPageView: (sessionID, view) => recordDocumentPageView(context.location, sessionID, view),
         isVideoFrames: async (tool) => {
           const facts = await policy.factsFor(tool)
           return facts?.identity.source === "mcp" && facts.authority.kind === "codepuppy-bundled" && facts.identity.origin === "codepuppy-video" && facts.identity.name === "frames"
@@ -235,6 +258,7 @@ export const CodePuppyExt: Plugin.Plugin = {
       })
       await context.tool.hook("execute.after", (event) => {
         if (event.status === "error") {
+          vision.toolAfter(event)
           // `#1449` / `#1445`(#1662 parity):Code Puppy 的 exa 供应商(exa-websearch.ts)抛出的具名结局,被 2.x 的 websearch 工具包成了
           // 通用的「Unable to search the web for …」;这里换回 0.1.26 的那句话(或供应商原文)。只认那个类型,不看文案。
           // 429 时供应商抛的是引擎认得出的 HttpClientError(random 才会换同伴),具名结局在它的 cause 里 —— 沿 cause 链找。
@@ -254,7 +278,10 @@ export const CodePuppyExt: Plugin.Plugin = {
         } catch (cause) {
           error(`[@codepuppy/ext] cloud tool ${event.tool} result refused: ${describe(cause)}`)
           event.result = { content: renderTemplate(CLOUD_CONTRACT_REFUSED_ID, { name: event.tool }), metadata: { codepuppy: { contractRefused: true } } }
+          vision.toolAfter({ ...event, status: "error" })
+          return
         }
+        vision.toolAfter(event)
       })
 
       // ── 请求组装(P3 / P4 / P5 / P6)─────────────────────────────────────────────────────────
@@ -369,7 +396,7 @@ export const CodePuppyExt: Plugin.Plugin = {
         return cfg
       }
 
-      await context.mcp.transform((editor) => {
+      await context.mcp.transform(async (editor) => {
         // #223 R5 / M3:云 MCP 的完整定义只由 ext 在这里装 —— 本句能执行 = 本 Location 的 ext 已装上、上面的执行闸已注册。
         try {
           // Main omits the effective server when its owning package is off. Rearm only an injected entry.
@@ -391,6 +418,19 @@ export const CodePuppyExt: Plugin.Plugin = {
             editor.update(name, (config) => {
               config.disabled = disabled
             })
+          }
+          for (const [name, config] of editor.list()) {
+            if (config.type !== "local" || config.disabled === true || !bootstrap.paths.officeMcpManifest) continue
+            const previous = config.environment?.[DOCUMENT_PYTHON_HOST] ? documentPythonEnvironmentFor(context.location) : undefined
+            if (!declaredFirstPartyTools(name, config, bootstrap.paths.officeMcpManifest, readFileSync, previous)) continue
+            const resources = dirname(dirname(bootstrap.paths.officeMcpManifest))
+            if (!checkCodePuppyOfficeMcpSafety(name, config as unknown as Record<string, unknown>, context.location.directory, resources, previous).ok) continue
+            try {
+              const environment = await documentHost().pythonEnvironment(context.location)
+              editor.update(name, (entry) => { if (entry.type === "local") entry.environment = { ...entry.environment, ...environment } })
+            } catch (cause) {
+              error(`[@codepuppy/ext] document Python environment unavailable: ${describe(cause)}`)
+            }
           }
         } catch (cause) {
           merged = false

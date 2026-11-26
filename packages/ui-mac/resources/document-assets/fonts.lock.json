@@ -1,0 +1,57 @@
+{
+  "upstream": "https://github.com/notofonts/noto-cjk",
+  "commit": "f8d157532fbfaeda587e826d4cd5b21a49186f7c",
+  "fontTools": "4.69.1",
+  "sources": [
+    {
+      "path": "Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf",
+      "sha256": "d68bafcb48a2707749396aa12bbbd833cb70401f3a9a689fd2902c7e0d295964",
+      "bytes": 17773132
+    },
+    {
+      "path": "Serif/Variable/TTF/Subset/NotoSerifSC-VF.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Serif/Variable/TTF/Subset/NotoSerifSC-VF.ttf",
+      "sha256": "5326cfb097e3ab26fcb39329752b5c0a439bf8d5c4649520e4b492939c352a09",
+      "bytes": 25125232
+    },
+    {
+      "path": "Sans/LICENSE",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/LICENSE",
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+      "bytes": 4301
+    },
+    {
+      "path": "Serif/LICENSE",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Serif/LICENSE",
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+      "bytes": 4301
+    }
+  ],
+  "instances": [
+    {
+      "path": "fonts/NotoSansSC-Regular.ttf",
+      "family": "Noto Sans SC",
+      "weight": 400,
+      "sha256": "a89babdfd7c3d0b7d69e489acacb8a363db38e7cd8b6f96ba08b10133acf777f"
+    },
+    {
+      "path": "fonts/NotoSansSC-Bold.ttf",
+      "family": "Noto Sans SC",
+      "weight": 700,
+      "sha256": "32173a0cecf15ac3c0752966be2e41cd881109f0ebec621072443555a1b9e420"
+    },
+    {
+      "path": "fonts/NotoSerifSC-Regular.ttf",
+      "family": "Noto Serif SC",
+      "weight": 400,
+      "sha256": "8be18a5b9bdc0ea76db6fdf77104bb63d24eb869fc4005615683cc2116136144"
+    },
+    {
+      "path": "fonts/NotoSerifSC-Bold.ttf",
+      "family": "Noto Serif SC",
+      "weight": 700,
+      "sha256": "473d03b9cf6d13ef4897f46b3f87ba31bab8d6c4b17601542f4dbea1f0d896f8"
+    }
+  ]
+}

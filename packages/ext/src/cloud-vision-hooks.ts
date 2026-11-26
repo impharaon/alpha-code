@@ -57,6 +57,10 @@ export const VISION_MARKER = "codepuppy_vision"
 
 export type CloudVisionHookDeps = {
   /** 本 Location 的目录(相对路径引用按它解析;与 Read 工具同一个基准)。 */
+  readonly documentPageView?: (
+    sessionID: string,
+    view: { path: string; sha256: string; inspected: boolean; reason?: string },
+  ) => void
   readonly directory: string
   /** Existing policy authority verifies the bundled video frames producer. */
   readonly isVideoFrames: (tool: string) => Promise<boolean>
@@ -86,12 +90,15 @@ const STORAGE_PREFIX = "vision:"
 
 /** 2.x 媒体部件的字节(base64);拿不到(远端 URL / 供应商句柄)⇒ undefined。 */
 function mediaBase64(part: Part): { base64: string; mime: string } | undefined {
-  const media = part.media as { source?: { type?: unknown; data?: unknown; url?: unknown; mediaType?: unknown } } | undefined
+  const media = part.media as
+    | { source?: { type?: unknown; data?: unknown; url?: unknown; mediaType?: unknown } }
+    | undefined
   const source = media?.source
   const mime = typeof source?.mediaType === "string" ? source.mediaType : ""
   if (!mime.startsWith("image/")) return undefined
   if (source?.type === "base64" && typeof source.data === "string") return { base64: source.data, mime }
-  if (source?.type === "bytes" && source.data instanceof Uint8Array) return { base64: Buffer.from(source.data).toString("base64"), mime }
+  if (source?.type === "bytes" && source.data instanceof Uint8Array)
+    return { base64: Buffer.from(source.data).toString("base64"), mime }
   if (source?.type === "url" && typeof source.url === "string") {
     const base64 = dataUrlBase64(source.url)
     return base64 ? { base64, mime } : undefined
@@ -102,7 +109,14 @@ function mediaBase64(part: Part): { base64: string; mime: string } | undefined {
 /** 工具结果里的图片文件项(`{ type: "file", uri: data:…, mime }`)。 */
 const imageFileItem = (item: unknown): item is { type: "file"; uri: string; mime: string; name?: string } => {
   const i = item as { type?: unknown; uri?: unknown; mime?: unknown } | null
-  return !!i && i.type === "file" && typeof i.mime === "string" && i.mime.startsWith("image/") && typeof i.uri === "string" && i.uri.startsWith("data:")
+  return (
+    !!i &&
+    i.type === "file" &&
+    typeof i.mime === "string" &&
+    i.mime.startsWith("image/") &&
+    typeof i.uri === "string" &&
+    i.uri.startsWith("data:")
+  )
 }
 
 const toolName = (part: Part) =>
@@ -115,6 +129,8 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
   const bootstrap = () => deps.bootstrap ?? codepuppyBootstrap()
   const readFile = deps.readFile ?? readCodePuppyCredential // DESIGN-stored-credentials-fence §4.4 C-d:进程内凭据表
   const sessions = new Map<string, VisionSession>()
+  const documentReads = new Map<string, Map<string, string>>()
+  const questions = new Map<string, { sessionID: string; entry: VisionImageEntry }>()
   const wrapped = Symbol("video-frame-vision")
   const sessionFor = (sessionID: string): VisionSession => {
     let s = sessions.get(sessionID)
@@ -149,7 +165,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
         const session = sessionFor(event.sessionID)
         const visionTool = cloudVisionToolId(bootstrap())
         const readPaths = new Map<string, string>()
-        type Slot = { message: number; part: number; item?: number; entry: VisionImageEntry; name?: string; frame?: { reference: VideoFrameReference; text: string } }
+        type Slot = { message: number; part: number; item?: number; entry: VisionImageEntry; name?: string; path?: string; frame?: { reference: VideoFrameReference; text: string } }
         const slots: Slot[] = []
         const replaced = new Map<number, unknown[]>()
         const contentOf = (index: number) => replaced.get(index) ?? ((event.messages[index] as MessageLike).content as unknown[])
@@ -176,12 +192,18 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
             }
             if (part.type === "tool-call" && toolName(part) === "read") {
               const target = (part.input as { path?: unknown } | null)?.path
-              if (typeof target === "string" && target) readPaths.set(String(part.id), path.resolve(deps.directory, target))
+              if (typeof target === "string" && target)
+                readPaths.set(String(part.id), path.resolve(deps.directory, target))
               return
             }
             if (part.type !== "tool-result") return
             const result = part.result as { type?: unknown; value?: unknown }
-            if (visionTool && toolName(part) === visionTool && result.type === "error" && REFUSAL_CODES.test(JSON.stringify(result.value ?? ""))) {
+            if (
+              visionTool &&
+              toolName(part) === visionTool &&
+              result.type === "error" &&
+              REFUSAL_CODES.test(JSON.stringify(result.value ?? ""))
+            ) {
               const next = [...contentOf(m)]
               next[p] = { ...part, result: { type: "error", value: visionToolRefusedText() } }
               replaced.set(m, next)
@@ -209,7 +231,7 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
               if (!imageFileItem(item)) return
               const base64 = dataUrlBase64(item.uri)
               const entry = base64 ? session.register({ base64, path: readPaths.get(String(part.id)) }) : undefined
-              if (entry) slots.push({ message: m, part: p, item: i, entry })
+              if (entry) slots.push({ message: m, part: p, item: i, entry, path: readPaths.get(String(part.id)) })
             })
           })
         })
@@ -235,14 +257,32 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
             replaced.set(slot.message, next)
           })
         }
-        for (const [index, content] of replaced) event.messages[index] = withContent(event.messages[index] as MessageLike, content)
+        for (const [index, content] of replaced)
+          event.messages[index] = withContent(event.messages[index] as MessageLike, content)
+        for (const slot of slots) {
+          if (!slot.path) continue
+          const reads = documentReads.get(event.sessionID) ?? new Map<string, string>()
+          reads.set(slot.path, slot.entry.hash)
+          documentReads.set(event.sessionID, reads)
+          deps.documentPageView?.(event.sessionID, {
+            path: slot.path,
+            sha256: slot.entry.hash,
+            inspected: sees || session.transcripts.has(slot.entry.hash),
+            ...(!sees && !session.transcripts.has(slot.entry.hash)
+              ? { reason: "The existing cloud vision path could not inspect this image; see its reported failure." }
+              : {}),
+          })
+        }
         if (sees) return
         const toolId = cloudVisionToolId(bootstrap())
         const access = cloudVisionAccess(bootstrap(), readFile)
         if (slots.some((slot) => slot.frame)) event.system.push({ type: "text", text: toolId && access.ok ? renderTemplate(VIDEO_FRAME_NOTE_ID, { name: toolId }) : contextText(VIDEO_FRAME_OFFLINE_ID) })
         event.system.push({
           type: "text",
-          text: toolId && access.ok ? renderTemplate(VISION_SYSTEM_NOTE_ID, { name: toolId }) : contextText(VISION_SYSTEM_NOTE_OFFLINE_ID),
+          text:
+            toolId && access.ok
+              ? renderTemplate(VISION_SYSTEM_NOTE_ID, { name: toolId })
+              : contextText(VISION_SYSTEM_NOTE_OFFLINE_ID),
         })
       } catch (error) {
         deps.error?.(`[@codepuppy/ext] cloud vision (context) failed: ${error instanceof globalThis.Error ? error.message : String(error)}`)
@@ -259,7 +299,8 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
       if (typeof ref !== "string" || ref.trim() === "")
         throw new globalThis.Error(`${toolId}: "image" is required — pass an attachment number, a file name, or a path already read with the Read tool`)
       let image: { base64: string; mime: string }
-      if (looksLikeBase64Image(ref)) image = await compressForVision(Buffer.from(ref, "base64"), { maxBytes: VISION_MCP_IMAGE_MAX_BYTES })
+      if (looksLikeBase64Image(ref))
+        image = await compressForVision(Buffer.from(ref, "base64"), { maxBytes: VISION_MCP_IMAGE_MAX_BYTES })
       else {
         const session = sessionFor(event.sessionID)
         const entry = session.lookup(ref, deps.directory)
@@ -281,9 +322,30 @@ export function createCloudVisionHooks(deps: CloudVisionHookDeps) {
           return
         }
         image = await entry.compressed(VISION_MCP_IMAGE_MAX_BYTES)
+        if (event.id) questions.set(event.id, { sessionID: event.sessionID, entry })
       }
       // owner 2026-09-23:Code Puppy 只用千问、审核拒绝不换 Gemini —— 模型传什么都覆盖。
-      event.input = { ...args, image: image.base64, mime: image.mime, model: CLOUD_VISION_MODEL, fallback_on_refusal: CLOUD_VISION_FALLBACK_ON_REFUSAL }
+      event.input = {
+        ...args,
+        image: image.base64,
+        mime: image.mime,
+        model: CLOUD_VISION_MODEL,
+        fallback_on_refusal: CLOUD_VISION_FALLBACK_ON_REFUSAL,
+      }
+    },
+
+    toolAfter(event: { readonly id: string; readonly status: string }) {
+      const question = questions.get(event.id)
+      questions.delete(event.id)
+      if (!question) return
+      for (const [path, sha256] of documentReads.get(question.sessionID) ?? [])
+        if (sha256 === question.entry.hash)
+          deps.documentPageView?.(question.sessionID, {
+            path,
+            sha256,
+            inspected: event.status === "completed",
+            ...(event.status !== "completed" ? { reason: "The existing vision question failed." } : {}),
+          })
     },
 
     /** The existing vision executor still owns upload, cache, billing and errors. */

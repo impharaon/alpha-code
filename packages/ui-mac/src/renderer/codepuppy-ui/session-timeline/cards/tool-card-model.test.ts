@@ -1334,6 +1334,21 @@ describe("#1568 AC5 tool details readable identifier", () => {
   })
 })
 
+test("document workflow stages reuse tool steps only for persisted builtin, cloud or bundled identities", () => {
+  for (const [name, stage, key] of [["shell", "generate", "generate"], ["read", "inspect", "inspect"]]) {
+    const value = part(name!, { metadata: { codepuppyDocumentStage: stage } }, { ...builtinDisplay(name!), identity: { source: "builtin-v2", origin: "", name: name! } })
+    expect(toolStepLineOf(value).verbKey).toBe(`codepuppy.timeline.document.${key}`)
+  }
+  const display = { identity: { source: "plugin", origin: "app", name: "codepuppy_document" }, technicalId: "app_codepuppy_document", readable: "codepuppy:document", authority: { kind: "codepuppy-bundled", bindingId: "app", evidenceDigest: "a".repeat(64) } } as ToolDisplaySnapshotV1
+  for (const stage of ["render", "inspect"]) {
+    const value = part("app_codepuppy_document", { metadata: { codepuppyDocumentStage: stage } }, display)
+    expect(toolStepLineOf(value).verbKey).toBe(`codepuppy.timeline.document.${stage}`)
+    expect(toolCardHeadOf(value).titleKey).toBe(`codepuppy.timeline.document.${stage}`)
+    const forged = part("app_codepuppy_document", { metadata: { codepuppyDocumentStage: stage } }, { ...display, authority: { kind: "not-asserted" } })
+    expect(toolStepLineOf(forged).verbKey).toBeUndefined()
+    expect(toolCardHeadOf(forged).titleKey).toBeUndefined()
+  }
+})
 
 test("verified video progress shows actual coverage and bytes, never a percentage or a third-party claim", () => {
   const display: ToolDisplaySnapshotV1 = { identity: { source: "mcp", origin: "codepuppy-video", name: "transcript" }, technicalId: "video", authority: { kind: "codepuppy-bundled", bindingId: "video", evidenceDigest: "sha256:abc" } }

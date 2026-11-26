@@ -621,13 +621,22 @@ describe("#1565: the shipped Office manifest and server", () => {
 
   testEffect(Layer.empty).effect("the command main writes and the one after the folder substitution both get the declaration", () =>
     Effect.sync(() => {
-      expect(declaredNames(asWritten)).toEqual(["read_docx", "write_docx"])
-      expect(declaredNames(afterExtension)).toEqual(["read_docx", "write_docx"])
+      expect(declaredNames(asWritten)).toEqual(["read_docx"])
+      expect(declaredNames(afterExtension)).toEqual(["read_docx"])
       expect(declaredNames(asWritten.map((token) => (token === "{workspace}" ? "relative/folder" : token)))).toEqual([])
       expect(declaredNames(asWritten.map((token) => (token === "{workspace}" ? `${ROOT}/../elsewhere` : token)))).toEqual([])
       expect(declaredNames([...afterExtension, "--debug"])).toEqual([])
     }),
   )
+
+  testEffect(Layer.empty).effect("Office declarations bind the exact trusted Python environment", () => Effect.sync(() => {
+    const expected = { CODEPUPPY_DOCUMENT_HOST: "/private/python-host/7/registration/host.json" }
+    const entry = { type: "local", command: afterExtension, environment: expected }
+    expect(declaredListedTools("codepuppy-word", entry, manifest, fs.readFileSync, expected)?.length).toBeGreaterThan(0)
+    expect(declaredListedTools("codepuppy-word", entry, manifest, fs.readFileSync)).toBeUndefined()
+    expect(declaredListedTools("codepuppy-word", { ...entry, environment: { CODEPUPPY_DOCUMENT_HOST: "/foreign/host.json" } }, manifest, fs.readFileSync, expected)).toBeUndefined()
+    expect(declaredListedTools("codepuppy-word", { type: "local", command: afterExtension }, manifest, fs.readFileSync, expected)).toBeUndefined()
+  }))
 
   let previous: string | undefined
   beforeAll(() => {
@@ -643,7 +652,7 @@ describe("#1565: the shipped Office manifest and server", () => {
       yield* connected("codepuppy-word")
       const declared = declaredListedTools("codepuppy-word", word(afterExtension), manifest, fs.readFileSync)
       const listed = (yield* (yield* Mcp.Service).tools()).filter((tool: any) => tool.server === "codepuppy-word")
-      expect(listed.map((tool: any) => tool.name)).toEqual(["read_docx", "write_docx"])
+      expect(listed.map((tool: any) => tool.name)).toEqual(["read_docx"])
       expect(listsDeclaration(declared ?? [], listed)).toBe(true)
     }),
   )

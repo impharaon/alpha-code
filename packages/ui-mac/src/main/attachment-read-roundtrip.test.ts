@@ -2,7 +2,7 @@
 // → 时间线附件卡(renderer 生产投影)判「已读取」。三段各用生产代码,中间不换替身:路径若在任何一段被各写一份,
 // 这里就红(方案 §2.6 F4 / §四 ⑤「真实读取往返」)。
 //
-// 样本来源:DOCX / PDF 由同一个随包 server.py 的 write_docx / write_pdf 现场写出(生产写入器的真产物,不手写 OOXML / PDF 字节),
+// 样本来源:DOCX / PDF 由构建烟测的随包文档库现场写出(真实库产物,不手写 OOXML / PDF 字节),
 // 再作为「用户拖进来的文件」的字节交给暂存。解释器同 office-mcp.test.ts:生产 build-office-runtime.ts 给出本机架构那份,
 // PATH 里没有 uv / Homebrew。随包运行时只进 mac 包,本文件只在 darwin 上跑。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import type { Message, Part } from "@opencode-ai/sdk/v2/client"
-import { buildOfficeRuntime } from "../../scripts/build-office-runtime"
+import { buildOfficeRuntime, createOfficeReaderSamples } from "../../scripts/build-office-runtime"
 import { attachmentInstruction } from "../../../ext/src/attachment-reader-hooks"
 import { mcpEngineToolId } from "../../../ext/src/cloud-websearch-kill"
 import { buildAttachmentParts } from "../renderer/codepuppy-ui/composer-attachments-core"
@@ -58,12 +58,12 @@ function instructed(text: string) {
   return { toolId: match[1]!, path: match[2]! }
 }
 
-async function roundTrip(format: "word" | "pdf", name: string, sample: Record<string, unknown>, expectText: string) {
-  const remote = format === "word" ? { write: "write_docx", read: "read_docx", ext: ".docx" } : { write: "write_pdf", read: "read_pdf", ext: ".pdf" }
-  // 1. 样本:生产写入器写进工作区里的另一处子目录(不在隐藏目录),读出字节 = 「用户拖进来的文件」。
+async function roundTrip(format: "word" | "pdf", name: string, expectText: string) {
+  const remote = format === "word" ? { read: "read_docx", ext: ".docx" } : { read: "read_pdf", ext: ".pdf" }
+  // 1. 样本:随包文档库写进工作区里的另一处子目录(不在隐藏目录),读出字节 = 「用户拖进来的文件」。
   mkdirSync(join(project, "samples"), { recursive: true })
   const source = join(project, "samples", `sample${remote.ext}`)
-  expect((await callTool(format, remote.write, { path: source, ...sample }))?.isError).not.toBe(true)
+  createOfficeReaderSamples(python, join(project, "samples"), [format], { PATH: "/usr/bin:/bin", HOME: project, TMPDIR: project })
   const bytes = readFileSync(source)
 
   // 2. 暂存(main)→ 用户消息里的记录(renderer 提交形状)。
@@ -118,9 +118,9 @@ async function roundTrip(format: "word" | "pdf", name: string, sample: Record<st
 
 describe("#1553 真实读取往返(随包解释器 + server.py)", () => {
   test.skipIf(!darwin)("Word:暂存的 DOCX 按指令里的路径读成功,时间线判「已读取」", async () => {
-    await roundTrip("word", "2026 第三季度经营复盘.docx", { title: "经营复盘", paragraphs: ["转化率下降的主因在首屏"] }, "转化率下降的主因在首屏")
+    await roundTrip("word", "2026 第三季度经营复盘.docx", "文档工具随包运行")
   }, 60_000)
   test.skipIf(!darwin)("PDF:暂存的 PDF 按指令里的路径读成功,时间线判「已读取」", async () => {
-    await roundTrip("pdf", "供应商合同(终版).pdf", { pages: ["Contract term: 24 months"] }, "Contract term: 24 months")
+    await roundTrip("pdf", "供应商合同(终版).pdf", "Runtime check page")
   }, 60_000)
 })

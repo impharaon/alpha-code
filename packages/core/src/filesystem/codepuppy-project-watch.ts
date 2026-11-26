@@ -11,9 +11,11 @@
  * (`packages/core/src/filesystem/ignore.ts` before the switch to OpenCode 2), plus the configured `watcher.ignore` entries, plus
  * the home folder's protected directories when the Location is home.
  */
+import { DOCUMENT_WORK_DIR } from "@opencode/util/codepuppy-document"
 import { Protected } from "./protected.js"
 
 const FOLDERS = [
+  DOCUMENT_WORK_DIR,
   "node_modules",
   "bower_components",
   ".pnpm-store",

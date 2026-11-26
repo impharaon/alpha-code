@@ -1,0 +1,5 @@
+Actual 200-row sample from /tmp/alpha-1761-r8/lo-probe.py, generated with locked openpyxl and selected Excel 2.3.2 operations.
+cache-original.xlsx is the source before recalculation. cache-calculated.xlsx is the actual LO 26.8.3.1 private copy from run 2, not a handcrafted OOXML result.
+Contains only generated East/West/North sales integers, application formulas and objects; no user data.
+cache-original.xlsx: e983120f415bb4279fc663e1607cb435338eee227ee51aa059e5067117640381
+cache-calculated.xlsx: 43275c00b93ec01a1aed52cb77c40f8024d446ab9aabf0f22a502451458ddb56

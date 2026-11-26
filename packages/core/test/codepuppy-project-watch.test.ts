@@ -96,7 +96,7 @@ describe("project-wide file change events", () => {
       (tmp) =>
         Effect.gen(function* () {
           const root = fs.realpathSync.native(tmp.path)
-          for (const folder of ["sub", ".git", path.join("node_modules", "pkg")]) fs.mkdirSync(path.join(root, folder), { recursive: true })
+          for (const folder of ["sub", ".git", path.join("node_modules", "pkg"), ".document-output"]) fs.mkdirSync(path.join(root, folder), { recursive: true })
           yield* watching(root, (changes) =>
             Effect.gen(function* () {
               expect(yield* warmUp(root, changes)).toBe(true)
@@ -112,11 +112,12 @@ describe("project-wide file change events", () => {
               }
               fs.writeFileSync(path.join(root, ".git", "config"), "x\n")
               fs.writeFileSync(path.join(root, "node_modules", "pkg", "index.js"), "x\n")
+              fs.writeFileSync(path.join(root, ".document-output", "page.png"), "rendered page\n")
               // A later change that does arrive bounds the wait for the ignored ones.
               fs.writeFileSync(path.join(root, "after.txt"), "x\n")
               yield* until(() => changes.some((change) => change.file === path.join(root, "after.txt")), "after.txt")
               yield* Effect.promise(() => Bun.sleep(300))
-              expect(changes.filter((change) => change.file.includes(`${path.sep}.git${path.sep}`) || change.file.includes(`${path.sep}node_modules${path.sep}`))).toEqual([])
+              expect(changes.filter((change) => change.file.includes(`${path.sep}.git${path.sep}`) || change.file.includes(`${path.sep}node_modules${path.sep}`) || change.file.includes(`${path.sep}.document-output${path.sep}`))).toEqual([])
             }),
           )
         }),

@@ -1,3 +1,4 @@
+import { documentPythonEnvironmentFor } from "../../../util/src/codepuppy-document"
 // Code Puppy tool policy inside the extension (lane seams I3): everything L4 hangs on the OpenCode 2 plugin Context
 // goes through `registerPolicy`. The extension's `setup` awaits it first and awaits `seal()` last (L3 owns the call
 // sites; `plugin-setup-order.test.ts`).
@@ -126,7 +127,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
 
   const allFacts = async (): Promise<ToolFacts[]> => {
     const tools = (await context.tool.list()) as readonly RegisteredTool[]
-    const input = { early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, cloudMcp: bootstrap.cloudMcp, officeMcpManifest: bootstrap.paths.officeMcpManifest }
+    const input = { documentPythonEnvironment: documentPythonEnvironmentFor(context.location), early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, cloudMcp: bootstrap.cloudMcp, officeMcpManifest: bootstrap.paths.officeMcpManifest }
     return tools.map((tool) => toolFacts(tool, input))
   }
 

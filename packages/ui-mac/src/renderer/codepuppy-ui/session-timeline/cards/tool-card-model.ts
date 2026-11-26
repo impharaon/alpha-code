@@ -12,6 +12,7 @@ import { VIDEO_PROGRESS_KEY, VIDEO_FRAME_KEY, videoProgress, videoFrameReference
 // 命中规则的卡,字段先走类别 allowlist 与 typed
 // normalization(I2 防御读取),再过共享 redactor(tool-redactor);redactor
 // 任一步失败即隐藏整字段(AC5),不回退 raw string。
+import { documentStage, type DocumentStage } from "../../../../../../util/src/codepuppy-document"
 import type { ToolPart, ToolState } from "../../../../engine-adapter/contract/v1"
 // seams I6:身份类型取自契约模块本身,不再借 SDK 生成类型。
 import type { ToolAuthority, ToolIdentity, ToolLocation } from "@opencode/schema/tool-identity"
@@ -118,6 +119,7 @@ export interface ToolCardDispatch {
   hiddenReason?: ToolHiddenReason
   /** kind="cloud" 时命中的 Code Puppy Cloud 宿主规则(标题 + 关键目标 allowlist)。 */
   cloudRule?: CodePuppyCloudRule
+  documentStage?: DocumentStage
 }
 
 // ── #587 Code Puppy Cloud 宿主展示规则表 ─────────────────────────────────────────
@@ -273,6 +275,12 @@ export function hubToolActionOf(part: ToolPart): "search" | "install" | undefine
 }
 
 // ── #1576 来源三类 × 执行位置(只从持久化快照派生) ─────────────────────────
+/** Only the verified app plugin can publish document receipts, including pending/failed inspections. */
+export function isDocumentTool(part: ToolPart): boolean {
+  const snapshot = displaySnapshotOf(part)
+  return snapshot?.identity.source === "plugin" && snapshot.authority.kind === "codepuppy-bundled" && snapshot.identity.name === "codepuppy_document" && snapshot.readable === "codepuppy:document"
+}
+
 /** 用户层来源三类:内置(builtin / host / 当次持久化 authority = codepuppy-bundled)、云(codepuppy-cloud)、其余一律第三方(含无快照)。 */
 export type ToolProvenanceSource = "builtin" | "codepuppy-cloud" | "third-party"
 
@@ -384,7 +392,7 @@ function dispatchOfSnapshot(snapshot: DisplaySnapshot, metadata: () => Record<st
       // 前提,冒名的第三方工具到不了这条分支;display 缺失或形状非法一律回落
       // read 卡(fail-closed)。
       const effective = kind === "read" && dirDisplayOf(metadata()) !== undefined ? "list" : kind
-      return { kind: effective, category, metadataOnly: false, name: sanitizedName(identity.name) }
+      return { kind: effective, category, metadataOnly: false, name: sanitizedName(identity.name), ...(["bash", "read"].includes(kind) ? { documentStage: documentStage(metadata().codepuppyDocumentStage) } : {}) }
     }
   }
   if (identity.source === "mcp" && authority.kind === "codepuppy-bundled" && identity.origin === "codepuppy-video" && VIDEO_CARD_TOOLS.has(identity.name))
@@ -402,9 +410,11 @@ function dispatchOfSnapshot(snapshot: DisplaySnapshot, metadata: () => Record<st
         name: sanitizedName(identity.name),
         origin: identity.origin.length > 0 ? sanitizedName(identity.origin) : undefined,
         cloudRule,
+        ...(identity.name === "vision" ? { documentStage: documentStage(metadata().codepuppyDocumentStage) } : {}),
       }
     }
   }
+  if (identity.source === "plugin" && authority.kind === "codepuppy-bundled" && identity.name === "codepuppy_document" && snapshot.readable === "codepuppy:document") return { kind: "unknown", category, metadataOnly: false, name: sanitizedName(identity.name), documentStage: documentStage(metadata().codepuppyDocumentStage) }
   const origin =
     (identity.source === "mcp" || identity.source === "plugin") && identity.origin.length > 0
       ? sanitizedName(identity.origin)
@@ -538,6 +548,7 @@ const TITLE_KEYS: Partial<Record<ToolCardKind, string>> = {
  */
 export function toolTitleKeyOf(dispatch: ToolCardDispatch): string | undefined {
   if (dispatch.metadataOnly) return undefined
+  if (dispatch.documentStage) return `codepuppy.timeline.document.${dispatch.documentStage}`
   if (dispatch.kind === "video") return VIDEO_CARD_TOOLS.get(dispatch.name)
   if (dispatch.kind === "cloud") return dispatch.cloudRule?.titleKey
   if (dispatch.kind === "bash") return "codepuppy.timeline.step.bash"
@@ -599,7 +610,7 @@ export function toolCardHeadOf(part: ToolPart): ToolCardHead {
   if (dispatch.kind === "cloud") {
     const rule = dispatch.cloudRule
     if (rule !== undefined) {
-      head.titleKey = rule.titleKey
+      head.titleKey = dispatch.documentStage ? `codepuppy.timeline.document.${dispatch.documentStage}` : rule.titleKey
       if (rule.targetInput !== undefined) assignInline(head, input[rule.targetInput])
     }
     return head

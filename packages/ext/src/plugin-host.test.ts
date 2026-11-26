@@ -2382,3 +2382,36 @@ packageIt.live("the real security PermissionRequest hook denies before a native 
 }), { id: "security-native-ask", setup: async context => {
   await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "question", resource: "*", effect: "ask" })))
 } }))
+
+
+packageIt.live("the real security expansion activates its skill hook only for that native task", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:claude-security"))
+  const decoder = new TextDecoder()
+  const hooks = JSON.parse(decoder.decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  for (const group of hooks.hooks.UserPromptExpansion) for (const handler of group.hooks)
+    if (handler.command.endsWith(" turn")) handler.command = 'CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" ' + handler.command
+  const skill = decoder.decode(yield* Effect.promise(() => capture.readFile("skills/threat-model/SKILL.md")))
+  // Route source-owned Claude config state into the test package DATA; scripts remain original.
+  const sample = yield* invocationSample("claude:claude-security", { "hooks/hooks.json": JSON.stringify(hooks), "skills/threat-model/SKILL.md": skill.replace('command: sh ', 'command: CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" sh ') })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const name = sample.hostNames["skill:skills/threat-model/SKILL.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Security scoped turn", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_security_outside", "write", { path: "unrelated.ts", content: "must not write" }), TestLLM.toolCall("call_security_inside", "write", { path: ".claude-security/threat-model.md", content: "fixture threat model" }), TestLLM.text("Threat model done", "security-scope-done"))
+  yield* commands.execute({ name, invocation: { sessionID: parent.id, prompt: { text: "Only inspect the fixture" }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "unrelated.ts")).exists())).toBe(false)
+  expect(readFileSync(join(location.directory, ".claude-security/threat-model.md"), "utf8")).toBe("fixture threat model")
+  expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("Claude Security")
+  yield* llm.push(TestLLM.toolCall("call_security_after", "write", { path: "unrelated.ts", content: "ordinary next turn" }), TestLLM.text("Ordinary done", "security-ordinary"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Write an ordinary file" })
+  yield* sessions.wait(parent.id)
+  expect(readFileSync(join(location.directory, "unrelated.ts"), "utf8")).toBe("ordinary next turn")
+})))

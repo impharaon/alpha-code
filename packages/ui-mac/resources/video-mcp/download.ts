@@ -1,3 +1,4 @@
+import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { mkdir, readdir } from "node:fs/promises"
 import { cachePath } from "./cache"
@@ -57,6 +58,8 @@ export function videoDownloadArgs(url:string,paths:{ytdlp:string;ejs:string;node
         paths.ejs,
         "yt-dlp",
         "--ignore-config",
+        "--cache-dir",
+        path.join(paths.cacheRoot,"yt-dlp"),
         "--no-plugin-dirs",
         "--no-remote-components",
         "--no-js-runtimes",

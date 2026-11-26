@@ -1095,3 +1095,29 @@ PostToolUse 步骤（D4 / AC-11）：4fdba9a7b3 隔离固定 hookify 原 PostToo
 较宽相关集核对发现并直接处理两项本轮引入的配套问题：原 context-injection `package idle cleanup preserves the context-bearing event unchanged` 在没有 Stop handler 时被新增的无条件 Session.get 拒绝（`/tmp/plugin-standard-r12-ext-related.log`）；idle 现在先看当前包的 Stop/SubagentStop 消费者，无消费者便不读会话、不改 context-bearing event。registry 的两条动态 PayPal 标题此前写成运行时展开的全名，原静态验证按源码 includes 找不到；只把登记名同步为原源码中稳定的测试前缀，不改验证器或测试断言。修后 context-injection / authority-registry / host 三个完整原文件 **129 pass / 0 fail**（`/tmp/plugin-standard-r12-idle-complete.log`），host 79 不另累加。
 
 移除核对发现真实 hookify 的规则在 tool_name 不匹配时仍加载全部规则，因此只删源别名映射的臂仍绿；没有称它为有效反臂。在 identity 原 fast 文件补最小源/运行字段往返及验证 MCP 源身份，取现有 toolFacts/mint 的本仓注册事实，外部拼写来自已固定 hookify/Convex；完整 **20 pass / 0 fail**（`/tmp/plugin-standard-r12-identity-complete.log`）。该纯映射在原同名文件、无进程/网络/真实 runtime，imports 可追踪，为 affected PR fast。随后用这一最低层证据替代弱的别名移除观察；字段和权限的真实宿主回归仍保留。
+
+### r12 收口证据与未完成边界
+
+本轮去重相关集合 **530 pass / 0 fail**，16 个有限原测试文件。完整行为文件 source 48 + converter 42 + installer 50 + host 79 + register-policy 76 + identity 20 + process 3 = 318。一次较宽相关集 UI artifact/envelope 117（`/tmp/plugin-standard-r12-ui-related.log`）；ext 原 unattended-policy / unattended / session-row-rules / authority-registry / plugin-setup-order / plugin-fanout / context-injection 七文件最终 95，其中未失败五文件 45 继承 `/tmp/plugin-standard-r12-ext-related.log`，配套修正后两文件 50 见 `idle-complete` 的 129 减已计 host 79；没有为了求整集合再次复跑已绿文件。具名迭代、红测与 removal 输出不累加。r11 的 engine 8 pass / 整树 15/15 继承 accepted 收据，不计作本轮新运行，也没有 engine 修改需要复跑 engine case。
+
+**14 个有效移除臂均红**，Bun child-only preload 精确命中并打印 REMOVAL_ARM_APPLIED，未改磁盘生产字节：mixed-marketplace、mixed-unlisted-root、Stop-same-task、PreTool-source-name（新增 fast 身份证据）、call-allow、ask-priority、final-input、live-generation、permission-identity、prompt-runtime、prompt-no-decision、prompt-turn-boundary、post-runtime、process-PATH。命令及每臂结果在 `/tmp/plugin-standard-r12-removal-results.json`，执行 `python3 /tmp/plugin-standard-r12-removal.py`；前 3 臂不重复，后 11 续跑。prompt-runtime 选择两条原回归而有 2 fail，其余各 1 fail；没有把较早仍绿的弱名字观察计入移除证明。每臂通过原具名断言观察缺失行为，不是只检查源码/标题。
+
+ext / ui-mac 包内 `bun typecheck` 均 exit 0（最终 `/tmp/plugin-standard-r12-ext-types-final.log`、`/tmp/plugin-standard-r12-ui-types.log`）。conversion `--check`、artifact `--check` 均 exit 0（20 files）。docs-contract 用原 Alpha 单仓临时 profile，`--changed-since 1db6a3bbf5 --format json` exit 1，仍 **71 errors / 250 warnings**（`/tmp/plugin-standard-r12-docs.json`），按派发不修基线。`git diff --check` exit 0，hooksPath=`.githooks`；`affected-tests --list` exit 0，scope **all tests: scripts/gate-files.tsv changed (gate or declared global input)**，列 678 个 PR 文件（`/tmp/plugin-standard-r12-affected{,-scope}.txt`）。只同步派发允许的精确计数行，没有运行该全清单、全层、gate run 或 bin/check。
+
+| 真样包 | 本轮实际运行证据 | 边界 / 片 5 尚未完成 |
+| --- | --- | --- |
+| ralph-loop | 原命令、fenced setup、原 Stop 脚本；同 Session 两次响应后 completion promise 结束、无 child，后续普通输入不再循环 | 此项通过；离线 TestLLM 验运行，不冒称真实模型任务质量 |
+| hookify | 原 Pre/Post 脚本及原敏感文件规则；真实 write 被 block / 写后上下文；post 旅程亦实际执行原 Stop 脚本；UserPromptSubmit 继承 r9 | 基础 command hook 已有真实证据；完整扩展生命周期仍随共享 runner 待实施 |
+| PayPal | 原 prompt + 仅文本拒绝变体、Read 不匹配；无工具生成、用户有效模型、原生审批、continueOnBlock 两臂均经真实宿主 | AC-24 本地运行语义通过；离线判断输出不代替付费模型质量/PayPal SaaS 验收 |
+| Convex | 原 convex-lint.mjs advisory allow、原生 deny、bundle off 后再问，进程 PATH 与源字段真实消费 | 5 个 monitor 选择/通知/离场清理尚未接线；原 SessionStart/Stop 外部工具链未验，尚不能说到达其 SaaS 登录边界 |
+| code-modernization | 固定声明/整树与共享 async/rewake 基础继承 | 未执行原 telemetry 全事件；PostToolUseFailure/StopFailure 仍待接线，不能记作 SaaS 阻塞 |
+| claude-security | 片 3 原命令/agent 证据继承；本轮源声明只读核对 | Expansion、PermissionRequest、skill-scoped hooks 尚未接线；原 handlers 全运行未验 |
+| Langfuse | 共享 package-process 原文件含真实 11 option 声明的 defaults/secret/DATA/stdin 与脱敏回归通过 | 原 hook 的 Stop/SessionEnd 全运行未验，SessionEnd 尚未接线；未冒称 Langfuse SDK/uv 或 SaaS 已跑到登录边界 |
+| dash0 | 固定 24 声明与五项 unavailable 原因继承 | 有时机的实际事件全回放尚未验；Config/Instructions/Compact/Elicitation 等 S-04…S-07 未实施 |
+| Stripe | 固定整树/声明继承 | S-08 PostToolBatch 尚未接线，原抽样脚本 always 变体未运行 |
+
+Host aggregate 现为 **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7**；相对 r11，artifact 成员只变 `plugin-conversion.mjs`，以及自身清单 `host-extension-package-artifact.v1.json`（共同前缀 `packages/ui-mac/src/shared/host-extension-package-contract/`）。相对 base 累计 9 成员仍为 CONTRACT.md、plugin-package.ts、plugin-hook-events.ts、plugin-conversion.mjs、plugin-conversion.d.mts、generate-artifact.ts、profiles/plugin-package.v1.schema.json、testvectors/plugin-package-description.v1.json、testvectors/decoder-corpus.v1.json。精确快照 `/tmp/plugin-standard-r12-host-artifact.json`；未改 consumer pin/vendor，checkpoint 归编排器。
+
+本轮结论 **PARTIAL**：片 3/4 accepted 继承；混合根问题已按 r12 裁决闭合；Ralph Stop 与上述 D4/PayPal/Post 增量完成。片 5 仍需原计划的 PermissionRequest、Expansion、PostToolUseFailure/StopFailure、skill/agent scope、S-03 leave/notification/FileChanged/子助手生命周期、S-04…S-07、S-08 与 monitor 实际激活/通知/取消，及表中七包剩余运行验收；不得把这些称为五项正式 unavailable 或外部 SaaS 限制。没有新增未决设计问题，本轮依执行边界返回具体状态，不开始片 7。
+
+已核 Codex（GPT-6），spec v5 / design v3.1 + r12 orchestrator ruling。22:35 至 23:17 UTC+08:00 约 42 分钟，19 文件、718 additions / 72 deletions（最后收口文字前；含测试、生成物与证据）；没有新增依赖、迁移、公共 DTO 或 engine takeover。各实现增量已同提交登记原 L0 主权；只动计划边界和必要同调用链文件，tests-only 与修正分开。遗留去向：上述片 5 行为 fix now 续本车道；host consumer checkpoint 交编排器；docs 基线及三条旧 command-subagent 断言沿原归属；没有新增 ARCH / OPTIONAL 或仓外写操作。

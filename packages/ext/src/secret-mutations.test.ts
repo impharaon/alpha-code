@@ -63,3 +63,25 @@ test("mutation failures keep existing IO and format outcomes", async () => {
   await writeFile(path.join(roots.directory, ".env"), new Uint8Array([255]))
   await expect(restoreEnvMutation({ operation: "write", path: ".env", content: "KEY=[REDACTED]" }, roots)).rejects.toMatchObject({ _tag: "Tool.Error" })
 })
+
+for (const operation of ["write", "edit", "patch"] as const) test(`multiline read view restores line slots through ${operation}`, async () => {
+  const { projectEnvRows } = await import("./secret-read")
+  const { roots } = await setup()
+  // Real ssh-keygen fixture, provenance recorded with the existing fixture; only assignment framing added.
+  const key = (await Bun.file(new URL("./fixtures/secret-files/private-key.txt", import.meta.url)).text()).trimEnd()
+  const source = `KEY="${key}"\nPORT=3000\n`
+  await writeFile(path.join(roots.directory, ".env"), source)
+  const rows = source.trimEnd().split("\n").map((text, index) => ({ number: index + 1, text }))
+  const view = projectEnvRows([source], rows, (text) => text).join("\n")
+  const input = operation === "write" ? { operation, path: ".env", content: view.replace("3000", "3001") + "\n" }
+    : operation === "edit" ? { operation, path: ".env", oldString: view, newString: view.replace("3000", "3001") }
+    : { operation, patchText: ["*** Begin Patch", "*** Update File: .env", "@@", ...view.split("\n").flatMap((line) => line === "PORT=3000" ? ["-PORT=3000", "+PORT=3001"] : [` ${line}`]), "*** End Patch"].join("\n") }
+  const { mutation } = await restoreEnvMutation(input, roots)
+  const actual = mutation.operation === "write" ? mutation.content : mutation.operation === "edit" ? source.replace(mutation.oldString, mutation.newString) : (() => {
+    const parsed = Patch.parse(mutation.patchText)
+    if (Result.isFailure(parsed) || parsed.success[0].type !== "update") throw new Error("invalid restored patch")
+    return Patch.derive(".env", parsed.success[0].chunks, source).content
+  })()
+  expect(actual === source.replace("3000", "3001")).toBe(true)
+  expect(actual.includes(ProtectedFiles.REDACTED)).toBe(false)
+})

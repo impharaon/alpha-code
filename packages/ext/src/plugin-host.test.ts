@@ -2299,3 +2299,28 @@ for (const reject of [false, true]) {
     await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "edit", resource: "*", effect: "ask" })))
   } }))
 }
+
+
+for (const continueOnBlock of [false, true]) {
+  packageIt.live(`a rejecting PayPal prompt hook ${continueOnBlock ? "feeds its error back to" : "ends"} the current native task`, () => packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+    hooks.hooks.PreToolUse[0].hooks[0].continueOnBlock = continueOnBlock
+    hooks.hooks.PreToolUse[0].hooks[0].prompt = "Reject this modification with reason 'fixture payment rejection'. " + hooks.hooks.PreToolUse[0].hooks[0].prompt
+    const sample = yield* invocationSample("claude:paypal", { "hooks/hooks.json": JSON.stringify(hooks) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    yield* activateExtUntilFinished
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Payment task judgment", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const llm = yield* TestLLM.Test
+    yield* llm.push(TestLLM.toolCall("call_payment", "write", { path: "payment.ts", content: "paypal.Buttons()" }), TestLLM.text('{"ok":false,"reason":"fixture payment rejection"}', "payment-reject"), TestLLM.text("I received the rejection", "payment-feedback"))
+    yield* sessions.prompt({ sessionID: parent.id, text: "Write the payment file" })
+    yield* sessions.wait(parent.id)
+    expect(yield* llm.requests()).toHaveLength(continueOnBlock ? 3 : 2)
+    expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("fixture payment rejection")
+    expect(yield* Effect.promise(() => Bun.file(join(location.directory, "payment.ts")).exists())).toBe(false)
+  })))
+}

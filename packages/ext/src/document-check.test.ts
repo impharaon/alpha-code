@@ -26,7 +26,7 @@ async function fixture() {
   const source = join(root, "report.pdf")
   copyFileSync(join(import.meta.dir, "../../ui-mac/src/main/fixtures/document-runtime/control.pdf"), source)
   mkdirSync(join(root, ".document-output"))
-  const runtime = { subscribe: () => () => {}, pythonEnvironment: async () => ({ CODEPUPPY_DOCUMENT_HOST: join(root, "host.json") }) }
+  const runtime = { subscribe: () => () => {}, query: () => ({ phase: "preparing", stage: "download" } as const), pythonEnvironment: async () => ({ CODEPUPPY_DOCUMENT_HOST: join(root, "host.json") }) }
   const stored = createDocumentChecks({ root: join(root, "runtime"), runtime })
   const host = {
     ...stored,

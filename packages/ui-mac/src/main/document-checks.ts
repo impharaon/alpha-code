@@ -22,7 +22,7 @@ import type { createDocumentRuntime } from "./document-runtime"
 /** This feature's durable handoff records; Session scheduling stays with session.synthetic. */
 export function createDocumentChecks(input: {
   root: string
-  runtime: Pick<ReturnType<typeof createDocumentRuntime>, "subscribe" | "pythonEnvironment">
+  runtime: Pick<ReturnType<typeof createDocumentRuntime>, "subscribe" | "pythonEnvironment" | "query">
 }) {
   const root = join(input.root, "checks")
   mkdirSync(root, { recursive: true })
@@ -176,6 +176,7 @@ export function createDocumentChecks(input: {
   const subscribeReady: DocumentHost["subscribeReady"] = (location, listener) => {
     const key = documentLocationKey(location)
     listeners.set(key, listener)
+    if ([...records.values()].some((check) => documentLocationKey(check.location) === key && ["waiting-runtime", "admitting"].includes(check.state))) input.runtime.query(location)
     replay()
     return () => {
       if (listeners.get(key) !== listener) return
@@ -183,6 +184,7 @@ export function createDocumentChecks(input: {
       for (const check of records.values()) if (documentLocationKey(check.location) === key) running.delete(check.id)
     }
   }
+  for (const check of records.values()) if (["waiting-runtime", "admitting"].includes(check.state)) input.runtime.query(check.location)
   return {
     defer,
     recordCheck,

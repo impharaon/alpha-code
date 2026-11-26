@@ -13,6 +13,7 @@ import { createNetworkEgressActivity } from "./network-egress-activity"
 import { createNetworkEgressApproval } from "./network-egress-approval"
 import type { EgressApproval, NetworkOutbound } from "../shared/network-egress-wire"
 import * as net from "node:net"
+import dns from "node:dns/promises"
 import { egressPolicyDenialOf } from "../shared/egress-denial"
 import { configureEgressGrantApproval, __resetEgressGrantsForTests } from "./network-egress-grants"
 import { EGRESS_DENIED_BODY_PREFIX, parseConnectAuthority, startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
@@ -733,4 +734,21 @@ test("档位重查迟于拨号到期时只记一次 504，不补写 403 或虚�
     expect(f.logs.filter((record) => record.event === "egress.connect").map((record) => record.status)).toEqual([504])
     expect(f.logs.filter((record) => record.event === "egress.grant")).toEqual([])
   } finally { release(); pass.mockRestore() }
+})
+
+test("系统代理名称 lookup 指回策略监听端口时拒绝循环", async () => {
+  const actual = await dns.lookup("localhost", { all: true })
+  expect(actual.some((entry) => entry.address === "127.0.0.1")).toBe(true)
+  const lookup = spyOn(dns, "lookup").mockResolvedValue(actual.filter((entry) => entry.address === "127.0.0.1"))
+  let handle: EgressProxyHandle
+  let dialed = 0
+  try {
+    const f = await startProxy({ authorize: () => true, resolveEgressRoutes: async () => [{ kind: "http", host: "local-proxy.egress.test", port: handle.port }], dial: testEgressDial(() => { dialed++; throw Object.assign(new Error("loop escaped"), { code: "ECONNREFUSED" }) }) })
+    handle = f.proxy
+    const response = await rawRequest(handle.port, "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n")
+    expect(response.status).toBe(502)
+    expect(response.body).toContain("EPROXYLOOP")
+    expect(dialed).toBe(0)
+    expect(lookup).toHaveBeenCalledWith("local-proxy.egress.test", { all: true })
+  } finally { lookup.mockRestore() }
 })

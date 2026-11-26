@@ -120,15 +120,20 @@ test("HTTPS 上游校验证书并保留隧道；system Session 每条连接重�
     const requests = [];
     server.on("connect", (request, socket) => { requests.push(request.url); socket.write("HTTP/1.1 200 OK\\r\\n\\r\\ntls-tail") });
     await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    let ipFailure;
+    try {
+      const invalid = await dialEgressUpstream({ host: "example.com", port: 443 }, [{ kind: "https", host: "127.0.0.1", port: server.address().port }], { kind: "existing-authorization" }, signal);
+      invalid.socket.destroy();
+    } catch (error) { ipFailure = error.code }
     const tunnel = await dialEgressUpstream({ host: "example.com", port: 443 }, [{ kind: "https", host: "localhost", port: server.address().port }], { kind: "existing-authorization" }, signal);
     const tail = await new Promise(resolve => { tunnel.socket.once("data", chunk => resolve(chunk.toString())); tunnel.socket.resume() });
     tunnel.socket.destroy(); server.close();
-    console.log(JSON.stringify({ calls, requests, tail }));
+    console.log(JSON.stringify({ calls, requests, tail, ipFailure }));
     process.exit(0);
   `
   const child = Bun.spawnSync([process.execPath, "-e", script], { env: { ...process.env, NODE_EXTRA_CA_CERTS: cert }, stdout: "pipe", stderr: "pipe" })
   expect(child.exitCode, child.stderr.toString()).toBe(0)
-  expect(JSON.parse(child.stdout.toString())).toEqual({ calls: ["codepuppy-egress-upstream", { mode: "system" }, "https://example.com:443/", "https://example.net:8443/"], requests: ["example.com:443"], tail: "tls-tail" })
+  expect(JSON.parse(child.stdout.toString())).toEqual({ calls: ["codepuppy-egress-upstream", { mode: "system" }, "https://example.com:443/", "https://example.net:8443/"], requests: ["example.com:443"], tail: "tls-tail", ipFailure: "EPROXYCONNECT" })
 })
 
 test("通放直连把全部已检查地址交给 TCP，IPv6 不通时仍连接 IPv4", () => {
@@ -175,4 +180,24 @@ test("通放 SOCKS4 从检查过的双栈集合选 IPv4，不再次解析目标"
   cleanups.push(() => tunnel.socket.destroy())
   expect([...requests[0]!]).toEqual([4, 1, 1, 187, 198, 18, 1, 1, 0])
   expect(lookup).toHaveBeenCalledTimes(1)
+})
+
+test("SOCKS 已答 greeting 但不答 CONNECT 时取消会关闭 peer", async () => {
+  let requested!: () => void
+  let closed!: () => void
+  const request = new Promise<void>((resolve) => { requested = resolve })
+  const closure = new Promise<boolean>((resolve) => { closed = () => resolve(true) })
+  const port = await peer((socket) => {
+    socket.once("close", closed)
+    socket.once("data", () => {
+      socket.write(Buffer.from([5, 0]))
+      socket.once("data", requested)
+    })
+  })
+  const controller = new AbortController()
+  const pending = dialEgressUpstream({ host: "example.com", port: 443 }, [{ kind: "socks5", host: "127.0.0.1", port }], { kind: "existing-authorization" }, controller.signal)
+  await request
+  controller.abort(Object.assign(new Error("deadline"), { code: "ETIMEDOUT" }))
+  await expect(pending).rejects.toMatchObject({ code: "ETIMEDOUT" })
+  expect(await Promise.race([closure, Bun.sleep(100).then(() => false)]), "SOCKS peer must observe close after cancellation").toBe(true)
 })

@@ -1351,3 +1351,12 @@ test("verified video progress shows actual coverage and bytes, never a percentag
   expect(toolStepLineOf(part("vision", { status: "running", metadata: { "codepuppy.video.frame": { sourceId: "source", frameId: "frame", actualMs: 121000 } } }, cloud))).toMatchObject({ verbKey: "codepuppy.timeline.video.frameUpload", object: "2:01" })
 
 })
+
+
+test("completed and cached video understanding cards retain the uploaded file range and bytes",()=>{
+ const display:ToolDisplaySnapshotV1={identity:{source:"mcp",origin:"codepuppy-video",name:"understand"},technicalId:"video",authority:{kind:"codepuppy-bundled",bindingId:"video",evidenceDigest:"sha256:abc"}}
+ for(const cached of [false,true]){
+  const value=part("video",{status:"completed",metadata:{"codepuppy.video.upload":{file:"speech.mp4",sourceRange:{start_ms:60000,end_ms:90000},bytes:1019},cached}},display)
+  expect(toolStepLineOf(value)).toMatchObject({verbKey:"codepuppy.timeline.video.understand",object:"speech.mp4 · 1:00–1:30 · 1019 B"})
+ }
+})

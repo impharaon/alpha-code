@@ -36,6 +36,7 @@ test("verified understand wraps preparation and returns the final cloud result w
             : raw.action === "query"
               ? {
                   progress: { phase: "understanding" as const, completed: 1, total: 1, unit: "items" as const },
+                  upload:{file:"speech.mp4",sourceRange:input.source_range,bytes:1019},
                   result: { ...result, jobIds: ["job_one"], cached: false },
                 }
               : {},
@@ -74,7 +75,7 @@ test("verified understand wraps preparation and returns the final cloud result w
   const actual = await tool.execute({ source: { kind: "path", path: "speech.mp4" }, question: input.question }, context)
   expect(actual).toEqual({
     output: { ...result, jobIds: ["job_one"], cached: false },
-    metadata: { jobIds: ["job_one"] },
+    metadata: { jobIds: ["job_one"],"codepuppy.video.upload":{file:"speech.mp4",sourceRange:input.source_range,bytes:1019} },
   })
   expect(calls.map((c) => c.action)).toEqual(["start", "prepare", "query"])
   expect(calls[0]?.call).toEqual({

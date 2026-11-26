@@ -149,6 +149,7 @@ test("video success cache is tenant and model revision scoped and returns the co
     request = await h.prepared(),
     first = await service.start(call, request, h.referencePath),
     done = await state(service, first.requestId)
+  expect(done.upload).toEqual({file:"speech.mp4",sourceRange:request.input.source_range,bytes:request.clip.bytes})
   expect(done.result).toMatchObject({
     text: expect.stringContaining(h.answer.text),
     cached: false,

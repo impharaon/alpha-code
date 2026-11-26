@@ -2045,3 +2045,31 @@ packageIt.live("package SessionStart hooks run before the first model request an
   yield* sessions.wait(second.id)
   expect(JSON.stringify((yield* llm.requests())[1])).not.toContain("You are in 'learning' output style mode")
 })))
+
+packageIt.live("unmatched package model hints use the existing default for commands and delegation", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const changes: Record<string, string> = {}
+  for (const path of ["commands/feature-dev.md", "agents/code-reviewer.md"]) {
+    const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+    changes[path] = /^model:.*$/m.test(source) ? source.replace(/^model:.*$/m, "model: missing-model-hint") : source.replace("\n---\n", "\nmodel: missing-model-hint\n---\n")
+  }
+  const sample = yield* invocationSample("claude:feature-dev", changes)
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === command))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Default command model", "command-default"), TestLLM.text("Default child model", "child-default"))
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Default command", agent: "build" } as never)
+  const invoked = yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "review" }, delivery: "queue" } }).pipe(Effect.exit)
+  expect(Exit.isSuccess(invoked)).toBe(true)
+  yield* sessions.wait(parent.id)
+  const delegate = yield* sessions.create({ location: { directory: location.directory }, title: "Default delegation", agent: "build" } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const result = yield* snapshot.execute({ sessionID: delegate.id, agent: "build" as never, messageID: "msg_default_model" as never, call: { type: "tool-call", name: "subagent", id: "call_default_model", input: { agent: sample.hostNames["agent:agents/code-reviewer.md"]!, description: "Review", prompt: "review", background: false } } })
+  expect(JSON.stringify(result)).toContain("Default child model")
+  expect((yield* llm.requests())).toHaveLength(2)
+})))

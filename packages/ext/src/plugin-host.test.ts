@@ -2199,3 +2199,26 @@ packageIt.live("the real ralph-loop Stop hook continues the same task and stops 
   yield* sessions.wait(parent.id)
   expect(yield* llm.requests()).toHaveLength(3)
 })))
+
+packageIt.live("real hookify PreToolUse blocks the matching native write using source tool fields", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+  const rule = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("examples/sensitive-files-warning.local.md")))
+  const sample = yield* invocationSample("claude:hookify")
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  mkdirSync(join(location.directory, ".claude"), { recursive: true })
+  writeFileSync(join(location.directory, ".claude/hookify.sensitive.local.md"), rule.replace("action: warn", "action: block"))
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Hook source fields", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_hook_safe" as never, call: { type: "tool-call", name: "write", id: "call_hook_safe", input: { path: "ordinary.txt", content: "safe fixture" } } })
+  expect(readFileSync(join(location.directory, "ordinary.txt"), "utf8")).toBe("safe fixture")
+  const blocked = yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_hook_blocked" as never, call: { type: "tool-call", name: "write", id: "call_hook_blocked", input: { path: "credentials.txt", content: "harmless test fixture" } } }).pipe(Effect.exit)
+  expect(Exit.isFailure(blocked)).toBe(true)
+  expect(JSON.stringify(blocked)).toContain("Sensitive file detected")
+  const { existsSync } = yield* Effect.promise(() => import("node:fs"))
+  expect(existsSync(join(location.directory, "credentials.txt"))).toBe(false)
+})))

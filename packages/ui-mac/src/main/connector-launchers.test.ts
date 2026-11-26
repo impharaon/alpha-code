@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { access, chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { access, chmod, cp, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import pins from "../../resources/pinned-files.json"
@@ -28,6 +28,7 @@ async function fixture(platform: LauncherPlatform = "darwin-arm64") {
   }
   const npm = join(directory, dirname(dirname(entries.npmCli)))
   await cp(join(samples, "npm"), npm, { recursive: true })
+  await rename(join(npm, "package.sample"), join(npm, "package.json"))
   await mkdir(join(directory, "licenses/uv"), { recursive: true })
   await mkdir(join(directory, "licenses/node"), { recursive: true })
   for (const file of ["LICENSE-MIT", "LICENSE-APACHE"]) await cp(join(samples, file), join(directory, "licenses/uv", file))

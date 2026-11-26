@@ -215,3 +215,17 @@ test("main waits for SessionEnd acknowledgements before sending the sidecar stop
   requester.close()
   notePluginSessionViewed(1776, undefined)
 })
+
+test("without a viewed Session main posts stop immediately and waits for the real child exit", async () => {
+  const { requestSidecarStop } = await import("./sidecar-stop")
+  const { createPluginSessionRequester } = await import("./plugin-session-lifecycle")
+  const requester = createPluginSessionRequester(() => { throw Error("no Session should be invented") })
+  const messages: unknown[] = []
+  let exited!: () => void
+  const exit = new Promise<void>(resolve => { exited = resolve })
+  const stopped = requestSidecarStop({ postMessage: message => { messages.push(message) }, kill: () => {} }, exit)
+  expect(messages).toEqual([{ type: "stop" }])
+  exited()
+  await stopped
+  requester.close()
+})

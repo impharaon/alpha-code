@@ -1183,7 +1183,11 @@ describe("REQ-236 #1617 确认卡只写人话", () => {
 // 分类结论取**真分类器**的输出,经生产适配器 `adaptPermissionV1Request` 投影(`v1()`),与生产里审批卡看到的形状一致。
 describe("#1314 批准面板的风险标签", () => {
   const classify = (permission: string, patterns: string[], metadata: Record<string, unknown> = {}) =>
-    classifyPermissionRequest({ permission, patterns, always: [], metadata })
+    // #1758 AC-06 / design §4.1: trusted Location roots are required; keep every card/ARIA assertion below.
+    classifyPermissionRequest({
+      protectedRoots: { platform: "darwin", project: "/project", directory: "/project", home: "/Users/me", appData: "/Users/me/Library/Application Support", localAppData: "/Users/me/Library", pathVariables: {} },
+      permission, patterns, always: [], metadata,
+    })
   const asked = (id: string, permission: string, patterns: string[], codepuppyRisk?: unknown) =>
     v1({
       id,

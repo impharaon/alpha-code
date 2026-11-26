@@ -1,4 +1,5 @@
 import { createUnattendedState } from "./unattended"
+import { buildUnattendedLive } from "../../../ui-mac/src/main/codepuppy-sidecar-messages"
 // #1662 L4 — lane seams I3 (`registerPolicy` / `seal`), I7, I9 and baseline S1 / S4 in a real OpenCode 2 plugin host
 // (policy-host.cases.ts: production plugin service, promise adapter, tool registry, permission engine, agents,
 // sessions, session context). The #725 discipline carries over: production entries only (`SessionContext.select` is
@@ -7,6 +8,7 @@ import { createUnattendedState } from "./unattended"
 import { publishTestBootstrap, testCloudMcp } from "../../../ui-mac/test-component/codepuppy-bootstrap-fixture"
 import { describe, expect } from "bun:test"
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { createServer, type AddressInfo } from "node:net"
 import { pathToFileURL } from "node:url"
@@ -49,9 +51,18 @@ import { attachDirectoryDisplay } from "./display"
 import { projectPluginContext, trackMcpNamespaces } from "../plugin-fanout"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
 import { canonicalJsonDigest, savePolicyDocument } from "./store"
+import { randomUUID } from "node:crypto"
+import type { ToolContext } from "@opencode/plugin/promise/tool"
+import { ProtectedFiles } from "../../../schema/src/codepuppy-protected-files"
+import { createLLMEventPublisher } from "../../../core/src/session/runner/publish-llm-event"
 
 const { Effect, Exit, Cause } = E
 isolate()
+const { WriteTool } = await import("../../../core/src/tool/plugin/write")
+const { EditTool } = await import("../../../core/src/tool/plugin/edit")
+const { PatchTool } = await import("../../../core/src/tool/plugin/patch")
+const { ShellTool } = await import("../../../core/src/tool/plugin/shell")
+const { Shell } = await import("../../../core/src/shell")
 
 // Hand-written expectations (never derived from production helpers).
 const ID_BUILTIN_WRITE = "builtin::probe_write"
@@ -68,6 +79,8 @@ type Rule = { action: string; resource: string; effect: "allow" | "deny" | "ask"
 const ALLOW_ALL: Rule = { action: "*", resource: "*", effect: "allow" }
 
 interface Setup {
+  readonly unattended?: ReturnType<typeof createUnattendedState>
+
   /** Install the policy through `registerPolicy` + `seal` (false = the extension without Code Puppy's policy). */
   readonly policy?: boolean
   /** The `build` agent's configured rules (appended by a post-activation config plugin, as OpenCode does). */
@@ -134,10 +147,11 @@ const setup = (options: Setup = {}) =>
         revision: `internal-${Math.random().toString(36).slice(2)}`,
       })),
       promisePlugin("codepuppy-ext", async (ctx: any) => {
-        const policy = options.policy === false ? undefined : await registerPolicy(ctx, createUnattendedState())
+        const policy = options.policy === false ? undefined : await registerPolicy(ctx, options.unattended ?? createUnattendedState())
         await ctx.tool.transform((editor: any) => editor.add(tool(ALIAS_PROBE, "probe")))
         await options.inside?.(ctx)
         await policy?.seal()
+        return () => policy?.dispose()
       }),
       // McpTool registers discovered tools after plugin activation (packages/core/src/tool/mcp.ts); Code Mode by default.
       // This plugin stands in for the MCP layer, so it carries the layer's own mark (slice E2; `E2` below runs the real one).
@@ -1652,6 +1666,408 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
       ].map((tool) => ({ ...tool, description: tool.name, inputSchema: { type: "object", properties: {} }, codemode: false })),
     ),
   )
+})
+
+describe("ordinary external reads", () => {
+  for (const tier of ["build", "codepuppy-ask", "codepuppy-readonly"] as const) it.live(`only fully approved ordinary external reads skip the directory ask (${tier})`, () => Effect.gen(function* () {
+    const outside = path.join(ROOT, `ordinary-${randomUUID()}.txt`)
+    fs.writeFileSync(outside, "ordinary outside content")
+    const { session } = yield* setup({ internal: [ReadTool.Plugin], records: NEUTRAL, inside: async (ctx) => {
+      await ctx.agent.transform((editor: import("@opencode/plugin/promise/agent").AgentEditor) => {
+        for (const agent of ["build", "codepuppy-ask", "codepuppy-readonly"])
+          editor.update(agent as never, (draft) => { draft.permissions.push(ALLOW_ALL, { action: "external_directory", resource: "*", effect: agent === "codepuppy-readonly" ? "deny" : "ask" }) })
+      })
+    }, rules: [ALLOW_ALL, { action: "external_directory", resource: "*", effect: "ask" }] })
+    const snapshot = yield* (yield* Tool.Service).snapshot([ALLOW_ALL])
+    const execute = snapshot.execute({ sessionID: session.id, agent: tier, messageID: "msg_external", call: { type: "tool-call", id: "read_external", name: "read", input: { path: outside } } } as never).pipe(Effect.exit)
+    const fiber = yield* execute.pipe(Effect.forkChild)
+    if (tier === "codepuppy-ask") {
+      const [request] = yield* pending
+      expect(request?.action).toBe("external_directory")
+      yield* (yield* Permission.Service).reply({ requestID: request!.id, reply: "once" })
+    }
+    const result = yield* E.Fiber.join(fiber)
+    expect(Exit.isSuccess(result)).toBe(tier !== "codepuppy-readonly")
+    if (tier !== "codepuppy-readonly") expect(JSON.stringify(result)).toContain("ordinary outside content")
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+  }))
+})
+
+describe("safe file tools", () => {
+  it.live("one protected file rule reaches read masking and risk", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const file = "secret.env"
+    const value = randomUUID()
+    fs.writeFileSync(path.join(location.directory, file), `KEY=${value}\nPORT=3000\n`)
+    const { session } = yield* setup({ internal: [ReadTool.Plugin], records: NEUTRAL, rules: [ALLOW_ALL, { action: "edit", resource: "*", effect: "ask" }], inside: async (ctx) => {
+      await ctx.tool.transform((editor) => editor.add({ name: "echo_protected", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async (_input, context) => {
+        await ctx.permission.assert({ sessionID: context.sessionID, action: "edit", resources: [file], save: [], metadata: { file } })
+        return { content: fs.readFileSync(path.join(location.directory, file), "utf8") }
+      } }))
+    } })
+    const read = yield* callRaw(session.id, "read", { path: file })
+    expect(JSON.stringify(read).includes(value)).toBe(false)
+    expect(JSON.stringify(read)).toContain("KEY=[REDACTED]")
+    expect(JSON.stringify(read)).toContain("PORT=3000")
+    const echo = yield* Effect.forkChild(callRaw(session.id, "echo_protected"))
+    const [request] = yield* pending
+    expect(request?.metadata?.codepuppyRisk?.facts?.signals).toContain("credential-path")
+    yield* (yield* Permission.Service).reply({ requestID: request!.id, reply: "once" })
+    const result = yield* E.Fiber.join(echo)
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(JSON.stringify(result).includes(value)).toBe(false)
+  }))
+  for (const tier of ["build", "codepuppy-ask", "codepuppy-readonly"] as const) it.live(`interactive protected reads bypass raw authorization in all tiers (${tier})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID()
+    fs.writeFileSync(path.join(location.directory, ".env"), `TOKEN=${value}\nPORT=3000\n`)
+    const { session } = yield* setup({ internal: [ReadTool.Plugin], records: NEUTRAL, rules: [ALLOW_ALL, { action: "read", resource: "*.env*", effect: "ask" }], inside: async (ctx) => {
+      await ctx.agent.transform((editor: import("@opencode/plugin/promise/agent").AgentEditor) => {
+        for (const agent of ["codepuppy-ask", "codepuppy-readonly"])
+          editor.update(agent as never, (draft) => { draft.permissions.push(ALLOW_ALL, { action: "read", resource: "*", effect: "allow" }, { action: "external_directory", resource: "*", effect: agent === "codepuppy-readonly" ? "deny" : "ask" }) })
+      })
+    } })
+    const snapshot = yield* (yield* Tool.Service).snapshot([ALLOW_ALL])
+    const execute = (input: unknown) => snapshot.execute({ sessionID: session.id, agent: tier, messageID: "msg_read", call: { type: "tool-call", id: "read_safe", name: "read", input } } as never).pipe(Effect.exit)
+    const result = yield* execute({ path: ".env" })
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(JSON.stringify(result).includes(value)).toBe(false)
+    expect(JSON.stringify(result)).toContain("TOKEN=[REDACTED]")
+    expect(JSON.stringify(result)).toContain("PORT=3000")
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+    const missing = yield* execute({ path: ".env.missing" })
+    expect(failure(missing)?.message).toContain("File not found:")
+  }))
+
+  for (const registered of [false, true]) it.live(`automation protected reads retain their original deny (${registered})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), `KEY=${randomUUID()}\n`)
+    const unattended = createUnattendedState()
+    const { session } = yield* setup({ internal: [ReadTool.Plugin], records: NEUTRAL, unattended, inside: async (ctx) => {
+      await ctx.agent.transform((editor: import("@opencode/plugin/promise/agent").AgentEditor) => editor.update("codepuppy-automation" as never, (draft) => { draft.permissions.push(ALLOW_ALL, { action: "read", resource: "*.env*", effect: "deny" }) }))
+    } })
+    if (registered) unattended.install(buildUnattendedLive({ seq: 1, nonce: "fixture", sessions: [{ sessionID: session.id, promptID: "msg_automation", agent: "codepuppy-automation" }] }))
+    const result = yield* (yield* (yield* Tool.Service).snapshot([ALLOW_ALL])).execute({ sessionID: session.id, agent: "codepuppy-automation", messageID: "msg_automation", call: { type: "tool-call", id: "read_automation", name: "read", input: { path: ".env" } } } as never).pipe(Effect.exit)
+    expect(Exit.isFailure(result)).toBe(true)
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+    expect(JSON.stringify(result)).not.toContain("KEY=[REDACTED]")
+  }))
+
+  it.live("paginated env views preserve long multiline slots and external aliases", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID()
+    const source = `TOKEN="${value}\n${value}\n${value}"\nPORT=3000\nPASSWORD=${"x".repeat(4000)}\n`
+    fs.writeFileSync(path.join(location.directory, ".env"), source)
+    const alias = path.join(ROOT, `env-alias-${randomUUID()}.txt`)
+    fs.symlinkSync(path.join(location.directory, ".env"), alias)
+    const { session } = yield* setup({ internal: [ReadTool.Plugin], records: NEUTRAL, inside: async (ctx) => {
+      await ctx.agent.transform((editor: import("@opencode/plugin/promise/agent").AgentEditor) => editor.update("codepuppy-readonly" as never, (draft) => { draft.permissions.push(ALLOW_ALL, { action: "read", resource: "*", effect: "allow" }, { action: "external_directory", resource: "*", effect: "deny" }) }))
+    } })
+    const snapshot = yield* (yield* Tool.Service).snapshot([ALLOW_ALL])
+    const result = yield* snapshot.execute({ sessionID: session.id, agent: "codepuppy-readonly", messageID: "msg_alias", call: { type: "tool-call", id: "alias", name: "read", input: { path: alias, offset: 2, limit: 4 } } } as never)
+    expect(result.output).toMatchObject({ offset: 2, truncated: false })
+    expect(JSON.stringify(result).includes(value)).toBe(false)
+    expect(JSON.stringify(result).includes("x".repeat(8))).toBe(false)
+    expect(JSON.stringify(result)).toContain("2: [REDACTED]")
+    expect(JSON.stringify(result)).toContain("4: PORT=3000")
+    expect(JSON.stringify(result)).toContain(alias)
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+  }))
+
+  it.live("protected private key aliases return only the notice", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const home = os.homedir()
+    expect(fs.realpathSync(home).startsWith(fs.realpathSync(path.dirname(os.tmpdir())) + path.sep)).toBe(true)
+    fs.mkdirSync(path.join(home, ".ssh"), { recursive: true })
+    const key = path.join(home, ".ssh", "fixture_private")
+    fs.copyFileSync(new URL("../fixtures/secret-files/private-key.txt", import.meta.url), key)
+    const alias = path.join(location.directory, "private-alias.txt")
+    fs.symlinkSync(key, alias)
+    const { session } = yield* setup({ internal: [ReadTool.Plugin], records: NEUTRAL, rules: [ALLOW_ALL, { action: "external_directory", resource: "*", effect: "deny" }] })
+    const result = yield* callRaw(session.id, "read", { path: alias })
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(JSON.stringify(result).includes(ProtectedFiles.PROTECTED_FILE_TEXT)).toBe(true)
+    expect(JSON.stringify(result).includes("BEGIN OPENSSH PRIVATE KEY")).toBe(false)
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+  }))
+
+  it.live("foreign read tools retain their original path", () => Effect.gen(function* () {
+    let rawReads = 0
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({ name: "read", description: "foreign read", options: { codemode: false }, input: { type: "object", properties: { path: { type: "string" } } }, execute: async () => { rawReads++; return { content: "foreign read executed" } } }))
+    } })
+    const result = yield* callRaw(session.id, "read", { path: ".env" })
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(rawReads).toBe(1)
+    expect(JSON.stringify(result)).toContain("foreign read executed")
+  }))
+})
+
+describe("env write-back", () => {
+  for (const operation of ["write", "edit", "patch"] as const) it.live(`pinned env mutations preserve values through the original writers (${operation})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const one = randomUUID(), two = randomUUID()
+    // Real Node dotenv grammar, preserving distinct repeated assignments.
+    fs.writeFileSync(path.join(location.directory, ".env"), `KEY="${one}\ncontinued"\nFLAG=0\nKEY=${two}\nFLAG=0\n`)
+    const pinned: boolean[] = []
+    const { session } = yield* setup({ internal: [WriteTool.Plugin, EditTool.Plugin, PatchTool.Plugin], records: NEUTRAL, rules: [ALLOW_ALL, { action: "edit", resource: "*", effect: "ask" }], after: promisePlugin("observe-env-input", async (ctx) => {
+      await ctx.tool.hook("execute.before", (event) => { if (event.tool === operation) pinned.push(Object.isFrozen(event.input) && JSON.stringify(event.input).includes("[REDACTED]")) })
+    }) })
+    const input = operation === "write" ? { path: ".env", content: "KEY=[REDACTED]\nFLAG=1\nKEY=[REDACTED]\nFLAG=1\n" }
+      : operation === "edit" ? { path: ".env", oldString: "KEY=[REDACTED]\nFLAG=0", newString: "KEY=[REDACTED]\nFLAG=1", replaceAll: true }
+      : { patchText: "*** Begin Patch\n*** Update File: .env\n@@\n KEY=[REDACTED]\n-FLAG=0\n+FLAG=1\n KEY=[REDACTED]\n-FLAG=0\n+FLAG=1\n*** End Patch" }
+    const fiber = yield* callRaw(session.id, operation, input).pipe(Effect.forkChild)
+    const [request] = yield* pending
+    expect(request?.action).toBe("edit")
+    const preview = JSON.stringify(request?.metadata)
+    expect(preview.includes(one)).toBe(false)
+    expect(preview.includes(two)).toBe(false)
+    expect(preview.includes("continued")).toBe(false)
+    yield* (yield* Permission.Service).reply({ requestID: request!.id, reply: "once" })
+    const result = yield* E.Fiber.join(fiber)
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(pinned).toEqual([true])
+    const actual = fs.readFileSync(path.join(location.directory, ".env"), "utf8")
+    expect(actual.includes(one)).toBe(true)
+    expect(actual.includes(two)).toBe(true)
+    expect(actual.includes("[REDACTED]")).toBe(false)
+    expect(actual.match(/FLAG=1/g)?.length).toBe(2)
+    expect(JSON.stringify(result).includes(one)).toBe(false)
+    expect(JSON.stringify(result).includes(two)).toBe(false)
+    expect(JSON.stringify(result).includes("continued")).toBe(false)
+    if (operation === "edit") expect((result as { value: { output: unknown } }).value.output).toMatchObject({ replacements: 2 })
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+  }))
+})
+
+describe("secret result boundaries", () => {
+  it.live("foreign tools named shell retain dynamic status masking", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=7\n")
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor) => editor.add({ name: "shell", description: "foreign fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async () => ({ content: [{ type: "text", text: "Exited with code 7" }], metadata: { exit: 7 } }) }))
+    } })
+    const result = yield* callRaw(session.id, "shell")
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect((result as { value: { metadata?: unknown } }).value.metadata).toMatchObject({ exit: "[REDACTED]", codepuppyDisplay: { identity: { source: "plugin" } } })
+    expect(JSON.stringify((result as { value: { content: unknown } }).value.content)).not.toContain("code 7")
+  }))
+  it.live("shell runtime notices remain visible without trusting foreign status fields", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=7\n")
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor) => editor.add({ name: "foreign_status", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async () => ({ content: [{ type: "text", text: "Exited with code 7" }], metadata: { exit: 7 } }) }))
+    } })
+    const result = yield* callRaw(session.id, "shell", { command: "cat .env; exit 7" })
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(JSON.stringify((result as { value: { content: unknown } }).value.content)).toContain("Exited with code 7")
+    const foreign = yield* callRaw(session.id, "foreign_status")
+    expect(Exit.isSuccess(foreign)).toBe(true)
+    expect((foreign as { value: { metadata?: unknown } }).value.metadata).toMatchObject({ exit: "[REDACTED]" })
+    expect(JSON.stringify((foreign as { value: { content: unknown } }).value.content)).not.toContain("code 7")
+  }))
+  it.live("verified shell exit stays numeric when it equals a protected value", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=7\n")
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL })
+    const result = yield* callRaw(session.id, "shell", { command: "cat .env; exit 7" })
+    expect(Exit.isSuccess(result)).toBe(true)
+    const completed = (result as { value: { output: unknown; metadata?: unknown } }).value
+    expect(completed.output).toMatchObject({ exit: 7, output: "PASSWORD=[REDACTED]\n" })
+    expect(completed.metadata).toMatchObject({ exit: 7 })
+  }))
+  it.live("registered shell capture masks live files and preserves program use", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID()
+    fs.writeFileSync(path.join(location.directory, ".env"), `KEY=${value}\nPORT=3000\n`)
+    const live: string[] = []
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, after: promisePlugin("observe-live-capture", async (ctx) => {
+      await ctx.shell.hook("capture", async (event) => {
+        if (event.phase === "chunk") live.push(await fs.promises.readFile(event.file, "utf8"))
+      })
+    }) })
+    const result = yield* callRaw(session.id, "shell", { command: "cat .env; cp .env program-copy.txt; exit 7" })
+    if (Exit.isFailure(result)) throw new Error(String(failure(result)?.message ?? Cause.pretty(result.cause)))
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(JSON.stringify(result).includes(value)).toBe(false)
+    expect(JSON.stringify(result)).toContain("[REDACTED]")
+    expect(JSON.stringify(result)).toContain("PORT=3000")
+    expect((result as { value: { output: unknown } }).value.output).toMatchObject({ exit: 7 })
+    expect(fs.readFileSync(path.join(location.directory, "program-copy.txt"), "utf8").includes(value)).toBe(true)
+    expect(live.length).toBeGreaterThan(0)
+    expect(live.every((text) => !text.includes(value))).toBe(true)
+    expect(live.join("\n")).toContain("PORT=3000")
+    const shell = yield* Shell.Service
+    const info = yield* shell.list()
+    expect(info).toEqual([])
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+  }))
+  it.live("synthetic execute progress must hide known protected values", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=1234\n")
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({ name: "mask_probe", description: "fixture", input: { type: "object", properties: { note: { type: "string" } } }, execute: async () => ({ content: "done" }) }))
+    } })
+    const registry = yield* Tool.Service
+    const listed = yield* registry.list()
+    const snapshot = yield* registry.snapshot([ALLOW_ALL])
+    const updates: unknown[] = []
+    const result = yield* snapshot.execute({ sessionID: session.id, agent: "build", messageID: "msg_1", call: { type: "tool-call", id: "mask_outer", name: "execute", input: { code: "return await tools.mask_probe({note:String(1230+4)})" } }, progress: (update: Record<string, unknown>) => Effect.sync(() => { updates.push(update) }) } as never)
+    const facts = { virtualExecuteListed: listed.some((tool) => tool.id === "execute"), liveContainsKnownValue: JSON.stringify(updates).includes("1234"), terminalContainsKnownValue: JSON.stringify(result).includes("1234") }
+    // The preserved SC-02 assertion: no weakening of its three original observations.
+    expect(facts).toEqual({ virtualExecuteListed: false, liveContainsKnownValue: false, terminalContainsKnownValue: false })
+    expect(updates.length).toBeGreaterThan(0)
+  }))
+
+  for (const mode of ["replace", "nested"] as const) it.live(`late progress hooks cannot revive raw metadata (${mode})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID()
+    fs.writeFileSync(path.join(location.directory, ".env"), `PASSWORD=${value}\n`)
+    let ran = false
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({ name: "late_progress", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async (_input: unknown, context: ToolContext) => { await context.progress({ nested: { value } }); ran = true; return { content: "done" } } }))
+    }, after: promisePlugin("late-progress", async (ctx) => {
+      await ctx.tool.hook("execute.progress", (event) => {
+        if (mode === "replace") event.metadata = { output: value }
+        else (event.metadata.nested as { value: string }).value = value
+      })
+    }) })
+    const exit = yield* call(session.id, "late_progress")
+    expect(ran).toBe(true)
+    expect(JSON.stringify(progress).includes(value)).toBe(false)
+    expect(JSON.stringify(exit)).toContain(ProtectedFiles.MASKING_FAILED_TEXT)
+  }))
+
+  it.live("cancelled Code Mode progress keeps publisher failure snapshots safe", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=1234\n")
+    const ready = yield* E.Deferred.make<void>()
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({ name: "mask_wait", description: "fixture", input: { type: "object", properties: { note: { type: "string" } } }, execute: async (_input: unknown, context: ToolContext) => new Promise((resolve) => { context.signal.addEventListener("abort", () => resolve({ content: "cancelled" }), { once: true }) }) }))
+    } })
+    const events: unknown[] = []
+    const publisher = createLLMEventPublisher({ publish: (_definition: unknown, data: unknown) => Effect.sync(() => { events.push(data); return {} as never }) } as never, { sessionID: session.id, assistantMessageID: "msg_mask", agent: "build", model: { id: "fixture", providerID: "fixture" }, started: 0 } as never)
+    yield* publisher.publish({ type: "tool-call", id: "mask_cancel", name: "execute", input: {} } as never)
+    const snapshot = yield* (yield* Tool.Service).snapshot([ALLOW_ALL])
+    const fiber = yield* snapshot.execute({ sessionID: session.id, agent: "build", messageID: "msg_mask", call: { type: "tool-call", id: "mask_cancel", name: "execute", input: { code: "return await tools.mask_wait({note:String(1230+4)})" } }, progress: (update: Record<string, unknown>) => publisher.progress("mask_cancel", update).pipe(Effect.andThen(E.Deferred.succeed(ready, undefined))) } as never).pipe(Effect.forkChild)
+    yield* E.Deferred.await(ready)
+    yield* E.Fiber.interrupt(fiber)
+    yield* publisher.failUnsettledTools({ type: "aborted", message: "Interrupted" } as never)
+    expect(events.length).toBeGreaterThan(1)
+    expect(JSON.stringify(events).includes("1234")).toBe(false)
+    expect(JSON.stringify(events)).toContain(ProtectedFiles.REDACTED)
+  }))
+
+  const source = (directory: string, value: string) => {
+    fs.mkdirSync(directory, { recursive: true })
+    // Assignment grammar from the official Node dotenv fixture; only the RHS is generated.
+    fs.writeFileSync(path.join(directory, ".env"), `KEY=${JSON.stringify(value)}\n`)
+  }
+
+  it.live("masking begins after pin and children keep the outer call", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID()
+    source(location.directory, value)
+    const bad = path.join(location.directory, "credentials.json")
+    fs.writeFileSync(bad, "{")
+    const observed: boolean[] = []
+    const pinned: boolean[] = []
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => {
+        editor.add({ name: "mask_child", description: "fixture", input: { type: "object", properties: { note: { type: "string" } } }, output: { type: "object", properties: { value: { type: "string" } }, required: ["value"] }, execute: async (input: { note?: string }) => {
+          observed.push(input.note === value)
+          fs.rmSync(bad, { force: true })
+          return { output: { value }, content: value }
+        } })
+      })
+      await ctx.tool.hook("execute.after", (event: { tool: string; status: string; result: { metadata?: Record<string, unknown> } }) => {
+        if (event.tool === "mask_child" && event.status === "completed") event.result.metadata = { late: value }
+      })
+    }, after: promisePlugin("observe-mask-pin", async (ctx) => {
+      await ctx.tool.hook("execute.before", (event) => { if (event.tool === "mask_child") pinned.push(Object.isFrozen(event.input)) })
+    }) })
+    const exit = yield* call(session.id, "execute", { code: 'const rows = await Promise.all([tools.mask_child({note:"a"}), tools.mask_child({note:"b"})]); return await tools.mask_child({note:rows[0].value})' })
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(observed).toEqual([false, false, false])
+    expect(pinned).toEqual([true, true, true])
+    expect((exit as { value: { content: unknown } }).value.content).toEqual([{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }])
+    // The root's initial failure survived every child; no child inherited that failure or cleared the root.
+    expect(JSON.stringify(exit).includes(value)).toBe(false)
+  }))
+
+  it.live("declined approval leaves no masking transaction", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    source(location.directory, randomUUID())
+    const bad = path.join(location.directory, "credentials.json")
+    fs.writeFileSync(bad, "{")
+    const { session } = yield* setup({ records: NEUTRAL, rules: [ALLOW_ALL, { action: "builtin::execute", resource: "*", effect: "ask" }] })
+    const permission = yield* Permission.Service
+    const invoke = () => callRaw(session.id, "execute", { code: 'return "ordinary output"' })
+    const declined = yield* Effect.forkChild(invoke())
+    const [first] = yield* pending
+    expect(first?.action).toBe("builtin::execute")
+    yield* permission.reply({ requestID: first!.id, reply: "reject" })
+    yield* E.Fiber.await(declined)
+    fs.rmSync(bad)
+    const allowed = yield* Effect.forkChild(invoke())
+    const [second] = yield* pending
+    yield* permission.reply({ requestID: second!.id, reply: "once" })
+    const exit = yield* E.Fiber.join(allowed)
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(JSON.stringify(exit).includes(ProtectedFiles.MASKING_FAILED_TEXT)).toBe(false)
+  }))
+
+  it.live("progress and preview are masked before publication", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID(); source(location.directory, value)
+    const { session } = yield* setup({ records: NEUTRAL, rules: [ALLOW_ALL, { action: "mask-preview", resource: "*", effect: "ask" }], inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({
+        name: "mask_visible", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} },
+        execute: async (_input: unknown, context: ToolContext) => {
+          await context.progress({ output: value })
+          await ctx.permission.assert({ sessionID: context.sessionID, agent: context.agent, action: "mask-preview", resources: ["fixture"], metadata: { diff: value, files: [{ before: value }] }, source: { type: "tool", id: context.id, messageID: context.messageID } })
+          return { content: value }
+        },
+      }))
+    } })
+    const fiber = yield* Effect.forkChild(call(session.id, "mask_visible"))
+    const [request] = yield* pending
+    expect(request?.action).toBe("mask-preview")
+    expect(JSON.stringify(request?.metadata).includes(value)).toBe(false)
+    expect(progress.some((row) => row.output === ProtectedFiles.REDACTED)).toBe(true)
+    expect(JSON.stringify(progress).includes(value)).toBe(false)
+    yield* (yield* Permission.Service).reply({ requestID: request!.id, reply: "once" })
+    const exit = yield* E.Fiber.join(fiber)
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(JSON.stringify(exit).includes(value)).toBe(false)
+  }))
+
+  for (const window of ["masking-failure", "new-key"] as const) it.live(`terminal failure cannot revive the last progress (${window})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID(); source(location.directory, window === "new-key" ? "base-fixture-value" : value)
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({ name: "mask_failure", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async (_input: unknown, context: ToolContext) => {
+        await context.progress(window === "new-key" ? { [value]: "public" } : { output: `prefix:${value}`, detail: value })
+        if (window === "new-key") source(location.directory, value)
+        else fs.writeFileSync(path.join(location.directory, "credentials.json"), "{")
+        throw new SchemaTool.Error({ message: window === "new-key" ? "failed" : value, error: { cause: value } })
+      } }))
+    } })
+    const published: { type: string; data: unknown }[] = []
+    const publisher = createLLMEventPublisher({ publish: (definition, data) => Effect.sync(() => {
+      published.push({ type: definition.type, data }); return { id: "evt_fixture", type: definition.type, data } as never
+    }) }, { sessionID: session.id, agent: "build" as never, model: { id: "model" as never, providerID: "test" as never }, providerMetadataKey: "test", started: 0, assistantMessageID: "msg_mask" as never })
+    yield* publisher.publish({ type: "tool-call", id: "mask-call", name: "mask_failure", input: {} } as never)
+    const snapshot = yield* (yield* Tool.Service).snapshot([ALLOW_ALL])
+    const exit = yield* snapshot.execute({ sessionID: session.id, agent: "build", messageID: "msg_mask", call: { type: "tool-call", id: "mask-call", name: "mask_failure", input: {} }, progress: (update: Record<string, unknown>) => publisher.progress("mask-call", update) } as never).pipe(Effect.exit)
+    const error = failure(exit)!
+    yield* publisher.failTool("mask-call", { type: "tool.execution", message: error.message! }, error.metadata)
+    const terminal = published.find((event) => event.type === "session.tool.failed")!
+    expect(terminal).toBeDefined()
+    expect(JSON.stringify(terminal).includes(value)).toBe(false)
+    expect(JSON.stringify(terminal).includes("prefix:")).toBe(false)
+    if (window === "masking-failure") expect(JSON.stringify(terminal)).toContain(ProtectedFiles.MASKING_FAILED_TEXT)
+  }))
 })
 
 void Agent

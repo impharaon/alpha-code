@@ -1,0 +1,2 @@
+            machine host.domain.com password pass1 login log1 account acct1
+            default login log2 password pass2 account acct2

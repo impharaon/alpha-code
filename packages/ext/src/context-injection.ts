@@ -781,6 +781,7 @@ export function applyRegisteredRebrands(segment: string): string {
 // 键集必须与源码 1:1(context-injection.test.ts 从源码解析比对):上游加一个钩子或一个 transform domain,这里不分类即红。
 export const HOOK_CONTEXT_CLASS = Object.freeze({
   "tool.execute.before": "context", // 入参是模型→工具方向,但它抛出的拒绝句作为工具失败回到模型(`#1704`)
+  "tool.execute.progress": "context", // SC-02 masks before the root publisher.
   "tool.execute.after": "context", // 工具结果回到模型
   "session.prompt": "context", // 用户消息
   "session.context": "context", // system / messages / 工具表 / 生成参数
@@ -797,6 +798,7 @@ export const HOOK_CONTEXT_CLASS = Object.freeze({
   "session.experimental.idle": "context", // 可以准入一条合成消息
   "permission.evaluate": "no-context", // effect 与给人看的提示
   "shell.create.before": "no-context",
+  "shell.capture": "context", // SC-01 publishes safe bytes consumed by tool results.
   "aisdk.sdk": "no-context",
   "aisdk.language": "context", // 可以换掉整个语言模型
   "agent.transform": "context", // agent 的 system / description

@@ -1,0 +1,1 @@
+CREATE TABLE access_tokens (account_id TEXT PRIMARY KEY, access_token TEXT, token_expiry TIMESTAMP, rapt_token TEXT, id_token TEXT, regional_access_boundary TEXT, regional_access_boundary_expiry TIMESTAMP);

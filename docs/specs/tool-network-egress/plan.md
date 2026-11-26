@@ -283,3 +283,31 @@ N7 循环边界补正：先以 `cbfedbb99b` 仅提交扩大 IPv6/IPv4-mapped 别
 本轮返回前已取消自身尚未启动的 slot 等待（退出 130，未执行测试），并用 `git worktree remove /tmp/egress-s2-controls-20261126` 移除隔离副本；没有取消其它作业。具名真引擎、对照和 relay/endpoint/official 仍待执行，不能宣称 AC-08 的 scenario 证据或 AC-13 日常真引擎代理证据已完成。后续获准直接运行或取得 slot 后，从步骤 3 的上述三条开始，三个移除臂分别只跑对应一条。AC-13 实机系统代理证明仍由编排器另安排。
 
 最终文档检查仍为 69 errors / 253 warnings，findings 与本轮基线完全一致（`/tmp/egress-s2-docs-final.json`）；链接 6 条与 `git diff --check` 通过。未启动应用/Electron、未改系统代理、未跑全套/bin/check/gate，core.hooksPath 保持 `.githooks`。
+
+
+### r7：共享 slot 内补齐重型证明
+
+r7 明确不提供直接运行例外，等待可接受；本节补齐前述未验证项，不改变设计或生产代码。通过 `gate slot -- python3 /tmp/egress-s2-r7-verify-explicit.py` 与续接的 `gate slot -- python3 /tmp/egress-s2-r7-remaining.py` 执行，均实际取得共享 slot 后才启动测试。正常场景通过一次后，续接只执行剩余项，没有重跑正常场景、旧 45 秒臂或 r6 已过的轻量相关集。完整命令、cwd、退出码、实际计数和耗时在 `/tmp/egress-s2-r7-evidence/results.json`；两个 slot 的日志分别为 `/tmp/egress-s2-r7-slot-explicit.log`、`/tmp/egress-s2-r7-remaining-slot.log`。
+
+以下均从 U 执行，统一命令前缀 `bun test --max-concurrency 2 --timeout 120000`（超时沿用仓内测试宿主合同，不改变产品期限）：
+
+| AC / 项 | 文件与 `-t` | 实测结果 |
+| --- | --- | --- |
+| AC-08、AC-13 日常 | `./src/main/network-egress.engine.cases.ts -t '通放与混合档\|通放拒绝非公网\|系统路由注入'` | 退出 0，3 pass / 0 fail，4.53 s。真引擎 PID 73702 与 main PID 73700 不同；实际 apply 返回 libsandbox `/usr/lib/libsandbox.1.dylib`、profile 9007 B；实际逐次 policy-pass 为 2 条。独占 allow 无卡且设置计数 2，混入 ask 后出卡，短写/私网/保留地址拒绝；注入代理的请求记录包含 `via-proxy.egress.invalid:80`，模型工具结果收到靶站正文。 |
+| 去档位旁路对照 | 同文件 `-t '通放与混合档'`；仅临时使 approval 的 `pass()` 返回 undefined | 退出 1，0 pass / 1 fail，4.61 s；明确失败为 `allow-only must not create a card`，实际出现卡片、policy-pass 为 0。 |
+| 去公网判据对照 | 同文件 `-t '通放拒绝非公网'`；仅临时使 `isNonPublicEgressAddress` 返回 false | 退出 1，0 pass / 1 fail，2.85 s；`127.1` 实际收到 `HTTP/1.1 200 Connection Established`，而判据要求 403；错误通放产生 1 条 policy-pass。 |
+| 去路由注入对照 | 同文件 `-t '系统路由注入'`；仅临时令代理解析结果为 DIRECT | 退出 1，0 pass / 1 fail，3.48 s；靶站正文缺失，实际为 `curl: (52) Empty reply from server`，`egress-target-ok` 断言红。没有把 TCP 接通当目标请求成功。 |
+| relay 消费者 | `./src/main/relay-wiring.cases.ts -t 'W1 \|W2 \|W3 '` | 退出 0，3 pass / 0 fail。 |
+| endpoint 消费者 | `./src/main/endpoint-route.engine.cases.ts -t 'E1 refused engine CONNECT'` | 退出 0，1 pass / 0 fail。 |
+| official 消费者 | `./test-component/official-connectors.cases.ts -t 'GitHub recipe decrypts through actual engine file substitution'` | 退出 0，1 pass / 0 fail。 |
+
+三个有效对照各自都是正常启动、实际 apply 围栏后，在目标行为断言处失败；对应 main/engine PID 为 78275/78277、78302/78304、78342/78354。每臂只临时修改一个生产函数，finally 恢复源文件；在独立 frozen-lockfile 安装的 detached 副本中执行，没有借用主树 node_modules。原始输出为 evidence 目录下的 `control-{tier,public,route}.log`，实际引擎/代理/模型数据保存为对应 `.engine.json`；正常场景为 `scenario.log` 与 `scenario.engine.json`。消费者输出为 `relay.log`、`endpoint.log`、`official.log`。有效证据合计正常 8 pass / 0 fail、3 个预期红臂；remaining 续接批次返回 0，保留前一 slot 已通过的 3 条正常场景结果；未改任何断言、门或阈值。
+
+执行偏离如实保留：首次 slot 命令的 `.cases.ts` 未带 `./`，Bun 将它当过滤器，退出 1 且没有运行用例（`scenario-filter-miss.log`），改为显式路径后才得到上述 3 pass。第一个 `/tmp` 副本因集合外探针也落在 W11 `/private/tmp` 可写范围，启动自证失败、准备阶段 90 秒到期；没有 engine ready、policy-pass 为 0，不计作移除臂（`control-tier-setup-miss.log`、对应 `.engine.json`）。将同一独立副本用 git worktree move 移到 `/Users/pharaon/app/wt/egress-controls`，重新 frozen-lockfile 安装确认链接后，才得到上述三个有效红臂。主树测试与生产代码未因这些准备错误改动。有效场景/对照/消费者实际运行约 19.23 s，本轮含排队与准备约 79 分钟；r7 明确允许等待，未再次因队列估计中止。
+
+观察交编排器（非本轮修复）：`src/main/network-egress.engine.cases.ts:181` 的 fixture.start 错误没有请求 id，ready 等待未收到错误，因而上述启动失败表现为 90 秒准备超时；后续可单独改善夹具诊断，不改变本片产品行为。
+
+AC-08 的计划证明与 AC-13 日常注入证明现已补齐。AC-13 的真实机器系统代理读取/无代理对照仍由编排器安排，本轮不将其记为已验收。没有启动应用/Electron，没有改本机系统代理，没有执行全套、bin/check 或 gate run，也没有 push/PR/merge。
+
+
+r7 收尾：源代码仍为 `cc604a9bcb`，本轮只更新本节证据。三个对照的源文件已恢复，`git worktree remove /Users/pharaon/app/wt/egress-controls` 已完成，证据副本保留在上述 /tmp 目录。提交前旧名扫描 10 pass / 0 fail；链接 6 条与 diff 检查通过。文档 contract 仍为既有 69 errors / 253 warnings，findings 与 r6 基线完全一致；`affected-tests --list` 仍因本 worktree 缺 `.gate-tests` 退出 2，没有 scope line，继续交编排器，未改门。core.hooksPath 仍为 `.githooks`。

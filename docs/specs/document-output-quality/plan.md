@@ -744,3 +744,5 @@ r14 Python race red（a）：在既有 office-excel 文件加实际模块 inode 
 r14 Python 安装 target green：相同 snapshot 不再删除模块，新增 inode 断言 1 PASS（office-reinstall-green.log）；源摘要校验仍先执行，只有导入验证成功才发布原戳记。最终会按 r14 独立复验两个原失败文件，并对这三个真实 runtime 消费者做有限并行接线，确认原 import 缺文件原因不再发生，不称 flaky。
 
 r14 security（a+c）：document-chromium 的离屏 BrowserWindow 显式 webviewTag:false；原安全闸仍扫全树、拒绝 true/标签，创建点名单只增加该真实文件（§4.4/R4 Chromium 输出）。原文件 red-2.log 为 7 PASS/1 FAIL；具名 target 已排 shared slot，最终全文件一次复验。
+
+r14 OOXML（a）：red-9.log 两条闸均点名 shared/workspace-file.ts。将原 documentContainerKind 实现原样迁入现有 shared/ooxml.ts 解压权威，并从原 workspace-file 路径转出；没有第二套 ZIP owner、增加 preview 大小限制或改声明/返回值，保持 §4.4/R4 的独立容器身份语义。

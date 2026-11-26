@@ -889,3 +889,23 @@ function notOoxml(code: OoxmlErrorCode, detail?: string): Exclude<OoxmlDetection
 function now(): number {
   return performance.now()
 }
+
+/** Container identity for the fixed renderer, independent of preview byte/page budgets. */
+export async function documentContainerKind(bytes: Uint8Array) {
+  if (Buffer.from(bytes.subarray(0, 5)).toString() === "%PDF-") return "pdf" as const
+  if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) return
+  const { ZipReader, Uint8ArrayReader } = await import("@zip.js/zip.js")
+  const reader = new ZipReader(new Uint8ArrayReader(new Uint8Array(bytes)), { useWebWorkers: false })
+  try {
+    const entries = await reader.getEntries()
+    const names = new Set(entries.filter((entry) => !entry.directory).map((entry) => entry.filename))
+    if (!names.has("[Content_Types].xml")) return
+    const matches = (Object.keys(OOXML_SUBTYPES) as (keyof typeof OOXML_SUBTYPES)[]).filter((kind) =>
+      names.has(OOXML_SUBTYPES[kind].mainPart),
+    )
+    return matches.length === 1 ? matches[0] : undefined
+  } finally {
+    await reader.close()
+  }
+}
+

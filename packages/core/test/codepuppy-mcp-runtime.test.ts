@@ -26,6 +26,8 @@
 // HOME, XDG_*, TMPDIR and the database are isolated by the shared test preload (bunfig.toml, I-08) before any module loads.
 import { afterAll, beforeAll, describe, expect } from "bun:test"
 import { createHash } from "node:crypto"
+import type { LauncherEnvironment } from "@opencode/util/codepuppy-connector-launch"
+import { canonicalJsonDigest } from "@opencode/util/codepuppy-hash"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -46,7 +48,7 @@ const { Location } = await import("@opencode/core/location")
 const { Mcp } = await import("@opencode/core/mcp/index")
 const { McpClient } = await import("@opencode/core/mcp/client")
 const { McpPool } = await import("@opencode/core/mcp/pool")
-const { declaredListedTools, listsDeclaration } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
+const { declaredListedTools, declaredFirstPartyTools, expandFirstPartyCommand, commandMatchesTemplate, listsDeclaration } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
 const { __resetCodePuppyBootstrapForTests, parseCodePuppyBootstrap, publishCodePuppyBootstrap, tryCodePuppyBootstrap } = await import("@opencode/util/codepuppy-bootstrap")
 const { parseFailureCode } = await import("@opencode/schema/codepuppy-net-failure")
 const { Server: McpServer, WebStandardStreamableHTTPServerTransport } = await import("@modelcontextprotocol/server")
@@ -312,18 +314,18 @@ describe("#1565: bundled declarations while a first-party server starts", () => 
   fs.writeFileSync(
     manifest,
     JSON.stringify({
-      serverSha256: createHash("sha256").update("# bundled server\n").digest("hex"),
       // Only entries with the bundled command (here: an extra `--office` token) are first-party.
-      formats: { docx: { command: [process.execPath, FIXTURE, "--office"], tools: [declaredTool] } },
+      formats: { docx: { command: [process.execPath, FIXTURE, "--office"], environment: {}, cwd: null, codeSha256: { "office-mcp/server.py": createHash("sha256").update("# bundled server\n").digest("hex") }, tools: [declaredTool] } },
     }),
   )
   publishOfficeManifest(manifest)
-  const office = (tools: unknown[]) =>
-    new ConfigMCP.Local({
-      type: "local",
-      command: [process.execPath, FIXTURE, "--office"],
-      environment: { CODEPUPPY_MCP_INIT_DELAY_MS: "1500", CODEPUPPY_MCP_TOOLS_FILE: toolsFile(tools) },
-    } as never)
+  const office = (tools: unknown[]) => {
+    const environment = { CODEPUPPY_MCP_INIT_DELAY_MS: "1500", CODEPUPPY_MCP_TOOLS_FILE: toolsFile(tools) }
+    const document = JSON.parse(fs.readFileSync(manifest, "utf8"))
+    document.formats[`docx-${Object.keys(document.formats).length}`] = { ...document.formats.docx, environment }
+    fs.writeFileSync(manifest, JSON.stringify(document))
+    return new ConfigMCP.Local({ type: "local", command: [process.execPath, FIXTURE, "--office"], environment } as never)
+  }
   const thirdParty = local({ CODEPUPPY_MCP_INIT_DELAY_MS: "1500", CODEPUPPY_MCP_TOOLS_FILE: toolsFile([declaredTool]) }, { cwd: ROOT })
 
   testEffect(mcpLayer({ office: office([declaredTool]), other: thirdParty })).live("offered while starting; the third party is not; the listing replaces it once connected", () =>
@@ -636,6 +638,48 @@ describe("#1565: the shipped Office manifest and server", () => {
     expect(declaredListedTools("codepuppy-word", entry, manifest, fs.readFileSync)).toBeUndefined()
     expect(declaredListedTools("codepuppy-word", { ...entry, environment: { CODEPUPPY_DOCUMENT_HOST: "/foreign/host.json" } }, manifest, fs.readFileSync, expected)).toBeUndefined()
     expect(declaredListedTools("codepuppy-word", { type: "local", command: afterExtension }, manifest, fs.readFileSync, expected)).toBeUndefined()
+  }))
+
+  // Integration layer: own manifest format, derived from the shipped declaration and protected server bytes.
+  testEffect(Layer.empty).effect("bundled slots bind only the host Node and stable declaration cache root before assets exist", () => Effect.sync(() => {
+    const native = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word
+    const declaration = { ...native, command: ["{codepuppyNode}", "{codepuppyResources}/office-mcp/server.py", "{workspace}", "{codepuppyCacheRoot}"] }
+    const slotManifest = path.join(resources, "office-mcp", "slots.json")
+    fs.writeFileSync(slotManifest, JSON.stringify({ formats: { stable: declaration } }))
+    for (const node of [path.join(resources, "connector-launchers/node/bin/node"), path.join(ROOT, "not-expanded/pin/node/bin/node")]) {
+      const launchers: LauncherEnvironment = { platform: "darwin-arm64", pinSet: "a".repeat(64), uv: "/runtime/uv", uvx: "/runtime/uvx", node, npmCli: "/runtime/npm.js", npxCli: "/runtime/npx.js", runtimeRoot: path.join(ROOT, "runtime"), pythonFileId: "python/darwin-arm64/3.12.16-20261124", packageManagerEnv: {}, environment: {}, firstPartyCacheRoots: { stable: path.join(ROOT, "first-party-cache/stable") } }
+      const command = expandFirstPartyCommand(declaration.command, resources, launchers, "stable")
+      expect(command).toEqual([node, path.join(resources, "office-mcp/server.py"), "{workspace}", launchers.firstPartyCacheRoots.stable])
+      expect(commandMatchesTemplate(declaration.command, command, resources, launchers, "stable")).toBe(true)
+      const entry = { type: "local", command }
+      const declared = declaredFirstPartyTools("user-renamed-server", entry, slotManifest, fs.readFileSync, undefined, launchers)
+      expect(declared?.tools).toEqual(native.tools)
+      expect(declaredFirstPartyTools("stable", entry, slotManifest, fs.readFileSync)).toBeUndefined()
+      expect(declaredFirstPartyTools("stable", { ...entry, command: ["/usr/local/bin/node", ...command.slice(1)] }, slotManifest, fs.readFileSync, undefined, launchers)).toBeUndefined()
+      expect(declaredFirstPartyTools("stable", { ...entry, command: [...command.slice(0, 3), "/foreign/cache"] }, slotManifest, fs.readFileSync, undefined, launchers)).toBeUndefined()
+      expect(declaredFirstPartyTools("stable", entry, slotManifest, fs.readFileSync, undefined, { ...launchers, firstPartyCacheRoots: { "user-renamed-server": launchers.firstPartyCacheRoots.stable! } })).toBeUndefined()
+      const recipeSha256 = canonicalJsonDigest({ kind: "codepuppy-pinned-entry-recipe", recipe: [] }).slice(7)
+      expect(declared?.recipeSha256).toBe(recipeSha256)
+      expect(declared?.declarationSha256).toBe(canonicalJsonDigest({ kind: "codepuppy-bundled-mcp-declaration", command: declaration.command, environment: {}, cwd: null, codeSha256: declaration.codeSha256, tools: native.tools, recipeSha256 }).slice(7))
+      for (const bad of [["{workspace}"], ["{codepuppyNode}/suffix"], ["/node", "{codepuppyNode}"], ["{codepuppyCacheRoot}"], ["/node", "{codepuppyCacheRoot}/suffix"]]) {
+        expect(() => expandFirstPartyCommand(bad, resources, launchers, "stable")).toThrow()
+        expect(commandMatchesTemplate(bad, bad, resources, launchers, "stable")).toBe(false)
+      }
+    }
+  }))
+
+  testEffect(Layer.empty).effect("bundled declarations reject extra environment cwd malformed recipes and escaped code", () => Effect.sync(() => {
+    const entry = { type: "local", command: afterExtension }
+    for (const environment of [{ NODE_OPTIONS: "--inspect" }, { PYTHONPATH: ROOT }, { EXTRA: "value" }, []]) expect(declaredFirstPartyTools("word", { ...entry, environment }, manifest, fs.readFileSync)).toBeUndefined()
+    expect(declaredFirstPartyTools("word", { ...entry, cwd: ROOT }, manifest, fs.readFileSync)).toBeUndefined()
+    const original = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word
+    const file = path.join(resources, "office-mcp", "invalid.json")
+    for (const change of [{ codeSha256: {} }, { codeSha256: { "../escape": "a".repeat(64) } }, { codeSha256: { "office-mcp/server.py": "0".repeat(64) } }, { recipe: [{ id: "python/darwin-arm64/3.12.16-20261124", archive: "tar.gz", entry: "../escape", required: ["../escape"] }] }]) {
+      fs.writeFileSync(file, JSON.stringify({ formats: { word: { ...original, ...change } } }))
+      expect(declaredFirstPartyTools("word", entry, file, fs.readFileSync)).toBeUndefined()
+    }
+    const expected = { CODEPUPPY_DOCUMENT_HOST: "/private/python-host/7/registration/host.json" }
+    expect(declaredFirstPartyTools("word", { ...entry, environment: { ...expected, NODE_OPTIONS: "--inspect" } }, manifest, fs.readFileSync, expected)).toBeUndefined()
   }))
 
   let previous: string | undefined

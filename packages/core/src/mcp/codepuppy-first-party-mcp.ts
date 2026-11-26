@@ -1,74 +1,98 @@
-/**
- * #1565 (REQ-236 §2.3): the four first-party Office servers are discoverable before they are executable.
- *
- * Main points the engine at the bundled manifest (`<resources>/office-mcp/tools.json`, exported from server.py's
- * `tools_for()` at build time and checked in) through the bootstrap document's `paths.officeMcpManifest` (#1698). The manifest carries, per format,
- * the bundled command template (`{codepuppyResources}` slots) and its tool definitions, plus server.py's sha256.
- *
- * An MCP entry gets a format's declared definitions only when its command equals that format's bundled command token
- * for token (the template with `{codepuppyResources}` = the manifest's resource root) and the bundled server.py next to
- * the manifest still hashes to the manifest's digest. Anything else — another command, an extra token, a server.py
- * the manifest was not exported from, no manifest at all — gets nothing and is listed only once it has connected.
- * The template's `{workspace}` slot matches the marker itself or an absolute folder without `..`: main writes either
- * (ui-mac `office-advisories.ts` codepuppyOfficeInstallCommand) and the extension replaces the marker with the
- * Location's folder before the engine and the identity see the command (#1666 Unit E). Core's declaration and the
- * extension's `codepuppy-bundled` authority both match through `commandMatchesTemplate`.
- * A declaration is never a connection: the engine still runs initialize + tools/list before executing one (I9).
- *
- * `name` (the MCP key) is not part of the binding; the engine derives the tools' identity from it either way.
- */
-
-import { matchesDocumentPythonEnvironment, type DocumentPythonEnvironment } from "@opencode/util/codepuppy-document"
+/** Bundled declarations bind explicit configuration and protected resource bytes, never a server name. */
+import type { DocumentPythonEnvironment } from "@opencode/util/codepuppy-document"
+import type { BundledFirstPartyDeclaration, DeclaredFirstParty, LauncherEnvironment } from "@opencode/util/codepuppy-connector-launch"
+import { canonicalJsonDigest } from "@opencode/util/codepuppy-hash"
 import { createHash } from "node:crypto"
 import path from "node:path"
 
 const RESOURCES_SLOT = "{codepuppyResources}"
 const WORKSPACE_SLOT = "{workspace}"
+const NODE_SLOT = "{codepuppyNode}"
+const CACHE_SLOT = "{codepuppyCacheRoot}"
 
-/** One command token against one template token (resource root substituted; workspace slot as described above). */
-export function commandMatchesTemplate(template: readonly string[], command: readonly unknown[], resources: string) {
-  return (
-    template.length === command.length &&
-    template.every((token, index) => {
+export function expandFirstPartyCommand(template: readonly string[], resources: string, launchers: LauncherEnvironment, declarationId: string): string[] {
+  return expandCommand(template, resources, launchers, declarationId)
+}
+
+function expandCommand(template: readonly string[], resources: string, launchers: LauncherEnvironment | undefined, declarationId: string): string[] {
+  return template.map((token, index) => {
+    if (token.includes(NODE_SLOT)) {
+      if (index !== 0 || token !== NODE_SLOT || !launchers || !path.isAbsolute(launchers.node)) throw new Error("invalid bundled Node slot")
+      return launchers.node
+    }
+    if (token.includes(CACHE_SLOT)) {
+      const root = launchers?.firstPartyCacheRoots[declarationId]
+      if (index === 0 || token !== CACHE_SLOT || !root || !path.isAbsolute(root)) throw new Error("invalid bundled cache slot")
+      return root
+    }
+    if (token.includes(WORKSPACE_SLOT) && (index === 0 || token !== WORKSPACE_SLOT)) throw new Error("invalid bundled workspace slot")
+    return token.split(RESOURCES_SLOT).join(resources)
+  })
+}
+
+export function commandMatchesTemplate(template: readonly string[], command: readonly unknown[], resources: string, launchers: LauncherEnvironment, declarationId: string): boolean {
+  return matchesCommand(template, command, resources, launchers, declarationId)
+}
+
+function matchesCommand(template: readonly string[], command: readonly unknown[], resources: string, launchers: LauncherEnvironment | undefined, declarationId: string) {
+  try {
+    const expanded = expandCommand(template, resources, launchers, declarationId)
+    return expanded.length === command.length && expanded.every((token, index) => {
       const actual = command[index]
-      if (token === WORKSPACE_SLOT)
-        return actual === WORKSPACE_SLOT || (typeof actual === "string" && path.isAbsolute(actual) && !actual.split(/[\\/]/).includes(".."))
-      return token.split(RESOURCES_SLOT).join(resources) === actual
+      if (index > 0 && token === WORKSPACE_SLOT) return actual === WORKSPACE_SLOT || (typeof actual === "string" && path.isAbsolute(actual) && !actual.split(/[\\/]/).includes(".."))
+      return token === actual
     })
-  )
+  } catch {
+    return false
+  }
 }
 
-type Manifest = {
-  serverSha256: string
-  formats: Record<string, { command: string[]; tools: unknown[] }>
+const relativeMember = (value: unknown): value is string => typeof value === "string" && value !== "" && !value.includes("\\") && !value.includes(":") && !value.startsWith("/") && value.split("/").every((part) => part !== "" && part !== "." && part !== "..")
+const stringRecord = (value: unknown): value is Record<string, string> => record(value) && Object.values(value).every((item) => typeof item === "string")
+
+function isDeclaration(value: unknown): value is BundledFirstPartyDeclaration {
+  if (!record(value) || !Array.isArray(value.command) || value.command.length === 0 || !value.command.every((item) => typeof item === "string") || !stringRecord(value.environment) || !(value.cwd === null || typeof value.cwd === "string") || !record(value.codeSha256) || Object.keys(value.codeSha256).length === 0 || !Array.isArray(value.tools)) return false
+  if (!Object.entries(value.codeSha256).every(([file, digest]) => relativeMember(file) && typeof digest === "string" && /^[a-f0-9]{64}$/.test(digest))) return false
+  if (value.recipe === undefined) return true
+  if (!Array.isArray(value.recipe)) return false
+  const ids = new Set<string>()
+  return value.recipe.every((recipe) => {
+    if (!record(recipe) || typeof recipe.id !== "string" || !relativeMember(recipe.id) || ids.has(recipe.id) || !["file", "zip", "tar.gz", "tar.bz2", "tar.xz"].includes(String(recipe.archive)) || !relativeMember(recipe.entry) || !Array.isArray(recipe.required) || !recipe.required.every(relativeMember) || !recipe.required.includes(recipe.entry)) return false
+    ids.add(recipe.id)
+    return true
+  })
 }
 
-/** `manifestPath` = Code Puppy 启动文档的 `paths.officeMcpManifest`(`#1698`;生产由调用方从已发布的文档取)。 */
+/** Missing launcher context can only attest resource-only native declarations while host composition is pending. */
 export function declaredFirstPartyTools(
   _name: string,
   entry: unknown,
   manifestPath: string | undefined,
   readFile: (file: string) => Uint8Array,
   pythonEnvironment?: DocumentPythonEnvironment,
-): unknown[] | undefined {
-  if (!manifestPath || !entry || typeof entry !== "object") return undefined
-  const { type, command, environment, disabled } = entry as { type?: unknown; command?: unknown; environment?: unknown; disabled?: unknown }
-  if (!matchesDocumentPythonEnvironment(environment, disabled === true ? undefined : pythonEnvironment)) return undefined
-  if (type !== "local" || !Array.isArray(command)) return undefined
+  launchers?: LauncherEnvironment,
+): DeclaredFirstParty | undefined {
+  if (!manifestPath || !record(entry) || entry.type !== "local" || !Array.isArray(entry.command)) return undefined
+  if (entry.environment !== undefined && !stringRecord(entry.environment)) return undefined
   try {
-    const manifest = JSON.parse(new TextDecoder().decode(readFile(manifestPath))) as Manifest
-    const officeDir = path.dirname(manifestPath)
-    const resources = path.dirname(officeDir)
-    const format = Object.values(manifest.formats).find((candidate) => commandMatchesTemplate(candidate.command, command, resources))
-    if (!format) return undefined
-    const digest = createHash("sha256")
-      .update(readFile(path.join(officeDir, "server.py")))
-      .digest("hex")
-    return digest === manifest.serverSha256 ? format.tools : undefined
+    const manifest: unknown = JSON.parse(new TextDecoder().decode(readFile(manifestPath)))
+    if (!record(manifest) || !record(manifest.formats)) return undefined
+    const resources = path.dirname(path.dirname(manifestPath))
+    for (const [id, declaration] of Object.entries(manifest.formats)) {
+      if (!isDeclaration(declaration) || !matchesCommand(declaration.command, entry.command, resources, launchers, id)) continue
+      // Only the native Office command receives the host's per-Location Python projection.
+      const office = declaration.command.includes(`${RESOURCES_SLOT}/office-mcp/server.py`)
+      const expectedEnvironment = { ...declaration.environment, ...(office && entry.disabled !== true ? pythonEnvironment : undefined) }
+      if (canonicalJsonDigest(entry.environment ?? {}) !== canonicalJsonDigest(expectedEnvironment) || (entry.cwd ?? null) !== declaration.cwd) continue
+      if (!Object.entries(declaration.codeSha256).every(([file, digest]) => createHash("sha256").update(readFile(path.join(resources, file))).digest("hex") === digest)) continue
+      const recipeSha256 = canonicalJsonDigest({ kind: "codepuppy-pinned-entry-recipe", recipe: declaration.recipe ?? [] }).slice("sha256:".length)
+      const declarationSha256 = canonicalJsonDigest({ kind: "codepuppy-bundled-mcp-declaration", command: declaration.command, environment: declaration.environment, cwd: declaration.cwd, codeSha256: declaration.codeSha256, tools: declaration.tools, recipeSha256 }).slice("sha256:".length)
+      return { tools: declaration.tools, ...(declaration.recipe === undefined ? {} : { recipe: declaration.recipe }), declarationSha256, recipeSha256 }
+    }
   } catch {
-    // Missing or unreadable manifest / server.py: nothing is declared; the server is listed once it connects.
-    return undefined
+    // Invalid manifest / unreadable protected code is untrusted, not an application failure.
   }
+  return undefined
 }
 
 /** A declared definition in the shape `tools/list` produces (packages/core/src/mcp/client.ts `Tool`). */
@@ -90,8 +114,9 @@ export function declaredListedTools(
   manifestPath: string | undefined,
   readFile: (file: string) => Uint8Array,
   pythonEnvironment?: DocumentPythonEnvironment,
+  launchers?: LauncherEnvironment,
 ): DeclaredTool[] | undefined {
-  const tools = declaredFirstPartyTools(name, entry, manifestPath, readFile, pythonEnvironment)?.flatMap((tool): DeclaredTool[] => {
+  const tools = declaredFirstPartyTools(name, entry, manifestPath, readFile, pythonEnvironment, launchers)?.tools.flatMap((tool): DeclaredTool[] => {
     if (!record(tool) || typeof tool.name !== "string" || tool.name === "" || !record(tool.inputSchema)) return []
     return [
       {

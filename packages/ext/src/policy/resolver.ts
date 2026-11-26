@@ -47,7 +47,7 @@ export function mcpBindingEvidence(name: string, entry: McpEntry): unknown {
 /** The de-secreted part of an OpenCode 2 MCP server config the policy reads (`@opencode/schema/mcp` ServerConfig). */
 export type McpEntry =
   | { readonly type: "remote"; readonly url: string }
-  | { readonly type: "local"; readonly command: readonly string[]; readonly cwd?: string }
+  | { readonly type: "local"; readonly command: readonly string[]; readonly environment?: Readonly<Record<string, string>>; readonly cwd?: string }
 
 export function mcpBindingDigest(name: string, entry: McpEntry): string {
   return canonicalJsonDigest(mcpBindingEvidence(name, entry))

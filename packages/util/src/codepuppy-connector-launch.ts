@@ -17,6 +17,27 @@ export type LauncherEnvironment = {
   environment: Record<string, string>
   firstPartyCacheRoots: Readonly<Record<string, string>>
 }
+export type PinnedEntryRecipe = {
+  id: PinnedFileId
+  archive: "file" | "zip" | "tar.gz" | "tar.bz2" | "tar.xz"
+  entry: string
+  required: readonly string[]
+}
+export type BundledFirstPartyDeclaration = {
+  command: readonly string[]
+  environment: Readonly<Record<string, string>>
+  cwd: string | null
+  codeSha256: Readonly<Record<string, string>>
+  tools: readonly unknown[]
+  recipe?: readonly PinnedEntryRecipe[]
+}
+export type DeclaredFirstParty = {
+  tools: readonly unknown[]
+  recipe?: readonly PinnedEntryRecipe[]
+  declarationSha256: string
+  recipeSha256: string
+}
+
 export type DownloadFailureEvidence =
   | { kind: "connect" | "timeout"; detail: string }
   | { kind: "http"; status: number; detail: string }

@@ -153,8 +153,7 @@ describe("authority minting (ADR-041 §5)", () => {
     fs.writeFileSync(
       manifest,
       JSON.stringify({
-        serverSha256: sha,
-        formats: { word: { command: ["{codepuppyResources}/office-runtime/bin/python3", "{codepuppyResources}/office-mcp/server.py", "word"], tools: [{ name: "read_docx" }] } },
+        formats: { word: { command: ["{codepuppyResources}/office-runtime/bin/python3", "{codepuppyResources}/office-mcp/server.py", "word"], environment: {}, cwd: null, codeSha256: { "office-mcp/server.py": sha }, tools: [{ name: "read_docx" }] } },
       }),
     )
     const command = [`${resources}/office-runtime/bin/python3`, `${resources}/office-mcp/server.py`, "word"]
@@ -164,6 +163,16 @@ describe("authority minting (ADR-041 §5)", () => {
   test("the exact bundled Office command next to the attested server.py mints codepuppy-bundled", () => {
     const authority = authorityForMcp("codepuppy-word", { type: "local", command: office.command } as never, undefined, office.manifest)
     expect(authority).toMatchObject({ kind: "codepuppy-bundled", bindingId: "mcp:codepuppy-word" })
+  })
+
+  test("bundled authority includes explicit configuration and both protected declaration digests", () => {
+    const entry = { type: "local" as const, command: office.command }
+    const declaration = JSON.parse(fs.readFileSync(office.manifest, "utf8")).formats.word
+    const recipeSha256 = canonicalJsonDigest({ kind: "codepuppy-pinned-entry-recipe", recipe: [] }).slice(7)
+    const declarationSha256 = canonicalJsonDigest({ kind: "codepuppy-bundled-mcp-declaration", command: declaration.command, environment: {}, cwd: null, codeSha256: declaration.codeSha256, tools: declaration.tools, recipeSha256 }).slice(7)
+    expect(authorityForMcp("renamed", entry, undefined, office.manifest)).toEqual({ kind: "codepuppy-bundled", bindingId: "mcp:renamed", evidenceDigest: canonicalJsonDigest({ kind: "codepuppy-bundled-mcp", name: "renamed", command: entry.command, environment: {}, cwd: null, tools: declaration.tools, declarationSha256, recipeSha256 }) })
+    expect(authorityForMcp("renamed", { ...entry, environment: { NODE_OPTIONS: "--inspect" } }, undefined, office.manifest)).toEqual({ kind: "not-asserted" })
+    expect(authorityForMcp("renamed", { ...entry, cwd: "/unexpected" }, undefined, office.manifest)).toEqual({ kind: "not-asserted" })
   })
 
   test("an extra token, or a server.py the manifest was not exported from, proves nothing", () => {

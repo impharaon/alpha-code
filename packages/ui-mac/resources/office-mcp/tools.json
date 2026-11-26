@@ -1,5 +1,4 @@
 {
-  "serverSha256": "efdfc2bd95c24b7dde1ba65a4f1c68c7a3e0f36db6976176cbea94db53a32858",
   "formats": {
     "word": {
       "command": [
@@ -28,7 +27,12 @@
             "additionalProperties": false
           }
         }
-      ]
+      ],
+      "environment": {},
+      "cwd": null,
+      "codeSha256": {
+        "office-mcp/server.py": "efdfc2bd95c24b7dde1ba65a4f1c68c7a3e0f36db6976176cbea94db53a32858"
+      }
     },
     "excel": {
       "command": [
@@ -498,7 +502,12 @@
             "additionalProperties": false
           }
         }
-      ]
+      ],
+      "environment": {},
+      "cwd": null,
+      "codeSha256": {
+        "office-mcp/server.py": "efdfc2bd95c24b7dde1ba65a4f1c68c7a3e0f36db6976176cbea94db53a32858"
+      }
     },
     "powerpoint": {
       "command": [
@@ -527,7 +536,12 @@
             "additionalProperties": false
           }
         }
-      ]
+      ],
+      "environment": {},
+      "cwd": null,
+      "codeSha256": {
+        "office-mcp/server.py": "efdfc2bd95c24b7dde1ba65a4f1c68c7a3e0f36db6976176cbea94db53a32858"
+      }
     },
     "pdf": {
       "command": [
@@ -556,7 +570,12 @@
             "additionalProperties": false
           }
         }
-      ]
+      ],
+      "environment": {},
+      "cwd": null,
+      "codeSha256": {
+        "office-mcp/server.py": "efdfc2bd95c24b7dde1ba65a4f1c68c7a3e0f36db6976176cbea94db53a32858"
+      }
     },
     "video": {
       "command": [

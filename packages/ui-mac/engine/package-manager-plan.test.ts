@@ -99,3 +99,13 @@ test("H4 three real interpreters preserve leaf redirections, stdin and private p
     }
   }
 })
+
+test("production config bundling retains the scanner owner's original source directory", async () => {
+  const { loadConfigFromFile } = await import("electron-vite")
+  const loaded = await loadConfigFromFile({ command: "build", mode: "production" }, resolve(import.meta.dirname, "../electron.vite.config.ts"))
+  const config = loaded!.config as { main?: { plugins?: Array<{ name?: string; load?: (id: string) => string | undefined }> } }
+  const plugin = config.main!.plugins!.find((plugin) => plugin.name === "codepuppy:package-manager-scanner")!
+  const code = plugin.load!("\0codepuppy-shell-scan.ts")!
+  expect(code).toContain("export function scanPackageManagerSource")
+  expect(code).toContain("export function shellName")
+})

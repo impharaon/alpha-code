@@ -1,9 +1,7 @@
 import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, join, normalize, relative } from "node:path"
-import { PROJECT_HIDDEN_DIR } from "./project-hidden-dir"
-
-const LEGACY_PROJECT_HIDDEN_DIR = ".code-puppy"
+import { LEGACY_PROJECT_HIDDEN_DIR, PROJECT_HIDDEN_DIR } from "./project-hidden-dir"
 
 export type ProjectDirectoryIdentity =
   | { status: "project"; directory: string; root: string }

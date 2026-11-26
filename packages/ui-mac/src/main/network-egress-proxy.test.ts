@@ -8,6 +8,9 @@
 // (与 403 可辨,`#1572`);静默隧道兜底与放行 / 关闭记录的新字段(`#1572` AC2)。
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { createNetworkEgressActivity } from "./network-egress-activity"
+import { createNetworkEgressApproval } from "./network-egress-approval"
+import type { EgressApproval, NetworkOutbound } from "../shared/network-egress-wire"
 import * as net from "node:net"
 import { egressPolicyDenialOf } from "../shared/egress-denial"
 import { __resetEgressGrantsForTests } from "./network-egress-grants"
@@ -539,7 +542,7 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
       },
       requestGrant: async (h, p) => {
         asked.push(`${h}:${p}`)
-        return "refused"
+        return "user-denied"
       },
     })
     const authority = `127.0.0.1:${target.port}`
@@ -558,7 +561,8 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
 
   test("用户批准 ⇒ 200 隧道,字节双向到达,grant 记录排在 connect allow 之前", async () => {
     const target = await withTarget()
-    const { proxy, logs } = await startProxy({ authorize: () => false, requestGrant: async () => "granted" })
+    let approved = false
+    const { proxy, logs } = await startProxy({ authorize: () => approved, requestGrant: async () => { approved = true; return "granted" } })
     const authority = `127.0.0.1:${target.port}`
     const { status, socket } = await connectThrough(proxy.port, authority)
     expect(status).toBe(200)
@@ -618,4 +622,36 @@ describe("`#1412` 未登记目的地的出口:问用户", () => {
     expect(dialed.length).toBe(dialsBefore + 1)
     expect(dialed.at(-1)).toBe(authority)
   })
+})
+
+test("真实 CONNECT 经 main 对话决定后收到靶站字节，拨号前授权撤销则拒绝", async () => {
+  const target = await withTarget()
+  const activity = createNetworkEgressActivity()
+  let snapshotReady: (() => void) | undefined
+  const post = (message: NetworkOutbound) => { if (message.type === "codepuppy.network.activity.reply") snapshotReady?.() }
+  activity.attach(1, post, { session: async () => ({}), shell: async () => true })
+  await new Promise<void>((resolve) => {
+    snapshotReady = resolve
+    activity.receive({ type: "codepuppy.network.snapshot", id: 1, generation: 1, seq: 1, activities: [{ kind: "tool", invocationID: "tool", ref: { generation: 1, sessionID: "ses_a", directory: "/project", messageID: "msg_a", callID: "call" }, tool: "shell" }] }, post)
+  })
+  const service = createNetworkEgressApproval({ available: true, activity, store: { read: () => ({ ok: true, absent: true, sites: [] }), write: () => {} }, log: () => {} })
+  let dialed = 0
+  const { proxy } = await startProxy({ authorize: service.authorized, requestGrant: service.request, dial: (_host, port) => { dialed++; return net.connect(port, "127.0.0.1") } })
+  const card = new Promise<EgressApproval>((resolve) => service.api.subscribe(() => {
+    void service.api.listApprovals({ session: { generation: 1, sessionID: "ses_a", directory: "/project" } }).then((result) => { if (result.ok && result.value[0]) resolve(result.value[0]) })
+  }))
+  try {
+    const connecting = connectThrough(proxy.port, `a.example.com:${target.port}`)
+    const pending = await card
+    expect(dialed).toBe(0)
+    await service.api.decide({ requestID: pending.requestID, decision: "allow-session" })
+    const connected = await connecting
+    expect(connected.status).toBe(200)
+    const echoed = new Promise<string>((resolve) => connected.socket.once("data", (chunk: Buffer) => resolve(chunk.toString())))
+    connected.socket.write("conversation-approved")
+    expect(await echoed).toBe("echo:conversation-approved")
+    connected.socket.destroy()
+  } finally { service.close() }
+  const revoked = await startProxy({ authorize: () => false, requestGrant: async () => "granted", dial: () => { throw new Error("revoked destination must not dial") } })
+  expect((await rawRequest(revoked.proxy.port, "CONNECT a.example.com:443 HTTP/1.1\r\nHost: a.example.com:443\r\n\r\n")).body).toContain("conversation approval is unavailable")
 })

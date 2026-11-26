@@ -120,6 +120,7 @@ export type HostOptions = {
   sandbox: EngineSandbox
   name: string
   modelBaseURL: string
+  egressProxy?: string
   directModelProxyBaseURL?: string
   routeRef?: `{file:${string}}`
   /** 用户在 Code Puppy 里加的本地 MCP(codepuppy.jsonc 里的 `probe`,引擎经显式文件读它),每次 tools/call 记进这个文件。 */
@@ -208,6 +209,7 @@ export function codepuppyEngine(options: HostOptions) {
     policyAccount: `acct:${createHash("sha256").update(`${name}-${Math.random()}`).digest("hex")}`,
     cloudMcp: options.cloudMcp,
     killSwitch: options.killSwitch,
+    egressProxy: options.egressProxy,
     // 引擎开关与交给 start() 的同一份(生产里 sidecar 从文档取 start() 的两项,core 的项目监听读同一个 filewatcher)
     engine: { modelsFetch: false, filewatcher: options.filewatcher ?? false },
     askTimeoutMs: options.askTimeoutMs,

@@ -130,3 +130,49 @@ test("HTTPS 上游校验证书并保留隧道；system Session 每条连接重�
   expect(child.exitCode, child.stderr.toString()).toBe(0)
   expect(JSON.parse(child.stdout.toString())).toEqual({ calls: ["codepuppy-egress-upstream", { mode: "system" }, "https://example.com:443/", "https://example.net:8443/"], requests: ["example.com:443"], tail: "tls-tail" })
 })
+
+test("通放直连把全部已检查地址交给 TCP，IPv6 不通时仍连接 IPv4", () => {
+  // The transport maps checked public addresses to a real IPv4-only local peer;
+  // its lookup results preserve the families/order from an actual localhost lookup.
+  const script = `
+    import { mock } from "bun:test";
+    import net from "node:net";
+    import dns from "node:dns/promises";
+    const connect = net.connect.bind(net);
+    const actual = await dns.lookup("localhost", { all: true });
+    const addresses = [{ address: "2001:4860:4860::8888", family: 6 }, { address: "8.8.8.8", family: 4 }];
+    const checked = [];
+    dns.lookup = async () => addresses;
+    mock.module("node:net", () => ({ ...net, connect(options) {
+      if (!options.lookup) throw Object.assign(new Error("only the first address was pinned"), { code: "EHOSTUNREACH" });
+      return connect({ ...options, lookup(host, opts, callback) {
+        options.lookup(host, opts, (error, result) => {
+          checked.push(result);
+          callback(error, result.map(entry => ({ ...entry, address: entry.family === 6 ? "::1" : "127.0.0.1" })));
+        });
+      } });
+    } }));
+    const { dialEgressUpstream } = await import(${JSON.stringify(new URL("./network-egress-upstream.ts", import.meta.url).pathname)});
+    const server = net.createServer(socket => socket.end("dual-stack-ok"));
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const tunnel = await dialEgressUpstream({ host: "dual.egress.test", port: server.address().port }, [{ kind: "direct" }], { kind: "allow-all", onPass() {} }, new AbortController().signal);
+    const body = await new Promise(resolve => { tunnel.socket.once("data", chunk => resolve(chunk.toString())); tunnel.socket.resume() });
+    tunnel.socket.destroy(); server.close();
+    console.log(JSON.stringify({ actual: actual.length > 0, checked, body }));
+    process.exit(0);
+  `
+  const child = Bun.spawnSync([process.execPath, "-e", script], { stdout: "pipe", stderr: "pipe" })
+  expect(child.exitCode, child.stderr.toString()).toBe(0)
+  expect(JSON.parse(child.stdout.toString())).toEqual({ actual: true, checked: [[{ address: "2001:4860:4860::8888", family: 6 }, { address: "8.8.8.8", family: 4 }]], body: "dual-stack-ok" })
+})
+
+test("通放 SOCKS4 从检查过的双栈集合选 IPv4，不再次解析目标", async () => {
+  const lookup = spyOn(dns, "lookup").mockResolvedValue([{ address: "2001:4860:4860::8888", family: 6 }, { address: "198.18.1.1", family: 4 }])
+  cleanups.push(() => lookup.mockRestore())
+  const requests: Buffer[] = []
+  const port = await peer((socket) => socket.once("data", (request) => { requests.push(request); socket.write(Buffer.from([0, 90, 1, 187, 198, 18, 1, 1])) }))
+  const tunnel = await dialEgressUpstream({ host: "dual.egress.test", port: 443 }, [{ kind: "socks4", host: "127.0.0.1", port }], { kind: "allow-all", onPass() {} }, new AbortController().signal)
+  cleanups.push(() => tunnel.socket.destroy())
+  expect([...requests[0]!]).toEqual([4, 1, 1, 187, 198, 18, 1, 1, 0])
+  expect(lookup).toHaveBeenCalledTimes(1)
+})

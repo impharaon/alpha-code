@@ -8,6 +8,8 @@ export type ShellProbeFenceContext = {
   profile: string
   env: Readonly<Record<string, string>>
   roots: EngineRoots & { stateHome: string; engineConfigDirectory: string }
+  /** Root keys whose `env` value is an app default, not a user export: the probe child gets them, main's own environment never does. */
+  defaults?: readonly string[]
 }
 
 const ROOT_KEYS = ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG", "OPENCODE_DB"] as const
@@ -17,7 +19,8 @@ export function applyTrustedShellEnvironment(target: NodeJS.ProcessEnv, source: 
   Object.assign(target, source)
   for (const key of ROOT_KEYS) {
     const value = context.env[key]
-    if (value === undefined) delete target[key]
+    // An app default written here would look user-exported after a relaunch.
+    if (value === undefined || context.defaults?.includes(key)) delete target[key]
     else target[key] = value
   }
 }

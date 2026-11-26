@@ -513,6 +513,24 @@ describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
     }
   })
 
+  test("app-supplied root defaults reach the probe child but never main's own environment, so a relaunch cannot mistake them for user exports", () => {
+    const keys = ["XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "OPENCODE_CONFIG_DIR"] as const
+    const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]))
+    try {
+      for (const key of keys) delete process.env[key]
+      process.env.XDG_DATA_HOME = join(process.env.HOME!, "user-data-root")
+      const context = { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: { ...process.env }, home: process.env.HOME!, userDataPath }) }
+      expect(context.env.XDG_CACHE_HOME).toBe(context.roots.cacheHome)
+      preferAppEnv(userDataPath, context)
+      expect(process.env.XDG_CACHE_HOME).toBeUndefined()
+      expect(process.env.XDG_CONFIG_HOME).toBeUndefined()
+      expect(process.env.OPENCODE_CONFIG_DIR).toBeUndefined()
+      expect(process.env.XDG_DATA_HOME).toBe(join(process.env.HOME!, "user-data-root"))
+    } finally {
+      for (const key of keys) if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]
+    }
+  })
+
   test("trusted probe roots survive cached input and the real asynchronous refresh", async () => {
     const context = { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: { ...process.env }, home: process.env.HOME!, userDataPath }) }
     process.env.SHELL = fakeLoginShell("root-refresh.sh", { HOME: "/wrong/fresh", XDG_CONFIG_HOME: "/wrong/fresh", XDG_DATA_HOME: "/wrong/fresh", OPENCODE_DB: "/wrong/fresh.db", R8_PROBE_MARKER: "fresh", PATH: "/usr/bin:/bin" })

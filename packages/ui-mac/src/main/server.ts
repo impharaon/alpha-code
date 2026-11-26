@@ -498,12 +498,13 @@ export function setDefaultServerUrl(url: string | null) {
   getStore().delete(DEFAULT_SERVER_URL_KEY)
 }
 
-export function resolveShellProbeRoots(input: { env: Record<string, string | undefined>; home: string; userDataPath: string }): Pick<ShellProbeFenceContext, "roots" | "env"> {
+export function resolveShellProbeRoots(input: { env: Record<string, string | undefined>; home: string; userDataPath: string }): Pick<ShellProbeFenceContext, "roots" | "env" | "defaults"> {
   const exported = usableExportedPaths({ env: input.env, home: input.home, log: (line) => getLogger()?.warn(line) })
   const roots = resolveEngineRoots(exported.env, exported.home)
   const stateHome = exported.env.XDG_STATE_HOME || input.userDataPath
   const engineConfigDirectory = engineGlobalConfigDirectory(exported.env, exported.home)
-  return { roots: { ...roots, stateHome, engineConfigDirectory }, env: {
+  const defaults = ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "OPENCODE_CONFIG_DIR"].filter((key) => !exported.env[key])
+  return { roots: { ...roots, stateHome, engineConfigDirectory }, defaults, env: {
     ...minimalProbeEnv(exported.env), HOME: roots.home,
     XDG_CONFIG_HOME: roots.configHome, XDG_DATA_HOME: roots.dataHome, XDG_CACHE_HOME: roots.cacheHome, XDG_STATE_HOME: stateHome,
     OPENCODE_CONFIG_DIR: engineConfigDirectory,

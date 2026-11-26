@@ -572,3 +572,5 @@ AC 对应的贡献与边界：AC-01..04/12 的默认路由、七技能/许可/�
 依据恢复 brief 的逐项采纳 A1..A10、B1..B8，冻结规格/设计不变；切片七保持其独立提交。开始 2026-11-26 11:15:48 UTC，预估约 90 分钟，先保留各正确反例再修生产代码，现有模块测试中添加用例；不跑全套或 gate run。A3 的本功能 retry 可以独立实现，#1760 现有 action 的生产代码在本分支尚不存在（`util/codepuppy-connector-launch.ts` 仅数据定义；实际 preload/main 无 connectorLaunch.retry 实现），接线须沿该拥有者的冻结面，不新增 DocumentHost/引擎 API 绕过。
 
 A1 red：新增既有 document-resources.test.ts 的真实 electron-builder 26.15.2 FileMatcher/copyFiles 用例（实际依赖解析，非 cpSync 模拟）及 afterPack 缺 npm 树的反例。`bun test src/main/document-resources.test.ts -t 'real electron-builder copier|afterPack rejects'` 为 0 PASS/2 FAIL（`/tmp/alpha-1761-r11/A1-red.log`）：前者实际丢根 node_modules 后 readDocumentAssets 报缺文件，后者当前 afterPack 在 win32 直接成功。这次只提交反例，下一提交加明确 npm FileSet 和真实打包目录资产验证。正式 package:mac 目录构建涉及完整引擎/签名资源，本轮选择 brief 允许的 closest real-copier 证据，不启动应用/Electron 窗口。
+
+A1 green：明确根 npm FileSet 并在 afterPack 对 darwin/win32 的真实 Resources 路径先执行 readDocumentAssets；相同新断言不改，既有文件 13 PASS（A1-green.log）。删除 FileSet 即实际 copier 缺树；删除 afterPack 检查即缺树反例不再拒绝。证明层为真实 copier + afterPack 组件，未冒称完整 app 包。

@@ -118,6 +118,7 @@ const getBase = (appId: string): Configuration => ({
     ...(process.platform === "darwin" || process.platform === "win32" ? [
       { from: `${OFFICE_RUNTIME_BUILD_DIR}/${process.platform === "darwin" ? macTargetArch : "win32-x64"}/`, to: "office-runtime/" },
       { from: `${DOCUMENT_ASSET_BUILD_DIR}/`, to: "document-assets/" },
+      { from: `${DOCUMENT_ASSET_BUILD_DIR}/node_modules/`, to: "document-assets/node_modules/" },
     ] : []),
     // (REQ-076 T1 清理)原有指向 native/ 的条目为上游 desktop 遗留死配置:alpha 无 native/ 目录
     // (mac_window.node/swift-build 未克隆),打包时恒为空 no-op,已删。
@@ -257,9 +258,14 @@ const getBase = (appId: string): Configuration => ({
   // `#1669`:装包后、签名前核对引擎原生资源在包里的落点 —— 每个都解包、加载点的目标在解包目录里、可执行的带执行位、
   // Mach-O 含目标片。不过即抛:宁可不出包,也不出一个终端打不开的包。
   afterPack: async (context) => {
+    if (context.electronPlatformName !== "darwin" && context.electronPlatformName !== "win32") return
+    const resourcesDir = context.electronPlatformName === "darwin"
+      ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources")
+      : path.join(context.appOutDir, "resources")
+    readDocumentAssets(path.join(resourcesDir, "document-assets"))
     if (context.electronPlatformName !== "darwin") return
     assertPackagedEngineAssets({
-      resourcesDir: path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources"),
+      resourcesDir,
       packingArch: Arch[context.arch],
     })
   },

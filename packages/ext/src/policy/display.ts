@@ -75,7 +75,9 @@ export function attachTerminal(
     event.result = { ...event.result, metadata: { ...event.result.metadata, [DISPLAY_KEY]: display } }
     return
   }
-  event.error = new ToolError({
+  // The plugin runtime can load a different SDK constructor; Core must still recognise its own error.
+  const Constructor = event.error.constructor as typeof ToolError
+  event.error = new Constructor({
     message: event.error.message,
     ...(event.error.error === undefined ? {} : { error: event.error.error }),
     metadata: { ...event.error.metadata, [DISPLAY_KEY]: display },
@@ -104,7 +106,8 @@ export function attachWriteDenied(
 ) {
   if (event.status === "error") {
     if (!FILE_WRITE_TOOLS.has(event.tool) || !writeWasRefused(event.error.error ?? event.error)) return
-    event.error = new ToolError({
+    const Constructor = event.error.constructor as typeof ToolError
+    event.error = new Constructor({
       message: `${event.error.message}\n\n${WRITE_REFUSED_NOTE}`,
       ...(event.error.error === undefined ? {} : { error: event.error.error }),
       ...(event.error.metadata === undefined ? {} : { metadata: event.error.metadata }),
@@ -143,7 +146,8 @@ export function attachNetFailure(
   const target = (event.input as { url?: unknown } | undefined)?.url
   const net = classifyNetFailure(event.error.error ?? event.error, engineNetFailurePath(typeof target === "string" ? target : undefined, env, egressProxy))
   if (!net) return
-  event.error = new ToolError({
+  const Constructor = event.error.constructor as typeof ToolError
+  event.error = new Constructor({
     message: event.error.message,
     ...(event.error.error === undefined ? {} : { error: event.error.error }),
     metadata: { ...event.error.metadata, [NET_FAILURE_KEY]: net },
@@ -193,7 +197,8 @@ export function attachUnattendedDenial(
     event.result = { ...event.result, metadata: { ...event.result.metadata, [UNATTENDED_DENIAL_KEY]: denial } }
     return
   }
-  event.error = new ToolError({
+  const Constructor = event.error.constructor as typeof ToolError
+  event.error = new Constructor({
     message: event.error.message,
     ...(event.error.error === undefined ? {} : { error: event.error.error }),
     metadata: { ...event.error.metadata, [UNATTENDED_DENIAL_KEY]: denial },

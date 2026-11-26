@@ -581,3 +581,50 @@ r8 开始于 2026-11-26 10:41:43 UTC。直达 `.cases.ts` 命令增加 `./`（�
 - `affected-tests --list` exit 2：`No such file or directory: '<worktree>/.gate-tests'`，本基线没有 scope line；被冻结的 gate/.gate-tests 未改。
 - 逐项落点以本节为唯一执行证据；额外文件仅第 2 项明确要求的真实格式样本 `fixtures/secret-files/kube-eks.yaml` 和既有 `provenance.json`。没有改 Core/SC 签名、依赖、生产配置、规则、其它仓库，未启动 app/Electron/窗口，无 push/PR/merge。
 - 遗留去向：**发现 5** 按两次修正失败规则交编排器，具体红点 `unattended-run.engine.cases.ts:286`（expected failed / actual ok，env 首格即失败），需要编排器处置真实 engine 错误分类链路的下一步范围；不声称已证实必须改冻结接口。第 3 项前提未确认供编排器知悉；selector 缺输入按既有归属处理。其余没有新 OPTIONAL/ARCH 扩项。
+
+## r10 发现 5：真实引擎错误身份定位与修复
+
+依据：r10 IMPLEMENT(diagnosis + fix)；spec v4、design v3.3、SC-01/SC-02 不变。已核 Codex / GPT-6。文档影响为本计划的执行证据；不另建诊断报告。开始 2026-11-26 12:07:55 UTC，最终检查于 12:32 UTC，约 24 分钟（含本机 slot 排队）。
+
+### 同命令 base/HEAD 与 bisect
+
+两臂都在各自 `packages/ui-mac` 前台执行一次：
+
+```sh
+gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/unattended-run.engine.cases.ts -t 'AC-04 敏感文件'
+```
+
+| 输入 | exit / PASS / FAIL | 实际输出 |
+| --- | --- | --- |
+| base `f7424aa452` | 0 / 1 / 0 | 15 expect；env/subagent/outside 三格均通过 |
+| 原 HEAD `989362d2b8` | 1 / 0 / 1 | 3 expect；env 首格 expected failed / actual ok |
+| 修复后的同一行（增加落库分类断言） | 0 / 1 / 0 | 18 expect；三格均为 permission.rejected，运行 failed、原因与 status.json 一致 |
+
+临时 detached worktree 独立安装锁定依赖；Core/Plugin/Schema workspace 链接的 canonical realpath 均在该副本内。两臂测试 SHA256 同为 `737fca59cfa76e9822ea89d10709ea306bab53515ad4819c9cc0ac49be7cc7b5`；锁文件、engine/sandbox helper、preload 与 bunfig 逐字节一致（comparison.json、input-parity.json、module-isolation.json）。安装后 hooksPath 恢复为 `.githooks`，无依赖/锁文件提交。
+
+在临时 worktree 执行 `git bisect start 989362d2b8 f7424aa452`、`git bisect run python3 <evidence>/bisect-row.py`；驱动每步只以前述命令经 slot 运行这一行，并验证实际执行到具名测试。六步结果：`1a13ddc9f9` BAD、`793fdff5db` BAD、`9cd3861ca4` GOOD、`1af2389012` BAD、`dcaa1fc375` BAD、`82e96edcca` BAD。**首坏提交 `82e96edccac03557441247fee846fbb4809162ce`，直接父提交 `9cd3861ca46f2e1d860f5b24e959c6bad4e25a69` 通过**。没有 skip/装载失败冒充坏提交；bisect 已 reset，临时 worktree 已移除。
+
+### 实际丢失边界与最小修正
+
+临时源码探针仅输出类名、tag 与 instanceof 布尔值，不输出消息/值。`trace-display.log` 确认：Core 执行失败时原生 Tool.Error=true；进入 `policy/display.ts::attachTerminal` 时仍 true，但该模块 SDK 构造器与 Core 构造器不同。`new ToolError` 后原生身份变 false；内层 Permission.BlockedError 仍存在。后续 secret-mask 保留的是已经被换掉的外层原型；Core 的 `toSessionError` 无法用 instanceof 识别外层，未递归解包权限原因，落库为 unknown，自动化因而记 ok。这是 display 的第二处包装边界，非 Permission.BlockedError 字段缺失或 Session 判定规则错误。
+
+修正仅在 display 的 attachTerminal/attachWriteDenied/attachNetFailure/attachUnattendedDenial 四处用输入错误自身的构造器重建，保留 cause、消息及既有 metadata 语义。临时修正探针中 Core AFTER nativeTool=true，Session 递归进入原生 Permission.BlockedError。SecretMask 的消息遮盖仍走原路径，现有 permission feedback 遮盖断言通过；不改 Core、自动化或冻结接口。
+
+- 红例提交 `97a1fcf6b4`：原 display.test.ts 新增一个四种包装的 fast 表例（实际引擎 ToolFailure 子类）；指定 AC-04 scenario 行增加真实落库 `permission.rejected` 断言，宿主条数不变。`scripts/gate-files.tsv` 仅同步 display 7→8。前者 `0 PASS / 1 FAIL`，后者经 slot `0 PASS / 1 FAIL`，实际 unknown。依赖均由已有 literal import/helper 跟踪，不加全局 setup/声明；真实引擎行仍属 scenario，不扩大 PR 层。
+- 夹具补齐提交 `39a9f070cf`：修复后单元例走到 network 分支时，显式 undefined 触发默认 bootstrap，造成 7 PASS / 1 FAIL（unpublished）。补齐已有参数的显式无代理输入 `""`，没有改断言；同一修正夹具在未修复临时 HEAD 再跑仍 `0 PASS / 1 FAIL`（display-fixture-red.log）。随后才提交生产修正，不把夹具装载错误计为行为反证。
+
+### 本轮最终相关检查
+
+| cwd / 命令 | exit / 结果 |
+| --- | --- |
+| ext：`bun test --max-concurrency 2 src/policy/display.test.ts` | 0 / 8 PASS，四处均保留实际构造器与 cause |
+| ext：`bun test --max-concurrency 2 src/policy/unattended.test.ts src/policy/register-policy.test.ts src/plugin-host.test.ts src/secret-mask.test.ts` | 0 / 164 PASS；一次 wider-related，覆盖 display 消费者、策略与 masking 链 |
+| ui-mac：上列 AC-04 单行 slot 命令 | 0 / 1 PASS，三个子场景 / 18 expect |
+| ext、ui-mac：各自 `bun typecheck` | 均 0 |
+| ext：`bun run build` | 0，扩展 bundle 成功；无 app/Electron 启动 |
+| 根：`./node_modules/.bin/oxlint packages/ext/src/policy/display.ts packages/ext/src/policy/display.test.ts packages/ui-mac/src/main/unattended-run.engine.cases.ts` | 0 / 0 warnings / 0 errors |
+| 根：`affected-tests --list` | 2 / 缺失 `<worktree>/.gate-tests`，本基线无 scope line；未改门或声明 |
+
+修复后共 **173 个不同用例 PASS**，不把 base/bisect/诊断重复执行计入。命令、完整输出、bisect log 与仅身份布尔值的探针材料保留于 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r10-evidence-gtjvqs62`；主要绿/红检查另见 `/tmp/secrets-r10-{engine,display}-{red,green}.log` 与 `/tmp/secrets-r10-related.log`。诊断时一次 cwd 为根的调用未匹配到测试（exit 1 / 0 tests），纠正 cwd 后才采纳行结果，不计为回归或有效 bisect 步。
+
+偏离：实际丢失边界是 display，因此新增授权内的 display.ts/display.test.ts 为修复文件，非继续猜测修改 secret-mask；原 AC-04 行只增强断言；registry 仅同步条数；无新依赖/公开导出/产品选项。最终 `git diff --check` 及本次 plan.md 文档检查通过。遗留去向：发现 5 已由本轮修复；既有 selector 输入缺失交编排器；发现 3 的已接受跳过不重开。OPTIONAL/ARCH：无新增项。

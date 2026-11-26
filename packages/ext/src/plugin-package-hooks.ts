@@ -17,7 +17,7 @@ import { join } from "node:path"
 import { createHash } from "node:crypto"
 
 type Installed = ReturnType<typeof allInstalledPluginPackages>[number]
-type Contribution = { installed: Installed; text: string; order: number; sessionID: string; lifetime: object }
+type Contribution = { installed: Installed; text: string; order: number; sessionID: string; lifetime: object; block?: boolean }
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value)
 
@@ -28,6 +28,7 @@ export async function registerPackageHooks(
   const processes = createPackageProcesses(context.location)
   const directory = mkdtempSync(join(tmpdir(), "codepuppy-plugin-session-"))
   const created = new Set<string>()
+  const continued = new Set<string>()
   const starts = new Map<string, Promise<void>>()
   const sessionContexts = new Map<string, Contribution[]>()
   const promptContexts = new Map<string, Contribution[]>()
@@ -66,6 +67,7 @@ export async function registerPackageHooks(
     sessionEpoch.delete(sessionID)
     promptEpoch.delete(sessionID)
     for (const [controller, owner] of running) if (owner.sessionID === sessionID) controller.abort()
+    continued.delete(sessionID)
     starts.delete(sessionID)
     created.delete(sessionID)
     sessionContexts.delete(sessionID)
@@ -172,6 +174,8 @@ export async function registerPackageHooks(
       permission_mode:
         session.agent === READONLY_AGENT ? "plan" : session.agent === ASK_AGENT ? "default" : "bypassPermissions",
       hook_event_name: event,
+      stop_hook_active: continued.has(sessionID),
+      last_assistant_message: history.filter(message => message.type === "assistant").at(-1)?.content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n") ?? "",
       ...fields,
     }
     const epoch = promptEpoch.get(sessionID)
@@ -233,7 +237,7 @@ export async function registerPackageHooks(
             if (result.exitCode === 2)
               return {
                 installed: handler.installed,
-                block: event === "UserPromptSubmit",
+                block: ["UserPromptSubmit", "Stop", "SubagentStop"].includes(event),
                 exitCode: 2,
                 order,
                 text: result.stderr,
@@ -241,16 +245,16 @@ export async function registerPackageHooks(
                 lifetime,
               }
             if (result.exitCode !== 0) throw Error("hook exited " + result.exitCode)
-            const output: unknown = result.stdout.trim() ? JSON.parse(result.stdout) : {}
+            const output: unknown = result.stdout.trim() ? /^[\s]*[\[{]/.test(result.stdout) ? JSON.parse(result.stdout) : { systemMessage: result.stdout } : {}
             if (!record(output)) throw Error("hook output must be an object")
             const specific = record(output.hookSpecificOutput) ? output.hookSpecificOutput : undefined
             return {
               installed: handler.installed,
-              block: output.continue === false,
+              block: output.continue === false || ["Stop", "SubagentStop"].includes(event) && output.decision === "block",
               exitCode: 0,
               order,
               text: redact(
-                [specific?.additionalContext, output.systemMessage, output.stopReason]
+                [specific?.additionalContext, output.systemMessage, output.stopReason, ["Stop", "SubagentStop"].includes(event) ? output.reason : undefined]
                   .filter((value) => typeof value === "string")
                   .join("\n"),
               ),
@@ -300,13 +304,14 @@ export async function registerPackageHooks(
     if (sessionEpoch.get(sessionID) !== lifetime) return []
     const contributions = results.filter((result): result is NonNullable<typeof result> => !!result)
     const blocked = contributions.find((result) => result.block)
-    if (blocked)
+    if (blocked && !["Stop", "SubagentStop"].includes(event))
       throw Error("runtime-failed: package hook blocked " + event + (blocked.text ? ": " + blocked.text : ""))
     return contributions
       .filter((result) => result.text)
-      .map((result) => ({ installed: result.installed, text: result.text, order: result.order, sessionID, lifetime }))
+      .map((result) => ({ installed: result.installed, text: result.text, order: result.order, sessionID, lifetime, block: result.block }))
   }
   await context.session.hook("prompt", async (event) => {
+    continued.delete(event.sessionID)
     promptEpoch.set(event.sessionID, (promptEpoch.get(event.sessionID) ?? 0) + 1)
     promptContexts.delete(event.sessionID)
     if (!starts.has(event.sessionID))
@@ -336,6 +341,14 @@ export async function registerPackageHooks(
             body: contribution.text,
           }),
         })
+  })
+  await context.session.hook("experimental.idle", async event => {
+    const session = await context.session.get({ sessionID: event.sessionID })
+    const results = await run(session.parentID ? "SubagentStop" : "Stop", event.sessionID, { background_tasks: event.background, session_crons: [] })
+    const blocking = results.filter(result => result.block)
+    if (!blocking.length) return
+    continued.add(event.sessionID)
+    await context.session.synthetic({ sessionID: event.sessionID, text: blocking.map(result => result.text).join("\n"), resume: true })
   })
   return async () => {
     disposed = true

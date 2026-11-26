@@ -2300,6 +2300,30 @@
           "name": "bundle root membership decodes without enabling its same-named instructions"
         }
       ]
+    },
+    {
+      "id": "plugin-hook-lifecycle",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.4/4.12 S-03: the ext runner consumes actual session lifecycle and existing idle/synthetic primitives. Package command SessionStart/UserPromptSubmit and Stop are active; Stop block/reason continues the same Session via its native idle drain, never a second inference loop. Other lifecycle domains are registered only as their consumers land.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r12",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-package-hooks.ts",
+        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, same-session synthetic and AppProcess; no engine takeover."
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the real ralph-loop Stop hook continues the same task and stops at its completion promise"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package SessionStart hooks run before the first model request and follow bundle activity"
+        }
+      ]
     }
   ]
 }

@@ -1472,12 +1472,37 @@ test("connector content key reuses identical effective npm resolution in another
         runner: "npm-exec",
         launchers: input.launchers,
         requirements: [{ kind: "registry", name: "own", version: "1.2.3" }],
-        options: parsed.options,
+        options: parsed.resolutionOptions,
         configuration: [],
       }),
     )
   }
   expect(keys[0]).toBe(keys[1])
+})
+
+// Integration layer: the real npm Config reads own .npmrc files and CLI precedence.
+test("official npm resolution facts preserve relative release age without a clock in the key", async () => {
+  const input = npmDeclarationFixture()
+  const config = path.join(input.root, ".npmrc")
+  const parse = (args: string[] = []) => Effect.runPromise(
+    Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: [...args, "own@1.2.3"] })).pipe(Effect.provide(hostEnvironmentLayer)),
+  )
+  const key = (options: Record<string, unknown>) => connectorPreparationKey({runner:"npm-exec", launchers:input.launchers, requirements:[{kind:"registry",name:"own",version:"1.2.3"}],options,configuration:[]})
+  writeFileSync(config, "min-release-age=7\nmin-release-age-exclude[]=@own/*\n")
+  const first = await parse()
+  expect(first.resolutionOptions.before).toEqual({kind:"relative-age",days:7})
+  expect(first.resolutionOptions.minReleaseAgeExclude).toEqual(["@own/*"])
+  const second = await parse()
+  expect(key(second.resolutionOptions)).toBe(key(first.resolutionOptions))
+  const absolute = await parse(["--before=2020-01-01T00:00:00.000Z"])
+  expect(absolute.resolutionOptions.before).toEqual({kind:"before",date:"2020-01-01T00:00:00.000Z"})
+  expect(key(absolute.resolutionOptions)).not.toBe(key(first.resolutionOptions))
+  writeFileSync(config, "before=2020-01-01T00:00:00.000Z\nmin-release-age=7\n")
+  const override = await parse(["--min-release-age=14"])
+  expect(override.resolutionOptions.before).toEqual({kind:"relative-age",days:14})
+  expect(key(override.resolutionOptions)).not.toBe(key(first.resolutionOptions))
+  const disabled = await parse(["--min-release-age=0"])
+  expect(disabled.resolutionOptions.before).toBeNull()
 })
 
 // Integration layer: prefix metadata and bin-selector sources are unmodified captures from

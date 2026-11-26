@@ -1,7 +1,7 @@
 ---
 id: DESIGN-child-process-write-fence
 title: 子进程写入围栏技术设计
-summary: 保留既有围栏与 Homebrew 裁决；v4.1 按规格 v6 让 Cargo 原生读取配置与凭据，只放行真实 Cargo Home 的缓存、锁和数据库，安装与配置编辑另循既有规则。
+summary: 保留既有围栏、Homebrew 与 Cargo 裁决；v4.2 将 Go 的 GOPATH/sumdb 缓存迁入应用数据，并固定原生 GOBIN，保持全局安装目标与校验语义。
 kind: tech-design
 status: frozen
 spec: SPEC-child-process-write-fence
@@ -9,7 +9,7 @@ spec_version: 6
 review:
   rounds: 0
   reviewed_sha: ""
-  verdict: "frozen-per-r7; no independent review claimed for v4.1"
+  verdict: "frozen-per-r8; scoped review flagged for Go install-location capture and coupled projection"
 owners: [owner]
 last_reviewed: 2026-11-27
 ---
@@ -424,6 +424,7 @@ type PackageManagerLocationInput = {
   configHome: string
   appData: string       // 主进程取得的 roaming/config 基目录
   localAppData: string  // 主进程取得的 local/cache 基目录
+  goInstallBin: string | null // v4.2：注入前 Go 原生有效安装目录；null 表示未取得
 }
 type PackageManagerLocations = {
   env: Readonly<Record<string, string>> // 只能包含下表列出的固定键
@@ -436,7 +437,7 @@ type PackageManagerLocations = {
 function resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations
 ```
 
-所有输入必填、无任意位置覆盖选项；输入来自主进程已有系统路径权威，必须为绝对路径。`ProcessFenceWriteRule` 复用 `process-fence-profile.ts:313` 的现有形状；literal/subpath 的 value 是绝对路径，regex 的 value 是以已转义绝对根锚定的模式。Homebrew 未进入本冻结函数的 manager 值域，也不产出 env/writable；其余八种工具和 #1760 不等待该值域扩展。`C=<userDataPath>/package-managers`；cache/global 的路径先规划并 canonical 化，父目录由现有 planner 的 `mkdirp` 端口预建（不能靠围栏内 `mkdir` 去建立尚不可写的祖先）。CF/C1 与其真实目标、via/祖先冻结规则照旧优先；碰到保护位置不转成新可写根。main 的纯解析函数只产路径、不读用户配置或秘密、不执行工具。
+所有输入必填、无任意位置覆盖选项；除 goInstallBin 按 v4.2 原生查询取得（可为 null）外，路径输入来自主进程已有系统路径权威，必须为绝对路径。`ProcessFenceWriteRule` 复用 `process-fence-profile.ts:313` 的现有形状；literal/subpath 的 value 是绝对路径，regex 的 value 是以已转义绝对根锚定的模式。Homebrew 未进入本冻结函数的 manager 值域，也不产出 env/writable；其余八种工具和 #1760 不等待该值域扩展。`C=<userDataPath>/package-managers`；cache/global 的路径先规划并 canonical 化，父目录由现有 planner 的 `mkdirp` 端口预建（不能靠围栏内 `mkdir` 去建立尚不可写的祖先）。CF/C1 与其真实目标、via/祖先冻结规则照旧优先；碰到保护位置不转成新可写根。main 的纯解析函数只产路径、不读用户配置或秘密、不执行工具。
 
 | 工具 | 缓存/辅助数据：固定注入的键和值 | 全局安装决定 |
 | --- | --- | --- |
@@ -446,11 +447,11 @@ function resolvePackageManagerLocations(input: PackageManagerLocationInput): Pac
 | npm / npx | `npm_config_cache=C/npm/cache`（包括 `_npx`、logs） | 真实 prefix 的 `lib/node_modules`、`bin`（Windows 为 prefix 下 `node_modules` 和 shim）；不重定向用户全局安装到 C |
 | pip | `PIP_CACHE_DIR=C/pip/cache` | 虚拟环境仍在项目；`--user` 写 Python 实际用户安装目录，缓存与其分开 |
 | uv | `UV_CACHE_DIR=C/uv/cache`；`UV_PYTHON_INSTALL_DIR=C/uv/python` | `uv tool` 的真实用户 tools/bin（下表）；连接器专用安装由 #1760 消费本端口派生的 C/uv，不另放一份 HOME 缓存 |
-| go | 保留 GOPATH 的开发工作区语义（默认 `~/go`）；显式 `GOMODCACHE=C/go/mod`、`GOCACHE=C/go/build`，下载工具链也在 module cache | 默认 GOBIN 为 `~/go/bin`；只放行 bin，不放行整个 GOPATH。显式 GOPATH/GOBIN 如已在项目/批准范围内照常使用，不因缓存修复把该根整体放开 |
+| go | **v4.2 取代旧决定**：`GOPATH=C/go/gopath`、`GOMODCACHE=C/go/mod`、`GOCACHE=C/go/build`；sumdb 的 latest 因而也留在 C。GOPATH/GOBIN 成对注入，见文末 v4.2 | `GOBIN=goInstallBin`，保留重定向前的原生安装目录；默认仍为 `~/go/bin`。只用既有 bin/项目/批准规则判写，不放开原 GOPATH 或其 pkg/sumdb |
 | cargo | **v4.1 / spec v6 取代旧决定**：R1/R2 不再注入 CARGO_HOME，Cargo 原生使用真实 `~/.cargo`；仅放行下文 v4.1 的缓存/锁精确表。project `target` 及配置中的路径不改 | `CARGO_INSTALL_ROOT=~/.cargo`，实际写入只含 `bin`、`.crates.toml`、`.crates2.json`；RUSTUP_HOME 不重定向、不把整棵 `~/.rustup` 加入写集合 |
 | Homebrew | **待 owner 定（B1）**；本次不确定其环境或执行方式 | **待 owner 定（B1）**；不产出 allow 清单，不影响其余行 |
 
-这些值是应用进程树的默认环境，不是命令黑名单；用户明确命令参数或项目配置仍按工具自身优先级解释，最终落盘受同一写集合约束。**已决定的新端口 R2**：shell、PTY、MCP、LSP 的 spawn 环境合成消费 R1 的相同 `env`，在该次 spawn 前只覆盖表内缓存键；不会清空用户 PATH、代理、registry 或凭据，不修改机器上的 rc/npmrc。**残留事实（R1-F6）**：PTY 在 spawn 后以 `-l` 运行用户 rc（`packages/core/src/pty.ts:169`），rc 后续 `export GOMODCACHE=...` 等仍能覆盖默认缓存键；Cargo 不再承诺迁入 C，见 v4.1；R2 不能在 exec 之前约束之后执行的 shell 代码，不宣称这种路径满足“缓存始终在 C”。不改 rc、不拦命令、不要求用户多做一步；真实入口证据分别报告默认路径与 rc 覆盖路径的结果。
+这些值是应用进程树的默认环境，不是命令黑名单；用户明确命令参数或项目配置仍按工具自身优先级解释，最终落盘受同一写集合约束。**已决定的新端口 R2**：shell、PTY、MCP、LSP 的 spawn 环境合成消费 R1 的相同 `env`，在该次 spawn 前只覆盖表内缓存键及 v4.2 为保留安装位置而配套的 GOBIN；不会清空用户 PATH、代理、registry 或凭据，不修改机器上的 rc/npmrc。**残留事实（R1-F6）**：PTY 在 spawn 后以 `-l` 运行用户 rc（`packages/core/src/pty.ts:169`），rc 后续 `export GOMODCACHE=...` 等仍能覆盖默认缓存键；Cargo 不再承诺迁入 C，见 v4.1；R2 不能在 exec 之前约束之后执行的 shell 代码，不宣称这种路径满足“缓存始终在 C”。不改 rc、不拦命令、不要求用户多做一步；真实入口证据分别报告默认路径与 rc 覆盖路径的结果。
 
 **pnpm 通道（R1-F7）**：现行官方配置文档使用 `pnpm_config_*`；本机 pnpm 10.32.1 的实际同名查询忽略该前缀，而读取 `npm_config_*`（P12）。因此三对固定同值键由 R1 同时产生，无版本探测、切换或配置选项。npm 对 pnpm 专用前缀没有该噪声，但 npm 11.20.0 在实际读取配置时会对另三键逐项输出 `Unknown env config`，三条警告明确接受并保留，不称作无噪声；不把“--version 没有警告”当成安装路径的证据。真实入口必须核对缓存落点与这些警告，不通过压 stderr 隐藏。
 
@@ -1034,3 +1035,89 @@ K1 的权限档权威、K2 的单一位置/身份权威均不变；沿 `modules.
 | v4.1 frozen；既有 v4/v5 审查结论只在其原范围继续有效 | 本次 r7 的明确冻结指令；本增量 rounds=0、未运行独立审查，不将 owner 规格批准或本地探针冒充独立审查通过 |
 
 **交接收据：** 依据 SPEC v6 与 r7/owner U-40，Codex（GPT-6，designer）完成 C41-P03–P05 的真实 Cargo 1.100 临时 Seatbelt 正反探针；保留 P01/P02 的失败证据。旧名称扫描 10 pass/0 fail，`git diff --check` 通过；文档契约检查与输入 HEAD 同为 70 error/252 warning，无新增 finding，未修无关基线问题。本增量已冻结，无 owner 待决；产品真实入口、Windows、shim/外部 provider 及生产签名证明留 §6。只提交 design.md，不 merge、实现或发布；文档索引按本次“仅 design.md”范围不修改。
+
+
+# v4.2 增量｜Go sumdb 留在应用数据，安装目标不变
+
+**状态：frozen，按 r8 冻结决定。** 只取代 v4 §4.1 中“保留原 GOPATH，仅重定向 GOMODCACHE/GOCACHE”的决定，并补齐 R1 输入与 R2 投影；v4/v5 的其它裁决、R1 审查处置和 v4.1 Cargo 例外不变。v4.1 原收据为 rounds=0、verdict=`frozen-per-r7; no independent review claimed for v4.1`；当前 frontmatter 属本增量。本次不冒称独立审查通过；原安装目录的原生读取接缝超出单纯固定路径替换，依 r8 标记限定范围审查，见 §10。
+
+## 1. 基线
+
+- 批准输入仍为 [SPEC-child-process-write-fence v6](https://github.com/impharaon/alpha%2Dcode/blob/7966eb280a7ed3c5341dbc98a1c5c690e6c20c5a/docs/specs/child-process-write-fence/spec.md)（`7966eb280a`），本轮用 `git show origin/alpha:docs/specs/child-process-write-fence/spec.md` 核对 BR-07、BR-09、AC-09/11：Go 无 Cargo 的 HOME 缓存例外；二进制安装位置仍按 BR-09。规格不改，无 owner 待决。
+- 新输入是实施方 `dabd56e112` 及后续提交的阻塞证据：其工作树 `packages/ui-mac/node_modules/.cache/package-manager-scenario-vf8vnnjs/r4/summary.json` 中，助手命令和 PTY 均失败；仅在实验臂增加原 `GOPATH/pkg/sumdb` allow 后成功。该实验 allow 不进入产品设计。
+
+## 2. 地面真相与停止边界
+
+仅核实 sumdb 写入归属、二进制目标和两入口的正反臂，得到能否决旧规则的证据即停止；不调查其它工具。G42-P02/P03 的输入是 Go CLI 生成的 module、真实公开 `rsc.io/quote@v1.5.2` 及其传递依赖；没有手写 registry 响应，没有读真实账号或凭据。
+
+| 证据 | 已观察事实与影响 |
+| --- | --- |
+| G42-P01（读，真实 Go 1.27.4 源码） | 工具链 `src/cmd/go/internal/cfg/cfg.go:505,643` 将 SumdbDir 固定为第一个 GOPATH 下 `pkg/sumdb`；`src/cmd/go/internal/modfetch/sumdb.go:229,249-282` 在此读写有签名的 latest，而 `:286-309` 的 lookup/tile 缓存落在 GOMODCACHE。只迁后者不够。没有独立于 GOPATH 的 sumdb 本地目录设置；GOSUMDB 选择服务/信任，不是本地缓存路径 |
+| G42-P02（测，两入口） | `go version go1.27.4 darwin/arm64`；生产 `spawnLocalServer → planProcessFence → Node IPC sidecar → session.shell / PTY`，真实 Seatbelt 与真实 Go。两入口 `go get rsc.io/quote@v1.5.2 && go run . && go install .` 均 0；latest 在 C/go/gopath，lookup/tile 在 C/go/mod；原 HOME/go/pkg 无新增或改动，二进制在原 HOME/go/bin，C/go/gopath/bin 无二进制。命令临时 `GOBIN=<项目>/explicit-bin go install .` 两入口也为 0 |
+| G42-P03（测，消融/校验） | 同一正式 profile 与空缓存，撤 GOPATH 重定向的 Shell、PTY 均退出 1，点名原 HOME/go/pkg/sumdb/.../latest；该位置没有落盘。正臂保留 `GOSUMDB=sum.golang.org`、空 GONOSUMDB/GOPRIVATE；破坏 latest 签名并用全新 module cache 下载 go.sum 未记录的 quote v1.5.1，退出 1，报告 `invalid signature`。不能用已在 go.sum 的版本作为签名负臂 |
+| G42-P04（测，原安装目录） | 用真实 `go env -w` 生成配置，覆盖默认、配置 GOBIN、配置 GOPATH 多目录、进程 GOBIN 覆盖配置、GOENV=off 五种情形。注入前 `go env -json GOBIN GOPATH` 取得原生目标；重定向 GOPATH 并固定该 GOBIN 后，`go list -f '{{.Target}}' .` 与之前逐字相同，`go install .` 均成功。不能只读进程 env 或硬写 HOME/go/bin，否则会覆盖 go env -w 的既有设置 |
+
+G42-P01 工具链来自实施方上述 scenario 根的 `toolchains/go`，未重新下载工具链。[Go 模块校验文档](https://go.dev/ref/mod#authenticating)与[命令环境文档](https://pkg.go.dev/cmd/go#hdr-Environment_variables)补充解释；实际裁决以版本固定的源码和探针为证。G42-P02/P03 首轮通过命令前缀模拟新键，原始 `result.json` 在本工作树忽略的 `packages/ui-mac/node_modules/.cache/go42-proof-oxlt80q9/`。随后 `go42-bootstrap-ipscftwu/` 改为在既有 StartCommand.packageManagerEnvironment 中补 GOPATH/GOBIN，命令不再 export 这两键，确认当前生产投影能让两入口同样成功（24 断言）；仍保留签名负臂。执行命令均为在 packages/ui-mac 下 `bun test <临时根>/probe.test.ts`；首轮 32 断言通过。host 使用现有测试 Electron mock 和 Node fork，无 Electron/应用/窗口启动，只在实验 profile 中加入 BR-09 已定义的真实 bin 规则。
+
+G42-P04 原始 `result.json` 位于系统临时根 `go42-install-input-jdrv4ddf/`；脚本 `/tmp/fence1759-go42-target-probe.py`。探针 HOME 与 GOENV 都隔离，未改用户配置。两入口最终证据的 HOME 刻意放在 W11/W12 通用临时写区域之外；早期临时 HOME 被 W12 盖住、PTY 复用完成标记和签名负臂命中既有 go.sum 的夹具结果均不作为产品结论。
+
+## 4. 接口契约
+
+### 4.1 R1 的 Go 环境与写规则
+
+`C=<userDataPath>/package-managers` 不变。R1 仍为唯一包管理器位置权威；新增必填输入 `goInstallBin: string | null`，是 main 在重定向前读取的原生有效安装目录，不是用户路径覆盖选项。非 null 必须为绝对目录路径，R1 纯函数不执行工具或读取配置。
+
+| 固定键 | R1 值 | 写规则用途 |
+| --- | --- | --- |
+| GOPATH | `C/go/gopath` | `manager: "go", purpose: "cache", rule: {kind: "subpath", value: ...}`，覆盖 pkg/sumdb/latest 及其锁/元数据 |
+| GOMODCACHE | `C/go/mod` | 保留原 cache subpath；module、工具链、lookup/tile 缓存 |
+| GOCACHE | `C/go/build` | 保留原 cache subpath |
+| GOBIN | `goInstallBin` | 配套环境投影，**不是 cache allow**；global-install 固定表及已打开/批准目录判写照旧 |
+
+GOPATH/GOBIN 必须成对生成与消费；不能先改 GOPATH，再从它推导安装目录。没有新增原 HOME/go/pkg/sumdb、原 GOPATH 或用户任意安装目录的 allow；自定义 GOBIN 原本在项目/批准范围内则照常用，不因读取此值而扩大写集合。C 下目录继续由 main 预建、canonical 化并走 R7 初次目标绑定/重指检查与 CF/C1，不把整个 HOME 或整个原 GOPATH 放开。其它 manager 的缓存、Cargo 原生 Home 和 #1760 的 uv/npm 消费契约不变。
+
+**已决定的读取接缝 G42-R1a：** main 在最终缓存环境投影之前，从过滤后的原始命令环境 PATH 解析真实 Go 可执行文件；在 R8 的同一围栏 context 下执行该文件的 `env -json GOBIN GOPATH`，cwd 为 main 已预建的 C/go，不读取项目 go.mod。沿用原 HOME、GOENV 与非根环境；只对此查询设 `GOTOOLCHAIN=local`、`GOTELEMETRY=off`，避免查询触发工具链下载或遥测写入，不把这两键注入用户命令。由 Go 自己处理 go env -w、GOENV=off 及环境优先级，不维护第二份 Go 配置解析器。返回 JSON 的有效 GOBIN 为原安装目录；若工具返回空 GOBIN，按其原始 GOPATH 的第一个目录加 bin（平台路径列表分隔符），而不是用重定向后的 GOPATH。只消费这两个键，不读取/保存 registry token 或整份 Go 配置。
+
+该接缝是**明确 raise**，尚无现成安装目录查询函数；归 main 启动协调层，复用 R8 context/进程取消，不创建未围栏的工具探针。围栏先用 R1 的 `goInstallBin: null` 形成，查询只需原生读配置；取得结果后再生成最终成对环境，策略写根不依赖查询结果，避免循环依赖。Go 不存在或查询非 0/JSON 无法得到绝对目录时，结果为 null，沿用既有启动诊断记录原因，不猜 HOME/bin 以覆盖用户配置；null 时 R1 不产 GOPATH/GOBIN 这对键，GOMODCACHE/GOCACHE 仍产出，其它工具不受阻。后续 Go 命令仍按原入口执行和报告实际错误；不退回未围栏查询、不新增卡片/批准步骤，不声称该失败分支已满足 Go 缓存修复。
+
+### 4.2 R2 必须投影 GOBIN
+
+R2 的环境不是单靠 `purpose: cache` 的路径值反查得出的键集合。Go 的缓存默认值必须包含配套 GOBIN；经 R7 规划后的 GOPATH/GOMODCACHE/GOCACHE 指向 canonical C 下根，GOBIN 保留原生目标路径而非改写为缓存路径。StartCommand.packageManagerEnvironment、sidecar 的同一安装/投影端口和 Shell/PTY/MCP/LSP 合成均消费这份结果，不另算 Go 目录。显式命令前缀 `GOBIN=... go install` 仍按 Go 优先级覆盖 spawn 默认，最终受现有写集合约束。配置快照之后的 rc/命令修改仍有 v4 R1-F6 的覆盖残留；不承诺 shell 执行之后还能强制缓存键或热更新原生安装目标。
+
+## 5. 数据与失败
+
+不复制/迁移/删除旧 Go 缓存，不改 go env 文件或 shell rc。不改 GOPROXY、GOSUMDB、GONOSUMDB、GOPRIVATE 及现有网络策略；不能以关闭校验或放开原 sumdb 目录来让正臂通过。R7/CF/C1 规划拒绝的目标仍按既有失败处理，不放宽保护。写入失败、校验失败、命令取消与输出/退出码沿既有 Shell/PTY 通道；读取接缝失败的行为见 §4.1，不新增用户步骤。
+
+## 6. 架构落点与证明义务
+
+以下 `packages/ui-mac/src/` 坐标以实施方 `dabd56e112` 及 r4 后续代码为准；本分支当前尚无 slice 2 实现，不能将这些观察冒充本分支已具备的能力。
+
+| 所需能力 | 现有 callable / 明确 raise | 权威 |
+| --- | --- | --- |
+| 固定 Go 路径与原安装目标输入 | `main/process-fence-profile.ts:226 resolvePackageManagerLocations`；按 §4.1 增字段及 quartet，是 R1 修订 | R1/main |
+| 读取原安装目标 | **G42-R1a raise**：§4.1 的围栏内 Go 原生查询；R8 context 已冻结，尚无该查询函数。返回绝对 bin 或 null，不返回新写根 | main 启动协调层 |
+| canonical cache 与真实目标绑定 | `main/process-fence-plan.ts:45 planPackageManagerCaches`、`:88 planWritableLocations`；增加 C/go/gopath 候选，沿 R7 真源 | 同一 planner |
+| 配套 GOBIN 进入启动文档 | `main/process-fence-plan.ts:82` 当前 cacheEnv 只按 cachePaths 筛键，**明确修订为包含配套 GOBIN**；`main/server.ts:932` 发送同一 packageManagerEnvironment | R1/R2 |
+| 两入口投影 | `main/sidecar.ts:187 parsePackageManagerEnvironment`、`:233 startEngine` 与 `shared/package-manager-environment.ts` 的 `installPackageManagerEnvironment` / `projectPackageManagerEnvironment`；后者无固定键枚举，复用现有消费者 | R2/main→sidecar→spawn |
+
+K1/K2 不变：档位/审批照旧，固定位置仍只在 R1，消费者不推导安装目录；无需新模块权威、配置开关或所有权拆分。被否决的是单放行原 sumdb（违反 BR-07）、只重定向 GOMODCACHE（G42-P01/P03 失败）、GOPATH 重定向而不配套 GOBIN（改变安装目标），以及硬编码原 HOME/go/bin（G42-P04 配置样本反证）。
+
+实施证明须在**未补丁的最终 R1/R2** 经 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence → session.shell / PTY` 完成空缓存下载、签名校验和安装目标核对；这里的临时 StartCommand 注入证明现有投影可承载新键，尚未证明新输入查询与最终 planner 自动接线。撤 GOPATH 重定向的两入口仍须失败，不能让临时 HOME 被 W11/W12 或其它已批准根覆盖；原 HOME 工具缓存哈希/文件集合不变，bin 与 cache 分开核对。损坏签名必须在 go.sum 未信任的版本和新 module cache 上失败；不能只看 exit 0 或 GOSUMDB 字符串。配置安装目录、显式 GOBIN 和 null/失败查询分支也须经过实际接缝。产品签名 utilityProcess、Windows 和其它进程类别未在本轮实跑，沿原证明边界留证；不扩大本轮本机声明。
+
+## 8. 拆分决定
+
+无新增跨仓/所有权拆分。传播检查 `rg -n 'GOPATH|GOMODCACHE|GOBIN' docs/specs --glob design.md`；旧“保留 GOPATH”有效声明只在本设计，已更新 §4.1 Go 行/R1 输入/R2 配套投影，其余历史证据不改写。#1760 无独立 Go 规则；共享位置权威仍是 R1。
+
+## 9. 回滚
+
+不适用；无迁移或旧版本行为路径。
+
+## 10. 裁决与审查结论（v4.2）
+
+| 裁决 | 依据与范围 |
+| --- | --- |
+| 撤销“保留原 GOPATH”的缓存决定，迁 GOPATH 到 C/go/gopath，模块/构建缓存原规则不变 | G42-P01–P03；修复 BR-07 / AC-09，不采用 HOME sumdb allow，不关闭 checksum |
+| 重定向前读取原生安装目录，成对投影 GOBIN，不据此扩权 | G42-P04；保留 BR-09 / AC-11 的安装目标，明确 G42-R1a 和 cacheEnv 过滤修订 |
+| frozen；独立 review rounds=0、reviewed_sha 为空；限定范围审查标记而非 not-required | 单纯 quartet 符合 R1/R2 模式；但保留 go env -w 目标需要新增围栏内原生查询接缝，超出纯固定路径替换，故按 r8 的“flag otherwise”标记。只审 §4.1 原目录读取/失败分支及 §4.2 配套投影与其直接后果；不重开 v4/v5/v4.1 或规格决定。本地 Go/入口证据不能替代该接缝的独立审查 |
+
+**交接收据：** Codex（GPT-6，designer）完成 G42-P02–P04；两个真实入口、bootstrap map 投影、安装目标与两个消融臂均有本机证据，签名负臂可失败。未声称新 planner/查询已实现、产品签名进程树或 Windows 已通过。旧名称扫描 10 pass/0 fail（2,347 断言），`git diff --check` 通过；文档契约检查与 HEAD 同为 70 error/252 warning，逐 finding 对比无新增。已运行 `affected-tests --list`，当前工作树缺 `.gate-tests`，工具返回缺文件错误、没有 scope 行，未将其记为范围检查通过。没有 owner 待决、规格变化或新增用户步骤；只修改本设计，未 merge、实现或发布。v4/v5 的审查与处置及 v4.1 Cargo 裁决保持原文。

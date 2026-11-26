@@ -31,13 +31,18 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   const directories = new Map<string, { version: string; entries: Dirent[] }>()
   const files = new Map<string, string>()
   const retained = new Map<string, Uint8Array>()
+  const encrypted = new Map<string, Uint8Array[]>()
+  let snapshot: readonly Uint8Array[] = []
+  const publishValues = () => { snapshot = [...retained.values(), ...[...encrypted.values()].flat()] }
   let pending: Promise<void> | undefined
   let requested = 0
   let completed = 0
   let disposed = false
   const remember = (values: readonly Uint8Array[]) => {
     if (disposed) return
+    const previous = retained.size
     for (const value of values) if (value.length) retained.set(Buffer.from(value).toString("base64"), value)
+    if (retained.size !== previous) publishValues()
   }
   const capture = async (file: ProtectedFiles.ProtectedFile, identity: BigIntStats) => {
     const versions =
@@ -56,7 +61,11 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
     if (files.get(key) === version) return
     const values =
       file.format === "sqlite" ? await sqliteValues(file) : credentialValues(file, await readFile(file.path))
-    remember(values)
+    if (file.profile === "encrypted-store") {
+      for (const value of encrypted.get(file.path) ?? []) value.fill(0)
+      encrypted.set(file.path, values)
+      publishValues()
+    } else remember(values)
     files.set(key, version)
   }
   const scan = async () => {
@@ -127,7 +136,7 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   return {
     roots,
     remember,
-    values: () => [...retained.values()],
+    values: () => snapshot,
     refresh: async () => {
       if (disposed) throw new Error("Secret files released")
       const generation = ++requested
@@ -145,6 +154,9 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
       directories.clear()
       files.clear()
       retained.clear()
+      for (const values of encrypted.values()) for (const value of values) value.fill(0)
+      encrypted.clear()
+      snapshot = []
     },
   }
 }

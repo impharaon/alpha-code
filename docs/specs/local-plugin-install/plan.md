@@ -1171,3 +1171,17 @@ ext、ui-mac 包内 `bun typecheck` exit 0（`/tmp/plugin-standard-r13-failure-t
 Host aggregate 保持 **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7**；相对 a9fe51d2ba **无 artifact 成员或清单变化**（`/tmp/plugin-standard-r13-host-artifact.json`）。未改 consumer pin/vendor，原 checkpoint 仍归编排器。
 
 已核 Codex（GPT-6），spec v5 / design v3.1 + 已接受 rulings。本轮返回 **SEAM-CHANGE-NEEDED（S-04 skills 生产点）**，片 3/4 accepted 继承，片 5 只按上文增量通过。后续仍有 S-03 完整 leave/notification/FileChanged/子助手、S-04…S-07、其他 prompt 事件、S-08、monitors 与剩余包运行验收；未开始片 7。23:19 至 23:50 UTC+08:00 约 31 分钟，16 文件、555 additions / 115 deletions（本收口文字前，含 tests/docs）；未达原片 5 规模/工时两倍，本次停止原因是上述冻结接缝而非扩大工时。无新依赖、迁移、公开 DTO 或 engine 接管；必要表外文件仅 setup-order.cases.ts 的原 mock 形状同步。遗留去向：S-04 交编排裁决；其余片 5 fix now 续本车道；host checkpoint 交编排器；docs 基线/三条旧 command-subagent 断言沿原归属。无新增 ARCH / OPTIONAL 或仓外写操作。
+
+### r14｜S-04 原生配置/技能发布边界
+
+核对：IMPLEMENT — r14 / orchestrator Claude Opus 5.5（2026-11-27）接受 skills watcher/rescan 的 S-04 最小增量；spec v5 / design v3.1 及前述 rulings 不变。
+
+偏离记录：**orchestrator ruling 2026-11-27** 将 S-04 同一 `beforeConfigChange` 调用扩至 `core/src/config/plugin/skill.ts` 自身发布链，覆盖 watcher 与 config.updated 重扫；拒绝只保留此前有效内容，签名/DTO 不变。`project-opencode-config-trust` 与 `plugin-hook-config-change` 在实现提交同时登记精确既有 L3 增量；设计 §10 的镜像归编排器。本轮新增私有 `config/codepuppy-plugin-config-change.ts` 是两处调用共用的文件修订选择器，不复制原生 trust/parser，不是第二份配置注册表。原 native 测试的 fixture 设置从跨包 converter import 改为该模块原有 upstream SKILL.md 字节，断言未改；消除新引入的 UI converter typecheck 范围，包格式/实际 dash0 由 ext 原 integration 覆盖。
+
+红先：ba141d926b 的 Location runtime 共享槽用例 0 pass/1 fail；91f898440d 的三个 native config/skill/managed 用例 0 pass/3 fail（未通知/超时）；37df51ee62 的实际 dash0 声明变体 0 pass/1 fail（没有 runtime port）。日志 `/tmp/plugin-standard-r14-{port-red,core-red,config-host-red}.log`。增量口仍使用已有 `./*` workspace 子路径；跨 bundle 同 Symbol 槽、directory/workspace 隔离、旧代 dispose 不撤新代。
+
+S-04 / AC-11/13/15/25：core 在原生变量展开、当前项目信任过滤和 parser 前选择 raw revision；拒绝后其他配置更新/技能 rescan 仍读旧字节，磁盘新内容保留；同一修订维持 occurrenceId。初次加载不伪造 ConfigChange，后续实际变更才调用。托管设置有通知但不受 apply=false 控制。ext 在真实 prompt 建立会话生命周期，通过同一 hook runner 执行 ConfigChange，给实际 source/file_path；同步 block/exit2 返回当前发布决定，不在 reload 内重入新配置。每个活跃 handler/会话/修订复用其结果；关闭会话清理，包停用/切代不再选其贡献，旧拒绝可释放。未接通的 S-05…S-07 端口保留冻结的无贡献默认，不报告 runtime-ready。
+
+完成步骤相关文件：`packages/core` 的 `bun test --max-concurrency 2 test/config/reload.test.ts` **16 pass**；`packages/ext` 同命令 `src/plugin-host.test.ts` **84 pass**；`packages/plugin` 同命令 `test/codepuppy-package-runtime.test.ts` **2 pass**，共 **102 pass / 0 fail**，具名迭代不累加。对应 `/tmp/plugin-standard-r14-{core-complete,config-complete,port-complete}.log`。core/ext/plugin 包内 `bun typecheck` exit 0（core 第二次修正 SkillScan 的 string 路径集合；临时引入的 UI fixture import 去掉后无新类型错误）。native reload 文件属于既有上游测试目录，不在当前 PR selector 的 core roots；ext 真实 runner 和 plugin 槽用例在原 PR integration 文件内、imports 可追踪，没有改 `.gate-tests` 或拓宽门控根。`scripts/gate-files.tsv` 只同步已批准 host 83→84 精确计数。
+
+S-04 五个移除臂全红：config-before-publish（配置/技能两例均红）、skill-before-publish、managed-authority、config-handler、config-revision-once。`python3 /tmp/plugin-standard-r14-removal.py`，每臂 child-only preload 实际命中唯一生产边界，日志与退出记录在 `/tmp/plugin-standard-r14-removal-{summary.txt,results.json}`，磁盘源文件未改。新增行为无需真实 SaaS、无真实凭据/工具链启动。

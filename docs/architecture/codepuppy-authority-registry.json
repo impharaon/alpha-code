@@ -2058,7 +2058,7 @@
       },
       "mechanism": {
         "file": "packages/core/src/config/codepuppy-project-gate.ts",
-        "ladder": "L3 (四个读取点只调用同一项目配置闸门)"
+        "ladder": "L3 (四个读取点只调用同一项目配置闸门); #1776 S-04 (orchestrator ruling 2026-11-27): Config file load and the skill watcher/rescan select a revision before the same native project-trust filters and parsers. Rejection retains prior bytes only within currently eligible sources; managed policy remains authoritative."
       },
       "tests": [
         {
@@ -2358,6 +2358,37 @@
         {
           "file": "packages/ext/src/plugin-host.test.ts",
           "name": "package SessionStart hooks run before the first model request and follow bundle activity"
+        }
+      ]
+    },
+    {
+      "id": "plugin-hook-config-change",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-04 plus orchestrator ruling 2026-11-27: await the same Location runtime before publishing changed settings or skill revisions, including the skill watcher and config.updated rescan. Rejection keeps the previous effective view without rewriting disk; policy_settings cannot be blocked. Rejected revisions reuse one occurrence and active handler result; disabling its package releases the rejection.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r14",
+      "takeovers": [
+        "packages/core/src/config.ts",
+        "packages/core/src/config/plugin/skill.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/config/codepuppy-plugin-config-change.ts",
+        "ladder": "Existing L3 increments only: config.updated is after publication and lacks source/rejection authority. L1/L2 would modify the same owned load and skill refresh lifecycles. Core selects raw revisions before its existing parser/trust authority; ext invokes the existing process runner through the frozen Code Puppy Location slot, with no DTO/signature change."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/config/reload.test.ts",
+          "name": "configuration hooks retain rejected file revisions across unrelated native rescans; skill configuration hooks retain rejected bytes through config rescans then release them; managed configuration changes are observed but package hooks cannot reject policy settings"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "ConfigChange uses active package handlers once per revision and releases their rejection on disable"
+        },
+        {
+          "file": "packages/plugin/test/codepuppy-package-runtime.test.ts",
+          "name": "package runtime handlers share the native Location slot and release only their generation"
         }
       ]
     }

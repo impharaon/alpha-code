@@ -565,9 +565,8 @@ it.live("skill configuration hooks retain rejected bytes through config rescans 
   const project = path.join(tmp.path, "project")
   const file = path.join(project, "opencode.json")
   const skill = path.join(project, ".opencode/skills/plugin-structure/SKILL.md")
-  const { captureStandardFixture } = yield* Effect.promise(() => import("../../../ui-mac/test-fixtures/plugin-helper/fixture"))
-  const capture = yield* Effect.promise(() => captureStandardFixture("claude:plugin-dev"))
-  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("skills/plugin-structure/SKILL.md")))
+  // Native skill input from this module's existing upstream fixture; package source conversion is covered in ext.
+  const source = yield* Effect.promise(() => Bun.file(path.join(import.meta.dir, "fixture/skills/first-source/first/SKILL.md")).text())
   yield* Effect.promise(async () => { await Bun.write(file, JSON.stringify({ shell: "initial" })); await Bun.write(skill, source) })
   yield* Effect.gen(function* () {
     const config = yield* Config.Service

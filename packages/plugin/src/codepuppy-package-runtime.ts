@@ -1,4 +1,5 @@
 // north-star:codepuppy-owned — S-01, same-process reverse port; no engine imports.
+import type { Schema } from "effect"
 import type { ArgumentSyntax } from "./codepuppy-package-syntax"
 
 export type RuntimeLocation = { directory: string; workspaceID?: string }
@@ -41,4 +42,33 @@ export async function bindPackageShellCommand(location: RuntimeLocation, input: 
   const render = renderers.get(key(location))
   if (!render) throw new Error("runtime-failed: package shell binding is unavailable for this Location")
   return render.shell(input)
+}
+
+
+export type RuntimeOccurrence = { sessionID: string; occurrenceId: string }
+export type ConfigSource = "user_settings" | "project_settings" | "local_settings" | "policy_settings" | "skills"
+type Json = Schema.Schema.Type<typeof Schema.Json>
+export type ElicitationRequest = { server: string; message: string; mode: "form" | "url"; requestedSchema?: Json; url?: string; elicitationId?: string }
+export type ElicitationAnswer = { action: "accept" | "decline" | "cancel"; content?: Json }
+export type PackageRuntimeHandlers = {
+  hasElicitationHandlers(server: string): boolean
+  beforeConfigChange(input: { occurrenceId: string; source: ConfigSource; filePath: string }): Promise<{ apply: boolean; reason?: string }>
+  instructionsLoaded(input: RuntimeOccurrence & { filePath: string; memoryType: "User" | "Project" | "Local" | "Managed"; loadReason: "session_start" | "nested_traversal" | "path_glob_match" | "include" | "compact"; globs?: string[]; triggerFilePath?: string; parentFilePath?: string; agentId?: string; parentSessionId?: string }): Promise<void>
+  beforeCompaction(input: RuntimeOccurrence & { trigger: "manual" | "auto"; customInstructions: string | null }): Promise<{ proceed: boolean; reason?: string }>
+  afterCompaction(input: RuntimeOccurrence & { trigger: "manual" | "auto"; summary?: string }): Promise<void>
+  beforeElicitation(input: RuntimeOccurrence & ElicitationRequest): Promise<{ handled: false } | { handled: true; answer: ElicitationAnswer }>
+  afterElicitationResult(input: RuntimeOccurrence & ElicitationRequest & { answer: ElicitationAnswer }): Promise<ElicitationAnswer>
+}
+const runtimeSlot = Symbol.for("codepuppy.package.runtime-handlers.v1")
+const runtimeScope = globalThis as typeof globalThis & { [runtimeSlot]?: Map<string, PackageRuntimeHandlers> }
+const handlers = runtimeScope[runtimeSlot] ??= new Map<string, PackageRuntimeHandlers>()
+
+export function registerPackageRuntime(location: RuntimeLocation, handler: PackageRuntimeHandlers): { dispose(): void } {
+  const id = key(location)
+  handlers.set(id, handler)
+  return { dispose() { if (handlers.get(id) === handler) handlers.delete(id) } }
+}
+
+export function packageRuntime(location: RuntimeLocation): PackageRuntimeHandlers | undefined {
+  return handlers.get(key(location))
 }

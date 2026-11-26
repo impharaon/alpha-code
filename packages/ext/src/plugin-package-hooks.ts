@@ -1,6 +1,7 @@
 import type { PolicyRegistration } from "./policy/index"
 import type { GateCall } from "./policy/gate"
 import type { Plugin } from "@opencode/plugin"
+import { registerPackageRuntime } from "@opencode/plugin/codepuppy-package-runtime"
 import type { HookEvent } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 import { pluginToolRules } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
 import { match } from "../../core/src/util/wildcard"
@@ -35,6 +36,7 @@ type Contribution = {
   stopTurn?: boolean
   output?: Record<string, unknown>
 }
+type HookResult = Contribution & { exitCode: number }
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value)
 
@@ -59,6 +61,7 @@ export async function registerPackageHooks(
   const observed = new Set<string>()
   const promptEpoch = new Map<string, number>()
   const sessionEpoch = new Map<string, object>()
+  const configResults = new Map<string, Map<string, { valid(): boolean; result: Promise<HookResult | undefined> }>>()
   let disposed = false
   const active = (installed: Installed) => {
     if (disposed) return false
@@ -90,6 +93,7 @@ export async function registerPackageHooks(
     instructions.delete(sessionID)
     failures.delete(sessionID)
     sessionEpoch.delete(sessionID)
+    configResults.delete(sessionID)
     promptEpoch.delete(sessionID)
     stopTurns.delete(sessionID)
     for (const [controller, owner] of running) if (owner.sessionID === sessionID) controller.abort()
@@ -106,6 +110,7 @@ export async function registerPackageHooks(
     fields: Record<string, unknown>,
     call?: GateCall,
     invocation?: InstructionScope,
+    occurrenceId?: string,
   ) => {
     const installed = allInstalledPluginPackages(input.root).filter(active)
     const handlers = installed.flatMap((installed) =>
@@ -218,7 +223,7 @@ export async function registerPackageHooks(
     const epoch = promptEpoch.get(sessionID)
     const results = await Promise.all(
       handlers.map(async (handler, order) => {
-        const execute = async () => {
+        const execute = async (): Promise<HookResult | undefined> => {
           const controller = new AbortController()
           let redact = (text: string) => text
           running.set(controller, { valid: handler.valid, sessionID })
@@ -401,7 +406,7 @@ export async function registerPackageHooks(
               return {
                 installed: handler.installed,
                 valid: handler.valid,
-                block: ["UserPromptSubmit", "PreToolUse", "Stop", "SubagentStop"].includes(event),
+                block: ["UserPromptSubmit", "PreToolUse", "Stop", "SubagentStop", "ConfigChange"].includes(event),
                 exitCode: 2,
                 order,
                 text: result.stderr,
@@ -421,7 +426,7 @@ export async function registerPackageHooks(
               valid: handler.valid,
               block:
                 output.continue === false ||
-                (["Stop", "SubagentStop", "PreToolUse"].includes(event) && output.decision === "block") ||
+                (["Stop", "SubagentStop", "PreToolUse", "ConfigChange"].includes(event) && output.decision === "block") ||
                 (event === "PreToolUse" && specific?.permissionDecision === "deny") ||
                 (event === "PermissionRequest" && record(specific?.decision) && specific.decision.behavior === "deny"),
               output,
@@ -433,7 +438,7 @@ export async function registerPackageHooks(
                   output.systemMessage,
                   output.stopReason,
                   event === "PermissionRequest" && record(specific?.decision) ? specific.decision.message : undefined,
-                  ["Stop", "SubagentStop", "PreToolUse"].includes(event)
+                  ["Stop", "SubagentStop", "PreToolUse", "ConfigChange"].includes(event)
                     ? (specific?.permissionDecisionReason ?? output.reason)
                     : undefined,
                 ]
@@ -465,8 +470,19 @@ export async function registerPackageHooks(
             running.delete(controller)
           }
         }
-        if (handler.hook.type !== "command" || (!handler.hook.async && !handler.hook.asyncRewake)) return execute()
-        void execute()
+        const executeRevision = () => {
+          if (event !== "ConfigChange" || !occurrenceId) return execute()
+          const revisions = configResults.get(sessionID) ?? new Map<string, { valid(): boolean; result: Promise<HookResult | undefined> }>()
+          configResults.set(sessionID, revisions)
+          const key = JSON.stringify([occurrenceId, handler.installed.key, handler.installed.pluginRoot, handler.installed.settings, handler.entry.id])
+          const previous = revisions.get(key)
+          if (previous?.valid()) return previous.result
+          const result = execute()
+          revisions.set(key, { valid: handler.valid, result })
+          return result
+        }
+        if (handler.hook.type !== "command" || (!handler.hook.async && !handler.hook.asyncRewake)) return executeRevision()
+        void executeRevision()
           .then(async (result) => {
             if (!result || !result.valid() || (event !== "SessionStart" && promptEpoch.get(sessionID) !== epoch)) return
             if (sessionEpoch.get(sessionID) !== lifetime) return
@@ -489,10 +505,10 @@ export async function registerPackageHooks(
     const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && result.valid())
     const blocked = contributions.find((result) => result.block)
     if (blocked?.stopTurn && event !== "StopFailure") stopTurns.set(sessionID, blocked)
-    if (blocked && !["Stop", "SubagentStop", "PostToolUseFailure", "StopFailure"].includes(event))
+    if (blocked && !["Stop", "SubagentStop", "PostToolUseFailure", "StopFailure", "ConfigChange"].includes(event))
       throw Error("runtime-failed: package hook blocked " + event + (blocked.text ? ": " + blocked.text : ""))
     return contributions
-      .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest")
+      .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest" || event === "ConfigChange")
       .map((result) => ({
         installed: result.installed,
         valid: result.valid,
@@ -504,6 +520,21 @@ export async function registerPackageHooks(
         output: "output" in result ? result.output : undefined,
       }))
   }
+  const runtime = registerPackageRuntime(context.location, {
+    hasElicitationHandlers: () => false,
+    async beforeConfigChange(change) {
+      const results = (await Promise.all([...sessionEpoch.keys()].map(sessionID => run("ConfigChange", sessionID, {
+        source: change.source, file_path: change.filePath,
+      }, undefined, undefined, change.occurrenceId)))).flat()
+      const blocked = results.find(result => result.block && result.valid())
+      return { apply: change.source === "policy_settings" || !blocked, ...(blocked?.text ? { reason: blocked.text } : {}) }
+    },
+    instructionsLoaded: async () => {},
+    beforeCompaction: async () => ({ proceed: true }),
+    afterCompaction: async () => {},
+    beforeElicitation: async () => ({ handled: false }),
+    afterElicitationResult: async input => input.answer,
+  })
   const subscription = (async () => {
     for await (const event of context.event.subscribe({
       types: ["session.created", "session.archived", "session.deleted", "session.execution.failed"],
@@ -581,6 +612,7 @@ export async function registerPackageHooks(
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })
   await context.session.hook("prompt", async (event) => {
+    if (!sessionEpoch.has(event.sessionID)) sessionEpoch.set(event.sessionID, {})
     continued.delete(event.sessionID)
     stopTurns.delete(event.sessionID)
     promptEpoch.set(event.sessionID, (promptEpoch.get(event.sessionID) ?? 0) + 1)
@@ -710,6 +742,8 @@ export async function registerPackageHooks(
     },
     dispose: async () => {
       disposed = true
+      runtime.dispose()
+      configResults.clear()
       releasePermissionRequest()
       events.abort()
       unwatchFile(membership, revoke)

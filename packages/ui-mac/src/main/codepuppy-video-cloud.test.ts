@@ -409,3 +409,15 @@ test("video sensitivity follows the verified admitted reference even after a non
  for(let i=0;!h.deps.upload.videoPreviews(1).length&&i<100;i++)await Bun.sleep(1)
  try{expect(h.deps.upload.videoPreviews(1)).toHaveLength(1);expect(h.requests).toHaveLength(0)}finally{await service.cancel(started.requestId,call)}
 })
+
+test("a start receipt lost before the first query never subscribes or prevents another caller cancelling",async()=>{
+ const h=await harness(),ready=Promise.withResolvers<CloudJobStatus>(),normal=h.deps.status
+ h.deps.status=async()=>ready.promise
+ const service=createMainVideoService(h.deps),request=await h.prepared()
+ await service.start({...call,callID:"lost-receipt"},request,h.referencePath)
+ const active=await service.start(call,request,h.referencePath)
+ await state(service,active.requestId,call,s=>s.progress?.phase === "understanding")
+ await service.cancel(active.requestId,call)
+ expect(h.cancelled).toContain("job_video_1")
+ ready.resolve(await normal("job_video_1") as CloudJobStatus)
+})

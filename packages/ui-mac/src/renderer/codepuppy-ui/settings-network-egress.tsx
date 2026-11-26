@@ -48,6 +48,15 @@ export function SettingsNetworkEgress(props: { api?: NetworkEgressApi }) {
       <div><strong>{entry.site.value}</strong><p>{t(entry.site.kind === "domain" ? "codepuppy.network.scope" : "codepuppy.network.hostScope", { site: entry.site.value })}</p><time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time></div>
       <Button size="sm" loading={busy() === JSON.stringify(entry.site)} disabled={!!busy()} onClick={() => void revoke(entry.site)}>{t("codepuppy.network.revoke")}</Button>
     </div>}</For>
-
+    <h3>{t("codepuppy.network.passesTitle")}</h3>
+    <p>{t("codepuppy.network.passesScope")}</p>
+    <Show when={!current().passes.length}><p>{t("codepuppy.network.noPasses")}</p></Show>
+    <For each={current().passes}>{(entry) => <div class="codepuppy-settings-row" data-network-egress-pass={`${entry.destination.host}:${entry.destination.port}`}>
+      <div><strong>{entry.destination.host}:{entry.destination.port}</strong>
+        <p>{t("codepuppy.network.passCount", { count: entry.count })}</p>
+        <p>{t("codepuppy.network.firstPass")} <time dateTime={entry.firstAt}>{new Date(entry.firstAt).toLocaleString()}</time></p>
+        <p>{t("codepuppy.network.lastPass")} <time dateTime={entry.lastAt}>{new Date(entry.lastAt).toLocaleString()}</time></p>
+      </div>
+    </div>}</For>
   </section>}</Show>
 }

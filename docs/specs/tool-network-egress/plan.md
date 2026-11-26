@@ -269,3 +269,17 @@ U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts src/mai
 
 
 N7 循环边界补正：先以 `cbfedbb99b` 仅提交扩大 IPv6/IPv4-mapped 别名的回归输入，U `bun test --max-concurrency 2 src/main/network-egress-proxy.test.ts -t '系统代理指回'` 为 0 pass / 1 fail（展开式 IPv6 错归 ERR_INVALID_URL，`/tmp/egress-s2-loop-red.log`）。随后把 WHATWG/mapped 归一提到 grants 的内部导出 `canonicalEgressHost`，公网判断与代理循环共用；卡片准入未改。代理自身端口的名称还检查本次 lookup 的 loopback 地址，避免名称别名回指自身。原回归测试未改，grants/proxy 两文件 32 pass / 0 fail（`/tmp/egress-s2-loop-green.log`）；补齐名称解析后代理文件再核对为 26 pass / 0 fail（`/tmp/egress-s2-loop-proxy-final.log`），typecheck 与提交前旧名扫描通过。
+
+
+步骤 3 的设置部分：U `bun test --max-concurrency 2 src/renderer/codepuppy-ui/network-egress-card.test.ts` 为 5 pass / 0 fail（`/tmp/egress-s2-ui-step3.log`）；新增行只展示政策放行，不附撤销/保存动作。中英文各补六键，locale 单独进程 10 pass（`/tmp/egress-s2-locale.log`），typecheck 通过。已有 scenario 文件增加三条具名用例、宿主内部预期由 6 同步到 9；旧 45 秒臂不重跑。
+
+一次较宽轻量相关集：U activity、IPC、derived、registry、disclosure、truth、write-sites、gate-file-registry、shared wire、renderer feed、settings-tools 共 11 文件，93 pass / 0 fail（`/tmp/egress-s2-related-ui.log`）；E network-egress/context-injection 两文件，49 pass / 0 fail（`/tmp/egress-s2-related-ext.log`）。命令均为各包 `bun test --max-concurrency 2 <上述具名路径>`。全局档位/事件声明的消费者由 rg 枚举；尚需的 relay、endpoint-route、official-connectors 具名运行与真引擎移除对照一并等共享 slot。
+
+验证阻塞（未算通过）：`gate slot -- bun test --max-concurrency 2 src/main/network-egress.engine.cases.ts -t '通放与混合档|通放拒绝非公网|系统路由注入'` 尚未获得 slot，没有启动用例。`gate queue` 显示多项 ship 优先于本背景 slot，预计等待约三小时，已超过本片 90 分钟预计的两倍。当前只有轻量和协议入口证据，不能把三条真引擎/真围栏或三个移除臂记为已验证。已在对话请求本轮具名用例按并发 2 直接执行的规则例外，未获答复前不绕开队列。临时 detached 副本 `/tmp/egress-s2-controls-20261126` 已独立 frozen-lockfile 安装并准备相同输入，未运行对照。
+
+选测观察（交编排器）：`affected-tests --list` 退出 2，原样输出 `No such file or directory: '<本 worktree>/.gate-tests'`，因此没有 scope line。本基线没有声明文件；gate 属冻结范围，本轮没有添加或改造选择器。新增测试的层与静态 import 依赖见步骤 2，不能将本条失败表述为 affected 选择已通过。
+
+
+本轮返回前已取消自身尚未启动的 slot 等待（退出 130，未执行测试），并用 `git worktree remove /tmp/egress-s2-controls-20261126` 移除隔离副本；没有取消其它作业。具名真引擎、对照和 relay/endpoint/official 仍待执行，不能宣称 AC-08 的 scenario 证据或 AC-13 日常真引擎代理证据已完成。后续获准直接运行或取得 slot 后，从步骤 3 的上述三条开始，三个移除臂分别只跑对应一条。AC-13 实机系统代理证明仍由编排器另安排。
+
+最终文档检查仍为 69 errors / 253 warnings，findings 与本轮基线完全一致（`/tmp/egress-s2-docs-final.json`）；链接 6 条与 `git diff --check` 通过。未启动应用/Electron、未改系统代理、未跑全套/bin/check/gate，core.hooksPath 保持 `.githooks`。

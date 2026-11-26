@@ -11,7 +11,7 @@ const UI_MAC = join(import.meta.dir, "../..")
 type Host = { title: string; cases: string; pass: number; args?: string[]; cwd?: string; timeout: number }
 
 const HOSTS: Host[] = [
-  { title: "对话联网批准：真引擎、真围栏、站点记忆、即时撤销与模型说明", cases: "src/main/network-egress.engine.cases.ts", pass: process.platform === "darwin" ? 6 : 0, args: ["--max-concurrency", "2", "--timeout", "90000"], timeout: 240_000 },
+  { title: "对话联网批准：真引擎、真围栏、站点记忆、即时撤销与模型说明", cases: "src/main/network-egress.engine.cases.ts", pass: process.platform === "darwin" ? 9 : 0, args: ["--max-concurrency", "2", "--timeout", "90000"], timeout: 240_000 },
   { title: "三档 × R1–R12、三条委派入口与审批请求的整条路径与助手发起的安装(composer-tier-matrix.engine.cases.ts,30 条)", cases: "src/main/composer-tier-matrix.engine.cases.ts", pass: 30, args: ["--timeout", "90000"], timeout: 300_000 },
   { title: "package effect isolation uses real engines and the config debounce window", cases: "src/main/package-effect.engine.cases.ts", pass: 5, args: ["--max-concurrency", "2", "--timeout", "180000"], timeout: 480_000 },
   { title: "I-12 / #1713 未允许与允许两臂:opencode.json 的 mcp / formatter / shell / commands / 模型级 package / 插件指令 / md 文件头的执行时点(project-config-commands.engine.cases.ts,28 条)", cases: "src/main/project-config-commands.engine.cases.ts", pass: 28, args: ["--timeout", "120000"], timeout: 600_000 },

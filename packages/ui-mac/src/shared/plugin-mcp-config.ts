@@ -9,7 +9,10 @@ export class PluginMcpBindingError extends Error {
 
 /** Normalized package entries retain their source argv through the existing v1 projection. */
 export function pluginMcpConfig(entry: Extract<Entry, { kind: "mcp" }>, bindings?: PackageTextBindings): McpConfigLeafV1 {
-  const render = (text: Text) => renderPluginText(text, bindings ?? { pluginRoot: "${CLAUDE_PLUGIN_ROOT}", projectDir: "${CLAUDE_PROJECT_DIR}" })
+  return renderMcpConfig(entry, text => renderPluginText(text, bindings ?? { pluginRoot: "${CLAUDE_PLUGIN_ROOT}", projectDir: "${CLAUDE_PROJECT_DIR}" }), bindings)
+}
+
+function renderMcpConfig(entry: Extract<Entry, { kind: "mcp" }>, render: (text: Text) => string, bindings?: PackageTextBindings): McpConfigLeafV1 {
   const timing = { ...(entry.timeoutMs === undefined ? {} : { timeout: entry.timeoutMs }), ...(entry.timeouts ? { timeouts: entry.timeouts } : {}) }
   if (entry.transport !== "stdio") return {
     type: "remote", transport: entry.transport, url: render(entry.url), headers: Object.fromEntries(Object.entries(entry.headers).map(([key, value]) => [key, render(value)])), ...timing,
@@ -94,7 +97,10 @@ export function pluginProcessConfig(input: PluginProcessSource) {
     for (const part of text) {
       if (typeof part === "string") continue
       if ("environment" in part && bindings.resolveEnvironment(part.environment.name) === undefined) {
-        if (part.environment.default) render(part.environment.default)
+        const fallback = part.environment.default
+        if (fallback?.length === 1 && typeof fallback[0] !== "string" && "secret" in fallback[0]! && bindings.resolveSecret(fallback[0].secret) === undefined)
+          throw new PluginMcpBindingError("dependency-missing", part.environment.name)
+        if (fallback) render(fallback)
         else throw new PluginMcpBindingError("dependency-missing", part.environment.name)
       }
       if ("option" in part && bindings.resolveOption(part.option) === undefined) throw new PluginMcpBindingError("missing-config", part.option)
@@ -108,7 +114,7 @@ export function pluginProcessConfig(input: PluginProcessSource) {
 
 export function bindPluginMcp(input: PluginProcessSource & { entry: Extract<Entry, { kind: "mcp" }> }): McpConfigLeafV1 {
   const process = pluginProcessConfig(input)
-  const config = pluginMcpConfig(input.entry, process.bindings)
+  const config = renderMcpConfig(input.entry, process.render, process.bindings)
   if (config.type !== "local") return config
   const version = input.settings.mcpVersions[input.entry.id]
   if (input.entry.transport === "stdio" && input.entry.floatingVersion && version !== undefined && version.length > 0) {

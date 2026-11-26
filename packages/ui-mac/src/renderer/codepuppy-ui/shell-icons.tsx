@@ -6,6 +6,12 @@
 import type { JSX } from "solid-js"
 
 const PATHS = {
+  layers: () => (
+    <>
+      <path d="m10.5 6.5.6-2.2a2.5 2.5 0 0 1 3.1-1.8l5.3 1.4a2.5 2.5 0 0 1 1.8 3.1l-2.1 7.8a2.5 2.5 0 0 1-2.8 1.8" />
+      <rect x="3.5" y="7" width="13" height="14" rx="2.5" transform="rotate(-5 10 14)" />
+    </>
+  ),
   pen: () => (
     <>
       <path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" />
@@ -18,17 +24,17 @@ const PATHS = {
       <path d="m20 20-4.2-4.2" />
     </>
   ),
-  sliders: () => (
+  plug: () => (
     <>
-      <path d="M4 7h3m4 0h9M4 17h9m4 0h3" />
-      <circle cx="9" cy="7" r="2" />
-      <circle cx="15" cy="17" r="2" />
+      <path d="M19 17a8.5 8.5 0 1 0-7 3.5" />
+      <path d="m9 8 7 7-2 2a4.95 4.95 0 0 1-7-7Z" />
+      <path d="m10 9 2.5-2.5M14 13l2.5-2.5M8 16l-1.5 1.5a3 3 0 0 0 .8 4.8c3.8 1.8 8.3 1.1 11.2-1.8" />
     </>
   ),
   clock: () => (
     <>
-      <path d="M20 8a8.5 8.5 0 1 0 .5 7M20 3v5h-5" />
-      <path d="M12 7.5V12l3 2" />
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 6.5V12l-3 2.5" />
     </>
   ),
   "panel-left": () => (

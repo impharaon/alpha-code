@@ -128,10 +128,10 @@ export function ShellRail(props: {
 }) {
   return (
     <nav class="codepuppy-rail codepuppy-sidebar-nav" aria-label={t("codepuppy.sidebar.projects")} data-codepuppy-rail-host>
-      <RailButton icon="pen" label={t("codepuppy.sidebar.newChat")} action="new-chat" onClick={props.onNewChat} />
+      <RailButton icon="layers" label={t("codepuppy.sidebar.newChat")} action="new-chat" onClick={props.onNewChat} />
       <RailButton icon="search" label={t("codepuppy.sidebar.searchChats")} action="search" onClick={props.onSearch} />
       <RailButton
-        icon="sliders"
+        icon="plug"
         label={t("codepuppy.sidebar.plugins")}
         action="hub"
         onClick={props.onHub}

@@ -8,7 +8,7 @@ import {
   writeDocumentRecord,
   type DocumentCheckIdentity,
 } from "../../ui-mac/src/shared/document-check-records"
-import { SessionMessage } from "../../schema/src/session-message"
+import { SessionMessage } from "@opencode/schema/session-message"
 import {
   DOCUMENT_WORK_DIR,
   documentRecord,

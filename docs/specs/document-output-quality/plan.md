@@ -733,11 +733,11 @@ bun.lock 随 origin 改变，`bun install --frozen-lockfile` exit 0（2 packages
 
 已复现：fixture-identity 4 PASS/1 FAIL（core/util tree 身份已改变，需真实重采，分类 c）；engine-cases 25 PASS/1 FAIL（无人值守子文件两种拒绝错误未投影，分类 a，正在核对）；ext-security 7 PASS/1 FAIL（document Chromium 窗口漏 webviewTag:false，分类 a，窗口清单新增点属 c）。OfficeExcel 15 PASS 与 schema snapshot 2 PASS 单独均绿，而 full gate 的 Python import 缺 text_budget.py / circular import，加上 installOfficeExcel 每次先删安装目录，表明必须修正共享环境的并行安装（分类 a），不能称 flaky。old-name 扫描 9 PASS/1 FAIL，唯一 stale 行为旧 office-docs 的旧工作目录词元计数（分类 c）。
 
-静态入口复现：`bash -c 'source scripts/docs-gates.sh; docs_gate_nul'` exit 1，实际 Office/解释器二进制 fixture 未在既有 binary 机制登记（分类 c）；`bash scripts/assert-seed-assets.sh` exit 1，默认制作入口重写后漏掉原社区 Excel 明确退役事实（分类 b，片 7 / §4.1/4.8 并未复活社区连接器，将恢复该事实而不放宽 guard）。后续修正均保留原守卫规则、阈值和地板。
+静态入口复现：`bash -c 'source scripts/docs-gates.sh; docs_gate_nul'` exit 1，实际 Office/解释器二进制 fixture 未在既有 binary 机制登记（分类 c）；`bash scripts/assert-seed-assets.sh` exit 1，默认制作入口重写后漏掉原社区 Excel 明确退役事实（分类 a，片 7 / §4.1/4.8 并未复活社区连接器，将恢复该事实而不放宽 guard）。后续修正均保留原守卫规则、阈值和地板。
 
 r14 NUL green（c）：沿原 BINARY_SUFFIXES 登记实际 docx/pptx/xlsx/pdf 格式，沿 EXCLUDED_PREFIXES 仅登记两份真实 Mach-O/PE 头文件（非整个目录或源文本）。同一 docs_gate_nul 入口 exit 0：5969 个受检文件零 NUL，1333 个已登记二进制、4 个非文本条目及 11260 个原样上游条目跳过；4000 地板未变。首轮漏列 control.pdf/头文件名字不准确已逐项核对后补齐，不把失败轮计为通过。
 
-r14 seed green（b）：片 7 默认技能恢复原独立社区 Excel connector 的明确退役/不可安装事实，保留新首方 Excel 与脚本制作能力；assert-seed-assets 原入口 exit 0，未修改 seed guard 的条件。
+r14 seed green（a）：片 7 默认技能恢复原独立社区 Excel connector 的明确退役/不可安装事实，保留新首方 Excel 与脚本制作能力；assert-seed-assets 原入口 exit 0，未修改 seed guard 的条件。
 
 r14 Python race red（a）：在既有 office-excel 文件加实际模块 inode 回归；相同已钉住 snapshot 再 install 后 `excel_mcp/text_budget.py` inode 118330632→118330811，1 FAIL（office-reinstall-red.log），证明重复准备会删除正在被并行 reader 导入的模块。下一实现沿已有 .office-excel-stamp 跳过相同已验证 snapshot，并将戳记放到 import 成功后；不新增下载/缓存路径或安装协议。
 
@@ -753,7 +753,7 @@ r14 HTML 预览消费者（b）：red-10.log 的旧 details.url 字面锚已由 
 
 r14 websearch 消费者（b）：red-8.log 的同步 transform 字面锚与 §4.10/R13 读取 Python projection 所需的 async transform 不符，只更新此锚；云定义安装先于项目合并/首个 return 的顺序断言全保留。
 
-r14 attachment 临时模块（b）：red-11.log 为拷平 office-advisories 后找不到新增 util/document 依赖。测试只想变更 PROJECT_HIDDEN_DIR，故复制的真实 attachment 模块仍 import 实际 advisories owner，只有隐藏目录常量保留本地替换。原路径正反断言不改，避免复制第二套运行时依赖（§4.10/R13 的唯一宿主环境校验）。
+r14 attachment 临时模块（c）：red-11.log 为拷平 office-advisories 后找不到新增 util/document 依赖。测试只想变更 PROJECT_HIDDEN_DIR，故复制的真实 attachment 模块仍 import 实际 advisories owner，只有隐藏目录常量保留本地替换。原路径正反断言不改，避免复制第二套运行时依赖（§4.10/R13 的唯一宿主环境校验）。
 
 r14 旧名登记（c）：red-5.log 唯一 stale 行为 office-docs 的旧工作目录词元，片 7 重写根路由后已无此命中，删除该精确失效行；其余 0/new-hit、计数、类别规则均不改。
 
@@ -762,3 +762,5 @@ r14 围栏消费者（b）：red-6.log 四项失败均来自现 server 已移除
 r14 阶段核对：Chromium webview 安全 target 1 PASS；四个 Office/uv 缓存围栏 target **4 PASS / 0 FAIL**（fence-target.log，51.55s），新制作用固定原生脚本在原生产围栏内执行、四 reader 读回且无出网；write-sites 原 --check 为 62 条登记/65 调用点一致。旧名说明也不把已移除的旧工作目录词元重新写进当前 plan；附件临时模块清去不再使用的 import。
 
 r14 无人值守根因（a+c）：受控样本证明 Tool.Error 在策略源端构造时有完整 codepuppyUnattendedDenial、与 canonical Tool.Error 同类，但发布端失去元数据；禁用文档标题包装、移除文档工具条目、恢复两个 MCP seam 或恢复 plugin 主文件均未改善，不把这些误作修正。读到唯一相关加载机制：packages/plugin/src/source.bun.ts:14-18 会删除相对依赖图中每个 require.cache，:39-57 对 bare 包名不遍历；document-render 的相对 SessionMessage runtime import 新引入 schema/session-message→tool/permission 的宿主类闭包，重新求值破坏宿主类身份。修正只将这个既有 schema 消费改为包边界引用，并在 ext manifest/lock 补登记早已通过相对路径消费的 schema workspace 依赖；这是已有仓内消费边的依赖登记，不引入第三方包、替代 ID 算法或新引擎 API。ID 仍由冻结 SessionMessage.ID.create() 一次生成。原 engine-cases/unattended 拒绝断言不改。
+
+r14 schema 边界实现：document-render 改用 `@opencode/schema/session-message`，packages/ext/package.json 与 bun.lock 只补同一个既有 workspace 消费边。HUSKY=0 bun install 449ms，2173 installs checked / no changes，无新第三方解析；hooksPath 已恢复 .githooks。ext 自包含 bundle 构建和 ext/ui-mac typecheck 均 exit 0。运行期两条原拒绝 target 正在 shared slot 排队，尚不计为通过；不会以文案匹配或削弱拒绝来补投影。首次 bootstrap 原检查在 d4ad79357f 已全绿（含幂等重跑后真实围栏、失败隔离与三个未验证分支），新增 workspace 声明属于安装输入变更，最终 HEAD 将再核一次该命名入口，非相同输入重复。

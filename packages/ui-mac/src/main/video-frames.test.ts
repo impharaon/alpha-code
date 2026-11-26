@@ -17,3 +17,9 @@ test("frame selection preserves request order and actual presentation times, inc
     { requestedMs: null, actualMs: 80 },
   ])
 })
+
+test("OCR helper bounds numerical edge overshoot inside the image",async()=>{
+ const {ocrBox}=await import("../../resources/video-mcp/ocr")
+ expect(ocrBox(-0.01,-0.02,100.03,100.04,100,100)).toEqual([0,0,1,1])
+ expect(ocrBox(25,20,75,80,100,100)).toEqual([0.25,0.2,0.5,0.6])
+})

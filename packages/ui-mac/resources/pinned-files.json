@@ -490,6 +490,26 @@
       "bytes": 22408571,
       "sha256": "5b42585b521c1e4dd708ec01b2c1f02812c3f254d8cc658ff9989bd314aebffe",
       "provenanceUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-ffmpeg-9.1-openh264-2.7.0-win32-x64-source.tar.gz"
+    },
+    {
+      "id": "python/darwin-arm64/3.12.16-20261124",
+      "family": "python",
+      "target": "darwin-arm64",
+      "version": "3.12.16",
+      "originUrl": "https://github.com/astral-sh/python-build-standalone/releases/download/20261124/cpython-3.12.16%2B20261124-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "sha256": "9d6d9d0d85feda3f9cb4eb3e048f0fed21ed280feda087927eaa4fbc7124826f",
+      "bytes": 25270084,
+      "provenanceUrl": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261124"
+    },
+    {
+      "id": "python/win32-x64/3.12.16-20261124",
+      "family": "python",
+      "target": "win32-x64",
+      "version": "3.12.16",
+      "originUrl": "https://github.com/astral-sh/python-build-standalone/releases/download/20261124/cpython-3.12.16%2B20261124-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "96694b50dcfde13d56e40346ddaa552a9cd650290e9b933cecf83c1d82226960",
+      "bytes": 22388338,
+      "provenanceUrl": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261124"
     }
   ]
 }

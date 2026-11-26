@@ -2,7 +2,9 @@
 import { $ } from "bun"
 
 import { resolveChannel } from "./utils"
+import { readPinnedFiles } from "../src/main/pinned-files"
 
+readPinnedFiles()
 const channel = resolveChannel()
 await $`bun ./scripts/build-video-runtime.ts`
 await $`bun ./scripts/build-video-mcp.ts`

@@ -21,6 +21,7 @@ import { runNamingMigrationDbStep } from "./naming-migration-db"
 import { createMigrationFs, type MigrationFs, type WriteAllowList } from "./naming-migration-fs"
 import { openJournal, readJournalFile, type JournalJson } from "./naming-migration-journal"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
+import { LEGACY_USER_DATA } from "./naming-migration-map"
 
 const SQLITE = "/usr/bin/sqlite3"
 const HAS_SQLITE = existsSync(SQLITE)
@@ -316,7 +317,7 @@ describe("AC1 / AC5 —— 首次启动把旧名持久化项改到新名", () =>
     const prod = join(f.dstBase, "env", "prod")
 
     // userData:改名项在新名下、旧名不在;加密文件字节不变
-    for (const [item, name] of Object.entries(USER_DATA_LAYOUT).filter(([item]) => item !== "documentRuntime")) {
+    for (const [item, name] of Object.entries(USER_DATA_LAYOUT).filter(([item]) => item in LEGACY_USER_DATA)) {
       if (item === "appliedCatalog" || item === "discoveredEndpoints") continue
       expect(existsSync(join(U, name)), `${name} 应在`).toBe(true)
     }

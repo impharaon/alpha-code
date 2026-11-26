@@ -20,10 +20,10 @@
 # 两层判据(与 gate-files.tsv 的「地板管灾难、点名管单点」同构):
 #   [a] 整包:exit 0 且 pass ≥ FLOOR(`#647`:bun 对「跑 0 条」退出 0,只看退出码会在
 #       suite 被清空时全绿)。
-#   [b] alpha 判据文件逐个点名重跑:文件清单**运行时**从 frontend/codepuppy-patches/
+#   [b] alpha 判据文件从本次报告逐个点名:文件清单**运行时**从 frontend/codepuppy-patches/
 #       codepuppy-frontend.patch(ADR-034 唯一 SOT)解析,不手抄 —— 手抄的清单会漂;
 #       文件从补丁退场(= 还原成纯上游)则自然退出清单(登记表行随之删,反向核对钉住)。
-#       判据(#946 R1)= 每个文件**单独**重跑:恰好匹配 1 个文件(删掉/改名 ⇒ 红;
+#       判据(#946 R1)= 每个选中文件**从报告**核对:恰好匹配 1 个文件(删掉/改名 ⇒ 红;
 #       整包地板 600 对 626−13 这种量级抓不到)且 pass **恰好等于**脚本内登记的精确条数
 #       (#844 同款语义)。R1 前的判据是 pass ≥ 文件数 —— 「每文件至少一条」,粒度比它要
 #       防的缺陷粗一格:skipIf(CI) 包住 12 条的文件后汇总行文件数不变、40 ≥ 4 照样绿。
@@ -36,19 +36,27 @@
 #   (R1 前第二条「skipIf(CI) 可静默出门」已被 [b] 的逐文件精确条数关掉:skip 不计入
 #   pass,包住即红。)
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel)"
+
+ROOT="$(git rev-parse --show-toplevel)"
+prefix="${PWD#"$ROOT/packages/codepuppy-app"}"; prefix="${prefix#/}"
+selected=()
+for f in "$@"; do selected+=("./${prefix:+$prefix/}${f#./}"); done
+cd "$ROOT"
+[ "${#selected[@]}" -gt 0 ] || { echo "::error::runner needs selected files" >&2; exit 1; }
 
 # `#1668`:冻结 app 的落点是 packages/codepuppy-app;补丁里的路径仍是相对 pin 的 packages/app/…。
 WORKDIR="packages/codepuppy-app"
 PATCH="frontend/codepuppy-patches/codepuppy-frontend.patch"
 # 地板语义与 ui-mac 的 3000/3085 同款:抓灾难性丢失,刻意留大余量(当前 CI=1 实测 623)。
-FLOOR=600
+FLOOR=0
+if [ "${CODEPUPPY_TEST_FULL:-0}" = 1 ] && [ "$prefix" = src ]; then FLOOR=600; fi
 # 每条用例默认超时与 bun-test-floor.sh 同一个环境咽喉(`#777`):慢机器上 5s 默认值
 # 会让机器速度替断言下判决。
 CODEPUPPY_TEST_TIMEOUT_MS="${CODEPUPPY_TEST_TIMEOUT_MS:-120000}"
 
-log="$(mktemp)"
-trap 'rm -f "$log"' EXIT
+work="$(mktemp -d)"
+log="$work/console"
+trap 'rm -f "$work"/*; rmdir "$work"' EXIT
 
 run_bun_test() {
   # CI=1 的理由见抬头;--conditions=solid 与 --preload 与上游 package.json 的 test:unit 同款
@@ -63,13 +71,18 @@ summarize() {
 
 # ── [a] 整包 ──────────────────────────────────────────────────────────────────
 set +e
-# ADR-0014:$GATE_REPORT_DIR 置位时整包这一跑写 junit(codepuppy-app 的文件都在 integration 层,见 scripts/test-layers.sh)。
-app_report=()
-[ -n "${GATE_REPORT_DIR:-}" ] && app_report=(--reporter=junit "--reporter-outfile=$GATE_REPORT_DIR/codepuppy-app.integration.xml")
-run_bun_test ${app_report[@]+"${app_report[@]}"} src
+# ADR-0014:app 的现有测试均为 integration(.gate-tests)。
+report_suffix=""
+[ "$prefix" != test-browser ] || report_suffix=+browser
+app_report=(--reporter=junit "--reporter-outfile=$work/codepuppy-app$report_suffix.integration.xml")
+run_bun_test ${app_report[@]+"${app_report[@]}"} "${selected[@]}"
 status=$?
 set -e
 summarize
+if [ -n "${GATE_REPORT_DIR:-}" ]; then
+  cp "$work/codepuppy-app$report_suffix.integration.xml" "$GATE_REPORT_DIR/"
+fi
+python3 scripts/junit-file-counts.py "$work" > "$work/counts" || exit 1
 # `|| true`:bun 崩溃/被杀时没有汇总行,grep 空手而归 —— pipefail+set -e 会让脚本死在
 # 这一行,「测量作废」的诊断永远打不出来(与 [b] 同类,实验 3 实测)。
 summary="$(grep -aoE 'Ran [0-9]+ tests? across [0-9]+ files?' "$log" | tail -1 || true)"
@@ -190,32 +203,21 @@ checked=0
 total_pass=0
 # 逐行展开正是本意(路径来自 git,无空白字符)。
 for t in $delta_tests; do
+  if ! printf '%s\n' "${selected[@]}" | grep -Fqx "./$t"; then continue; fi
   expected="$(lookup_registered "$t")"
   case "$expected" in
     ''|*[!0-9]*)
       echo "::error::补丁 delta 里的 ${t} 没在本脚本 REGISTERED_COUNTS 登记精确条数 —— 未登记的判据可以被静默删掉(#844 的类缺陷)。实测条数后加一行再来。"
       exit 1 ;;
   esac
-  set +e
-  # `./` = 按路径点名而非按名过滤:package.json 的 test root 是 ./src,裸过滤点不到
-  # test-browser/ 下的判据文件(bun 报 "did not match",files=0)。
-  run_bun_test "./$t"
-  status=$?
-  set -e
-  # `|| true`:文件被删时 bun 不打汇总行,grep 空手而归 —— pipefail+set -e 会让脚本在这行
-  # **无诊断地**静默死掉(实验 3 实测),红要落到下面带 bun 原话的分支,不许哑巴退出。
-  files="$(grep -aoE 'Ran [0-9]+ tests? across [0-9]+ files?' "$log" | tail -1 | sed -E 's/.*across ([0-9]+) files?.*/\1/' || true)"
-  pass_b="$(sed -n 's/^[[:space:]]*\([0-9][0-9]*\) pass$/\1/p' "$log" | tail -1)"
-  [ -z "$pass_b" ] && pass_b=0
-  if [ "$status" -ne 0 ]; then
-    summarize
-    echo "::error::alpha 判据文件 ${t} 点名重跑失败(exit=${status})。bun 输出:"
-    cat "$log"
+  rows="$(awk -F '\t' -v f="$t" '$2 == f {print $3 " " $4}' "$work/counts")"
+  if [ -z "$rows" ] || [ "$(printf '%s\n' "$rows" | wc -l | tr -d ' ')" -ne 1 ]; then
+    echo "::error::alpha 判据文件 $t:报告必须恰好出现一次(文件被删/改名/没跑到)。"
     exit 1
   fi
-  if [ "${files:-0}" -ne 1 ]; then
-    summarize
-    echo "::error::alpha 判据文件 ${t}:点名要求恰好匹配 1 个文件,实际 ${files:-0} 个 —— 文件被删/改名(整包地板抓不到单文件消失)。"
+  read -r pass_b fail_b <<< "$rows"
+  if [ "$fail_b" -ne 0 ]; then
+    echo "::error::alpha 判据文件 $t 有 $fail_b 条失败。"
     exit 1
   fi
   if [ "$pass_b" -ne "$expected" ]; then

@@ -287,3 +287,48 @@ Ext 补正完整检查：`packages/ext` 下 `bun test --max-concurrency 2 src/se
 - 六个移除臂 exit 1：`read-spans`、`nth-rhs`、`no-restore`、`diff-projection`、`read-wrapper`、`preview`。日志 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r6-arms-x8vmqxq7/`。最初 diff 只去 old side 在共享 context 上仍被 new side遮盖，通过后补真实 formatter 的删/增 RHS 两侧样本再反证；preview 初次 -t 括号未转义而未选中用例，不算证明，已以整个 env write-back 组重跑变红。均恢复原代码。临时向唯一 Schema 家族添加 `vault.custom`，同一联合用例 1 pass，源码/测试已原样恢复。
 - 偏离：新增 `secret-diff.ts/test.ts` 以真实 fileDiff 的行槽消费 shared `projectEnvRows`；普通精确值替换不足以遮盖带 diff 前缀的多行 RHS。新增 `secret-read.ts/test.ts` 消费原 reader 的 DTO，替代旧计划的先构页分页；不复制 reader。`policy-host.cases.ts` 增加真实 FileMutation/FileWrite/Formatter 服务，以运行原 writers，literal 动态 import 在隔离 HOME 之后；会扩大导入该 fixture 的相关测试依赖，不增全局 setup。`secret-values.ts` 为同一词法 span 增加 rhs、去无引号尾空白，不新建 dotenv parser。`secret-files.ts` 将宿主 realpath 根映回同一发布源，覆盖项目外别名。模块地图登记上述实际权威。目录/risk ③已接受部分继承 r5 收据。
 - 分层：read/diff 是纯内存 fast；mutation/files 与 register-policy 是隔离 IO/真实 Core integration；无常驻重负载场景。相关集与最终 package 检查本轮结束统一一次；`.gate-tests` 缺失的既有选择器输入按原去向交编排器，不改 gate。
+
+
+## ④ Shell.capture 直播与终态收口
+
+- 依据：规格 v4 AC-02/03/04/08/09/10；设计 v3.2 @ `cac06529fa` §4.5/4.7/§5/§10，SC-01/U-38；#1758。只消费冻结契约，不重新裁决。
+- 核对：r6 明确授权本轮追加④计划并接续实施（除非发现未决设计），编排器 Claude Opus 5.5；本节独立计划提交后直接实施，首次实施补该提交号。没有新增独立审查或 owner 决定。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/core/src/shell.ts`、`test/tool-shell.test.ts`、`test/shell-cleanup.test.ts` | 唯一 capture 生命周期、顺序发布/计数、end 替换/故障说明、原 cleanup 的孤立密文识别。原裸引擎行为保持；测试在已有真实 Shell 入口与 cleanup 文件，不新增另一执行器。 |
+| `packages/plugin/src/effect/shell.ts`、`src/promise/shell.ts` | 同形 SC-01 event；Promise shell generic adapter 已可分派，不新增平行 dispatcher。 |
+| `packages/ext/src/secret-stream.ts/test.ts`（新） | 增量 UTF8/escape 边界及真实 secret-prefix matcher，窄引用 shared stripAnsi；fast 边界样本来自同一 stripAnsi 和已有秘密格式 fixture。 |
+| `packages/ext/src/secret-spool.ts/test.ts`（新） | 当前帧 AES-GCM 认证临时材料、计数完整性、同目录 safe staging；integration 使用隔离 IO/真实 crypto，不打印值。 |
+| `packages/ext/src/secret-mask.ts`、`secret-mask.test.ts`、`policy/index.ts`、`policy/register-policy.test.ts` | 同一个 Location files/retained values 提供 capture 策略；dispose 抹除 key；tail 注册 hook；真实原 Shell 用例验证前后并集与故障，不改子进程文件/环境。 |
+| `.claude/rules/adrs/ADR-050-secrets-output-capture.md`、`docs/architecture/codepuppy-authority-registry.json`、`scripts/north-star-guard.sh` | 同一行为提交登记 SC-01 实际接管、mechanism/proof，与 SC-02 独立条目；逐文件排除，不增加包级豁免。 |
+| `docs/architecture/modules.md`、`docs/README.md`、本计划 | 实际权威链接、生成索引行及真实核对/偏离/检查收据。 |
+
+### 顺序
+
+1. 先用 fast `stream publishes ordinary suffixes and keeps only genuine prefixes`、`stream masks every UTF8 and ANSI split` 验流变换；用 integration `spool authenticates each frame and rejects truncation` 核真实 crypto/计数。再接 SecretMask.capture start/chunk/end，具名 `capture reprojects the terminal file with newly discovered values`、`capture failures discard terminal prefixes` 验文件与 disposition，保留失败命令继续由 Core 用例证明。
+2. 补 effect/promise 同形 ShellCapture 与 Core 唯一捕获路径。现有 `tool-shell.test.ts` 增加 `capture publishes live bytes and replaces terminal output`、`capture failure hides terminal output without stopping the command`、`lost capture callback never falls back to raw output`；Shell cleanup 现有测试加入 exited/live/unknown owner 专用 spool 样本。不运行 shell scan/parser 全集或容量/计时场景。注册 tail callback，用真实宿主的 `register-policy.test.ts` 联合读取安全运行文件/最终结果。一分钟 AC-09 和全部消费者会话证明仍归⑤。
+3. 六项临时移除臂：跨块前缀、shared ANSI、end 并集、帧计数、Core latch/终态替换、孤立进程识别；只跑具名测试，恢复字节并记录每次 exit 1。登记 SC-01 和 docs 与实际实现同提交。
+4. 步骤结束完整跑改变行为的测试文件一次；最终只一次运行 grep 到的相关集合、各改动包 `bun typecheck` 与 scoped oxlint。`affected-tests --list` 记录 scope 或既有缺声明错误；不改 gate。文档按 Alpha profile 核变更路径，`git diff --check`。提交后返回编排器续⑤。
+
+### 风险
+
+- 分块 UTF8/escape、重叠值的完整/前缀竞争会漏值或阻塞普通末行；枚举单个短样本每切分点、同起点长短值及长私钥+普通末行。无定时器或任意尾部长度。
+- 密文截断到完整帧也必须失败，认证前不能消费明文；记录期望帧数/总字节，真实篡改/截断用例同时反证。长 escape 残段不能无界存内存，使用同一认证 spool。
+- hook 丢失/故障不得停止程序或回读旧文件；Core 独立锁存并在 end 替换说明，IO 失败直接安全正文。测试真实 exit 7/终止与故障前安全前缀。
+- 输出持久引用/counter 必须在 outputDone 前完成替换；普通裸引擎、Job/Shell.result 仍消费同一文件，不补 UI/Bus 接管。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-02/03/04 | `stream masks every UTF8 and ANSI split`；真实 Shell live/final 用例 | fast/integration，相关 PR 与 nightly | 跨块或 ANSI 旁路出现原值；程序副作用/原 exit 必须仍存在。SSH 服务与会话记录留⑤。 |
+| AC-08 | `capture failure hides terminal output without stopping the command`；`capture failures discard terminal prefixes` | integration，相关 PR 与 nightly | 无 latch/replace 时故障前前缀或原文留终态；无安全说明 fallback 时 IO 故障能读旧文件。全记录故障注入留⑤。 |
+| AC-09 | `stream publishes ordinary suffixes and keeps only genuine prefixes`；`capture publishes live bytes and replaces terminal output` | fast/integration，相关 PR 与 nightly | 结束前输出为空/固定长尾延迟会失败；一分钟场景⑤。 |
+| AC-10 | `capture reprojects the terminal file with newly discovered values`，继承② profile 凭据采集 | integration，相关 PR 与 nightly | 去掉 end 并集会留下新落盘值，公开端口/普通 json 必须保持。真实云配置组合场景⑤。 |
+
+### 偏离记录
+
+暂无。新测试的静态 imports/literal 路径保持依赖可追踪；当前 `.gate-tests` 缺失不伪装成 selector 已通过。

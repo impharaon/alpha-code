@@ -1,23 +1,23 @@
 ---
 id: DESIGN-secrets-usable-not-visible
 title: 密钥文件程序可用、助手不可见 技术设计
-summary: v3.1 增量核实 Code Mode 外层进度绕过包装；桌面出口遮盖不能保护取消后的记录，最小第二个进度 hook 待 owner 裁决，其余 v3 决定继承。
+summary: v3.1 冻结：U-40 已批准 SC-02 根进度发布前 hook；遮盖规则仍归扩展，按现有 ADR 与接管权威册登记，其余 v3 决定继承。
 kind: tech-design
-status: frozen-pending-review
+status: frozen
 design_version: "3.1"
 spec: SPEC-secrets-usable-not-visible
 spec_version: 3
 review:
   rounds: 2
   reviewed_sha: "d336e59d04"
-  verdict: "v3.1 pending-review; R2 receipt retained"
+  verdict: "v3.1 frozen; SC-02 owner-approved U-40; R2 receipt retained"
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # DESIGN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 技术设计
 
-本设计对应 #1758；本次 **v3.1 增量为 frozen-pending-review**，仅重开 Code Mode 外层进度的出口与直接消费者（§2、§4.5/§4.7/§4.8、§5、§6、§10），其余规格 v3/R1/R2 决定继承。实施反例推翻了「ToolEditor 能包装所有根工具 progress」的前提。非引擎桌面出口无法阻止取消路径先将原进度写入记录；§10 将最小第二个 hook **SC-02 标为 OWNER-DECISION，未获授权、不得实施**。frontmatter 的 rounds/reviewed_sha 保留真实 R2 收据，不表示本增量已经独立审查。LIVE-01 的规格裁决与 BR-07 均不变。
+本设计对应 #1758；**v3.1 增量为 frozen**。2026-11-27 owner 在 U-40 明确批准第二处引擎改动 SC-02（原话及登记决定见 §10），外层根进度在 publisher 缓存/发布前由扩展遮盖。其余规格 v3/R1/R2 决定继承；frontmatter 的 rounds/reviewed_sha 保留真实 R2 收据，不把本次 owner 批准写成新增独立审查。LIVE-01 与 BR-07 不变，无待 owner 项。
 
 ## 1. 基线
 
@@ -26,12 +26,13 @@ last_reviewed: 2026-11-26
 - 输入收据：owner 2026-11-26 的 U-38「好的。」已批准 SC-01、前后可读值边界及失败整次隐藏；U-39「这两个你的建议是什么，按你的建议吧。」批准实时逐段遮盖、先打印后写入的窄残留，以及非 env 格式只提取凭据字段，已落入规格 v3。继承 Windows 发布时真机验收和「复用工具卡文本区、无需 frames」约定。自动化仍消费 [SPEC-unattended-run-permissions v2](../unattended-run-permissions/spec.md) BR-03。
 - 背景：规格[来源](spec.md#来源)所指的协调仓安全意图 I-45、讨论 P-06/P-08；不重开「程序可用」「全部批准读项目外文件不问」和原样匹配边界。
 - r3 输入：独立 R2 审查 `582f056887..d336e59d04`，FIX-THEN-MERGE；本轮按六项 finding 与三项补充处置冻结。执行 `git fetch`、`git rebase origin/alpha`（上游 `d4a849e524`），无冲突，没有新增 merge；只改本文与必要索引行。
+- r5 输入：v3.1 `4466819664`；本轮派单转录的协调仓安全意图 U-40，owner 2026-11-27「Cargo 选 1，第二处引擎改动允许，Supabase 报告批准」。本票只消费第二处引擎改动的批准，冻结既有 SC-02 契约，不扩大范围。
 - v3.1 输入：已合入的设计 `66313542d3` / #1772；实施②的采集提交 `d14b17a2ea` 与接缝收据 `9a08725438`，其 `plan.md` 的「偏离记录 / ②实施检查收据」提供真实 Code Mode 反例。当前只处理 BR-03/BR-07 对进度、记录和模型的义务，不增加 AC 或改动其余实施段。新工作树基线 `a586b16fcac32702d2d14cda898c5a32bb71d02c`，未 merge。
 - 代码证据基线：`9f08c506d9842d319616c7e45c33d3b9c3279e48`，引擎包版本 `2.2.5`，Bun `1.4.4`、Node `26.13.1`。r1 授权的合并为历史事实；r3 对 Core/Plugin/Ext 源码与 ANSI 权威执行 `git diff --stat 9f08c506d9842d319616c7e45c33d3b9c3279e48 HEAD -- packages/core/src packages/plugin/src packages/ext/src packages/session-ui/src/tools/ansi.ts`，输出为空，继承有效的行号/探针。
 
 ## 2. 地面真相
 
-继承成功 hook、R1 的直播/Code Mode/写回/SQLite 证据。r3 的归一化/重复键/清理证据继承。v3.1 只追踪外层 progress → 发布缓存 → 实时卡/失败记录/模型的可达链路；停止条件是证实现有非引擎出口完整覆盖，或找到它无法覆盖的实际写入反例并定义最小待批接缝。
+继承成功 hook、R1 的直播/Code Mode/写回/SQLite 证据。r3 的归一化/重复键/清理证据继承。v3.1 只追踪外层 progress → 发布缓存 → 实时卡/失败记录/模型的可达链路；停止条件是证实现有非引擎出口完整覆盖，或找到它无法覆盖的实际写入反例并定义最小所需接缝（已由 U-40 批准）。
 
 | 已观察的事实 | 证据与结论 |
 | --- | --- |
@@ -304,7 +305,7 @@ env（包括 `.envrc`）静态解析用 `node:util.parseEnv` 读取可识别的�
 
 Tool.Content 的文本、文件 uri/name 都属于处理面。内联 data URI 先按协议还原载荷再查原样值；文本载荷可替换后重编码；二进制载荷命中时以一个 text 遮盖符替换该文件 content，避免把损坏的图/PDF交给模型。文件引用如果指向受保护文件则换说明；非保护文件的内联字节同样检查。只检查原始字节，不承诺 OCR、解密、解压或程序额外编码的识别。MCP 非内联二进制资源已保存到普通工具产物时，后续读取仍经过同一结果遮盖，不能把产物路径当作安全证明。
 
-普通已注册工具的进度继续用现成 tool.transform 包装，可信运行标识/display 立即发布；输出字段用当前 retained values 加重读处理，失败隐藏该 update。**外层 execute 不在该包装范围，改由 §4.8 的待批 SC-02 承担发布前遮盖；现有接口尚不能闭合此保证。** Code Mode children 不建进度/结果事务；child 结果在交给 JS 前无状态遮盖，外层终态仍在 after 重遮盖，不能让 child after 清掉 outer。不得把成功终态已遮盖当成外层直播/取消记录已安全。
+普通已注册工具的进度继续用现成 tool.transform 包装，可信运行标识/display 立即发布；输出字段用当前 retained values 加重读处理，失败隐藏该 update。**外层 execute 不在该包装范围，改由 §4.8 的已批准 SC-02 承担发布前遮盖；现有接口尚不能闭合此保证。** Code Mode children 不建进度/结果事务；child 结果在交给 JS 前无状态遮盖，外层终态仍在 after 重遮盖，不能让 child after 清掉 outer。不得把成功终态已遮盖当成外层直播/取消记录已安全。
 
 **已批准接管 SC-01** 保留 shell.capture，规则仍在扩展。r2 在同一 Core Shell 生命周期增加直播 publish 与终态文件替换，Effect/Promise 两面同形：
 
@@ -385,7 +386,7 @@ end 成功返回 replace + staging 文件路径/安全 size/行数；Core 先关
 | 修改正常返回或 Tool.Error 终态 | `Context.tool.hook("execute.after", ...)`，`packages/plugin/src/promise/tool.ts:47-71`；`Tool.executeTool`，`packages/core/src/tool.ts:155-179`，已实测 | 扩展 SecretMask；覆盖内置、插件、MCP、Code Mode 子调用与外层的正常返回/Tool.Error；中断/defect 无 after，需发布前安全缓存 |
 | 已注册工具的运行期进度 | `Context.tool.transform` / `ToolEditor.update`，`packages/plugin/src/promise/tool.ts:25-35`；既有 `wrapForDisplay`，`packages/ext/src/policy/display.ts:43` | 仅覆盖 registry 工具；不能声称包含合成 execute |
 | 中断根缓存回收 | 现有 `Context.event.subscribe`（`packages/plugin/src/promise/event.ts:6-9`）；根键对应终态事件的 sessionID/assistantMessageID/id | 只释放私有缓存，不改事件/数据库；不能当作发布前遮盖接缝 |
-| 外层 execute 进度与取消记录 | **raise SC-02，OWNER-DECISION**：§4.8 候选 `tool.execute.progress`，根调用 context.progress 交给 publisher 前由扩展改写 | 现有 callable 缺失；非引擎 createProjector/Context.event.subscribe 只能护桌面副本，不能护已提交的失败记录；未获批前不得接线实施 |
+| 外层 execute 进度与取消记录 | **raise SC-02，U-40 已批准**：§4.8 `tool.execute.progress`，根调用 context.progress 交给 publisher 前由扩展改写 | 现有 callable 缺失；非引擎 createProjector/Context.event.subscribe 只能护桌面副本，不能护已提交的失败记录；按冻结契约实施并登记接管 |
 | 外层 begin / 子调用无状态 | **新增** SecretMask.begin 接在 `policy.seal` 的尾部 execute.before 回调内（`packages/ext/src/policy/index.ts:248-264`），confirm/pin 后最后一步；共享 context 的证据为 `packages/core/src/codemode/tool.ts:147-150` | 根 execute 建/结束唯一事务；活动键下 child before 不 begin，child after 只重读并转换自己的结果 |
 | 保护直接读并保留 read 形状 | 同一 ToolEditor.update；现有 `ReadToolFileSystem.TextPage`，`packages/core/src/tool/read-filesystem.ts:81-88` | 新增 SecretMask.read；复用形状，不导入 Core 服务实现 |
 | 判定路径 / 凭据字段 / 非密钥 | **新增** ProtectedFiles.sources/match/probe/isPublicValue 及 §4.1 profile 发布数据 | Schema 一份权威；相同依赖树边界、KUBECONFIG 拆分和列/字段选择由所有消费者共用 |
@@ -403,11 +404,11 @@ end 成功返回 replace + staging 文件路径/安全 size/行数；Core 先关
 | 风险标注与当前卡片呈现 | `classifyPermissionRequest`，`packages/ext/src/policy/risk.ts:730`；`attachTerminal`，`packages/ext/src/policy/display.ts:67` | 复用既有风险信号和 Tool.Content 文本，末尾再遮盖 |
 | 存储和模型消费 | `publisher.toolExecution`，`packages/core/src/session/runner/publish-llm-event.ts:561`；`toolResult`，`packages/core/src/session/runner/to-llm-message.ts:114` | 消费现有安全结果，不增加持久 schema、重放补丁或 UI 接缝 |
 
-### 4.8 v3.1：所需第二接缝（候选，未获授权）
+### 4.8 v3.1：已批准第二接缝 SC-02
 
-**SC-02 不是 SC-01 的扩展授权。** 最小所需能力是在 Core `Tool.snapshot.execute` 已完成 before/确认及有效工具名解析、构造根执行 context 时，包装传入的 progress：每次先执行扩展可改写事件，再将安全 metadata 交回原 `input.progress`。位置必须早于 `publisher.progress` 的缓存与发布，不是 bus 订阅回调。普通根与合成 execute 共用这个位置，child 仍由引擎现有 noop progress 隔离，不引入第二个 Code Mode runtime、子调用状态或新的限额。
+**SC-02 由 U-40 单独批准，不挪用 SC-01 的授权。** 最小所需能力是在 Core `Tool.snapshot.execute` 已完成 before/确认及有效工具名解析、构造根执行 context 时，包装传入的 progress：每次先执行扩展可改写事件，再将安全 metadata 交回原 `input.progress`。位置必须早于 `publisher.progress` 的缓存与发布，不是 bus 订阅回调。普通根与合成 execute 共用这个位置，child 仍由引擎现有 noop progress 隔离，不引入第二个 Code Mode runtime、子调用状态或新的限额。
 
-待 owner 批准的最小接口候选（Effect/Promise 的 ToolHooks 同形；其它既有事件不变）：
+已冻结的最小接口（Effect/Promise 的 ToolHooks 同形；其它既有事件不变）：
 
 ```ts
 import type { Tool } from "@opencode/schema/tool"
@@ -421,13 +422,13 @@ interface ToolHooks {
 }
 ```
 
-事件按现有 hook 语义替换其 metadata 字段，不采用返回新事件对象；SecretMask 生成安全副本，不改 Code Mode 内部 calls 或子工具真实 input；Effect 的 `ToolFailures["execute.progress"]` 为 never。规则、重读、根事务与故障隐藏仍唯一归扩展 SecretMask.progress（§4.3），Core 不持名单/秘密值。若采用此公共根出口，已注册工具包装保留 display 等原职责，进度遮盖在此统一执行一次；不能让多层 masker、第三方后续 hook 或旧原 metadata 回填绕过最终安全值。BR-07 的总收口须覆盖回调 reject/defect 和注册失效，不能因 hook 本身故障透传 update 或终止命令；继续复用 §4.3/§5 的安全进度/终态说明投影，不新增原文 fallback；真实故障注入仍待获批后的实施验证，不在本次冒称完成。
+事件按现有 hook 语义替换其 metadata 字段，不采用返回新事件对象；SecretMask 生成安全副本，不改 Code Mode 内部 calls 或子工具真实 input；Effect 的 `ToolFailures["execute.progress"]` 为 never。规则、重读、根事务与故障隐藏仍唯一归扩展 SecretMask.progress（§4.3），Core 不持名单/秘密值。采用此公共根出口后，已注册工具包装保留 display 等原职责，进度遮盖在此统一执行一次；不能让多层 masker、第三方后续 hook 或旧原 metadata 回填绕过最终安全值。BR-07 的总收口须覆盖回调 reject/defect 和注册失效，不能因 hook 本身故障透传 update 或终止命令；继续复用 §4.3/§5 的安全进度/终态说明投影，不新增原文 fallback；真实故障注入仍待实施验证，不在本次冒称完成。
 
-候选的最小新增面是 **Core Tool.snapshot.execute 的根 progress 包装、Plugin 的 Effect/Promise ToolHooks/失败类型，以及 Promise adapter 的 toolHook 分派**（现成分派仅列 before/after，`packages/plugin/src/promise/adapter.ts:686-692`）；现有 host.tool.hook/PluginHooks.trigger 仍负责注册与转发。无须修改 Core CodeModeTool、publisher、Bus、持久 projector、模型降层或桌面投影；它们统一消费入口已处理的 metadata。是否允许这一第二处引擎改动保留给 §10 owner 裁决，不能先按候选实现。
+最小新增面是 **Core Tool.snapshot.execute 的根 progress 包装、Plugin 的 Effect/Promise ToolHooks/失败类型，以及 Promise adapter 的 toolHook 分派**（现成分派仅列 before/after，`packages/plugin/src/promise/adapter.ts:686-692`）；现有 host.tool.hook/PluginHooks.trigger 仍负责注册与转发。无须修改 Core CodeModeTool、publisher、Bus、持久 projector、模型降层或桌面投影；它们统一消费入口已处理的 metadata。U-40 已批准这一第二处引擎改动；实施与接管登记消费 §10，不增加其它引擎改动。
 
 ## 5. 数据与失败
 
-不新增业务数据库、会话 schema、历史清洗或凭据存储。正常返回/Tool.Error 的终态仍在 after 后经原事件投影事务写入；根中断/defect 的记录直接来自 publisher 的缓存（外层 execute 的安全缓存欠 SC-02），不宣称它经过 after；直播文件逐段含当前集合处理的文本，成功结束从加密原文 spool 用并集重写，失败结束原子替换为仅说明文件。直播与终态是两个明确的发布边界，终态绝不复用旧正文绕过收口。
+不新增业务数据库、会话 schema、历史清洗或凭据存储。正常返回/Tool.Error 的终态仍在 after 后经原事件投影事务写入；根中断/defect 的记录直接来自 publisher 的缓存（外层 execute 的安全缓存由 SC-02 保证，尚待实施验证），不宣称它经过 after；直播文件逐段含当前集合处理的文本，成功结束从加密原文 spool 用并集重写，失败结束原子替换为仅说明文件。直播与终态是两个明确的发布边界，终态绝不复用旧正文绕过收口。
 
 普通根工具/连接器的未发布结果若处理失败，整份动态 content/output/metadata/附件/error cause 换固定说明，保留可信执行状态。子工具使用同一安全替换形状，但不创建/销毁外层状态；外层 Code Mode 正常返回在自己的 after 终结，中断缓存清理按 §4.3。没有调用 ID 去重把不同 child 当作重试，也不会漏第二个/并发子调用。
 
@@ -462,8 +463,8 @@ const hiddenResult: Tool.Result = {
 | --- | --- | --- |
 | 保护名单、公开值判定、平台路径匹配 | Schema 的纯 Code Puppy 契约；不依赖 Core/Server/UI | K2 收敛：风险器、read 和遮盖不再各持名单 |
 | 凭据字段/SQLite 采集、安全 read、env 写回恢复、输出遮盖与加密 spool | Ext 的 Location 生命周期；依赖 Schema、公开 Plugin API、Node IO/crypto/sqlite 及现成 stripAnsi 纯函数 | 不 import Electron main 私有模块、不增加包依赖；ANSI 只窄引用原纯函数，不引 UI 运行时；原 writer、Patch.parse、身份和自动化仍为权威 |
-| shell 捕获出口 | Core 调用已有 PluginHooks，事件类型归 Plugin；不反向依赖 Ext；复用自己的 cleanup | SC-01 是唯一已获准的引擎改动；规则仍归扩展 |
-| 根工具进度入口（候选） | Core/Plugin 只增加可改写事件，Ext 继续持有 SecretMask | SC-02 待 owner；不绕过权限/代际权威、不复制名单，不以桌面过滤替代持久记录保证 |
+| shell 捕获出口 | Core 调用已有 PluginHooks，事件类型归 Plugin；不反向依赖 Ext；复用自己的 cleanup | SC-01 由 U-38 批准；SC-02 由 U-40 另行批准；规则仍归扩展 |
+| 根工具进度入口 | Core/Plugin 只增加可改写事件，Ext 继续持有 SecretMask | SC-02 已由 U-40 批准；不绕过权限/代际权威、不复制名单，不以桌面过滤替代持久记录保证 |
 | 档位注入与项目外审批 | UI main 消除交互 `.env` 专用冲突；Ext 原权限权威解释操作例外 | K1 不新建档位载体列表；自动化原规则和非读取 ask 保持原义 |
 | 历史、模型与卡片 | 现有投影、终态降层和直播跟随文本区 | 直播继续，终态成功重遮盖、故障仅说明；已见缓存不回撤、不写回终态；先打印后落盘仅 LIVE-01；不添 UI redactor/frames/客户端协议 |
 
@@ -489,7 +490,7 @@ const hiddenResult: Tool.Result = {
 
 ## 8. 拆分决定
 
-不适用跨仓拆分；Schema、Ext、Core、Plugin、桌面宿主在同一仓。SC-01 是上游接管权限边界，不是另开跨仓接口或顺序 Task。后续实施需消费经裁决和审查冻结的 §4；v3.1 的 SC-02 尚待 owner，不能在未获授权的出口先行实现；其余已定部分不重开。
+不适用跨仓拆分；Schema、Ext、Core、Plugin、桌面宿主在同一仓。SC-01 是上游接管权限边界，不是另开跨仓接口或顺序 Task。后续实施需消费经裁决和审查冻结的 §4；v3.1 的 SC-02 已获 U-40 授权，按 §10 登记接管；其余已定部分不重开。
 
 ## 9. 回滚
 
@@ -497,7 +498,7 @@ const hiddenResult: Tool.Result = {
 
 ## 10. 裁决与审查结论
 
-### v3.1 / r4 裁决与 OWNER-DECISION
+### v3.1 / r4、r5 裁决与批准
 
 **PROGRESS-01：接受实施②的 SEAM-CHANGE-NEEDED。** 原 §4.5/§4.7 把 ToolEditor 当成所有根进度出口，前提已被真实 Code Mode 探针否定。本次只重开这一边界及取消/记录/模型的直接后果；R1/R2 的其它结论与规格 v3 不重开。
 
@@ -505,13 +506,14 @@ const hiddenResult: Tool.Result = {
 | --- | --- |
 | 不采用桌面出口作为完整纠正 | §2 六项真实 Bus/DB 事实：卡片副本虽可遮盖，取消后的失败事件和消息已含原值。createProjector/Context.event.subscribe 都晚于 durable commit；只能做显示保护，不能实现 BR-03 的记录义务。 |
 | 不以仅终态 after 或模型降层代替 | 成功终态可遮盖、直接模型降层不读 progress metadata 均为真，但取消/defect 绕过 after，failureSnapshot 先落原值。两项真事实不构成全消费者保证。 |
-| **SC-02 — OWNER-DECISION，尚未批准** | 请求允许 §4.8 的第二处根工具 progress 发布前 hook：在 Tool.snapshot.execute 包装根 context.progress，扩展改写 metadata 后原 publisher 才缓存/发出。Effect/Promise ToolHooks 和 Promise 分派同形补接口；名单、采集、匹配仍归扩展。不修改 Code Mode runtime、Bus/投影器或桌面协议。 |
-| 授权边界与结果 | 已核 U-38 原始记录：owner 引用「是否允许改一处引擎代码，让命令输出里的密钥也能被遮盖。我建议允许。」后答「好的。」；本轮派单明确这一处为 SC-01 shell.capture。**不能用它授权 SC-02，也不把 SC-02 登记进 SC-01 的 takeover。** 建议 owner 批准第二个最小 hook，才能同时保持 Code Mode 直播和保护取消后的记录；不批准则②的外层进度接线仍不能满足既有 BR-03，采集等已授权成果保留，不默认禁用 Code Mode/移除直播/放宽记录保护。 |
-| 登记与派工 | 只有 owner 实际批准后，才在既有接管 ADR/authority registry 单独登记 SC-02 的授权与实际接管面，并更新消费收据；当前只冻结候选供审查，不伪造 ADR/登记已批准，不 dispatch 这一未授权实现。SC-01 原登记决定继承。 |
+| **SC-02 — U-40 已批准（2026-11-27）** | 已批准 §4.8 的第二处根工具 progress 发布前 hook：在 Tool.snapshot.execute 包装根 context.progress，扩展改写 metadata 后原 publisher 才缓存/发出。Effect/Promise ToolHooks 和 Promise 分派同形补接口；名单、采集、匹配仍归扩展。不修改 Code Mode runtime、Bus/投影器或桌面协议。 |
+| 授权边界与结果 | 本轮派单转录的协调仓安全意图 U-40，owner 2026-11-27 原话：「Cargo 选 1，第二处引擎改动允许，Supabase 报告批准」。本票只消费「第二处引擎改动允许」，批准 §4.8 的 SC-02，不包含其它业务事项。U-38 的 SC-01 与 U-40 的 SC-02 分别记授权来源，不把第二处冒充第一处既有授权。无需再问 owner。 |
+| 登记与派工 | SC-02 与 SC-01 使用同一现有运行规则 ADR 命名空间及接管权威册：在 `.claude/rules/adrs/ADR-050-secrets-output-capture.md` 中单列 SC-02/U-40；在 `docs/architecture/codepuppy-authority-registry.json` 单独登记 ID `secrets-tool-progress`、`adr: ["ADR-050"]`。该条 takeovers 仅覆盖 §4.8 的根进度包装、Effect/Promise ToolHooks 及 Promise 分派，mechanism 指向实际扩展遮盖实现；SC-01 的 `secrets-output-capture` 条目保持独立。相关上游准入逐文件沿用 `scripts/north-star-guard.sh` 的 UPSTREAM_EXCLUDES（与 SC-01 同一 CI 权威），不加包级豁免。登记及真实 proof 随 SC-02 实现生效；本轮仅提交设计，不伪造 ADR/registry 已写入或机制已实现。 |
 
 | 本增量收据 | 检查方 / 结论 | 遗留去向 |
 | --- | --- | --- |
-| v3.1，`66313542d3` 设计 + `d14b17a2ea`/`9a08725438` 实施反例 | Codex / GPT-6 作者定向核对；重跑原反例 1 pass，真实 Bus/DB 新探针 1 pass，均 exit 0；生产链定向 diff 为空。没有实施生产代码、没有新独立审查结论 | **frozen-pending-review**；owner-only 仅 SC-02。审查只覆盖 PROGRESS-01、§4.8 候选与直接消费者，不重审其它范围。 |
+| v3.1，`66313542d3` 设计 + `d14b17a2ea`/`9a08725438` 实施反例 | Codex / GPT-6 作者定向核对；重跑原反例 1 pass，真实 Bus/DB 新探针 1 pass，均 exit 0；生产链定向 diff 为空。没有实施生产代码、没有新独立审查结论 | r4 待批状态由 r5 的 U-40 解决；证据继承，不重审其它范围。 |
+| r5 / `4466819664` + U-40，授权与登记 delta | Codex / GPT-6 作者核对；按 owner 原话确认批准来源，仅消除待批标记、固定登记归属，无新增独立审查轮次 | **frozen**；无 owner-only 决定；SC-02 实现与端到端证明仍留实施。 |
 
 本轮检查：`packages/ui-mac` 执行 `bun test src/main/old-name-scan.test.ts`，exit **0**、10 pass / 0 fail；按已解析 delivery profile 调用 `check_repo(..., changed_since="HEAD")`，本文 findings 为 **0**，元数据/本地链接/旧名词元及 `git diff --check` 通过。文档检查只针对本次增量；按本轮「commit only the design」不更新索引，也不把现有 index.stale 报成全仓通过。尚未验证 SC-02 的实际接线/回调故障、完整 live card 和各消费者端到端；现有探针证明的是旧接缝不足及所需前置边界，不能宣称第二 hook 已经生效。没有新增产品限制或规格取舍。
 
@@ -576,4 +578,4 @@ SC-01 的登记权威固定如下；这是架构边界决定，本设计提交�
 
 **仍未核验**：SC-01、增量归一化/matcher、env 写回包装、各 profile 解析与 spill/staging 尚未实现；全消费者真引擎故障注入、真实并发/目录变化与出货 Windows/Node SQLite 验收仍属实施证明。本机临时原语/算法探针不冒充出货验证，也不承诺 LIVE-01 窗口内新值从未被已见直播消费。
 
-**留档**：入口索引与守卫旧说明保持原处置，不改运行规则/权威册。R1/R2 的历史 finding 已处置；当前产品仍以规格 v3 为准。v3.1 唯一待 owner 的是 SC-02，审查收据以上方增量为准，不继承 r3 的「无需再审」到新证据。
+**留档**：入口索引与守卫旧说明保持原处置，不改运行规则/权威册。R1/R2 的历史 finding 已处置；当前产品仍以规格 v3 为准。v3.1 的 SC-02 已由 U-40 批准并冻结，授权收据以上方 r5 为准；没有待 owner 项，不伪造新增独立审查或已完成实施。

@@ -19,7 +19,7 @@ import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
 import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, attachWriteDenied, displaySnapshot, wrapForDisplay } from "./display"
-import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
+import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, deepFreeze, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
 import {
   codeModeFacts,
   CODE_MODE_TOOL,
@@ -243,8 +243,14 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     },
   }) as never)
 
+  const terminalEvents = new AbortController()
+  void (async () => {
+    for await (const event of context.event.subscribe({ types: ["session.tool.success", "session.tool.failed"], signal: terminalEvents.signal }))
+      secrets.release({ sessionID: event.data.sessionID, messageID: event.data.assistantMessageID, id: event.data.id })
+  })().catch(() => { /* Location disposal aborts the cleanup subscription. */ })
+
   return {
-    dispose: secrets.dispose,
+    dispose: () => { terminalEvents.abort(); secrets.dispose() },
     askInstall: async (call) => {
       const key = installCallKey(call)
       const prepared = installAsks.get(key)
@@ -286,6 +292,10 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       await context.tool.transform((editor) => {
         wrapForDisplay(editor as never, (callID) => displays.get(callID))
         secrets.wrap(editor)
+      })
+      await context.tool.hook("execute.progress", async (event) => {
+        const safe = deepFreeze(await secrets.progress({ call: event, update: event.metadata }))
+        Object.defineProperty(event, "metadata", { value: safe, enumerable: true, configurable: false, writable: false })
       })
       await context.tool.hook("execute.after", async (event) => {
         if (event.tool === CODE_MODE_TOOL) {

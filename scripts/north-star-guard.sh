@@ -122,6 +122,15 @@ done
 # 等),随之出清单(能力清点表 §9)。M0 把这 15 个文件也取成了上游原样;L4 逐条重判「退回 L0 / 重新接管」,
 # 定出最终清单并在 ADR-047「精确接管面」写理由。
 UPSTREAM_EXCLUDES=(
+  # ADR-050 / SC-02 (U-40): root progress and the matching Effect/Promise hook surface.
+  ':(exclude)packages/core/src/tool.ts'
+  ':(exclude)packages/plugin/src/effect/tool.ts'
+  ':(exclude)packages/plugin/src/promise/tool.ts'
+  ':(exclude)packages/plugin/src/promise/adapter.ts'
+  ':(exclude)packages/core/test/tool-registry.test.ts'
+  ':(exclude)packages/core/test/plugin/promise-tool.test.ts'
+  ':(exclude)packages/core/test/plugin/tool-input-repair.test.ts'
+
   # #1662 L4(ADR-047「精确接管面」):换代后的最终清单。旧清单 49 条不继承 —— 34 条随文件消失删除,
   # 仍存在的 15 条逐条重判,每条的去留、它握的决定与 2.x 上的握法登记在
   # docs/architecture/codepuppy-authority-registry.json(判官 packages/ext/src/policy/authority-registry.test.ts)。

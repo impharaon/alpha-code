@@ -20,6 +20,7 @@ function run(input: unknown, inputSchema: JsonSchema.JsonSchema) {
   }
   const events: ToolHooks = {
     "execute.before": event,
+    "execute.progress": { ...event, metadata: {} },
     "execute.after": { ...event, status: "error", error: new Tool.Error({ message: "unused" }) },
   }
   const tool = {

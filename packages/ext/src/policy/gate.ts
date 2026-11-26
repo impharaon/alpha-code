@@ -283,7 +283,7 @@ export function holdAsk(event: { effect: string }) {
   })
 }
 
-function deepFreeze<T>(value: T): T {
+export function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value)
     for (const item of Object.values(value)) deepFreeze(item)

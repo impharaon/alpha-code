@@ -12,7 +12,7 @@ last_reviewed: 2026-11-26
 
 # PLAN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 实施计划
 
-本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；当前已展开①②③。①②实际检查见各段实施收据；②的 Code Mode 外层进度保留待决 SC-02，完整真引擎行为验收仍在⑤。
+本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；当前已展开①②③。①②实际检查见各段实施收据；②的 Code Mode 外层进度已在 r5 通过 SC-02 补齐，完整真引擎行为验收仍在⑤。
 
 ## 交付段落
 
@@ -179,6 +179,16 @@ AC-01/05/07 的完整 read/权限/Windows 证明不在②宣告完成。去掉�
 - r4 pending SC-02：保留原 privacy.test.ts；只替换其 import 为当前出货 secret-mask.ts 的同目录 privacy-current.test.ts，从 `packages/ext` 执行 `bun test <该文件绝对路径>`，exit 1，0 pass / 1 fail / 0 import errors。原断言仍要求 liveContainsKnownValue=false，实际 true；未削弱为允许泄漏。段②其余义务已完成，外层实时进度交设计候选 v3.1 的 owner 决策；不得据此宣告 BR-03、AC-09 或⑤完成。
 
 2026-11-26 r4 · 追加必要范围：`packages/ext/src/plugin-host.test.ts` 的两例因本票明确移除错误 cause 而更新旧行为断言（见收据），属于原范围外唯一新增测试文件修改；不修无关问题。三个提交单元分别为 `d14b17a2ea`、`9cd3861ca4` 和本次接线提交；中间 `9a08725438` 只保留接缝反例。模块地图已在结果投影提交补权威链接。冻结决定和源文件使用权限未改；SC-02 单列待决，不把续派授权说成 owner 已批准其契约。
+
+## SC-02 实施收据（r5）
+
+2026-11-26 本机 07:00 UTC 开始；依据派单转录的 owner 2026-11-27 U-40「Cargo 选 1，第二处引擎改动允许，Supabase 报告批准」和 `git show 832ab5a4f4:docs/specs/secrets-usable-not-visible/design.md` §4.8/§10。只消费其中第二处引擎改动批准；未 merge/rebase，不把本地旧设计改写为新决定。
+
+- Codex / GPT-6 作者自查：Core snapshot 的根 progress 入口先 trigger 新事件再发布，覆盖普通与合成 execute；Effect/Promise 类型与 adapter 同形。回调 defect/reject 或运行中失效时只发布固定隐藏说明，终态同样隐藏且执行器继续。扩展生成并锁定安全副本；原注册工具包装只保留终态回调，不重复匹配。现有 event.subscribe 仅清理中断/defect 根状态。
+- 定向红例：原外层断言保留三项预期，接线前 0 pass / 1 fail；Core 根入口三例接线前 0 pass / 3 fail。完成后 `packages/core` 下 `bun test test/tool-registry.test.ts test/plugin/promise-tool.test.ts test/plugin/tool-input-repair.test.ts` exit 0，**64 pass / 200 expect**；`packages/ext` 下 `bun test src/policy/register-policy.test.ts src/secret-mask.test.ts src/plugin-setup-order.test.ts src/policy/authority-registry.test.ts` exit 0，**89 pass / 273 expect**。外层实时值隐藏、原 Promise adapter、后置替换/嵌套写、真实 publisher 取消失败缓存均有具名断言。
+- 移除臂：仅将根 executeTool 的 context 换回未包装 context，运行 `bun test src/policy/register-policy.test.ts -t 'synthetic execute progress must hide known protected values'`，exit 1，0 pass / 1 fail；失败为原 liveContainsKnownValue 断言。日志 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/sc02-removal-myfmwgvl/output.log`。以暂存版本 scoped git restore 恢复，字节一致；无注入选项。
+- Core、Plugin、Ext 各自 `bun typecheck` exit 0；三个包按实际 11 个改动 TS 分别 oxlint，均 0 warnings / 0 errors。Core 的 ToolHooks 枚举测试需补 progress 样本，属新增契约的机械同步，不更改原断言。
+- 同提交登记 `.claude/rules/adrs/ADR-050-secrets-output-capture.md`、权威册独立 ID `secrets-tool-progress`、逐文件 UPSTREAM_EXCLUDES。本地及批准基线尚无 SC-01 已实现条目，因此 ADR 明确其独立批准，`secrets-output-capture` 的真实机制/proof 仍随④登记；不填伪实现。新增范围仅 §4.8 指定四个上游运行文件、对应现有测试及这些登记；复用 gate 的既有 deepFreeze，未另写冻结算法。
 
 ## ③ 安全读取、env 保值写回与权限例外
 

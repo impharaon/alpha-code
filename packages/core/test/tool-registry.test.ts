@@ -1,4 +1,5 @@
 import { describe, expect } from "bun:test"
+import { ProtectedFiles } from "@opencode/schema/codepuppy-protected-files"
 import { Agent } from "@opencode/core/agent"
 import { Permission } from "@opencode/core/permission"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -1244,3 +1245,32 @@ describe("Tool", () => {
     }),
   )
 })
+
+// ADR-050 / SC-02: the same root boundary owns direct and synthetic tool progress.
+for (const mode of ["rewrite", "defect", "dispose"] as const)
+  it.effect(`root progress is transformed before publication (${mode})`, () => Effect.gen(function* () {
+    const service = yield* Tool.Service
+    const hooks = yield* PluginHooks.Service
+    const observed: unknown[] = []
+    const seen: string[] = []
+    let ran = 0
+    const registration = yield* hooks.register("tool", "execute.progress", (event) => Effect.gen(function* () {
+      seen.push(event.tool)
+      if (mode === "defect") return yield* Effect.die("fixture hook defect")
+      event.metadata = { output: "safe" }
+    }))
+    yield* transform(service, { progress: {
+      name: "progress", description: "fixture", input: Schema.Struct({ text: Schema.String }),
+      execute: (_input, context) => Effect.gen(function* () {
+        if (mode === "dispose") yield* registration.dispose
+        yield* context.progress({ output: "raw fixture" })
+        ran++
+        return { content: "done" }
+      }),
+    } }, { codemode: false })
+    const result = yield* (yield* service.snapshot()).execute({ ...call("progress"), progress: (update) => Effect.sync(() => { observed.push(update) }) })
+    expect(ran).toBe(1)
+    expect(seen).toEqual(mode === "dispose" ? [] : ["progress"])
+    expect(observed).toEqual([{ output: mode === "rewrite" ? "safe" : ProtectedFiles.MASKING_FAILED_TEXT }])
+    expect(result.content).toEqual([{ type: "text", text: mode === "rewrite" ? "done" : ProtectedFiles.MASKING_FAILED_TEXT }])
+  }))

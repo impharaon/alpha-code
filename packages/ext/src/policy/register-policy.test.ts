@@ -1660,6 +1660,62 @@ describe("E2: only the MCP layer's own tools carry an MCP identity", () => {
 })
 
 describe("secret result boundaries", () => {
+  it.live("synthetic execute progress must hide known protected values", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=1234\n")
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({ name: "mask_probe", description: "fixture", input: { type: "object", properties: { note: { type: "string" } } }, execute: async () => ({ content: "done" }) }))
+    } })
+    const registry = yield* Tool.Service
+    const listed = yield* registry.list()
+    const snapshot = yield* registry.snapshot([ALLOW_ALL])
+    const updates: unknown[] = []
+    const result = yield* snapshot.execute({ sessionID: session.id, agent: "build", messageID: "msg_1", call: { type: "tool-call", id: "mask_outer", name: "execute", input: { code: "return await tools.mask_probe({note:String(1230+4)})" } }, progress: (update: Record<string, unknown>) => Effect.sync(() => { updates.push(update) }) } as never)
+    const facts = { virtualExecuteListed: listed.some((tool) => tool.id === "execute"), liveContainsKnownValue: JSON.stringify(updates).includes("1234"), terminalContainsKnownValue: JSON.stringify(result).includes("1234") }
+    // The preserved SC-02 assertion: no weakening of its three original observations.
+    expect(facts).toEqual({ virtualExecuteListed: false, liveContainsKnownValue: false, terminalContainsKnownValue: false })
+    expect(updates.length).toBeGreaterThan(0)
+  }))
+
+  for (const mode of ["replace", "nested"] as const) it.live(`late progress hooks cannot revive raw metadata (${mode})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID()
+    fs.writeFileSync(path.join(location.directory, ".env"), `PASSWORD=${value}\n`)
+    let ran = false
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({ name: "late_progress", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async (_input: unknown, context: ToolContext) => { await context.progress({ nested: { value } }); ran = true; return { content: "done" } } }))
+    }, after: promisePlugin("late-progress", async (ctx) => {
+      await ctx.tool.hook("execute.progress", (event) => {
+        if (mode === "replace") event.metadata = { output: value }
+        else (event.metadata.nested as { value: string }).value = value
+      })
+    }) })
+    const exit = yield* call(session.id, "late_progress")
+    expect(ran).toBe(true)
+    expect(JSON.stringify(progress).includes(value)).toBe(false)
+    expect(JSON.stringify(exit)).toContain(ProtectedFiles.MASKING_FAILED_TEXT)
+  }))
+
+  it.live("cancelled Code Mode progress keeps publisher failure snapshots safe", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=1234\n")
+    const ready = yield* E.Deferred.make<void>()
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({ name: "mask_wait", description: "fixture", input: { type: "object", properties: { note: { type: "string" } } }, execute: async (_input: unknown, context: ToolContext) => new Promise((resolve) => { context.signal.addEventListener("abort", () => resolve({ content: "cancelled" }), { once: true }) }) }))
+    } })
+    const events: unknown[] = []
+    const publisher = createLLMEventPublisher({ publish: (_definition: unknown, data: unknown) => Effect.sync(() => { events.push(data); return {} as never }) } as never, { sessionID: session.id, assistantMessageID: "msg_mask", agent: "build", model: { id: "fixture", providerID: "fixture" }, started: 0 } as never)
+    yield* publisher.publish({ type: "tool-call", id: "mask_cancel", name: "execute", input: {} } as never)
+    const snapshot = yield* (yield* Tool.Service).snapshot([ALLOW_ALL])
+    const fiber = yield* snapshot.execute({ sessionID: session.id, agent: "build", messageID: "msg_mask", call: { type: "tool-call", id: "mask_cancel", name: "execute", input: { code: "return await tools.mask_wait({note:String(1230+4)})" } }, progress: (update: Record<string, unknown>) => publisher.progress("mask_cancel", update).pipe(Effect.andThen(E.Deferred.succeed(ready, undefined))) } as never).pipe(Effect.forkChild)
+    yield* E.Deferred.await(ready)
+    yield* E.Fiber.interrupt(fiber)
+    yield* publisher.failUnsettledTools({ type: "aborted", message: "Interrupted" } as never)
+    expect(events.length).toBeGreaterThan(1)
+    expect(JSON.stringify(events).includes("1234")).toBe(false)
+    expect(JSON.stringify(events)).toContain(ProtectedFiles.REDACTED)
+  }))
+
   const source = (directory: string, value: string) => {
     fs.mkdirSync(directory, { recursive: true })
     // Assignment grammar from the official Node dotenv fixture; only the RHS is generated.

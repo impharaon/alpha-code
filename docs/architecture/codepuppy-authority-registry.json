@@ -10,6 +10,38 @@
   },
   "entries": [
     {
+      "id": "secrets-tool-progress",
+      "decision": "SC-02 / U-40：根工具含合成 Code Mode 的进度在 publisher 缓存与发布前由扩展遮盖；故障隐藏且命令继续。",
+      "adr": [
+        "ADR-050"
+      ],
+      "lane": "#1758 SC-02",
+      "takeovers": [
+        "packages/core/src/tool.ts",
+        "packages/plugin/src/effect/tool.ts",
+        "packages/plugin/src/promise/tool.ts",
+        "packages/plugin/src/promise/adapter.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/secret-mask.ts",
+        "ladder": "L1 (owner-approved SC-02; root execute.progress hook)"
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "synthetic execute progress must hide known protected values"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "cancelled Code Mode progress keeps publisher failure snapshots safe"
+        },
+        {
+          "file": "packages/core/test/plugin/promise-tool.test.ts",
+          "name": "Promise progress rejection hides output without aborting the executor"
+        }
+      ]
+    },
+    {
       "id": "unattended-run-permissions",
       "decision": "无人值守运行按 main 在册名单即时裁决,标准档的默认询问与每次询问可执行,拒绝具名进入运行记录;交互会话保持审批,补充信息按项目立即取消(#1699)。",
       "lane": "#1699",

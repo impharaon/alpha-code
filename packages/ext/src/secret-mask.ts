@@ -181,9 +181,12 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       try {
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
-        return metadata(input.update)
+        if (state) state.last = input.update
+        const safe = metadata(input.update)
+        if (state) state.published = safe
+        return safe
       } catch {
-        if (state && state.kind !== "execute") state.failed = true
+        if (state) state.failed = true
         return {
           ...hiddenMetadata(state),
           ...Object.fromEntries(Object.keys(input.update).map((key) => [key, null])),
@@ -215,14 +218,8 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
               progress: async (update) => {
                 // Core makes child progress a no-op; it must not overwrite the outer execute snapshot.
                 if (!state && calls.get(callKey(context))?.kind === "execute") return
-                const safe = await service.progress({ call: context, update })
-                if (state) state.last = update
-                try {
-                  await context.progress(safe)
-                  if (state) state.published = safe
-                } catch {
-                  if (state) state.failed = true
-                }
+                // SC-02 masks once at the root publication boundary.
+                await context.progress(update)
               },
             })
           }
@@ -230,6 +227,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
           draft.execute = wrapped
         })
     },
+    release: (call: MaskCall) => { calls.delete(callKey(call)) },
     dispose: () => {
       calls.clear()
       files.dispose()

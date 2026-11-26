@@ -1719,12 +1719,14 @@ const invocationSample = (name: string, changes: Record<string, string | null> =
 const packageJourney = <A, E, R>(program: Effect.Effect<A, E, R>, before?: Plugin.Plugin) => Effect.gen(function* () {
   env({})
   const sdk = yield* SdkPlugins.Service
-  yield* sdk.register(PluginPromise.fromPromise(providerPlugin("test", "https://test.invalid", "picked")))
+  yield* sdk.register(PluginPromise.fromPromise(providerPlugin("test", "https://test.invalid", "picked", "source-sonnet")))
   yield* sdk.register(PluginPromise.fromPromise({ id: "package-test-variants", setup: async context => {
-    await context.model.transform(editor => editor.update("test", "picked", model => {
-      model.family = "sonnet" as never
+    await context.model.transform(editor => {
+      editor.default.set("test", "picked")
+      editor.update("test", "picked", model => {
       model.variants = ["low", "high"].map(id => ({ id: id as never, name: id, settings: { test: { reasoningEffort: id } } }))
-    }))
+      })
+    })
   } }))
   if (before) yield* sdk.register(PluginPromise.fromPromise(before))
   yield* sdk.register(PluginPromise.fromPromise(CodePuppyExt))
@@ -1766,7 +1768,7 @@ packageIt.live("package agent delegates with its instructions and tool set", () 
   expect(JSON.stringify(request?.tools)).toContain('"name":"read"')
   const suggested = yield* sessions.create({ location: { directory: location.directory }, title: "Source model suggestion", agent: "build" } as never)
   yield* snapshot.execute({ sessionID: suggested.id, agent: "build" as never, messageID: "msg_suggested" as never, call: { type: "tool-call", name: "subagent", id: "call_suggested", input: { agent: target, description: "Suggested model", prompt: "review", background: false } } })
-  expect((yield* sessions.list({ parentID: suggested.id })).data[0]?.model).toMatchObject({ providerID: "test", id: "picked" })
+  expect((yield* sessions.list({ parentID: suggested.id })).data[0]?.model).toMatchObject({ providerID: "test", id: "source-sonnet" })
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
   const denied = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_package_agent_off" as never, call: { type: "tool-call", name: "subagent", id: "call_package_agent_off", input: { agent: target, description: "Stopped review", prompt: "review", background: false } } }).pipe(Effect.exit)
   expect(Exit.isFailure(denied)).toBe(true)

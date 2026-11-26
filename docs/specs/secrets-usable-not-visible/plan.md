@@ -628,3 +628,40 @@ gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/unattended-
 修复后共 **173 个不同用例 PASS**，不把 base/bisect/诊断重复执行计入。命令、完整输出、bisect log 与仅身份布尔值的探针材料保留于 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r10-evidence-gtjvqs62`；主要绿/红检查另见 `/tmp/secrets-r10-{engine,display}-{red,green}.log` 与 `/tmp/secrets-r10-related.log`。诊断时一次 cwd 为根的调用未匹配到测试（exit 1 / 0 tests），纠正 cwd 后才采纳行结果，不计为回归或有效 bisect 步。
 
 偏离：实际丢失边界是 display，因此新增授权内的 display.ts/display.test.ts 为修复文件，非继续猜测修改 secret-mask；原 AC-04 行只增强断言；registry 仅同步条数；无新依赖/公开导出/产品选项。最终 `git diff --check` 及本次 plan.md 文档检查通过。遗留去向：发现 5 已由本轮修复；既有 selector 输入缺失交编排器；发现 3 的已接受跳过不重开。OPTIONAL/ARCH：无新增项。
+
+## r11 alpha 合并与宿主迁移收据
+
+依据：r11 IMPLEMENT(integration) 明确授权 fetch + merge；spec v4、design v3.3、SC-01/SC-02 不变。已核 Codex / GPT-6。开始 2026-11-26 12:34:53 UTC，验证完成 12:45 UTC，约 10 分钟（含本机 slot 排队及场景运行 100.48 秒）。文档影响为本计划执行证据；未新增决定或发布状态。
+
+`git fetch origin` exit 0；`git merge --no-edit origin/alpha` 按预期返回三处冲突。合并提交 **`233b29e2e0966d47231247a3ddc39210ecba8f98`**，两个父提交为本分支 `53f37b4187c553bc9881e3436e732855bf73dfa9` 和 fetch 所得 alpha `b0a9d0298d5da959e281b218c01d33249823a7f5`。未 rebase、push、开 PR 或 merge PR。
+
+| 冲突文件 | 保留的两侧行为 / 落点 |
+| --- | --- |
+| `packages/ext/src/plugin.ts` | cleanup 同时保留 policy.dispose、reload unregister 与条件 network.watch cleanup；alpha 的整包技能装载、联网 context hook 与 network 参数照常保留 |
+| `packages/ext/src/policy/index.ts` | display wrapper 同时接 network.run 并继续 secrets.wrap；after 中先消费 network.attachResult，有 notice 时不覆盖其网络归因，再做 display/安全 read/result/error masking；progress、审批 preview masking、finally externalRead.end 全部保留 |
+| `packages/ui-mac/src/main/engine-cases.scenario.test.ts` | 接受 alpha 删除，不复活；`git log --follow` 与 alpha 中 composer-tier-matrix 引用定位到独立 `src/main/composer-tier-matrix.engine.scenario.test.ts`，在那里更新完整标题及 pass 30→48（原 30 + ⑤新增 18） |
+
+未发现两侧同一行为相互排斥的语义冲突。自动合入的 display.ts 保留 r10 的四处原构造器重建，同时接 alpha 的联网执行 wrapper。
+
+### 库存与计数
+
+- 锁文件改变后执行根 `bun install --frozen-lockfile`，exit 0；实际 2 packages installed。随后恢复并读回 `core.hooksPath=.githooks`；最终 bun.lock 与 alpha 一致，没有额外依赖更改。
+- 用原生成器 `bun packages/ext/scripts/context-injection-inventory.ts --write`，exit 0；结果为 99 fragments / 29843 injected bytes / 162304 declared limits，与自动合入快照一致。Ext build 同时生成当前工具 manifest。权威登记册是人工维护的源记录：将两条 composer 证明的名称机械同步为新宿主标题，没有改决定或新增 authority。
+- 首次相关七文件运行 `212 PASS / 1 FAIL`：唯一红点是上述两条 proof 仍引用 30 条旧标题。同步后只重跑 authority-registry 原文件，`5 PASS / 0 FAIL`；其余已绿文件没有重复运行，最终 **213 个不同 Ext 用例 PASS**。
+- 为取得逐文件登记数而不再执行已绿用例体，分别用 Bun 对原测试文件执行 `-t 'a^'`。三个命令都按无匹配约定 exit 1，明确输出 `matched 0 tests ... skipping 44/53/97 tests`；这是注册数探针，不计 PASS 或行为失败。它与七文件实际总数 213 一致：context-injection 44、plugin-host 53、register-policy 97、setup-order 1、network-egress 5、display 8、authority-registry 5。`scripts/gate-files.tsv` 的前两数已正确，register-policy 本票新增用例后的旧 69→实测 97 已同步；新独立场景宿主外层仍 1 条。
+
+### 相关检查（全部前台结束）
+
+| cwd / 命令 | exit / 输出 |
+| --- | --- |
+| ext：`bun test --max-concurrency 2 src/plugin-host.test.ts src/policy/register-policy.test.ts src/plugin-setup-order.test.ts src/network-egress.test.ts src/policy/display.test.ts src/context-injection.test.ts src/policy/authority-registry.test.ts` | 首跑 1 / 212 PASS + 1 stale-name FAIL；只修证据名称，未改断言 |
+| ext：`bun test --max-concurrency 2 src/policy/authority-registry.test.ts` | 0 / 5 PASS；registry 红→绿，含 SC-01/SC-02 与迁移宿主引用；wider-related 的登记/枚举与实际 mock registerPolicy 的 setup-order 子进程已在上组覆盖 |
+| ui-mac：`gate slot -- bun test --max-concurrency 2 --timeout 660000 ./src/main/composer-tier-matrix.engine.scenario.test.ts` | **0 / 外层 1 PASS、4 expect**；断言内层 exit 0、48 PASS、0 FAIL、恰好 1 文件；唯一一次整行运行，含 SSH 与一分钟行，100.48 秒 |
+| ext、ui-mac：各自 `bun typecheck` | 均 0 |
+| ext：`bun run build` | 0，扩展 bundle / manifest 成功，无 app/Electron 启动 |
+| 根：scoped oxlint（plugin.ts、policy/index.ts、policy/display.ts、新 composer 宿主） | 0 / 0 warnings / 0 errors |
+| 根：`affected-tests --list`（merge commit 后） | **0 / `affected tests: 138 of 714 test files`**；仅列出，未运行 PR gate；场景宿主不在 PR 选择中 |
+
+完整命令输出位于 `/tmp/secrets-r11-{related,registry-green,host,install,inventory,ext-typecheck,ui-typecheck,build,lint,affected}.log`；计数探针与合并标识分别为 `/tmp/secrets-r11-counts.json`、`/tmp/secrets-r11-receipt.json`。本次 plan.md 文档合同检查与 `git diff --check` 通过。
+
+偏离：除三处冲突外，仅对新宿主、自动合入登记册的两个证明名称、表中本票测试数做必要同步；库存按生成器重生，无手工改生成内容。旧 r10 selector 缺输入由本次 alpha 自带声明解决，当前 scope 正常；无未解冲突、新 ARCH/OPTIONAL 项。遗留去向：none；提交后的发布仍由编排器负责。

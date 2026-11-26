@@ -47,6 +47,7 @@ import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
 
 export interface PolicyRegistration {
+  onPackagePermissionRequest(handler: (call: GateCall) => Promise<void>): () => void
   bindPackageHook(call: GateCall, decision: "allow" | "ask", active: () => boolean): Promise<void>
   packageToolCall(tool: string, input: unknown, bindings: Readonly<Record<string, string>>, format: "claude" | "runtime"): Promise<ReturnType<typeof packageToolCall>>
   bindPackageAgent(agent: string, invocation: Pick<Invocation, "availableTools" | "deniedTools">, bindings: Readonly<Record<string, string>>): void
@@ -177,6 +178,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     log: (message) => console.info(`[codepuppy-policy] ${message}`),
   })
 
+  let packagePermissionRequest: ((call: GateCall) => Promise<void>) | undefined
+  const calls = new Map<string, GateCall>()
   const packageHooks = new Map<string, { call: GateCall; decision: "allow" | "ask"; active: () => boolean; input: string; binding: string | undefined; phase: "prepared" | "confirmed" }>()
   const packageHook = (call: GateCall, facts: ToolFacts) => {
     const bound = packageHooks.get(toolCallKey(call))
@@ -253,6 +256,21 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     if (missing.length) event.system.push({ type: "text", text: renderWrapper(PACKAGE_TOOL_DEPENDENCY_ID, { label: "package invocation", body: missing.join(", ") }) })
   })
 
+  const requestPackagePermission = async (event: import("@opencode/plugin/promise/permission").PermissionEvaluation) => {
+    if (event.effect !== "ask" || event.source?.type !== "tool" || !packagePermissionRequest) return
+    const call = calls.get(toolCallKey({ sessionID: event.sessionID, messageID: event.source.messageID, id: event.source.id }))
+    if (!call) return
+    const facts = await factsFor(call.tool)
+    if (!facts || event.action !== facts.permission && event.action !== canonicalToolIdentity(facts.identity)) return
+    await packagePermissionRequest(call)
+    const final = await decide(deps, call)
+    const hook = packageHook(call, final.facts)
+    if (hook?.decision === "allow" && !isInstallAsk(event.metadata)) {
+      hook.phase = "confirmed"
+      event.effect = "allow"
+    }
+  }
+
   // Risk facts on every approval request (#1285): Code Puppy's classification overrides what a tool reports.
   // Code Puppy's own gate requests already carry theirs (`confirm`); their ask is held so no later evaluate hook can
   // turn it into allow (`holdAsk`).
@@ -268,6 +286,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     if (isCodePuppyPolicyRequest(event.metadata)) {
       // BR-10: an assistant-initiated install asks in every tier — no allow rule, saved approval or tier skips it.
       if (isInstallAsk(event.metadata) && event.effect !== "deny") event.effect = "ask"
+      await requestPackagePermission(event)
       return holdAsk(event)
     }
     // A tool's permission action asserted without a tool call (a subtask command, review R1 #2) is decided like the
@@ -285,6 +304,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       if (rules.some(rule => rule.effect === "deny")) event.effect = "deny"
       else if (event.effect === "ask" && (packageCallAllows(canonicalToolIdentity(sourceFacts.identity), rules) || hook !== undefined)) event.effect = "allow"
     }
+    await requestPackagePermission(event)
     if (event.effect !== "ask" || !event.metadata) return
     ;(event.metadata as Record<string, unknown>)[RISK_METADATA_KEY] = classifyPermissionRequest({
       permission: event.action,
@@ -305,6 +325,10 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }) as never)
 
   return {
+    onPackagePermissionRequest: handler => {
+      packagePermissionRequest = handler
+      return () => { if (packagePermissionRequest === handler) packagePermissionRequest = undefined }
+    },
     bindPackageHook: async (call, decision, active) => {
       const facts = await factsFor(call.tool)
       if (!facts) throw Error("dependency-missing: tool identity " + call.tool)
@@ -348,11 +372,13 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           const decision = await decide(deps, event)
           const facts = decision.facts
           const install = facts.identity.source === "plugin" ? hubInstallAsk(event, facts.authority.kind === "codepuppy-bundled", installSubject) : undefined
-          const hook = packageHook(event, facts)
+          const preparedHook = packageHook(event, facts)
+          calls.set(toolCallKey(event), event)
           // BR-10: the verified install tool asks from its own call (`askInstall`), once it has recorded what it installs.
           if (install?.subject) installAsks.set(toolCallKey(event), { decision, call: { tool: event.tool, sessionID: event.sessionID, agent: event.agent, messageID: event.messageID, id: event.id, input: event.input }, install })
           else await confirm(deps, decision, event, install)
           if (install && !install.subject) installAsks.set(toolCallKey(event), "asked")
+          const hook = preparedHook ?? packageHook(event, facts)
           if (hook) {
             const final = await decide(deps, event)
             if (packageHook(event, final.facts) !== hook) {
@@ -366,6 +392,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         } catch (error) {
           displays.delete(event.id)
           packageHooks.delete(toolCallKey(event))
+          calls.delete(toolCallKey(event))
           installAsks.delete(toolCallKey(event))
           throw error
         }
@@ -376,6 +403,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       )
       await context.tool.hook("execute.after", (event) => {
         packageHooks.delete(toolCallKey(event))
+        calls.delete(toolCallKey(event))
         const networkNotice = network?.attachResult(event as never)
         if (event.tool === CODE_MODE_TOOL) {
           attachUnattendedDenial(event as never, codeModeDenials.get(event.id))

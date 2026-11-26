@@ -1121,3 +1121,12 @@ Host aggregate 现为 **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc4
 本轮结论 **PARTIAL**：片 3/4 accepted 继承；混合根问题已按 r12 裁决闭合；Ralph Stop 与上述 D4/PayPal/Post 增量完成。片 5 仍需原计划的 PermissionRequest、Expansion、PostToolUseFailure/StopFailure、skill/agent scope、S-03 leave/notification/FileChanged/子助手生命周期、S-04…S-07、S-08 与 monitor 实际激活/通知/取消，及表中七包剩余运行验收；不得把这些称为五项正式 unavailable 或外部 SaaS 限制。没有新增未决设计问题，本轮依执行边界返回具体状态，不开始片 7。
 
 已核 Codex（GPT-6），spec v5 / design v3.1 + r12 orchestrator ruling。22:35 至 23:17 UTC+08:00 约 42 分钟，19 文件、718 additions / 72 deletions（最后收口文字前；含测试、生成物与证据）；没有新增依赖、迁移、公共 DTO 或 engine takeover。各实现增量已同提交登记原 L0 主权；只动计划边界和必要同调用链文件，tests-only 与修正分开。遗留去向：上述片 5 行为 fix now 续本车道；host consumer checkpoint 交编排器；docs 基线及三条旧 command-subagent 断言沿原归属；没有新增 ARCH / OPTIONAL 或仓外写操作。
+
+## r13 · 片 5 运行接线续行
+
+核对：IMPLEMENT，编排器 r13 / Claude Opus 5.5；继承 a9fe51d2ba 与 spec v5 / design v3.1 及现有 ruling，按片 5 原顺序，不开片 7。2026-11-26 23:19 UTC+08:00 起，文档影响为既有运行挂点与证据，落本节、modules 与唯一 L0 registry。
+
+PermissionRequest（D4 / AC-11/22）：e69bad67d6 用固定 Claude Security 原 unanswered 脚本只把 UNANSWERED_AFTER_S 60→0，保留原 START_CONFIRMATION 文本/JSON 判定，实际 native question 请求先红（出现一张普通审批卡，`/tmp/plugin-standard-r13-permission-red.log`）。现在同一个 runner 在 policy 即将产生真实 ask 的 evaluate 点运行，真实 session/message/call 对应 tail 当前输入；源 AskUserQuestion/tool_input 从同一 identity 投影。原 JSON decision.behavior=deny 在卡出现前拒绝并显示原 message；identity-axis 和 native-axis 的有效 allow 均重新判最终输入/服务/包活跃，再消费本次决定，不写持久权限。无真实 ask 不触发；安装 BR-10、automation、硬 deny 和其他 permission action 不放松。原 60 秒计时未运行；这是有限 wiring integration，不把等待测量塞进 PR。原副本无 credentials/SaaS 请求。
+
+
+PermissionRequest 步骤完整 host 80 + policy 78 = **158 pass / 0 fail**（`bun test --max-concurrency 2 src/plugin-host.test.ts src/policy/register-policy.test.ts`，`/tmp/plugin-standard-r13-permission-complete.log`）；installer 原文件 **50 pass / 0 fail**（`/tmp/plugin-standard-r13-permission-install.log`）；ext typecheck exit 0。新正向表验证两个真实审批轴只执行一次 handler、无卡、释放后下一次仍问；原安全脚本 deny 具名 **1 pass**。生产使用同一 policy.evaluate/current-call 表与 runner，只有已接通的 package command PermissionRequest 加入 readiness，无新 engine 接管/公共 DTO。相关用例在原 integration 文件、imports/固定 corpus 可追踪，gate-files 仅同步 host 80、policy 78；唯一 L0 registry 与 modules 同步。

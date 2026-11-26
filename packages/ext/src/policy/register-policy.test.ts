@@ -1757,3 +1757,39 @@ it.live("a package hook allow cannot approve another permission action inside it
   yield* permission.reply({ requestID: request!.id, reply: "reject" })
   expect(Exit.isFailure(yield* E.Fiber.join(running))).toBe(true)
 }))
+
+
+for (const action of [ID_BUILTIN_WRITE, ALIAS_WRITE]) {
+  it.live(`package PermissionRequest allows the current ${action === ID_BUILTIN_WRITE ? "identity" : "native"} ask without showing a card`, () => Effect.gen(function* () {
+    const { session, registration } = yield* setup({
+      rules: [ALLOW_ALL, { action, resource: "*", effect: "ask" }],
+      inside: async context => {
+        await context.tool.transform(editor => editor.update(ALIAS_WRITE, tool => {
+          const original = tool.execute
+          tool.execute = async (input, call) => {
+            await context.permission.assert({ sessionID: call.sessionID, agent: call.agent, action: ALIAS_WRITE, resources: ["fixture"], save: [], source: { type: "tool", messageID: call.messageID, id: call.id } })
+            return original(input, call)
+          }
+        }))
+      },
+    })
+    const policy = registration!
+    let invoked = 0
+    const release = policy.onPackagePermissionRequest(async call => {
+      invoked++
+      await policy.bindPackageHook(call, "allow", () => true)
+    })
+    expect(Exit.isSuccess(yield* callRaw(session.id, ALIAS_WRITE).pipe(Effect.timeout("1 second")))).toBe(true)
+    expect(invoked).toBe(1)
+    expect(counts.write).toBe(1)
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+    release()
+    const next = yield* Effect.forkChild(callRaw(session.id, ALIAS_WRITE))
+    const [request] = yield* pending
+    expect(request).toBeDefined()
+    const permission = yield* Permission.Service
+    yield* permission.reply({ requestID: request!.id, reply: "reject" })
+    expect(Exit.isFailure(yield* E.Fiber.join(next))).toBe(true)
+    expect(counts.write).toBe(1)
+  }))
+}

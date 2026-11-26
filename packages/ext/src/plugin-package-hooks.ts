@@ -390,7 +390,8 @@ export async function registerPackageHooks(
               block:
                 output.continue === false ||
                 (["Stop", "SubagentStop", "PreToolUse"].includes(event) && output.decision === "block") ||
-                (event === "PreToolUse" && specific?.permissionDecision === "deny"),
+                (event === "PreToolUse" && specific?.permissionDecision === "deny") ||
+                (event === "PermissionRequest" && record(specific?.decision) && specific.decision.behavior === "deny"),
               output,
               exitCode: 0,
               order,
@@ -399,6 +400,7 @@ export async function registerPackageHooks(
                   specific?.additionalContext,
                   output.systemMessage,
                   output.stopReason,
+                  event === "PermissionRequest" && record(specific?.decision) ? specific.decision.message : undefined,
                   ["Stop", "SubagentStop", "PreToolUse"].includes(event)
                     ? (specific?.permissionDecisionReason ?? output.reason)
                     : undefined,
@@ -469,6 +471,21 @@ export async function registerPackageHooks(
         output: "output" in result ? result.output : undefined,
       }))
   }
+  const releasePermissionRequest = input.policy.onPackagePermissionRequest(async (call) => {
+    const results = await run("PermissionRequest", call.sessionID, {}, call)
+    const allowed = results.filter(
+      (result) =>
+        result.output &&
+        record(result.output.hookSpecificOutput) &&
+        record(result.output.hookSpecificOutput.decision) &&
+        result.output.hookSpecificOutput.decision.behavior === "allow",
+    )
+    if (allowed.length)
+      await input.policy.bindPackageHook(call, "allow", () => allowed.every((result) => active(result.installed)))
+    const contexts = results.filter((result) => result.text)
+    if (contexts.length)
+      promptContexts.set(call.sessionID, [...(promptContexts.get(call.sessionID) ?? []), ...contexts])
+  })
   await context.tool.hook("execute.before", async (event) => {
     const results = await run("PreToolUse", event.sessionID, {}, event)
     for (const result of results) {
@@ -571,6 +588,7 @@ export async function registerPackageHooks(
   })
   return async () => {
     disposed = true
+    releasePermissionRequest()
     events.abort()
     unwatchFile(membership, revoke)
     for (const pointer of observed) unwatchFile(pointer, revoke)

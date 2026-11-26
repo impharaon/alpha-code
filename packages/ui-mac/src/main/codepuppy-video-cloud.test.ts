@@ -117,6 +117,7 @@ async function harness(originalPath = "/project/speech.mp4") {
     artifact: async () => answer,
   }
   return {
+    referencePath: originalPath,
     deps,
     prepared,
     requests,
@@ -146,7 +147,7 @@ test("video success cache is tenant and model revision scoped and returns the co
   const h = await harness(),
     service = createMainVideoService(h.deps),
     request = await h.prepared(),
-    first = await service.start(call, request),
+    first = await service.start(call, request, h.referencePath),
     done = await state(service, first.requestId)
   expect(done.result).toMatchObject({
     text: expect.stringContaining(h.answer.text),
@@ -155,16 +156,16 @@ test("video success cache is tenant and model revision scoped and returns the co
     usage: h.answer.usage,
   })
   const restarted = createMainVideoService(h.deps),
-    second = await restarted.start({ ...call, callID: "other" }, request)
+    second = await restarted.start({ ...call, callID: "other" }, request, h.referencePath)
   expect((await state(restarted, second.requestId, { ...call, callID: "other" })).result?.cached).toBe(true)
   expect(h.requests).toHaveLength(1)
   h.tenant("tenant-b")
   await expect(restarted.query(first.requestId, call)).rejects.toThrow("not-authenticated")
-  const third = await restarted.start(call, request)
+  const third = await restarted.start(call, request, h.referencePath)
   expect((await state(restarted, third.requestId)).result).toBeDefined()
   expect(h.requests).toHaveLength(2)
   h.models.models[0]!.revision = "changed"
-  const fourth = await restarted.start({ ...call, callID: "revision" }, request)
+  const fourth = await restarted.start({ ...call, callID: "revision" }, request, h.referencePath)
   expect((await state(restarted, fourth.requestId, { ...call, callID: "revision" })).result).toMatchObject({text:expect.stringContaining(h.answer.text),model_revision:h.answer.model_revision,cached:false})
   const records=await readdir(path.join(root,"cloud"))
   const changed=await Promise.all(records.map(async file=>JSON.parse(await readFile(path.join(root,"cloud",file),"utf8"))))
@@ -182,12 +183,12 @@ test("video resumes persisted unknown dispatch control bytes and reattaches a kn
   }
   const first = createMainVideoService(h.deps),
     input = await h.prepared(),
-    started = await first.start(call, input)
+    started = await first.start(call, input, h.referencePath)
   expect((await state(first, started.requestId)).error).toBe("network")
   const original = h.requests[0]!
   h.deps.dispatch = send
   const restarted = createMainVideoService(h.deps),
-    next = await restarted.start(call, input)
+    next = await restarted.start(call, input, h.referencePath)
   expect((await state(restarted, next.requestId)).result).toBeDefined()
   expect(h.requests[1]!.envelopeJson).toBe(original.envelopeJson)
   expect(h.requests[1]!.manifestJson).toBe(original.manifestJson)
@@ -200,7 +201,7 @@ test("video resumes persisted unknown dispatch control bytes and reattaches a kn
   await writeJson(recordPath, record)
   await rm(path.join(root, input.clip.relativePath))
   const known = createMainVideoService(h.deps),
-    reattach = await known.start(call, input)
+    reattach = await known.start(call, input, h.referencePath)
   expect((await state(known, reattach.requestId)).result).toBeDefined()
   expect(h.requests).toHaveLength(2)
   expect(await readFile(recordPath, "utf8")).not.toContain("test-access")
@@ -218,7 +219,7 @@ test("video size and timeout recovery preserves complete source coverage and all
     return result
   }
   const service = createMainVideoService(h.deps),
-    started = await service.start(call, await h.prepared())
+    started = await service.start(call, await h.prepared(), h.referencePath)
   for (;;) {
     const current = await state(service, started.requestId)
     if (current.prepare) {
@@ -254,7 +255,7 @@ test("video full result follows the registered artifact reference without a cont
     return full
   }
   const service = createMainVideoService(h.deps),
-    start = await service.start(call, await h.prepared())
+    start = await service.start(call, await h.prepared(), h.referencePath)
   expect((await state(service, start.requestId)).result?.text).toContain(full.text)
   expect(reads).toBe(1)
 })
@@ -265,9 +266,9 @@ test("video cancellation leaves another subscriber running and cancels the last 
   h.deps.status = async () => status.promise
   const service = createMainVideoService(h.deps),
     request = await h.prepared(),
-    first = await service.start(call, request),
+    first = await service.start(call, request, h.referencePath),
     other = { ...call, callID: "second" },
-    second = await service.start(other, request)
+    second = await service.start(other, request, h.referencePath)
   await state(service, first.requestId, call, (s) => s.progress?.phase === "understanding")
   await service.cancel(first.requestId, call)
   expect(h.cancelled).toEqual([])
@@ -296,11 +297,11 @@ test("video main admission rejects changed media and escaping symlinks before up
     request = await h.prepared(),
     service = createMainVideoService(h.deps),
     changed = { ...request, clip: { ...request.clip, bytes: 1 } }
-  await expect(service.start(call, changed)).rejects.toThrow("snapshot-changed")
+  await expect(service.start(call, changed, h.referencePath)).rejects.toThrow("snapshot-changed")
   const target = path.join(root, "clips/escape.mp4")
   await symlink(path.join(import.meta.dir, "fixtures/video/platform-sample.mp4"), target)
   await expect(
-    service.start(call, { ...request, clip: { ...request.clip, relativePath: "clips/escape.mp4" } }),
+    service.start(call, { ...request, clip: { ...request.clip, relativePath: "clips/escape.mp4" } }, h.referencePath),
   ).rejects.toThrow("upload-path-invalid")
   expect(h.requests).toHaveLength(0)
 })
@@ -310,7 +311,7 @@ test("video published exclusive bounds split locally before any upload", async (
     request = await h.prepared()
   h.models.models[0]!.upload_media_bytes_exclusive = request.clip.bytes
   const service = createMainVideoService(h.deps),
-    started = await service.start(call, request),
+    started = await service.start(call, request, h.referencePath),
     next = await state(service, started.requestId)
   expect(next.prepare?.start_ms).toBe(request.input.source_range.start_ms)
   expect(next.prepare!.end_ms).toBeLessThan(request.input.source_range.end_ms)
@@ -323,7 +324,7 @@ test("video equal media bytes retain independent completion records for differen
     range = request.input.source_range
   await h.prepared({ start_ms: range.start_ms + 1, end_ms: range.end_ms })
   const service = createMainVideoService(h.deps),
-    started = await service.start(call, request)
+    started = await service.start(call, request, h.referencePath)
   expect((await state(service, started.requestId)).result).toBeDefined()
 })
 test.each([false,true])("video cancel only recovers fully sent unknown admissions (%s)", async (fullySent) => {
@@ -340,7 +341,7 @@ test.each([false,true])("video cancel only recovers fully sent unknown admission
     return normal(input)
   }
   const service = createMainVideoService(h.deps),
-    started = await service.start(call, await h.prepared())
+    started = await service.start(call, await h.prepared(), h.referencePath)
   for (let i = 0; !h.requests.length && i < 100; i++) await Bun.sleep(1)
   await service.cancel(started.requestId, call)
   const file = path.join(root, "cloud", (await readdir(path.join(root, "cloud")))[0]!)
@@ -366,7 +367,7 @@ test.each([false,true])("video cancel only recovers fully sent unknown admission
 
 test("video privacy-card cancellation never dispatches media",async()=>{
  const h=await harness("/project/.ssh/speech.mp4"),service=createMainVideoService(h.deps)
- const started=await service.start(call,await h.prepared())
+ const started=await service.start(call,await h.prepared(), h.referencePath)
  for(let i=0;!h.deps.upload.videoPreviews(1).length && i<1000;i++)await Bun.sleep(1)
  const preview=h.deps.upload.videoPreviews(1)[0]
  expect(preview).toBeDefined()
@@ -388,7 +389,7 @@ test("video network retry reuses the same in-process consent without a second pr
  },dispatch:async()=>{throw Error("not text")},log:()=>{}})
  const normal=h.deps.dispatch
  h.deps.dispatch=async input=>{if(!h.requests.length){h.requests.push(input);await input.progress(input.clip.bytes);return {error:"network"}}return normal(input)}
- const service=createMainVideoService(h.deps),started=await service.start(call,await h.prepared())
+ const service=createMainVideoService(h.deps),started=await service.start(call,await h.prepared(), h.referencePath)
  try{
   for(let i=0;!h.deps.upload.videoPreviews(1).length&&i<1000;i++)await Bun.sleep(1)
   const preview=h.deps.upload.videoPreviews(1)[0]!
@@ -399,4 +400,12 @@ test("video network retry reuses the same in-process consent without a second pr
   expect(issues).toBe(1)
   expect(h.requests[1]!.uploadConsent).toBe(h.requests[0]!.uploadConsent)
  }finally{await service.cancel(started.requestId,call)}
+})
+
+
+test("video sensitivity follows the verified admitted reference even after a nonsensitive alias was opened",async()=>{
+ const h=await harness(),service=createMainVideoService(h.deps)
+ const started=await service.start(call,await h.prepared(),"/project/.ssh/speech.mp4")
+ for(let i=0;!h.deps.upload.videoPreviews(1).length&&i<100;i++)await Bun.sleep(1)
+ try{expect(h.deps.upload.videoPreviews(1)).toHaveLength(1);expect(h.requests).toHaveLength(0)}finally{await service.cancel(started.requestId,call)}
 })

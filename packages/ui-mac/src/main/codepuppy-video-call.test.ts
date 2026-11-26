@@ -81,7 +81,7 @@ test("main verifies the engine minted running video call and original admitted s
           sensitivity: { originalName: "speech.mp4" },
         },
       }
-      await verifyVideoCall(request, client, root)
+      expect(await verifyVideoCall(request, client, root)).toBe(path.join(root,"speech.mp4"))
       await expect(
         verifyVideoCall({ ...request, call: { ...request.call, agent: "other" } }, client, root),
       ).rejects.toThrow("video_request_invalid")

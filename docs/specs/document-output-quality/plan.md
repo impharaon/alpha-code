@@ -658,3 +658,5 @@ B7 layout red：既有 renderer 的三个变体（计算失败回执、坏回执
 B7 layout green：renderer 文件 9 PASS（B7-layout-green.log）。失败/无效回执/进程异常均继续布局并明确计算不完整；成功才写 recalculationId/缓存诊断，pending 流程与源版本变化拒绝仍保留，不把旧缓存冒称重算成功。
 
 A1/A10 消费者补齐 red：最终 related 搜索找到现有 mac-target-arch 的全局 Office FileSet 假设，以及原 afterPack 原生资源 fixture 缺新必需 document-assets。具名相关变体 4 PASS/2 FAIL（A10-consumer-red.log），这两处是同调用链必须同步的测试消费者，补进具名文件列表；不改变它们的架构/缺 ripgrep 拒绝断言。
+
+A1/A10 消费者同步：原 mac FileSet 用例消费 global+mac，真实 asar fixture 补随包资产；全文件首轮 39 PASS/1 FAIL 显示另一旧 Win 完全免检断言，改为仍不适用的 Linux，Win 新必检行为由 A1 的真实 afterPack 正反两臂负责（follow-up 1 PASS）。没有删除原生架构/asar/ripgrep 断言。真实完整资产包装补证 `gate slot -- bun /tmp/alpha-1761-r11/package-copy.ts` exit 0：生产 electron-builder copier 从 native build 拷贝 593 份资产（npm 580 份），所有摘要/许可通过，并执行真实 afterPack 的 Windows Resources 路径（package-copy.log）；这是 closest real-copier + afterPack，不是完整 package:mac 目录构建或 Windows 实机包。

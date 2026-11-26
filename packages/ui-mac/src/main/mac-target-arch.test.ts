@@ -325,9 +325,10 @@ describe("#1570 生产 electron-builder.config.ts 拒绝退役的签名变量名
 describe("#1564 生产 electron-builder.config.ts 把随包 Office 运行时装进包", () => {
   test("darwin extraResources:目标架构那一份 → <Resources>/office-runtime/(main 模板的命令头所在);Windows 复制对应目标", async () => {
     const { getConfig } = await import("../../electron-builder.config")
-    const entries = (getConfig("prod").extraResources ?? []) as Array<{ from: string; to: string }>
+    const config = getConfig("prod")
+    const entries = [...(config.extraResources ?? []), ...(config.mac?.extraResources ?? [])] as Array<{ from: string; to: string }>
     expect(entries.filter((entry) => entry.to === "office-runtime/")).toEqual(
-      process.platform === "darwin" ? [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/${resolveTargetArch()}/`, to: "office-runtime/" }] : process.platform === "win32" ? [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/win32-x64/`, to: "office-runtime/" }] : [],
+      [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/${resolveTargetArch()}/`, to: "office-runtime/" }],
     )
   })
 })
@@ -438,6 +439,7 @@ async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode
   }
   const resources = path.join(dir, "app", "Code Puppy.app", "Contents", "Resources")
   fs.mkdirSync(resources, { recursive: true })
+  fs.cpSync(path.join(import.meta.dir, "fixtures/document-assets"), path.join(resources, "document-assets"), { recursive: true })
   const { createPackageWithOptions } = await import(createRequire(require.resolve("electron-builder")).resolve("@electron/asar"))
   await createPackageWithOptions(path.join(dir, "source"), path.join(resources, "app.asar"), opts.unpack ? { unpackDir: ENGINE_ASSETS_DIR } : {})
   // DESIGN-domestic-cloud-connectivity §4.8:随包 ripgrep 落 <Resources>/ripgrep/rg(extraResources,不进 asar)。
@@ -487,7 +489,7 @@ describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
     ])
   })
 
-  test("生产 electron-builder.config.ts:asarUnpack 解包引擎资源目录;afterPack 对今天的形状拒绝出包、对解包的形状放行,非 mac 平台不受影响", async () => {
+  test("生产 electron-builder.config.ts:asarUnpack 解包引擎资源目录;afterPack 对今天的形状拒绝出包、对解包的形状放行,Linux 不受影响", async () => {
     const { getConfig } = await import("../../electron-builder.config")
     const config = getConfig("prod")
     expect(config.asarUnpack).toEqual([`${ENGINE_ASSETS_DIR}/**`])
@@ -499,7 +501,7 @@ describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
     )
     const unpacked = await packagedResources({ arch: "arm64", unpack: true })
     await expect(afterPack(context(unpacked.appOutDir))).resolves.toBeUndefined()
-    await expect(afterPack({ ...context(packed.appOutDir), electronPlatformName: "win32" })).resolves.toBeUndefined()
+    await expect(afterPack({ ...context(packed.appOutDir), electronPlatformName: "linux" })).resolves.toBeUndefined()
   })
 })
 

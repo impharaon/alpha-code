@@ -381,3 +381,60 @@ bun --eval 'import { stripAnsi } from "../session-ui/src/tools/ansi.ts"; for (co
 - Core/Ext/Plugin package `bun typecheck`、实际改动 TS oxlint、`git diff --check` exit 0；Ext `bun run build` 产生 self-contained ESM，未启动 app/Electron。额外一次真实 Node 平台探针 `node /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r7-node-pyEiXt/probe.mjs` exit 0：Node v26.13.1 / darwin / arm64，authenticatedFrames、ciphertextOnly、truncatedRejected、streamingMask 均 true；只编译本次 spool/stream，输入临时生成、不打印值，不作为常驻重复测试。
 - `affected-tests --list` 仍 exit **2**，缺根 `.gate-tests`，**无 scope line**；交编排器按既有去向，不改 gate。Alpha profile 检查本 plan、ADR-050、registry 的 findings 为 0（输出 `/tmp/secrets-r7-docs-contract.json`），modules/README 既有问题继承③去向，不报全仓文档通过。新增 authority 链接存在，索引只提取本计划行。
 - 已核：Codex / GPT-6；r7 开始 09:54 UTC，④完成检查约 10:28 UTC。实际首提交 23 文件、794 insertions/33 deletions，加本段真实退出字段的必要修正；无迁移/新依赖/新配置。SC-01/SC-02/U-42 的已定边界不重开。完整 AC-01..10 真引擎验收、故障跨记录与一分钟直播仍属⑤；Windows 真机待 Windows 包发布，不含 Intel Mac。
+
+
+## ⑤ 真引擎与平台验收证据
+
+- 依据：规格 v4 AC-01..10 / BR-01..07；冻结设计 v3.3 @ `f988de5eb1` §2/§4/§5/§10；①②③及 SC-02 已接受收据、④ `60b58554c6` 与真实退出状态修正 `44849a0fe2`；#1758。Windows 真机只在 win32-x64 包发布时验，不含 Intel Mac。
+- 核对：待编排器核对本节计划后续派实施；r7 本轮只追加⑤计划，不运行本节场景、不预填验收结论。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/main/composer-tier-matrix.engine.cases.ts` | 在已有真注入、真 Ext、本机 scriptedModel、HTTP/权限路径的三档模块里增加 `protected files` 场景组，共 18 行（下表展开），只用真实内置 read/shell/writers。场景内的临时目录、接收服务、SSH 服务与卡片/记录观察 helper 留本模块，复用现有 engine-sandbox/codepuppy-engine，不新建票号文件或第二个引擎宿主。 |
+| `packages/ui-mac/src/main/engine-cases.scenario.test.ts` | 只更新现有 composer-tier-matrix 行的标题与精确 pass 数（预计 30→48，以实际具名行核对）；宿主仍 7 行，保留每行 0 fail / 恰好一个文件及现有时限断言，不加第二张表、不改 gate、地板或阈值。 |
+| 本 `plan.md` | 同提交补核对、逐 AC 实际命令/结果、所有对照臂与平台 pending 行；实测失败按原 Handling problems 处理，不把目录/标题存在当行为证据。 |
+
+不改其它 specs/design/生产接口、Core/Ext 功能、运行规则或 gate。若场景暴露本票真实缺陷，先记录具名红例，再做必要同调用链最小修正及本计划偏离；冻结接口不足则精确返回，不预建测试开关/配置/依赖。
+
+### 顺序
+
+1. **先建安全观察与三档读矩阵（首提交）**。沿用现有 `engineSandbox()`、`assertEngineSandboxed()` 和 `codepuppyEngine()`；所有 HOME/XDG、global/data/config、项目与测试输出都须由引擎自己核实落在 sandbox。测试在启动前以穷尽 `Record<ProtectedFiles.ProtectedPathVariable, string>` 的 fixture 输入把八个已发布路径变量重定向到 sandbox，防止继承宿主 AWS/Kube/gcloud 等真实路径；这份类型约束的输入不是第二张保护名单。每行建立新的项目/Location，不只新 Session，防 retained values 跨行让反例假绿。所有来源值由 fixture/CLI 在测试侧生成，prompt 只给文件名/命令，不能把期望秘密写进用户提示或模型桩响应。
+2. 复用 `scriptedModel.requests` 观察真正收到的 tool 消息；走已有 Session API 读取记录，并消费真实 EventV2/消息到现有 `createProjector`（`src/engine-adapter/opencode2/events.ts`）与 `shellRunProps/transitionShellRun`（`packages/session-ui/src/tools/run-machine.ts`）得到卡片数据。用同一原始事件/记录，不能另写投影或把模型文本当卡片证明；结束前同时直接读实际 capture 文件和 Shell.output。所有缺值断言比较 boolean，报告只记结果/路径，不打印 fixture RHS。先落 AC-01 三行、AC-05 三行和 AC-06 一行；所有 Asked 通过引擎原待批/回复路由计数，保护读出现 Asked 立即判错后清理，不自动批准掩盖它。
+3. **程序可用、命令与结构化文件（第二提交）**。AC-02 原样 cat，AC-03 Node 官方 dotenv fixture + 原 write/edit/patch 恢复后脚本发送到 127.0.0.1 临时 HTTP 接收端（端口由 listen(0) 分配），测试侧核收到真实值/重复 RHS、引擎侧看不到值。AC-04 使用现有 private-key fixture/真实 ssh-keygen 生成的临时测试钥匙（来源注释指向既有 provenance），只在 sandbox 放私钥/authorized_keys/host key；运行本机现有 OpenSSH sshd、临时配置与高位回环端口。用 internal-sftp/测试根验证私钥认证成功，不启动用户登录 shell/rc，不读 owner SSH 配置或 agent；client 使用明确的测试 identity、已知主机表与空配置。`/usr/sbin/sshd -V` 本轮只读确认 OpenSSH 10.2p1；无特权服务能力留实施时在临时目录验证，不请求 root/安装依赖来假定成功。AC-10 直接复制②已记录来源的真实 AWS/云配置格式，打印 package.json 与配置，核凭据字段消失而 json、端口/开关仍在。此处不重做解析器证明。
+4. **故障、Code Mode 与唯一一分钟（第三提交）**。借既有测试 probe 的 Context 注册同一个 capture hook 作一次故障注入：start（首 publish 前）、chunk（已 publish 后）、end、实际 capture 路径 IO 阻断四行。记录注入确实发生，命令仍完成副作用/真实退出码；终态 API、文件、记录、模型和卡片全部只含固定说明与运行状态。IO 例在 start 把本次临时 capture 路径占为目录，验证说明文件也不能落盘时仍无旧引用；finally 只清本次测试材料。Code Mode 行跑真实 child 结果/错误及根取消路径，用真实事件/记录证明没有原值，不以 direct snapshot 替代模型请求。长 escape 行只用一个固定 1 MiB 样本：先有密文残段、后无效 escape，在同一回调释放安全帧；不做 RSS 阈值、容量/seed 扫描。AC-09 的一分钟行在结束前观察卡片及运行文件，结束后观察模型/记录/最终文件；迭代时先不跑这行，最后经宿主一次跑完，不为同一代码再跑一分钟。
+5. **一次性反证，不加产品开关**。①②③④已有低层移除臂继承；本段另在隔离的新进程中按 AC 跑最小真实反臂。对 AC-01/02/04 去对应规则/遮盖后观察原值确实出现；AC-06 临时只向 Schema 的 PROJECT 家族加 `vault.custom` 并把同一个联合用例的文件名改成它，三处仍通过，再分别旁路 read、普通结果遮盖、risk probe，各一臂变红；不用导出/可注入名单。AC-08 的对照只移除故障隐藏并恢复原文 fallback，注入仍须命中且原值出现；AC-09 的对照延迟 publish 到 end，结束前观察失败；AC-10 把实际配置全文当匹配单位，普通 json 被遮使断言红。每次保存命令、原始输出、输入提交/差异和观察 boolean，结束后精确恢复并比对字节；不用常驻变异测试或修改旧记录。源/模块缓存不能跨臂复用，反例不得因旧 retained values 或另一消费者再次遮盖而假绿。
+6. **运行与交付**。每次真引擎、SSH、1 MiB 和一分钟均经 `gate slot --`；不跑 gate/bin/check/whole suites。迭代只跑刚变的具名行：从 `packages/ui-mac` 执行 `gate slot -- bun test --max-concurrency 2 --timeout 90000 src/main/composer-tier-matrix.engine.cases.ts -t '<具名行>'`，不包含一分钟。结束步骤只一次从同包运行 `gate slot -- bun test --max-concurrency 2 src/main/engine-cases.scenario.test.ts -t '三档 × R1'`，现有行执行全部 48 例并校验精确数/0 fail/一文件；不另跑直达 cases 全文件或宿主其它 6 行。对照一分钟为不同变异代码，只跑该臂一次，失败后用现有 Shell remove/宿主 close 在 finally 清理，不留进程。若实施中的新改动确实需要重验已跑的重例，记录新版本/原因，不重复 unchanged run。
+7. 最后只一次 grep 实际改动 helper/mock/枚举消费者，跑未跑过的必要相关文件；当前预计无需改共享 helper，pure engine-adapter/run-machine 消费者已在④核过，不因写计划重跑。ui-mac `bun typecheck`、实际改动 TS scoped oxlint、`affected-tests --list`（只列范围）、Alpha profile 本次文档检查和 `git diff --check`。核宿主表仍 7 行、实际新增 static imports/literal fixture 路径可被选择器追踪；不修当前缺 `.gate-tests` 的独立输入。分上述三单元提交，只返编排器，不 push/PR/merge。
+
+### 风险
+
+- 只看 hook 返回会漏掉模型/记录/卡片，或等到结束才检查会把 AC-09 假装通过。先接现有真实事件/消息观察，分钟行必须在命令仍活动时留下实际 capture 和卡片证据；不启动窗口，不补 UI/Bus 接管。
+- 全局路径变量/OS homedir、retain 跨 Location、同进程模块缓存都可能越界或污染对照。先证明完整沙箱与显式路径输入，再逐行新 Location、逐反臂新进程；不读取 owner 的源文件，也不把真实凭据放报告。
+- 真实 SSH 需要本机 sshd 可在临时目录无特权运行，且不能通过真实用户 rc/agent 获得偶然成功。现有二进制已确认，服务/认证到目标目录的验证未跑；若环境无法提供，不换假 SSH、不写系统配置/申请 sudo，返回具体机器前置项给编排器，先完成独立 AC。
+- 负向只有“没输出”不足以证明没漏，故障注入也可能没命中。每臂同时核执行/接收/注入计数与原值可见或普通值丢失，坏臂必须触发对应正向断言；物理文件与 API/记录不能互相代替。
+- 上游 tool-shell 文件已有预期红与独立 baseline 问题按④去向保留；不在本段重跑其全文件或修旧 shell 语义。host 原有 30 行若有红，按 Handling problems 的一次具名基线处理，不改断言/阈值来获得 48 pass。
+
+### 证明
+
+以下均为现有 `composer-tier-matrix.engine.cases.ts` 的 `protected files` scenario 组；相关 PR 不运行、nightly 才常驻，本次按批准计划手动经 slot 执行。共 18 新行，加原 30 行预计 48；其它计数变化必须列为本计划偏离。
+
+| AC / 行数 | 具名行为证据 | 缺少行为为什么会失败 / 平台去向 |
+| --- | --- | --- |
+| AC-01 / 3 | `protected files read build`、`protected files read ask`、`protected files read readonly`：真实 env 工具结果、模型/记录、Asked=0，两个变量名、秘密遮盖、端口原样；另含原 offset/limit 长行/多行页观察 | 去 read 规则/源跨度会出现原值或 Asked；整文遮盖会丢变量/端口。darwin-arm64 本轮，Windows 三档真机留发布。 |
+| AC-02 / 1 | `protected files shell model records and card` | 去捕获/终态遮盖，模型、记录、最终卡或物理输出出现已知原值；不以工具卡截图代替原始数据。 |
+| AC-03、BR-04 写回 / 1 | `protected files restored env reaches local receiver`：真实三 writer 与脚本/接收端 | 去回填会把占位符/错误序号发出；不执行程序则接收端为空，单纯隐藏所有输出也不能使接收证明通过。 |
+| AC-04 / 1 | `protected files private key authenticates over SSH`：read/命令打印/真实私钥认证三步 | 去保护会出现完整测试私钥；限制程序读取则真实认证失败。使用本机临时 SSH 服务，不碰远端或 owner 登录环境；Windows 真机留发布。 |
+| AC-05 / 3 | `protected files ordinary outside read build/ask/readonly` | 删例外导致 build 出 Asked，删整规则导致 ask/readonly 放开；三档原先结果分别核，保持已有明确 deny。 |
+| AC-06 / 1 | `protected files one rule reaches three consumers` + 同名 case 的新文件名一次性图 | read、普通工具回显、审批风险三处同一源；分别去任一消费者断言红，新文件名图不是只检查字符串/导出存在。 |
+| AC-07 / 0 新行 | 继承① Windows 形态路径和移除臂；本段记录 win32-x64 的 AC-01/02/04 真机行 pending | darwin 不把 Windows 字符串当实际 Windows IO；发布到 Windows 时逐项实际运行，不能以 Mac pass 代签。 |
+| AC-08 / 4 | `protected files capture failure start/chunk/end/io` | 需故障命中、进程副作用/真实 exit 可见、所有终态仅说明；去故障隐藏的原文 fallback 反臂确实出现原值。 |
+| AC-09 / 1 | `protected files minute live output` | 结束前卡片/文件没有输出，或任何阶段出现已知值均失败；延到 end 的对照在前置观察处红。唯一正常一分钟在最终宿主检查中跑一次。 |
+| AC-10 / 1 | `protected files cloud fields keep ordinary values` | 真格式凭据被遮，package.json 的 json/数字及配置普通值原样；整文作为秘密的对照使普通值断言红。 |
+| BR-03/07，SC-02 / 1 | `protected files Code Mode results errors and cancelled progress` | child/outer 真实模型请求、progress、取消记录都有检查，去 SC-02 时根原值出现；不改 r5 已保留的外层进度断言。 |
+| v3.3 / 1 | `protected files invalid escape publishes streamed residue` | 当前 flush 内实际文件/卡片已有安全文本，未决时只有密文；单槽聚合/延后发布或临时原文会失败。仅固定 1 MiB 一次，不常驻 PR 层。 |
+
+### 偏离记录
+
+暂无。⑤ PLAN 作者核对：Codex / GPT-6，只读检查了上述现有引擎沙箱、模型桩、生产注入/Ext 入口、scenario 宿主行、卡片投影与 OpenSSH 二进制；未运行本节重例，未改生产/测试/gate，平台与 SSH 服务实际能力没有伪报通过。下一步为编排器核对本计划后续派实施。

@@ -19,10 +19,10 @@ export type EgressGrantTruthWriteFs = {
 let tmpSeq = 0
 
 /** 原子写(见文件头)。父目录 `egress-grants/` 不在 codepuppy-environment.ts 的拓扑预检里,不在就建。 */
-export function writeEgressGrantTruth(path: string, grants: readonly EgressGrantRecord[], fs: EgressGrantTruthWriteFs): void {
-  const bad = invalidEgressGrantList(grants)
+export function writeEgressGrantTruth(path: string, sites: readonly EgressGrantRecord[], fs: EgressGrantTruthWriteFs): void {
+  const bad = invalidEgressGrantList(sites)
   if (bad) throw new Error(`egress grants: refusing to write ${path} — ${bad}`)
-  const text = JSON.stringify({ v: EGRESS_GRANT_TRUTH_VERSION, grants: grants.map(canonicalEgressGrantRecord) }) + "\n"
+  const text = JSON.stringify({ v: EGRESS_GRANT_TRUTH_VERSION, sites: sites.map(canonicalEgressGrantRecord) }) + "\n"
   fs.mkdirSync(dirname(path), { recursive: true })
   const tmp = `${path}.${process.pid}.${++tmpSeq}.tmp`
   try {
@@ -32,7 +32,7 @@ export function writeEgressGrantTruth(path: string, grants: readonly EgressGrant
     try {
       fs.rmSync(tmp, { force: true })
     } catch {
-      // 临时文件留着无害(读端只认 <env>.json);真正要报的是下面那个错
+      // 临时文件留着无害(读端只认 sites.<env>.json);真正要报的是下面那个错
     }
     throw error
   }

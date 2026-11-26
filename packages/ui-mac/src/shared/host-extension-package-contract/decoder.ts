@@ -1,3 +1,4 @@
+import { validPluginPackage, type PluginPackagePayloadV1 } from "./plugin-package"
 import envelopeSchemaJson from "./codepuppy-package-envelope-v1.schema.json"
 import {
   HOST_EXTENSION_PACKAGE_LIMITS_V1,
@@ -361,6 +362,7 @@ export type CloudPayloadV1 = {
 }
 
 export type PackageProfilePayloadV1 =
+  | PluginPackagePayloadV1
   | SkillPayloadV1
   | AgentPayloadV1
   | CloudPayloadV1
@@ -538,7 +540,7 @@ export function decodePackageProfilePayloadV1(
   bytes: Uint8Array,
   capabilities: PackageCapabilityV1[],
 ): PackageProfilePayloadDecodeV1 {
-  if (bytes.byteLength > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxPayloadBytes)
+  if (profileId !== "plugin-package" && bytes.byteLength > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxPayloadBytes)
     return {
       ok: false,
       errors: [
@@ -547,6 +549,11 @@ export function decodePackageProfilePayloadV1(
     }
   const parsed = parseJsonBytes(bytes, "payload")
   if (!parsed.ok) return parsed
+  if (profileId === "plugin-package") {
+    const decoded = decodePluginPackagePayload(parsed.value)
+    if (!decoded.ok) return decoded
+    return derivePayloadCapabilitiesV1(decoded.payload).join("\n") === capabilities.join("\n") ? decoded : { ok: false, errors: ["payload.capabilities: plugin package capabilities differ"] }
+  }
   const limitErrors = inspectStructure(
     parsed.value,
     "payload",
@@ -580,6 +587,11 @@ export function decodePackageProfilePayloadV1(
 
 export function derivePayloadCapabilitiesV1(payload: PackageProfilePayloadV1): PackageCapabilityV1[] {
   const capabilities: PackageCapabilityV1[] = []
+  if (payload.schema === "codepuppy.host-extension-package.payload.plugin-package.v1") {
+    if (payload.description.secrets.length) capabilities.push("codepuppy.secret-prerequisite.v1")
+    if (payload.description.entries.some(entry => entry.kind === "mcp" && entry.transport !== "stdio" && entry.oauth && entry.oauth.required)) capabilities.push("codepuppy.mcp-oauth.v1")
+    return capabilities.sort()
+  }
   if ("officialRecipe" in payload.behavior && payload.behavior.officialRecipe)
     capabilities.push("codepuppy.official-connectors.v1")
   if (
@@ -962,7 +974,7 @@ function decodeComponent(
   )
     errors.push(`${at}.profileVersion: required positive 32-bit integer`)
   const capabilities = decodeCapabilities(value.capabilities, `${at}.capabilities`, errors)
-  const payloadRef = decodePayloadRef(value.payloadRef, `${at}.payloadRef`, errors)
+  const payloadRef = decodePayloadRef(value.payloadRef, `${at}.payloadRef`, errors, profileId === "plugin-package" ? { maxBytes: Number.MAX_SAFE_INTEGER } : {})
   if (
     id &&
     typeof value.required === "boolean" &&
@@ -1788,4 +1800,17 @@ function rejectUnknownKeys(
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+function decodePluginPackagePayload(value: unknown): PackageProfilePayloadDecodeV1 {
+  const errors: string[] = []
+  if (!isObject(value) || value.schema !== "codepuppy.host-extension-package.payload.plugin-package.v1" || Object.keys(value).some(key => !["schema", "description", "blobs"].includes(key)) || !validPluginPackage(value.description) || !Array.isArray(value.blobs)) return { ok: false, errors: ["payload: invalid plugin package description or tree digest"] }
+  const blobs = value.blobs.flatMap((blob, index) => {
+    const ref = decodePayloadRef(blob, `payload.blobs[${index}]`, errors, { maxBytes: Number.MAX_SAFE_INTEGER })
+    return ref ? [ref] : []
+  })
+  const expected = new Map(value.description.tree.flatMap(node => node.kind === "file" && node.bytes > 0 ? [[node.digest.slice(7), node.bytes] as const] : []))
+  if (blobs.length !== expected.size || new Set(blobs.map(blob => blob.sha256)).size !== blobs.length || blobs.some(blob => expected.get(blob.sha256) !== blob.bytes)) errors.push("payload.blobs: must match every nonempty file digest and byte count exactly")
+  if (errors.length) return { ok: false, errors }
+  return { ok: true, payload: { schema: "codepuppy.host-extension-package.payload.plugin-package.v1", description: value.description, blobs } }
 }

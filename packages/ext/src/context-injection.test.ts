@@ -178,9 +178,9 @@ describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
     expect(ctx).toEqual(THROATED)
     // 四条请求钩子挂的是**同一个**回调对象:下面 ③b / ③h 在四条钩子上逐一过真宿主,这里再钉住它们不会各自漂移。
     // session.context 上另有 L4 策略的目录闸(registerPolicy 里先注册,只删工具表条目、不写字;③b / ③h 的真宿主链里同在);
-    // ext 自己的组装回调是那里的最后一个。
+    // 联网 notice 仅在 context 的中间回调按事实写登记文本；四者共用的组装回调仍在最后。
     const [context, ...rest] = REQUEST_HOOKS.map((name) => recorded.hooks[`session.${name}`] ?? [])
-    expect(context).toHaveLength(2)
+    expect(context).toHaveLength(3)
     const assemble = context!.at(-1)!
     for (const other of rest) {
       expect(other).toHaveLength(1)
@@ -1052,4 +1052,11 @@ describe("AC3 库存:一处列全,快照逐字节比对(codepuppy-check 第 [12/
     for (const f of CONTEXT_INJECTIONS) expect(text, f.id).toContain(f.id)
     for (const r of inventory()) expect(text).toContain(`${String(r.bytes).padStart(6)}  ${String(r.maxBytes).padStart(6)}`)
   })
+})
+
+ test("联网 notice 的 system 与 result 登记共用固定说明", () => {
+  const rows = CONTEXT_INJECTIONS.filter((entry) => entry.id.startsWith("network.egress.notice."))
+  expect(rows.map((row) => [row.id, row.sink])).toEqual([["network.egress.notice.system", "system"], ["network.egress.notice.result", "tool-failure"]])
+  expect(contextText("network.egress.notice.system")).toBe(contextText("network.egress.notice.result"))
+  expect(contextText("network.egress.notice.result")).toContain("请等待决定或获准后重试，不要排查网络或绕开代理。")
 })

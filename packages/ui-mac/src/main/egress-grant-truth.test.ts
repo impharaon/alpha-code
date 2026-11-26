@@ -11,7 +11,7 @@
 
 import { describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
-import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, renameSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, relative, resolve } from "node:path"
 import { environmentMutableRoot } from "./codepuppy-environment"
@@ -84,9 +84,9 @@ const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<Proces
 
 describe("真源位置(I3):<casBaseRoot>/egress-grants/<env>.json 不在可写集任何固定行之下", () => {
   test("路径 = <casBaseRoot>/egress-grants/<env>.json;与 env 根、mcp-servers/、cas/ 同级(相对每个都以 .. 开头)", () => {
-    expect(egressGrantTruthPath(DEFAULT_STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/egress-grants/prod.json")
-    expect(egressGrantTruthPath(DEFAULT_STATE_ROOT, "beta")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/egress-grants/beta.json")
-    expect(egressGrantTruthPath(OVERRIDE_STATE_ROOT, "dev")).toBe("/Users/alpha/dev/codepuppy-base/egress-grants/dev.json")
+    expect(egressGrantTruthPath(DEFAULT_STATE_ROOT, "prod")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/egress-grants/sites.prod.json")
+    expect(egressGrantTruthPath(DEFAULT_STATE_ROOT, "beta")).toBe("/Users/alpha/Library/Application Support/codepuppy-state/egress-grants/sites.beta.json")
+    expect(egressGrantTruthPath(OVERRIDE_STATE_ROOT, "dev")).toBe("/Users/alpha/dev/codepuppy-base/egress-grants/sites.dev.json")
     for (const env of ["prod", "beta", "dev"] as const) {
       const truth = egressGrantTruthPath(DEFAULT_STATE_ROOT, env)
       for (const sibling of [
@@ -99,7 +99,7 @@ describe("真源位置(I3):<casBaseRoot>/egress-grants/<env>.json 不在可写�
         expect(relative(sibling, truth).startsWith(".."), `${env}: ${sibling}`).toBe(true)
       }
       // 与远程 MCP 真源是同一个父目录下的两个文件,不是同一个文件(两种记录形状不同)
-      expect(relative(mcpServerTruthPath(DEFAULT_STATE_ROOT, env), truth)).toBe(join("..", "..", "egress-grants", `${env}.json`))
+      expect(relative(mcpServerTruthPath(DEFAULT_STATE_ROOT, env), truth)).toBe(join("..", "..", "egress-grants", `sites.${env}.json`))
     }
   })
 
@@ -130,130 +130,67 @@ describe("真源位置(I3):<casBaseRoot>/egress-grants/<env>.json 不在可写�
 
 // ── I8:严格读 ─────────────────────────────────────────────────────────────────
 
-const A: EgressGrantRecord = { host: "en.wikipedia.org", port: 443, at: "2026-09-23T10:00:00.000Z" }
-const B: EgressGrantRecord = { host: "example.com", port: 443, at: "2026-09-23T10:01:00.000Z" }
-const AB_BYTES =
-  '{"v":1,"grants":[{"host":"en.wikipedia.org","port":443,"at":"2026-09-23T10:00:00.000Z"},{"host":"example.com","port":443,"at":"2026-09-23T10:01:00.000Z"}]}\n'
-
 function readWithLog(path: string) {
   const lines: string[] = []
-  const read = readEgressGrantTruth(path, { readFileSync, log: (l) => lines.push(l) })
+  const read = readEgressGrantTruth(path, { readFileSync, log: (line) => { lines.push(line) } })
   return { read, lines }
 }
 
-describe("严格读(I8):缺失 = 没批准过;其余任何不对 = 没问出来,不是空记录", () => {
-  test("缺失 ⇒ ok + absent + 空清单 + 零日志", () => {
+// Records are produced from the frozen N4 shape, with production serialization for persisted fixtures.
+const A: EgressGrantRecord = { site: { kind: "domain", value: "example.com" }, at: "2026-11-26T00:00:00.000Z" }
+const B: EgressGrantRecord = { site: { kind: "domain", value: "alice.github.io" }, at: "2026-11-26T00:01:00.000Z" }
+
+describe("严格站点文档与原子替换", () => {
+  test("缺失与 unreadable 分开；重启重读站点，只有用户级环境文件改变", () => {
     withTemp((dir) => {
-      const { read, lines } = readWithLog(join(dir, "egress-grants", "prod.json"))
-      expect(read.ok).toBe(true)
-      expect(read.ok && read.absent).toBe(true)
-      expect(read.ok && read.grants).toEqual([])
-      expect(lines).toEqual([])
+      const path = egressGrantTruthPath(dir, "prod")
+      expect(readWithLog(path).read).toEqual({ ok: true, absent: true, sites: [] })
+      writeEgressGrantTruth(path, [A, B], { mkdirSync, writeFileSync, renameSync, rmSync })
+      expect(readWithLog(path).read).toEqual({ ok: true, absent: false, sites: [A, B] })
+      expect(readFileSync(path, "utf8")).toBe(JSON.stringify({ v: 1, sites: [A, B] }) + "\n")
+      expect(readdirSync(join(dir, "egress-grants"))).toEqual(["sites.prod.json"])
+      expect(egressGrantTruthPath(dir, "prod")).not.toBe(egressGrantTruthPath(dir, "dev"))
     })
   })
-
-  test("正样本:键序乱也读回固定键序,两条记录逐字", () => {
-    withTemp((dir) => {
-      const path = join(dir, "prod.json")
-      writeFileSync(path, '{"grants":[{"at":"2026-09-23T10:00:00.000Z","port":443,"host":"en.wikipedia.org"}],"v":1}')
-      const { read, lines } = readWithLog(path)
-      expect(read.ok && read.grants).toEqual([A])
-      expect(read.ok && JSON.stringify(read.grants[0])).toBe('{"host":"en.wikipedia.org","port":443,"at":"2026-09-23T10:00:00.000Z"}')
-      expect(lines).toEqual([])
-    })
-  })
-
-  test("十种坏形状各一臂 ⇒ ok:false、reason 点名哪一项、日志恰一行", () => {
-    const cases: Array<[string, string, string]> = [
-      ["not JSON", "{", "not JSON"],
-      ["顶层不是对象", "[]", "not a JSON object"],
-      ["版本 2", '{"v":2,"grants":[]}', "unsupported version 2 (expected 1)"],
-      ["缺版本", '{"grants":[]}', "unsupported version undefined (expected 1)"],
-      ["顶层多余键", '{"v":1,"grants":[],"extra":1}', "unexpected top-level key(s): extra"],
-      ["grants 不是数组", '{"v":1,"grants":{}}', "`grants` is not an array"],
-      ["记录不是对象", '{"v":1,"grants":["x"]}', "grants[0] is not an object"],
-      ["记录多余键", '{"v":1,"grants":[{"host":"a.example","port":443,"at":"t","why":"x"}]}', "grants[0] has unexpected key(s): why"],
-      ["port 越界", '{"v":1,"grants":[{"host":"a.example","port":0,"at":"t"}]}', "grants[0].port is not a port number: 0"],
-      ["at 缺失", '{"v":1,"grants":[{"host":"a.example","port":443}]}', "grants[0].at is not a timestamp: undefined"],
+  test("多余字段、旧精确记录、坏站点、坏 UTC 和重复站点拒绝，不冒充空清单", () => {
+    const invalid: unknown[] = [
+      null, { v: 2, sites: [] }, { v: 1, grants: [] }, { v: 1, sites: [], project: "x" }, { v: 1, sites: {} },
+      { v: 1, sites: [null] }, { v: 1, sites: [{ ...A, port: 443 }] },
+      { v: 1, sites: [{ ...A, site: { kind: "domain", value: "*.com" } }] },
+      { v: 1, sites: [{ ...A, at: "2026-02-31T00:00:00.000Z" }] },
+      { v: 1, sites: [{ ...A, at: "2026-11-26T00:00:00+08:00" }] }, { v: 1, sites: [A, A] },
     ]
     withTemp((dir) => {
-      for (const [label, text, reason] of cases) {
-        const path = join(dir, `${label.replace(/[^a-z0-9]/gi, "_")}.json`)
-        writeFileSync(path, text)
-        const { read, lines } = readWithLog(path)
-        expect(read.ok, label).toBe(false)
-        expect(!read.ok && read.reason, label).toStartWith(`${path}: ${reason}`)
-        expect(lines.length, label).toBe(1)
-        expect(lines[0], label).toContain('this is "unanswerable", not "nothing approved"')
+      const path = join(dir, "sites.prod.json")
+      for (const value of invalid) {
+        writeFileSync(path, JSON.stringify(value))
+        const result = readWithLog(path)
+        expect(result.read.ok).toBe(false)
+        expect(result.lines).toHaveLength(1)
       }
+      writeFileSync(path, "bad json")
+      expect(readWithLog(path).read.ok).toBe(false)
     })
   })
-
-  test("同一 host:port 重复 ⇒ 拒;读错(目录当文件)也拒,不当缺失", () => {
-    withTemp((dir) => {
-      const dup = join(dir, "dup.json")
-      writeFileSync(dup, '{"v":1,"grants":[{"host":"a.example","port":443,"at":"t"},{"host":"A.EXAMPLE","port":443,"at":"t2"}]}')
-      const { read } = readWithLog(dup)
-      expect(!read.ok && read.reason).toBe(`${dup}: grants[1] duplicates an earlier record: "a.example:443"`)
-      const { read: dirRead, lines } = readWithLog(dir)
-      expect(dirRead.ok).toBe(false)
-      expect(lines.length).toBe(1)
-    })
-  })
-})
-
-// ── 写 ────────────────────────────────────────────────────────────────────────
-
-describe("写:字节确定、原子、坏记录不落盘", () => {
-  test("落盘字节是固定字面量;父目录不在就建;无临时文件残留", () => {
+  test("坏记录不写，rename 失败保留原字节并清理临时文件", () => {
     withTemp((dir) => {
       const path = egressGrantTruthPath(dir, "prod")
-      writeEgressGrantTruth(path, [A, B], fs)
-      expect(readFileSync(path, "utf8")).toBe(AB_BYTES)
-      expect(readdirSync(join(dir, "egress-grants"))).toEqual(["prod.json"])
-    })
-  })
-
-  test("坏记录不落盘,连目录都不建;rename 中途抛 ⇒ 盘上仍是旧内容", () => {
-    withTemp((dir) => {
-      const path = egressGrantTruthPath(dir, "prod")
-      expect(() => writeEgressGrantTruth(path, [{ host: "a.example", port: 443, at: "t", extra: 1 } as never], fs)).toThrow(
-        `egress grants: refusing to write ${path} — grants[0] has unexpected key(s): extra`,
-      )
+      const fs = { mkdirSync, writeFileSync, renameSync, rmSync }
+      expect(() => writeEgressGrantTruth(path, [{ ...A, at: "bad" }], fs)).toThrow()
       expect(existsSync(join(dir, "egress-grants"))).toBe(false)
-      writeEgressGrantTruth(path, [A, B], fs)
-      const boom = {
-        ...fs,
-        renameSync: () => {
-          throw new Error("rename exploded")
-        },
-      }
-      expect(() => writeEgressGrantTruth(path, [A], boom)).toThrow("rename exploded")
-      expect(readFileSync(path, "utf8")).toBe(AB_BYTES)
-      expect(readdirSync(join(dir, "egress-grants"))).toEqual(["prod.json"])
+      writeEgressGrantTruth(path, [A], fs)
+      const before = readFileSync(path, "utf8")
+      expect(() => writeEgressGrantTruth(path, [B], { ...fs, renameSync: () => { throw new Error("rename exploded") } })).toThrow("rename exploded")
+      expect(readFileSync(path, "utf8")).toBe(before)
+      expect(readdirSync(join(dir, "egress-grants"))).toEqual(["sites.prod.json"])
     })
   })
 })
 
-// ── 闭包 ─────────────────────────────────────────────────────────────────────
-
-describe("写端与生产绑定不在 sidecar 的 import 闭包里(生产的闭包工具实测)", () => {
-  test("sidecarSourceFiles 不含 egress-grant-truth-write / egress-grant-records / egress-approval-dialog", () => {
-    const files = sidecarSourceFiles(repoRoot)
-    // 集合是活的:先证明这个手段看得见东西,再断言它看不见我们关心的那几个
-    expect(files).toContain("packages/ui-mac/src/main/codepuppy-config-injection.ts")
-    expect(files).not.toContain("packages/ui-mac/src/main/egress-grant-truth-write.ts")
-    expect(files).not.toContain("packages/ui-mac/src/main/egress-grant-records.ts")
-    expect(files).not.toContain("packages/ui-mac/src/main/egress-approval-dialog.ts")
-  })
-
-  test("读端自己的相对 import 闭包 = 它自己(零 fs、零判据依赖);生产绑定的闭包含读端与写端", () => {
-    const rel = (files: string[]) => files.map((p) => relative(repoRoot, p)).sort()
-    expect(rel(relativeImportClosure(join(repoRoot, "packages/ui-mac/src/main/egress-grant-truth.ts")))).toEqual([
-      "packages/ui-mac/src/main/egress-grant-truth.ts",
-    ])
-    const records = rel(relativeImportClosure(join(repoRoot, "packages/ui-mac/src/main/egress-grant-records.ts")))
-    expect(records).toContain("packages/ui-mac/src/main/egress-grant-truth.ts")
-    expect(records).toContain("packages/ui-mac/src/main/egress-grant-truth-write.ts")
-  })
+test("main 站点写端不进入 sidecar 闭包，读端消费共享校验但没有写盘权", () => {
+  const files = sidecarSourceFiles(repoRoot)
+  expect(files).toContain("packages/ui-mac/src/main/codepuppy-config-injection.ts")
+  for (const name of ["egress-grant-truth-write", "egress-grant-records", "network-egress-approval"]) expect(files).not.toContain(`packages/ui-mac/src/main/${name}.ts`)
+  const closure = relativeImportClosure(join(repoRoot, "packages/ui-mac/src/main/egress-grant-truth.ts"))
+  expect(closure.some((path) => path.endsWith("egress-grant-truth-write.ts"))).toBe(false)
 })

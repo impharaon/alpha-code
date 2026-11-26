@@ -507,11 +507,25 @@ describe("REQ-236 AC3:斜杠命令带档位 agent(与普通发送同一张档位
     const host = mountSessionSurface(() => false)
     await waitFor(() => expect(composerModel()?.id).toBe(catalog.platformModels[0]!.id))
 
+    const sandbox = await import("../src/renderer/codepuppy-ui/sandbox-state")
+    const tiers: Array<{ tier: string; session: { sessionID: string; generation: number } }> = []
+    let release: (() => void) | undefined
+    Object.assign(window.api, { networkEgress: { setTier: (input: typeof tiers[number]) => {
+      tiers.push(input)
+      return new Promise((resolve) => { release = () => resolve({ ok: true, value: { revision: tiers.length } }) })
+    } } })
+    sandbox.setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+    try {
     const seen: Record<string, unknown> = {}
     for (const perm of ["allow", "ask", "readonly"] as const) {
       setComposerPerm(perm)
       engine.commandRequests = []
+      tiers.length = 0
       await send(host, "session", "/review")
+      await waitFor(() => expect(tiers).toHaveLength(1))
+      expect(tiers[0]).toMatchObject({ tier: perm, session: { generation: 1, sessionID: SESSION_ID } })
+      expect(engine.commandRequests).toHaveLength(0)
+      release!()
       await waitFor(() => expect(engine.commandRequests).toHaveLength(1))
       const request = engine.commandRequests[0]!
       expect(request["command"]).toBe("review")
@@ -524,6 +538,10 @@ describe("REQ-236 AC3:斜杠命令带档位 agent(与普通发送同一张档位
     }
     // 「全部批准」不带 agent 键(改动前的请求逐字不变),另两档带各自的载体。
     expect(seen).toEqual({ allow: "<absent>", ask: "codepuppy-ask", readonly: "codepuppy-readonly" })
+    } finally {
+      sandbox.setSandboxStateForTests(undefined)
+      Reflect.deleteProperty(window.api, "networkEgress")
+    }
   })
 })
 

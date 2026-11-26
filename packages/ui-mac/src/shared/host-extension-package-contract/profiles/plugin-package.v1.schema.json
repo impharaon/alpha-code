@@ -1,0 +1,1411 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "profiles/plugin-package.v1.schema.json",
+  "title": "HostExtensionPackage Plugin Package Payload V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "description",
+    "blobs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codepuppy.host-extension-package.payload.plugin-package.v1"
+    },
+    "description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "provider",
+        "name",
+        "source",
+        "tree",
+        "treeDigest",
+        "entries",
+        "secrets",
+        "diagnostics"
+      ],
+      "properties": {
+        "schema": {
+          "const": "codepuppy.plugin-package.v1"
+        },
+        "provider": {
+          "enum": [
+            "claude-code",
+            "codex",
+            "skill",
+            "mcp-registry",
+            "opencode"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "locator"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "folder",
+                "git",
+                "listing",
+                "marketplace",
+                "mcp-registry",
+                "npm",
+                "created"
+              ]
+            },
+            "locator": {
+              "type": "string"
+            },
+            "repository": {
+              "type": "string"
+            },
+            "commit": {
+              "type": "string"
+            },
+            "pluginPath": {
+              "type": "string"
+            },
+            "ecosystem": {
+              "enum": ["claude", "codex", "opencode"]
+            },
+            "entryName": {
+              "type": "string"
+            },
+            "serverName": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "integrity": {
+              "type": "string"
+            }
+          }
+        },
+        "tree": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "path",
+                  "mode"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "directory"
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "mode": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4095
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "path",
+                  "mode",
+                  "bytes",
+                  "digest"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "file"
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "mode": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4095
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "digest": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "path",
+                  "target"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "symlink"
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "target": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "treeDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "kind",
+                  "directory",
+                  "instruction",
+                  "invocation",
+                  "display",
+                  "mcpDependencies"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "skill"
+                  },
+                  "directory": {
+                    "type": "string"
+                  },
+                  "instruction": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "binding"
+                          ],
+                          "properties": {
+                            "binding": {
+                              "enum": [
+                                "pluginRoot",
+                                "skillDir",
+                                "projectDir"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "secret"
+                          ],
+                          "properties": {
+                            "secret": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "invocation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "fork",
+                      "userInvocable",
+                      "implicitInvocation",
+                      "allowedTools",
+                      "deniedTools"
+                    ],
+                    "properties": {
+                      "argumentHint": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "alias"
+                            ],
+                            "properties": {
+                              "alias": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "providerID",
+                              "modelID"
+                            ],
+                            "properties": {
+                              "providerID": {
+                                "type": "string"
+                              },
+                              "modelID": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "agent": {
+                        "type": "string"
+                      },
+                      "fork": {
+                        "type": "boolean"
+                      },
+                      "userInvocable": {
+                        "type": "boolean"
+                      },
+                      "implicitInvocation": {
+                        "type": "boolean"
+                      },
+                      "allowedTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tool"
+                          ],
+                          "properties": {
+                            "tool": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "deniedTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tool"
+                          ],
+                          "properties": {
+                            "tool": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "availableTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tool"
+                          ],
+                          "properties": {
+                            "tool": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "display": {
+                    "type": "object"
+                  },
+                  "mcpDependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "kind",
+                  "instruction",
+                  "invocation"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "command"
+                  },
+                  "instruction": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "binding"
+                          ],
+                          "properties": {
+                            "binding": {
+                              "enum": [
+                                "pluginRoot",
+                                "skillDir",
+                                "projectDir"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "secret"
+                          ],
+                          "properties": {
+                            "secret": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "invocation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "fork",
+                      "userInvocable",
+                      "implicitInvocation",
+                      "allowedTools",
+                      "deniedTools"
+                    ],
+                    "properties": {
+                      "argumentHint": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "alias"
+                            ],
+                            "properties": {
+                              "alias": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "providerID",
+                              "modelID"
+                            ],
+                            "properties": {
+                              "providerID": {
+                                "type": "string"
+                              },
+                              "modelID": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "agent": {
+                        "type": "string"
+                      },
+                      "fork": {
+                        "type": "boolean"
+                      },
+                      "userInvocable": {
+                        "type": "boolean"
+                      },
+                      "implicitInvocation": {
+                        "type": "boolean"
+                      },
+                      "allowedTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tool"
+                          ],
+                          "properties": {
+                            "tool": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "deniedTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tool"
+                          ],
+                          "properties": {
+                            "tool": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "availableTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tool"
+                          ],
+                          "properties": {
+                            "tool": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "kind",
+                  "instruction",
+                  "invocation"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "agent"
+                  },
+                  "instruction": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "binding"
+                          ],
+                          "properties": {
+                            "binding": {
+                              "enum": [
+                                "pluginRoot",
+                                "skillDir",
+                                "projectDir"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "secret"
+                          ],
+                          "properties": {
+                            "secret": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "invocation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "fork",
+                      "userInvocable",
+                      "implicitInvocation",
+                      "allowedTools",
+                      "deniedTools"
+                    ],
+                    "properties": {
+                      "argumentHint": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "alias"
+                            ],
+                            "properties": {
+                              "alias": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "providerID",
+                              "modelID"
+                            ],
+                            "properties": {
+                              "providerID": {
+                                "type": "string"
+                              },
+                              "modelID": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "agent": {
+                        "type": "string"
+                      },
+                      "fork": {
+                        "type": "boolean"
+                      },
+                      "userInvocable": {
+                        "type": "boolean"
+                      },
+                      "implicitInvocation": {
+                        "type": "boolean"
+                      },
+                      "allowedTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tool"
+                          ],
+                          "properties": {
+                            "tool": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "deniedTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tool"
+                          ],
+                          "properties": {
+                            "tool": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "availableTools": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "tool"
+                          ],
+                          "properties": {
+                            "tool": {
+                              "type": "string"
+                            },
+                            "pattern": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "kind",
+                  "transport",
+                  "command",
+                  "environment"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "mcp"
+                  },
+                  "transport": {
+                    "const": "stdio"
+                  },
+                  "command": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "binding"
+                            ],
+                            "properties": {
+                              "binding": {
+                                "enum": [
+                                  "pluginRoot",
+                                  "skillDir",
+                                  "projectDir"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "secret"
+                            ],
+                            "properties": {
+                              "secret": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "environment": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "binding"
+                            ],
+                            "properties": {
+                              "binding": {
+                                "enum": [
+                                  "pluginRoot",
+                                  "skillDir",
+                                  "projectDir"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "secret"
+                            ],
+                            "properties": {
+                              "secret": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "cwd": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "binding"
+                          ],
+                          "properties": {
+                            "binding": {
+                              "enum": [
+                                "pluginRoot",
+                                "skillDir",
+                                "projectDir"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "secret"
+                          ],
+                          "properties": {
+                            "secret": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "floatingVersion": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "commandIndex",
+                      "token"
+                    ],
+                    "properties": {
+                      "commandIndex": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "token": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "kind",
+                  "transport",
+                  "url",
+                  "headers"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "mcp"
+                  },
+                  "transport": {
+                    "enum": [
+                      "http",
+                      "sse"
+                    ]
+                  },
+                  "url": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "binding"
+                          ],
+                          "properties": {
+                            "binding": {
+                              "enum": [
+                                "pluginRoot",
+                                "skillDir",
+                                "projectDir"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "secret"
+                          ],
+                          "properties": {
+                            "secret": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "binding"
+                            ],
+                            "properties": {
+                              "binding": {
+                                "enum": [
+                                  "pluginRoot",
+                                  "skillDir",
+                                  "projectDir"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "secret"
+                            ],
+                            "properties": {
+                              "secret": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "oauth": {
+                    "oneOf": [
+                      {
+                        "const": false
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "componentId",
+                          "kind",
+                          "required",
+                          "serviceId",
+                          "serverUrl"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "componentId": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "mcp-oauth"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "serviceId": {
+                            "type": "string"
+                          },
+                          "serverUrl": {
+                            "type": "string"
+                          },
+                          "oauth": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [],
+                            "properties": {
+                              "clientId": {
+                                "type": "string"
+                              },
+                              "clientSecret": {
+                                "type": "array",
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "binding"
+                                      ],
+                                      "properties": {
+                                        "binding": {
+                                          "enum": [
+                                            "pluginRoot",
+                                            "skillDir",
+                                            "projectDir"
+                                          ]
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "secret"
+                                      ],
+                                      "properties": {
+                                        "secret": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              "scopes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "resource": {
+                                "type": "string"
+                              },
+                              "authorizationServerUrl": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "kind",
+                  "hook"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "hook"
+                  },
+                  "hook": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "event",
+                      "command",
+                      "timeoutSeconds",
+                      "async",
+                      "asyncRewake",
+                      "onFailure",
+                      "order",
+                      "scope"
+                    ],
+                    "properties": {
+                      "event": {
+                        "enum": [
+                          "SessionStart",
+                          "UserPromptSubmit",
+                          "UserPromptExpansion",
+                          "PreToolUse",
+                          "PostToolUse",
+                          "PostToolUseFailure",
+                          "Stop",
+                          "StopFailure",
+                          "PermissionRequest"
+                        ]
+                      },
+                      "matcher": {
+                        "type": "string"
+                      },
+                      "if": {
+                        "type": "string"
+                      },
+                      "command": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "binding"
+                              ],
+                              "properties": {
+                                "binding": {
+                                  "enum": [
+                                    "pluginRoot",
+                                    "skillDir",
+                                    "projectDir"
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "secret"
+                              ],
+                              "properties": {
+                                "secret": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "timeoutSeconds": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "async": {
+                        "type": "boolean"
+                      },
+                      "asyncRewake": {
+                        "type": "boolean"
+                      },
+                      "onFailure": {
+                        "enum": [
+                          "continue",
+                          "block"
+                        ]
+                      },
+                      "order": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "scope": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "kind"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "const": "package"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "kind",
+                              "entryId"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "skill",
+                                  "agent"
+                                ]
+                              },
+                              "entryId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "componentId",
+              "label",
+              "targets"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "componentId": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "file",
+                    "pointer"
+                  ],
+                  "properties": {
+                    "file": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                    },
+                    "pointer": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "code",
+              "message"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "code": {
+                "enum": [
+                  "invalid-definition",
+                  "missing-entry",
+                  "unresolved-app-id",
+                  "native-js-plugin"
+                ]
+              },
+              "sourceName": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "blobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sha256",
+          "bytes",
+          "mediaType",
+          "url"
+        ],
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          }
+        }
+      }
+    }
+  }
+}

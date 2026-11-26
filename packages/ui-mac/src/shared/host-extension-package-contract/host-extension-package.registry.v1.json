@@ -32,6 +32,12 @@
       "schemaPath": "profiles/mcp-remote.v1.schema.json"
     },
     {
+      "profileId": "plugin-package",
+      "profileVersion": 1,
+      "mediaType": "application/vnd.codepuppy.host-extension-package.plugin-package.v1+json",
+      "schemaPath": "profiles/plugin-package.v1.schema.json"
+    },
+    {
       "profileId": "skill",
       "profileVersion": 1,
       "mediaType": "application/vnd.codepuppy.host-extension-package.skill.v1+json",

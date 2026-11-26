@@ -41,17 +41,21 @@ export function wrapForDisplay(
     update(id: string, update: (tool: { execute: Execute }) => void): void
   },
   snapshotOf: (callID: string) => ToolDisplaySnapshotV1 | undefined,
+  run?: (tool: string, context: Record<string, unknown>, execute: () => Promise<unknown>) => Promise<unknown>,
 ) {
   for (const { id } of editor.list()) {
     editor.update(id, (draft) => {
       if ((draft.execute as unknown as Record<symbol, unknown>)[WRAPPED]) return
       const inner = draft.execute
       const wrapped: Execute = async (input, context) => {
-        const display = snapshotOf(String(context.id ?? ""))
-        if (!display) return inner(input, context)
-        const progress = context.progress
-        await progress({ [DISPLAY_KEY]: display })
-        return inner(input, { ...context, progress: (update) => progress({ ...update, [DISPLAY_KEY]: display }) })
+        const execute = async () => {
+          const display = snapshotOf(String(context.id ?? ""))
+          if (!display) return inner(input, context)
+          const progress = context.progress
+          await progress({ [DISPLAY_KEY]: display })
+          return inner(input, { ...context, progress: (update) => progress({ ...update, [DISPLAY_KEY]: display }) })
+        }
+        return run ? run(id, context, execute) : execute()
       }
       Object.defineProperty(wrapped, WRAPPED, { value: true })
       draft.execute = wrapped

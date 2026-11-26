@@ -3149,11 +3149,23 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
       composer.setComposerAgent(selectedAgent)
       composer.setComposerPerm(mode) // Same write entry as PermChip.pick; keep the historical user unchanged.
 
+      const sandbox = await import("../src/renderer/codepuppy-ui/sandbox-state")
+      const previousApi = Object.getOwnPropertyDescriptor(window, "api")
+      const tiers: Array<{ tier: string; session: { sessionID: string } }> = []
+      Object.defineProperty(window, "api", { configurable: true, value: { networkEgress: { setTier: async (input: typeof tiers[number]) => {
+        expect(sdkPromptCalls).toHaveLength(0)
+        tiers.push(input)
+        return { ok: true, value: { revision: tiers.length } }
+      } } } })
+      sandbox.setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+      try {
       const cont = host.querySelector<HTMLButtonElement>(".a-tl-int-continue")
       expect(cont).not.toBeNull()
       cont!.click()
       await settle()
 
+      expect(tiers).toHaveLength(1)
+      expect(tiers[0]).toMatchObject({ tier: mode, session: { sessionID: BINDING_SESSION_ID } })
       // #620:续写的输入带 v1 wire 契约的 synthetic 标记(它是「系统替用户按的」,不是发言)。
       expect(sdkPromptCalls).toEqual([
         { sessionID: BINDING_SESSION_ID, ...(agent ? { agent } : {}), parts: [{ type: "text", text: "继续", synthetic: true }] },
@@ -3161,6 +3173,11 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
       // 续写与 composer 同代次:新引擎那条链一次都不碰。
       expect(v2PromptCalls).toEqual([])
       expect(host.querySelector(".a-tl-int-failed")).toBeNull()
+      } finally {
+        sandbox.setSandboxStateForTests(undefined)
+        if (previousApi) Object.defineProperty(window, "api", previousApi)
+        else Reflect.deleteProperty(window, "api")
+      }
     },
   )
 

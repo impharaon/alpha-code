@@ -130,7 +130,7 @@ export type PackageAdmissionPlanItemV1 =
       key: string
       /** `#809`:与 `packageChildKindV1` 那张表的值域逐字相同。IPC 契约面收窄一格就会让
        *  managed plugin 在授权屏上无法表示 —— 而它已经装得上了。`#840` 增 command,REQ-235 增 cloud。 */
-      kind: "skill" | "agent" | "cloud" | "command" | "mcp" | "plugin"
+      kind: "skill" | "agent" | "cloud" | "command" | "mcp" | "plugin" | "bundle"
       name: string
       manifestDigest: string
       payloadDigest: string

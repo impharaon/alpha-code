@@ -109,6 +109,7 @@ export type PackageGraphV1 = PackageGraphAnnotationsV1 & {
   installedGraphDigest: string
   root: PackageGraphNodeV1
   children: PackageGraphNodeV1[]
+  pluginTree?: { treeDigest: string; storeKey: string }
 }
 
 /** 显示名的长度帽。够长到装得下真实插件名,短到不能被当成一个载荷通道。
@@ -235,7 +236,7 @@ export function parseOwnerToken(token: unknown): OwnerToken | null {
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
 
 const GRAPH_NODE_KEYS = new Set(["componentId", "kind", "name", "required", "manifestDigest"])
-const GRAPH_KEYS = new Set(["packageId", "envelopeDigest", "displayName", "installedGraphDigest", "root", "children", "source", "effect", "notRunning", "declarations"])
+const GRAPH_KEYS = new Set(["packageId", "envelopeDigest", "displayName", "installedGraphDigest", "root", "children", "source", "effect", "notRunning", "declarations", "pluginTree"])
 
 function graphAnnotations(graph: PackageGraphAnnotationsV1): PackageGraphAnnotationsV1 {
   return {
@@ -295,6 +296,7 @@ export function computeInstalledGraphDigest(graph: Omit<PackageGraphV1, "install
       envelopeDigest: graph.envelopeDigest,
       ...(graph.displayName === undefined ? {} : { displayName: graph.displayName }),
       ...graphAnnotations(graph),
+      ...(graph.pluginTree ? { pluginTree: graph.pluginTree } : {}),
       root: graph.root,
       children: [...graph.children].sort((a, b) => (a.componentId < b.componentId ? -1 : a.componentId > b.componentId ? 1 : 0)),
     }),
@@ -328,6 +330,7 @@ export function decodePackageGraphV1(input: unknown): Decoded<PackageGraphV1> {
       const node = decodeGraphNode(input.children[i], `packageGraph.children[${i}]`, errors)
       if (node) children.push(node)
     }
+  if (input.pluginTree !== undefined && (!isObj(input.pluginTree) || Object.keys(input.pluginTree).some(key => !["treeDigest", "storeKey"].includes(key)) || typeof input.pluginTree.treeDigest !== "string" || !DIGEST_RE.test(input.pluginTree.treeDigest) || root?.kind !== "bundle" || input.pluginTree.storeKey !== "bundle--" + root?.name)) errors.push("packageGraph.pluginTree: invalid tree resource")
   if (errors.length > 0 || !root) return { ok: false, errors: errors.length ? errors : ["packageGraph.root: invalid"] }
   // root 必须是 required(基线:非 required 的 root 无意义 —— 整包可跳过就不是一个包)。
   if (!root.required) return { ok: false, errors: ["packageGraph.root.required: root component must be required"] }
@@ -349,6 +352,7 @@ export function decodePackageGraphV1(input: unknown): Decoded<PackageGraphV1> {
     // 它正是「前提为假的闸门比没有闸门更贵」的最小实例:拒的不是坏输入,是我们自己刚写的配置。
     ...(displayName === undefined ? {} : { displayName: displayName as string }),
     ...graphAnnotations(input as PackageGraphAnnotationsV1),
+    ...(input.pluginTree ? { pluginTree: input.pluginTree as PackageGraphV1["pluginTree"] } : {}),
     installedGraphDigest: installedGraphDigest as string,
     root,
     children,

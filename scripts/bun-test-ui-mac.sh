@@ -1,83 +1,94 @@
 #!/usr/bin/env bash
-# ui-mac 本次范围里的那几层测试(`bash scripts/bun-test-ui-mac.sh <层...>`,PR 门 `fast integration`,`--full` 再加 `scenario`),
-# 每组都走 scripts/bun-test-floor.sh(条数下界 + 已知红棘轮,#1086)。层由文件名决定,规则在 scripts/test-layers.sh(唯一真源);
-# 文件进哪一组由 test-layers.sh 的 ui_mac_run_group 定(门与测量读同一份):
-#
-#   并行组:`bun test --parallel`(worker 进程,隐含 --isolate,默认核数)—— fast 层全部、其余层里不起引擎也不起浏览器的文件。
-#   串行组:起真引擎的 integration / scenario 文件,一个进程按文件表顺序跑。真引擎用例(内嵌引擎 / 子进程里的真引擎,15s~90s
-#           级的等待)与别的 worker 抢 CPU 会超时变红(2026-11-23 实测:10 worker 多出 7 行红,`--parallel=5` 在负载 ~14 的
-#           整门里仍有 4 个真引擎文件红)。
-#   浏览器组:真浏览器文件(*.browser.*),`--parallel=1`:一个隔离 worker 逐个跑(理由见 ui_mac_run_group)。
-# 每组一次调用,不按层分开跑(分层逐个串着调用会丢并行);跑完按层把 junit 拆成 `ui-mac.<层>.xml` /
-# `ui-mac+serial.<层>.xml` / `ui-mac+browser.<层>.xml` 写进 $GATE_REPORT_DIR(scripts/junit-split-layers.py)。
-#
-# 下界是灾难闸(加载失败、成片删除、runner 配错):按组内各层的下界相加;逐文件精确条数由闸门登记簿(scripts/assert-gate-files.sh)判。
+# Run only the shared selector's file list. Real engines own their test-group slot;
+# browser processes use separate Vite caches.
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel)"
-# shellcheck source=scripts/test-layers.sh
-source scripts/test-layers.sh
-WORKDIR=packages/ui-mac
-[ "$#" -gt 0 ] || { echo "usage: $0 <fast|integration|scenario>..." >&2; exit 2; }
-for layer in "$@"; do
-  case "$layer" in fast|integration|scenario) ;; *) echo "usage: $0 <fast|integration|scenario>..." >&2; exit 2 ;; esac
-done
-
+ROOT="$(git rev-parse --show-toplevel)"
+step="$1"; WORKDIR="$2"; floor="$3"; shift 3
+prefix="${PWD#"$ROOT/$WORKDIR"}"; prefix="${prefix#/}"
+flags=()
+if [ "${1:-}" = --parallel ]; then flags=(--parallel); shift; fi
+files=()
+for f in "$@"; do files+=("./${prefix:+$prefix/}${f#./}"); done
+cd "$ROOT"
+[ "${#files[@]}" -gt 0 ] || { echo "::error::runner needs selected files" >&2; exit 1; }
+[ "${CODEPUPPY_TEST_FULL:-0}" = 1 ] || floor=0
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
-parallel_files=()
-serial_files=()
-browser_files=()
-: > "$work/parallel.map"
-: > "$work/serial.map"
-: > "$work/browser.map"
-while IFS=$'\t' read -r f layer; do
-  group="$(ui_mac_run_group "$f" "$layer")"
-  case "$group" in
-    serial) serial_files+=("./$f") ;;
-    browser) browser_files+=("./$f") ;;
-    *) parallel_files+=("./$f") ;;
-  esac
-  printf '%s\t%s\n' "$f" "$layer" >> "$work/$group.map"
-done < <(test_layer_map "$WORKDIR" "$@")
-floor_parallel=0
-floor_serial=0
-for layer in "$@"; do
-  case "$layer" in
-    fast) floor_parallel=$((floor_parallel + 100)) ;;
-    integration) floor_parallel=$((floor_parallel + 1500)); floor_serial=$((floor_serial + 300)) ;;
-    scenario) floor_serial=$((floor_serial + 5)) ;;
-  esac
-done
+trap 'rm -f "$work"/*.xml; rmdir "$work"' EXIT
 
-echo "── ui-mac($*):并行 ${#parallel_files[@]} + 串行 ${#serial_files[@]} + 浏览器 ${#browser_files[@]} 个文件"
-if [ $((${#parallel_files[@]} + ${#serial_files[@]} + ${#browser_files[@]})) -eq 0 ]; then
-  echo "::error::ui-mac 本次范围($*)一个测试文件都没有 —— 分层枚举退化" >&2
-  exit 1
-fi
-
-# <组名> <map> <下界> [bun test 参数...]
-run_group() {
-  local step="$1" map="$2" floor="$3" rc=0
-  shift 3
-  CODEPUPPY_JUNIT_FILE="$work/$step.xml" CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv \
-    bash scripts/bun-test-floor.sh "$floor" "$WORKDIR" "$@" || rc=1
-  if [ -n "${GATE_REPORT_DIR:-}" ]; then
-    python3 scripts/junit-split-layers.py "$work/$step.xml" "$map" "$GATE_REPORT_DIR" "$step" || rc=1
-  fi
-  return $rc
+UI_MAC_ENGINE_PAT='engine-sandbox|engine-embed|in-process-engine|spawnLocalServer|startEngine'
+ui_mac_is_engine() { # <相对 packages/ui-mac 的文件>
+  local f="$1" c cf
+  case "${f##*/}" in *engine*) return 0 ;; esac
+  grep -qE "$UI_MAC_ENGINE_PAT" "packages/ui-mac/$f" && return 0
+  for c in $(grep -oE '[A-Za-z0-9._-]+\.(cases|live-cases)\.ts' "packages/ui-mac/$f" | sort -u); do
+    cf="packages/ui-mac/$(dirname "$f")/$c"
+    if [ -f "$cf" ] && grep -qE "$UI_MAC_ENGINE_PAT" "$cf"; then return 0; fi
+  done
+  return 1
 }
 
+# <相对 packages/ui-mac 的文件> <层> → 它进哪一组:parallel / serial / browser。ui-mac 的分组只在这里定(门与测量都读它)。
+#   serial  = 起真引擎的 integration / scenario 文件;组内 --parallel=3,组间串行以免别组抢 CPU 触发引擎超时。
+#   browser = 真浏览器文件(*.browser.*):每个隔离进程起一台 vite + Chrome;test-visual/vite.config.ts 按 PID 隔离依赖缓存,
+#             避免共用缓存触发整页重载(aa455979a3 上 composer-popover-gap 的 navigation 红);组内 --parallel=5。
+#   parallel = 其余。
+ui_mac_run_group() {
+  case "${1##*/}" in *.fast.test.ts|*.fast.test.tsx) echo parallel; return 0 ;; esac
+  case "${1##*/}" in *.browser.*) echo browser; return 0 ;; esac
+  if ui_mac_is_engine "$1"; then echo serial; else echo parallel; fi
+}
+
+# Reports use the declaration's layer globs; this runner does no selection.
+run_group() {
+  local name="$1" minimum="$2" rc=0
+  shift 2
+  CODEPUPPY_JUNIT_FILE="$work/$name.xml" \
+    bash scripts/bun-test-floor.sh "$minimum" "$WORKDIR" "$@" || rc=1
+  if [ -n "${GATE_REPORT_DIR:-}" ]; then
+    python3 scripts/junit-split-layers.py "$work/$name.xml" "$WORKDIR" "$GATE_REPORT_DIR" "$name" || rc=1
+  fi
+  return "$rc"
+}
+if [ "$WORKDIR" != packages/ui-mac ]; then
+  if [ "$WORKDIR" = packages/ext ]; then
+    ext_files=(); upstream_red_files=()
+    for f in "${files[@]}"; do
+      case "$f" in
+        *-upstream-reds.scenario.test.ts) upstream_red_files+=("$f") ;;
+        *) ext_files+=("$f") ;;
+      esac
+    done
+    rc=0
+    # 普通 ext 文件串行:policy-host 的顶层 await 共享模块不能被 --isolate 打断初始化。
+    # 两组之间串行:普通组的真实 policy-host 引擎先结束,再让红例子进程并行加载 core/server,避免 CPU 竞争超时。
+    [ "${#ext_files[@]}" -eq 0 ] || run_group "$step" "$floor" "${ext_files[@]}" || rc=1
+    # 预期红例宿主不导入 policy-host;各自把上游文件放进子进程,可隔离并行。
+    [ "${#upstream_red_files[@]}" -eq 0 ] || run_group "$step+upstream-reds" 0 --parallel=3 "${upstream_red_files[@]}" || rc=1
+    exit "$rc"
+  fi
+  run_group "$step" "$floor" ${flags[@]+"${flags[@]}"} "${files[@]}"
+  exit $?
+fi
+parallel_files=(); serial_files=(); browser_files=()
+for f in "${files[@]}"; do
+  case "$(ui_mac_run_group "${f#./}")" in
+    serial) serial_files+=("$f") ;;
+    browser) browser_files+=("$f") ;;
+    *) parallel_files+=("$f") ;;
+  esac
+done
+floor_parallel=0; floor_serial=0
+if [ "${CODEPUPPY_TEST_FULL:-0}" = 1 ]; then floor_parallel=1600; floor_serial=305; fi
+export CODEPUPPY_KNOWN_FAILS_FILE=scripts/known-fails.tsv
 rc=0
-if [ "${#parallel_files[@]}" -gt 0 ]; then
-  echo "── [ui-mac] 并行组"
-  run_group ui-mac "$work/parallel.map" "$floor_parallel" --parallel "${parallel_files[@]}" || rc=1
-fi
+# 组间串行:浏览器冷构建不与普通组叠加;两者结束后才把测试组时段交给真引擎。
+[ "${#parallel_files[@]}" -eq 0 ] || run_group ui-mac "$floor_parallel" --parallel "${parallel_files[@]}" || rc=1
+[ "${#browser_files[@]}" -eq 0 ] || run_group ui-mac+browser 1 --parallel=5 "${browser_files[@]}" || rc=1
 if [ "${#serial_files[@]}" -gt 0 ]; then
-  echo "── [ui-mac] 串行组(真引擎)"
-  run_group ui-mac+serial "$work/serial.map" "$floor_serial" "${serial_files[@]}" || rc=1
+  # bootstrap 探针会安装依赖、typecheck、跑围栏;只与非引擎组重叠,全部退出后引擎才独占 CPU。
+  for pid in ${CODEPUPPY_TEST_PROBE_PIDS:-}; do
+    while kill -0 "$pid" 2>/dev/null; do sleep 0.05; done
+  done
+  run_group ui-mac+serial "$floor_serial" --parallel=3 "${serial_files[@]}" || rc=1
 fi
-if [ "${#browser_files[@]}" -gt 0 ]; then
-  echo "── [ui-mac] 浏览器组(--parallel=1)"
-  run_group ui-mac+browser "$work/browser.map" 1 --parallel=1 "${browser_files[@]}" || rc=1
-fi
-exit $rc
+exit "$rc"

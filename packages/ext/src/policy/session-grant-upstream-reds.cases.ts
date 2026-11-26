@@ -29,11 +29,11 @@ const REPO = path.resolve(import.meta.dir, "../../../..")
 const I13_SAVED_APPROVALS_IGNORED: Record<string, readonly string[]> = {
   "packages/core/test/tool-shell.test.ts": [
     "pipeline redirect keeps the redirect target visible to exact approval and denial",
-    "zsh: for value (a b) printf %s \"$value\"",
-    "zsh: for value (a b) { printf %s \"$value\"; }",
-    "zsh: for value ($(printf a)) do printf %s \"$value\"; done",
-    "bash: probe() for value in a b; do printf %s \"$value\"; done; probe",
-    "bash: printf %s \"$(probe() case value in (value) printf hello;; esac; probe)\"",
+    'zsh: for value (a b) printf %s "$value"',
+    'zsh: for value (a b) { printf %s "$value"; }',
+    'zsh: for value ($(printf a)) do printf %s "$value"; done',
+    'bash: probe() for value in a b; do printf %s "$value"; done; probe',
+    'bash: printf %s "$(probe() case value in (value) printf hello;; esac; probe)"',
     "bash: quoted heredoc reuses existing approvals",
     "bash: heredoc substitution reuses existing approvals",
     "bash: loop with a conditional reuses existing approvals",
@@ -47,7 +47,7 @@ const I13_SAVED_APPROVALS_IGNORED: Record<string, readonly string[]> = {
     "zsh: function and case reuses existing approvals",
     "zsh: parameter fallback reuses existing approvals",
     "zsh: arithmetic statement reuses existing approvals",
-    "zsh: ANSI-C quoting reuses existing approvals"
+    "zsh: ANSI-C quoting reuses existing approvals",
   ],
   "packages/core/test/permission.test.ts": [
     "merges session rules after agent rules and before saved approvals",
@@ -93,8 +93,8 @@ const I13_SAVED_APPROVALS_IGNORED: Record<string, readonly string[]> = {
     "commandless redirect write: exact saved approvals",
     "PowerShell .NET method invocation: saved wildcard",
     "PowerShell .NET method invocation: saved command approvals",
-    "PowerShell .NET method invocation: exact saved approvals"
-  ]
+    "PowerShell .NET method invocation: exact saved approvals",
+  ],
 }
 
 /** `<package dir>/<test file>` → the case names expected to fail there (bun's junit `testcase name`). */
@@ -122,15 +122,20 @@ const KNOWN_RED: Record<string, readonly string[]> = {
 type Case = { file: string; name: string; failed: boolean }
 
 const unescape = (text: string) =>
-  text.replace(/&(apos|quot|lt|gt|amp|#10);/g, (_, entity: string) => ({ apos: "'", quot: '"', lt: "<", gt: ">", amp: "&", "#10": "\n" })[entity]!)
+  text.replace(
+    /&(apos|quot|lt|gt|amp|#10);/g,
+    (_, entity: string) => ({ apos: "'", quot: '"', lt: "<", gt: ">", amp: "&", "#10": "\n" })[entity]!,
+  )
 
 /** Every testcase in a bun junit report; `prefix` turns the report's package-relative file into a repo path. */
 function casesOf(xml: string, prefix: string): Case[] {
-  return [...xml.matchAll(/<testcase name="([^"]*)"[^>]*?file="([^"]*)"[^>]*?(?:\/>|>([\s\S]*?)<\/testcase>)/g)].map((match) => ({
-    file: `${prefix}/${match[2]}`,
-    name: unescape(match[1]!),
-    failed: (match[3] ?? "").includes("<failure"),
-  }))
+  return [...xml.matchAll(/<testcase name="([^"]*)"[^>]*?file="([^"]*)"[^>]*?(?:\/>|>([\s\S]*?)<\/testcase>)/g)].map(
+    (match) => ({
+      file: `${prefix}/${match[2]}`,
+      name: unescape(match[1]!),
+      failed: (match[3] ?? "").includes("<failure"),
+    }),
+  )
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -140,29 +145,55 @@ function run(packageDir: string, files: string[], names: readonly string[]): Cas
   const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "upstream-reds-")), "junit.xml")
   const pattern = names.map(escapeRegExp).join("|")
   const result = Bun.spawnSync({
-    cmd: [process.execPath, "test", "--timeout", "2000", "--test-name-pattern", pattern, "--reporter=junit", "--reporter-outfile", out, ...files],
+    cmd: [
+      process.execPath,
+      "test",
+      "--timeout",
+      "2000",
+      "--test-name-pattern",
+      pattern,
+      "--reporter=junit",
+      "--reporter-outfile",
+      out,
+      ...files,
+    ],
     cwd: path.join(REPO, packageDir),
     env: process.env,
   })
-  if (!fs.existsSync(out)) throw new Error(`no junit report from ${packageDir}:\n${result.stdout.toString()}${result.stderr.toString()}`)
+  if (!fs.existsSync(out))
+    throw new Error(`no junit report from ${packageDir}:\n${result.stdout.toString()}${result.stderr.toString()}`)
   return casesOf(fs.readFileSync(out, "utf8"), packageDir)
 }
 
-describe("[packages/core/src/permission.ts codepuppy(I-05, I-13 L1)] upstream tests that assert a project-level always write or a saved approval's effect are red by design", () => {
-  test("the pinned upstream cases in those three files are present and red", () => {
-    const core = [...KNOWN_RED["packages/core/test/permission.test.ts"]!, ...KNOWN_RED["packages/core/test/tool-shell.test.ts"]!]
-    const cases = [
-      ...run("packages/core", ["test/permission.test.ts", "test/tool-shell.test.ts"], core),
-      ...run("packages/server", ["test/permission-saved.test.ts"], KNOWN_RED["packages/server/test/permission-saved.test.ts"]!),
-    ]
-    const missing: string[] = []
-    const passing: string[] = []
-    for (const [file, names] of Object.entries(KNOWN_RED))
-      for (const name of names) {
-        const found = cases.find((item) => item.file === file && item.name === name)
-        if (!found) missing.push(`${file} › ${name}`)
-        else if (!found.failed) passing.push(`${file} › ${name}`)
-      }
-    expect({ missing, passing }).toEqual({ missing: [], passing: [] })
-  }, 240_000)
-})
+export function upstreamReds(
+  file: keyof typeof KNOWN_RED,
+  title: string,
+  group?: "command-forms" | "bash-approvals" | "zsh-approvals",
+) {
+  // The shell approval cases each wait for their expected timeout; distribute those waits across hosts.
+  const names = KNOWN_RED[file]!.filter(
+    (name) =>
+      !group ||
+      (group === "command-forms"
+        ? !(name.endsWith("reuses existing approvals") && (name.startsWith("bash:") || name.startsWith("zsh:")))
+        : name.endsWith("reuses existing approvals") && name.startsWith(group === "bash-approvals" ? "bash:" : "zsh:")),
+  )
+  describe("[packages/core/src/permission.ts codepuppy(I-05, I-13 L1)] upstream tests that assert a project-level always write or a saved approval's effect are red by design", () => {
+    test(
+      title,
+      () => {
+        const packageDir = path.dirname(path.dirname(file))
+        const cases = run(packageDir, [path.relative(packageDir, file)], names)
+        const missing: string[] = []
+        const passing: string[] = []
+        for (const name of names) {
+          const found = cases.find((item) => item.file === file && item.name === name)
+          if (!found) missing.push(`${file} › ${name}`)
+          else if (!found.failed) passing.push(`${file} › ${name}`)
+        }
+        expect({ missing, passing }).toEqual({ missing: [], passing: [] })
+      },
+      240_000,
+    )
+  })
+}

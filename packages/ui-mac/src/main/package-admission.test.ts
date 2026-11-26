@@ -1,3 +1,7 @@
+import corpus from "../shared/host-extension-package-contract/testvectors/decoder-corpus.v1.json"
+import { captureWholeFixture } from "../../test-fixtures/plugin-helper/fixture"
+import { canonicalArtifactJsonBytesV1 } from "../shared/host-extension-package-contract/generate-artifact"
+import { resolveLiveGenerationDir } from "./ext-transaction"
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -48,6 +52,79 @@ function desktopDeps() {
     resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(sample.catalog, id, version), channel: "cache" as const }),
   }
 }
+
+test("whole plugin profile installs its signed tree and registered skills through catalog admission", async () => {
+  const { installDesktopPackageV1 } = await import("./package-admission")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const sample = corpus.cases.find(sample => sample.name === "plugin-package-real-superpowers-v1")!
+  const payload = sample.components[0]!.payload
+  const bytes = canonicalArtifactJsonBytesV1(payload)
+  const capture = await captureWholeFixture("superpowers")
+  const fetchBytes = async (ref: { sha256: string }) => {
+    if (ref.sha256 === sample.envelope.components[0]!.payloadRef.sha256) return bytes
+    const node = capture.nodes.find(node => node.kind === "file" && node.digest === "sha256:" + ref.sha256)
+    if (!node) throw Error("Unknown signed sample blob")
+    return capture.readFile(node.path)
+  }
+  const catalog = { version: "1", entries: [], packages: [sample.envelope] }
+  const deps = { ...desktopDeps(), loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest }), installability: { fetchPayload: fetchBytes }, fetchAsset: fetchBytes, resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }) }
+  const result = await installDesktopPackageV1(sample.envelope.prelude.packageId, deps)
+  expect(result).toMatchObject({ ok: true, kind: "bundle" })
+  const state = readPackageLedgerStateV1(root)
+  if (!state.ok) throw Error(state.reason)
+  expect(state.packageGraphs[0]?.children.map(node => node.kind)).toEqual(["skill"])
+  expect(state.records.map(record => record.kind)).toEqual(["bundle", "skill"])
+  const live = resolveLiveGenerationDir(root, state.packageGraphs[0]!.pluginTree!.storeKey)!
+  expect(readFileSync(join(live, "tree/skills/using-superpowers/SKILL.md"), "utf8")).toContain("superpowers")
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).toContain("skill--using-superpowers")
+  expect(await setPackageStateV1({ packageId: sample.envelope.prelude.packageId, state: "disabled" }, deps)).toMatchObject({ ok: true })
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers")
+})
+
+test("whole plugin profile reports package-dependent MCP entries without installing a broken command", async () => {
+  const { installDesktopPackageV1 } = await import("./package-admission")
+  const { convertPluginTree } = await import("../shared/host-extension-package-contract/plugin-conversion.mjs")
+  const { derivePayloadCapabilitiesV1 } = await import("../shared/host-extension-package-contract/decoder")
+  const { parse } = await import("jsonc-parser")
+  const captured = await captureWholeFixture("plugin-dev")
+  // Exact database server definition from S1's pinned stdio example, exposed as the root declaration.
+  const example = JSON.parse(new TextDecoder().decode(await captured.readFile("skills/mcp-integration/examples/stdio-server.json")))
+  const declaration = new TextEncoder().encode(JSON.stringify({ database: example.database }))
+  const capture = { ...captured, nodes: [...captured.nodes, { kind: "file" as const, path: ".mcp.json", mode: 0o644, bytes: declaration.length, digest: `sha256:${sha256Hex(declaration)}` as const }], readFile: async (path: string) => path === ".mcp.json" ? declaration : captured.readFile(path) }
+  const converted = await convertPluginTree(capture)
+  const blobs = new Map<string, { sha256: string; bytes: number; mediaType: string; url: string }>()
+  const assets = new Map<string, Uint8Array>()
+  for (const node of converted.package.tree) if (node.kind === "file" && node.bytes > 0) {
+    const digest = node.digest.slice(7)
+    blobs.set(digest, { sha256: digest, bytes: node.bytes, mediaType: "application/octet-stream", url: "https://example.invalid/blobs/" + digest })
+    assets.set(digest, converted.replacements.get(node.path) ?? await capture.readFile(node.path))
+  }
+  const payload = { schema: "codepuppy.host-extension-package.payload.plugin-package.v1" as const, description: converted.package, blobs: [...blobs.values()] }
+  const envelope = structuredClone(corpus.cases.find(sample => sample.name === "plugin-package-real-superpowers-v1")!.envelope) as CodePuppyPackageEnvelopeV1
+  const component = envelope.components[0]!
+  const bytes = canonicalArtifactJsonBytesV1(payload)
+  component.payloadRef = { ...component.payloadRef, bytes: bytes.length, sha256: sha256Hex(bytes) }
+  component.capabilities = derivePayloadCapabilitiesV1(payload)
+  envelope.capabilities = [...component.capabilities]
+  const catalog = { version: "1", entries: [], packages: [envelope] }
+  const fetchBytes = async (ref: { sha256: string }) => {
+    const value = ref.sha256 === component.payloadRef.sha256 ? bytes : assets.get(ref.sha256)
+    if (!value) throw Error("Unknown signed source blob")
+    return value
+  }
+  const deps = { ...desktopDeps(), loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest }), installability: { fetchPayload: fetchBytes }, fetchAsset: fetchBytes, resolvePackage: async (id: string, version: string) => ({ ...resolveVerifiedPackageV1(catalog, id, version), channel: "cache" as const }) }
+  expect(await installDesktopPackageV1(envelope.prelude.packageId, deps)).toMatchObject({ ok: true, kind: "bundle" })
+  const state = readPackageLedgerStateV1(root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs[0]!
+  expect(graph.notRunning).toContainEqual({ kind: "mcp", sourceName: "database", reason: "needs-plugin-files" })
+  expect(state.records.some(record => record.kind === "mcp")).toBe(false)
+  expect(graph.children.filter(node => node.kind === "skill")).toHaveLength(7)
+  expect(graph.children.some(node => node.kind === "mcp")).toBe(false)
+  expect(existsSync(join(root, "codepuppy.jsonc")) ? parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp?.database : undefined).toBeUndefined()
+  const live = resolveLiveGenerationDir(root, graph.pluginTree!.storeKey)!
+  expect(readFileSync(join(live, "tree/.mcp.json"), "utf8")).toContain("${CLAUDE_PLUGIN_ROOT}/servers/db-server.js")
+})
 
 test("project-only catalog admission commits effect with the graph and keeps persistent MCP disabled", async () => {
   const { installDesktopPackageV1 } = await import("./package-admission")

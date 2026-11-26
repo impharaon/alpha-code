@@ -1,3 +1,4 @@
+import { setSessionNetworkTier } from "../network-egress"
 // REQ-125 C5/C6/#568 — 数据绑定层:SDK typed 通道 → 行模型 → 视图。
 //
 // 只消费公开 typed hooks(useServerSync;I1 白名单),不触碰上游 session 叶/DOM。
@@ -276,7 +277,12 @@ export function CodePuppySessionTimeline(props: CodePuppySessionTimelineProps = 
       const id = sessionID()
       if (!id) return
       if ((session().data.session_status[id]?.type ?? "idle") !== "idle") return
-      const agent = tierAgent(composerPerm()) ?? composerAgent()
+      const identity = live.current()?.identity
+      if (!identity) return
+      const submittedPerm = composerPerm()
+      const agent = tierAgent(submittedPerm) ?? composerAgent()
+      await setSessionNetworkTier(identity, submittedPerm)
+      if (epoch() !== `${identity.serverKey} ${identity.directory} ${identity.sessionID}`) return
       const result = await serverSDK().client.session.promptAsync({
         sessionID: id,
         ...(agent ? { agent } : {}),

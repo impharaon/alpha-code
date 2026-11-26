@@ -745,6 +745,7 @@ describe("CodePuppyPackageEnvelopeV1 synthetic decoder corpus", () => {
     expect(corpus.schema).toBe("codepuppy.host-extension-package.decoder-corpus.v1")
     const cases = corpus.cases.filter((item) => item.expect === "accepted")
     expect(cases.map((item) => item.name)).toEqual([
+      "plugin-package-real-superpowers-v1",
       "skill-v1",
       "skill-multifile-v1",
       "agent-v1",
@@ -1384,7 +1385,7 @@ describe("CodePuppyPackageEnvelopeV1 listing section", () => {
     const withListing = corpus.cases.filter((item) => "listing" in item.envelope)
     expect(withListing.map((item) => item.name)).toEqual(["listing-full-v1"])
     // 下界式的 `> 0` 会在有人把语料删剩一条时仍然绿。数出真实条数。
-    expect(withoutListing.length).toBe(18)
+    expect(withoutListing.length).toBe(19)
 
     for (const item of withoutListing) {
       const decoded = decodePackageEnvelopeHeaderV1(jsonBytes(item.envelope))
@@ -1461,4 +1462,17 @@ describe("CodePuppyPackageEnvelopeV1 listing section", () => {
     )
     expect(errorsOf(decodePackageEnvelopeHeaderV1(jsonBytes(wide.envelope)))).toBe("")
   })
+})
+
+test("plugin package profile binds real source tree files and blob references", async () => {
+  const description = structuredClone((await import("./testvectors/plugin-package-description.v1.json")).default)
+  const payload = { schema: "codepuppy.host-extension-package.payload.plugin-package.v1", description,
+    blobs: description.tree.filter(node => node.kind === "file" && node.bytes > 0).map(node => ({ sha256: node.digest.slice(7), bytes: node.bytes, mediaType: "application/octet-stream", url: "https://example.invalid/blobs/" + node.digest.slice(7) })) }
+  const bytes = () => new TextEncoder().encode(JSON.stringify(payload))
+  expect(decodePackageProfilePayloadV1("plugin-package", bytes(), [])).toMatchObject({ ok: true })
+  const removed = payload.blobs.pop()!
+  expect(decodePackageProfilePayloadV1("plugin-package", bytes(), [])).toMatchObject({ ok: false })
+  payload.blobs.push(removed)
+  payload.description.treeDigest = "sha256:" + "0".repeat(64)
+  expect(decodePackageProfilePayloadV1("plugin-package", bytes(), [])).toMatchObject({ ok: false })
 })

@@ -17,7 +17,7 @@ import type { AuthorizationConfirmationWire, CapabilityDiffWire } from "../../sh
 import type { CatalogPackageViewV1 } from "../../shared/catalog-package-view"
 import { isCodePuppyOfficeCatalogId } from "../../shared/office-advisories"
 import type { PackageAdmissionPreviewV1 } from "../../shared/package-admission"
-import { packageSkipReasonKey } from "./ext-package-presentation"
+import { packageComponentEntries, packageSkipReasonKey } from "./ext-package-presentation"
 import { confirmNoteKey, packageConfirmNoteKey } from "./ext-curation-view"
 import { catalog } from "./catalog-source"
 import type { CatalogEntry } from "./catalog-types"
@@ -163,7 +163,7 @@ export function createInstallConfirm(deps: InstallConfirmDeps) {
   })
   /** 确认屏上「会装什么」与「不会装什么」两段 —— 同一个 items[],由 `included` 分开。 */
   const packagePlanIncluded = () =>
-    packageAuthz()?.preview.plan.items.flatMap((item) => (item.included ? [item] : [])) ?? []
+    packageComponentEntries(packageAuthz()?.preview.plan.items.flatMap((item) => (item.included ? [item] : [])) ?? [])
   const packagePlanSkipped = () =>
     packageAuthz()?.preview.plan.items.flatMap((item) => (item.included ? [] : [item])) ?? []
   const packageSecretsComplete = () =>

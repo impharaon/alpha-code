@@ -1,0 +1,5503 @@
+{
+  "archive": {
+    "path": "selection.tar.gz",
+    "sha256": "0eb005186cc43b42fc7024dad3391741dede82eb8cce231626fc9f3930b5c98d",
+    "note": "Pinned real upstream plugin trees; original paths, bytes and modes retained. Extracted only under temporary storage."
+  },
+  "samples": [
+    {
+      "name": "plugin-dev",
+      "root": "claude/plugins/plugin-dev",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6",
+      "pluginPath": "plugins/plugin-dev",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 289,
+          "sha256": "3c83209b8d3f7844f98d9982e520327bd97b888c0772c0e0f82fd4fd7d9f9eec"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 14676,
+          "sha256": "3b2c268c85f34e7bd8db62ce3e38b07ae210f6e4b9131ec2cf669479205378c7"
+        },
+        {
+          "path": "agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "agents/agent-creator.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7488,
+          "sha256": "99ca808b7577e5c4b816cd7e621a1dea4b0ba9104ba24629cd713170cfe9dbd3"
+        },
+        {
+          "path": "agents/plugin-validator.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6678,
+          "sha256": "cd1cf892e9d4693a1b783ffd53965a25bad9c293db87a2122578c97fdb098b94"
+        },
+        {
+          "path": "agents/skill-reviewer.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6132,
+          "sha256": "78ac55ddc31dd78227df90029d9c2333bdd97567296ddd4a9b23c090a94fc09a"
+        },
+        {
+          "path": "commands",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "commands/create-plugin.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 15855,
+          "sha256": "f2c634dfc0b519dbb1795bd012f44f93a94cabfc2cbd08020ccd1816a435dab8"
+        },
+        {
+          "path": "skills",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/agent-development",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/agent-development/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 11168,
+          "sha256": "6a2826571320828cc6f8f21ccd8e6eefd2bced62000c8c5e43a712c12e2d83a1"
+        },
+        {
+          "path": "skills/agent-development/examples",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/agent-development/examples/agent-creation-prompt.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9838,
+          "sha256": "a299652c1bba7b43736cc72a14ada464baccc80c6431e5fa3a55bd13129ac54c"
+        },
+        {
+          "path": "skills/agent-development/examples/complete-agent-examples.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13916,
+          "sha256": "8321e9933dd0033c46bf5ae831e7cf7dc79783c80fb9b5ea1b66c74f4ac2b337"
+        },
+        {
+          "path": "skills/agent-development/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/agent-development/references/agent-creation-system-prompt.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9749,
+          "sha256": "c56e7fafb84bcbeff69ecd61b1f68ca380e8ba4177dc57c6ceeecd3aa8a83d7b"
+        },
+        {
+          "path": "skills/agent-development/references/system-prompt-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9998,
+          "sha256": "eaac53eaaf8326ac04428987280fb5041920b7571477ad41742517c5aac683fc"
+        },
+        {
+          "path": "skills/agent-development/references/triggering-examples.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8868,
+          "sha256": "b8ff47692b007b19b36df81ebd0562476202a21d67db80eeca9c3ee05528cb10"
+        },
+        {
+          "path": "skills/agent-development/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/agent-development/scripts/validate-agent.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 5796,
+          "sha256": "d22e1292f997169fb745793dc50ebe3e9c6631603e1d77f04c2e79bb1fc63cba"
+        },
+        {
+          "path": "skills/command-development",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/command-development/README.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7651,
+          "sha256": "dd4ba7eded93d7ba698f05ec63d06d110a6b5543664af359b005dd976ce811b8"
+        },
+        {
+          "path": "skills/command-development/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 19233,
+          "sha256": "c55ad02cfe4cbb2a947eea3b1ed5fa1871e722d627c3c6792c3ed87c10c4d7a8"
+        },
+        {
+          "path": "skills/command-development/examples",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/command-development/examples/plugin-commands.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13989,
+          "sha256": "7d71d7b516020a6c171171399b40dd2cad02b842c9faa78b90e0983906c9ee94"
+        },
+        {
+          "path": "skills/command-development/examples/simple-commands.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8675,
+          "sha256": "f2533ed834305166603bcb4dd870d695af4a33b9a49d330937a4c70ed964767c"
+        },
+        {
+          "path": "skills/command-development/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/command-development/references/advanced-workflows.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13618,
+          "sha256": "eb258095b5a411b68377c96730effe597884a14b619cb0c1a7ab1c801d80a7d9"
+        },
+        {
+          "path": "skills/command-development/references/documentation-patterns.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 14971,
+          "sha256": "70c6c9b0a9b2d46a925ada6c45808a73498a457e1d641c82cc05de8a29a33b05"
+        },
+        {
+          "path": "skills/command-development/references/frontmatter-reference.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9162,
+          "sha256": "db1ea175ca4b0bb7d11c75cb8a7d00b353ea7cf4df2027b4263e45ded4d39475"
+        },
+        {
+          "path": "skills/command-development/references/interactive-commands.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 20980,
+          "sha256": "09ab1f18bfa3ff5f7088e45d5810ac20eb25ffc97fc9e8bb79416d40e0b4516b"
+        },
+        {
+          "path": "skills/command-development/references/marketplace-considerations.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 16437,
+          "sha256": "ab30835431d06a8e65cd629ba0e73b3f1de5b043126c6fef7ea70163400e90f4"
+        },
+        {
+          "path": "skills/command-development/references/plugin-features-reference.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 14622,
+          "sha256": "57e11ae6a4bbc1a4a295d1f036202970911d6029d64f4ab058b63a4c5a899072"
+        },
+        {
+          "path": "skills/command-development/references/testing-strategies.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 14803,
+          "sha256": "e6ccf78d85c23bc58582dbc8b91731c4e412568705ed2c87ac699a1ded9adc67"
+        },
+        {
+          "path": "skills/hook-development",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/hook-development/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 16246,
+          "sha256": "f47e2d42f6360294216a859ae0c30b93caafdd2b2e5ffc007489ba4ca447fa5c"
+        },
+        {
+          "path": "skills/hook-development/examples",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/hook-development/examples/load-context.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1690,
+          "sha256": "0d614599e711c087b381a4ac7ee3c40758af1022669fc998649d199b9dfe15ed"
+        },
+        {
+          "path": "skills/hook-development/examples/validate-bash.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1304,
+          "sha256": "348c58f4cf38a2e7080ea5272935a7658c7122d83dd6c52d0a1f2ef599c176ab"
+        },
+        {
+          "path": "skills/hook-development/examples/validate-write.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1222,
+          "sha256": "89a8ef9bb7508e4819080e65834d6783afa5a5a614d458a3821b80a329eb32e5"
+        },
+        {
+          "path": "skills/hook-development/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/hook-development/references/advanced.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10148,
+          "sha256": "5b139ceeb6a3ef16555a6eef421e2642e6ca286b5527ee2b4e02c11ae5b75dd5"
+        },
+        {
+          "path": "skills/hook-development/references/migration.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8299,
+          "sha256": "7f8e7a795829837f46a0c058c26c8f5c4aa8be5c9fb5316b828229d1802ded77"
+        },
+        {
+          "path": "skills/hook-development/references/patterns.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7144,
+          "sha256": "cb607fca192bfa892fd198141b86dac9d0ca2c573a280b054b7beaa56fc9a8bf"
+        },
+        {
+          "path": "skills/hook-development/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/hook-development/scripts/README.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3677,
+          "sha256": "08a28b12ffa9fcb16f257ea685c70a920f4f835978b9ffbbac055137c6f6aca0"
+        },
+        {
+          "path": "skills/hook-development/scripts/hook-linter.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4200,
+          "sha256": "85a7d55488f8f38f9b98350b5cb597fb306432d5e61eaa3444e7226ca9309e0b"
+        },
+        {
+          "path": "skills/hook-development/scripts/test-hook.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 5336,
+          "sha256": "ded642e811b4731f6a2c90c73b02e00c937511d9ee65236bb8cf9964f0069393"
+        },
+        {
+          "path": "skills/hook-development/scripts/validate-hook-schema.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 5081,
+          "sha256": "e7785d6c61d368f5ea5270c979753aea02f776f5b6aa220137ec4585abd720c2"
+        },
+        {
+          "path": "skills/mcp-integration",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/mcp-integration/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12530,
+          "sha256": "b9319d8e44c8f058c1c4f003168295ab2582567fd6329c8b933409116e938bc6"
+        },
+        {
+          "path": "skills/mcp-integration/examples",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/mcp-integration/examples/http-server.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 502,
+          "sha256": "7a11adaea5ac1bb76269bf473f5cf5cbd636a83c2ec0b7007f2b1cbf4a8a725f"
+        },
+        {
+          "path": "skills/mcp-integration/examples/sse-server.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 337,
+          "sha256": "2bb1c32911c5714158e368d4bb347306078f6d2097b653e9e5c9a02d2cc0510e"
+        },
+        {
+          "path": "skills/mcp-integration/examples/stdio-server.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 686,
+          "sha256": "46148a5dc7fc5e63c681c5fb975d3908d3f3052f51de7236725cdadda41e2b5d"
+        },
+        {
+          "path": "skills/mcp-integration/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/mcp-integration/references/authentication.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10159,
+          "sha256": "2f48cf8fd68d169e885ce96a62a7feaadd0fa293d74b451a51998947f41a8f86"
+        },
+        {
+          "path": "skills/mcp-integration/references/server-types.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10824,
+          "sha256": "6ec320da9fdec2445d03f6b3ece875ecba383fa5e6fd9c2f5dd8fd7a6038a090"
+        },
+        {
+          "path": "skills/mcp-integration/references/tool-usage.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 11674,
+          "sha256": "8dd0005d7ba6cd2d24e72f9e6102c129b7445fc818e14656ad9ebaef6621a7a6"
+        },
+        {
+          "path": "skills/plugin-settings",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/plugin-settings/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12097,
+          "sha256": "028b955244b937ebc1a5c268a12776b8ceae4cbfb60928fbca927227f4c8851d"
+        },
+        {
+          "path": "skills/plugin-settings/examples",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/plugin-settings/examples/create-settings-command.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2177,
+          "sha256": "abf0a36bb3f6425041046f2da1ebfac5505c5b37656fdd4772cfc4d8bd2fa655"
+        },
+        {
+          "path": "skills/plugin-settings/examples/example-settings.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2930,
+          "sha256": "f07209b6e2fb62d443ae07d01bc1674c6c741c352a04549bfa978e1f34b9769e"
+        },
+        {
+          "path": "skills/plugin-settings/examples/read-settings-hook.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2205,
+          "sha256": "627fce38d37d64c971401ecc85d548f060075670bcac52f65c92ca156e810c70"
+        },
+        {
+          "path": "skills/plugin-settings/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/plugin-settings/references/parsing-techniques.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 11513,
+          "sha256": "bc90aa020aa5fcbb3483d7316754450dcc91d086ee96f9304fa655e878f7712e"
+        },
+        {
+          "path": "skills/plugin-settings/references/real-world-examples.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9492,
+          "sha256": "35c8805ac43fccd9efeef932bc49afc424f8fd150b553197652996abf2d1327e"
+        },
+        {
+          "path": "skills/plugin-settings/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/plugin-settings/scripts/parse-frontmatter.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1269,
+          "sha256": "1ab8c42d5a19e0b404af3c573d0267fc19b5987e1d7885f522066ffd76e54553"
+        },
+        {
+          "path": "skills/plugin-settings/scripts/validate-settings.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2712,
+          "sha256": "2f4975285cba7f16b82c764a95fe76d34ac488308ba6705c04561267da4f4f75"
+        },
+        {
+          "path": "skills/plugin-structure",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/plugin-structure/README.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3210,
+          "sha256": "c7cb4931d6d71198cba6b552e4733b41940be56a65552a2ff7c5656750b95184"
+        },
+        {
+          "path": "skills/plugin-structure/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13796,
+          "sha256": "a2dbc1e5502aacb360d0ca74732cdd7be4f6a12a49edf4f2ade4134fbc026247"
+        },
+        {
+          "path": "skills/plugin-structure/examples",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/plugin-structure/examples/advanced-plugin.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 18746,
+          "sha256": "3d24f5856048a94cb99fe2b8207d99f2f5d69325771b361d63ec73024290759c"
+        },
+        {
+          "path": "skills/plugin-structure/examples/minimal-plugin.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1731,
+          "sha256": "c4f14fe56b153be3c532b7947bb10b453fc92e280dca5a7da752d2b1b5d17448"
+        },
+        {
+          "path": "skills/plugin-structure/examples/standard-plugin.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13310,
+          "sha256": "b8cfba84bd4dbdc83365cebcde5dcc6391252372300df0c1ea7890441582d784"
+        },
+        {
+          "path": "skills/plugin-structure/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/plugin-structure/references/component-patterns.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12086,
+          "sha256": "38681792a6aba4f06d3c391b20b04060263f1fbaacc5880cc0cafe0543d37f91"
+        },
+        {
+          "path": "skills/plugin-structure/references/manifest-reference.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12061,
+          "sha256": "d0ff8ffece4754df92c543266b8d0b689fb85473f51fbb57e215f2d235ee9782"
+        },
+        {
+          "path": "skills/skill-development",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/skill-development/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 22825,
+          "sha256": "d51b4e20043b13e462aa86c47ea82d43e216eb292871538127f4b12a54e4944f"
+        },
+        {
+          "path": "skills/skill-development/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/skill-development/references/skill-creator-original.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 11547,
+          "sha256": "8c0ce23bb87be91f5b0853c2e9815617c3858b63acdddfe5da47d2c2d3a60816"
+        }
+      ]
+    },
+    {
+      "name": "claude-security",
+      "root": "claude/plugins/claude-security",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "b5b01ac4f889fec0c4c6bb89f27ca7c8574473f6",
+      "pluginPath": "plugins/claude-security",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 750,
+          "sha256": "3576c397867ad312519d7346afba035f1363007b400d12b5e241e15dd50b81fd"
+        },
+        {
+          "path": ".gitattributes",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 178,
+          "sha256": "6165c3453b390e9e0718ddeeb212cd9652559d7dff94a622aca6819279d5f133"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1500,
+          "sha256": "15d46b21bd3c8ead21dd4fe0f4b82a8d934b698cf6367b09c06211058fc4332d"
+        },
+        {
+          "path": "NOTICE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1037,
+          "sha256": "de9f06a5e0b160f563704ef53f03336f17b65685285b0b077a574ff3f3d28d8f"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 11568,
+          "sha256": "ee6076a0c950676b6cb8e55d106bf98e738ab5fb4f1e03501642595c4301d9e8"
+        },
+        {
+          "path": "SECURITY.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2015,
+          "sha256": "b60e6fcc9f67467478500b150fe7f87fe76c3d04404b2baffccfc5b6ad6f5caf"
+        },
+        {
+          "path": "agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "agents/claude-security.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4039,
+          "sha256": "b6ffed9f97ac263cbee4b6a986df5e8c00f6c2affee6979f1b43c04650d2320a"
+        },
+        {
+          "path": "agents/explore.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2516,
+          "sha256": "33469106c1b754c53000fada8dd5f72eb1f17348d9e7da435b0997795155dac9"
+        },
+        {
+          "path": "agents/patch-generator.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5697,
+          "sha256": "c813ba43601b11ca47f1d8f6db97c487b17f37c555482ea552461cc6150d0b2b"
+        },
+        {
+          "path": "agents/patch-verifier.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9052,
+          "sha256": "a9cffdbb894da9da96bed5c1ef31a1bf20e2c2dcf626d7185ad59aa12bcd8ee2"
+        },
+        {
+          "path": "agents/scan-inventory.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4589,
+          "sha256": "84dc5a96c9ae4c198ab39e3c8db6f2e2729ff032f9e80ab5ab766ed64adea465"
+        },
+        {
+          "path": "agents/scan-loader.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 606,
+          "sha256": "6dd1b274aae7de7b1b3c8810a469aeee46eba8ccaccccb0cba1fd1b55bd1a2f1"
+        },
+        {
+          "path": "agents/scan-redactor.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3114,
+          "sha256": "9261f274a1c4930ad95d62b1cc1f25719af414543aa434dd9b2ab52d089d95e9"
+        },
+        {
+          "path": "agents/scan-researcher.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7678,
+          "sha256": "e708259950956244471f6fef4adbc50bf99e189c68a48b925f8dca0f674df659"
+        },
+        {
+          "path": "agents/scan-verifier.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5713,
+          "sha256": "6a24be23785cd44069c4999c30a62aabb2d8c799100916fb8d76da7e3249fa9b"
+        },
+        {
+          "path": "hooks",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2108,
+          "sha256": "e74c462ffb157fc972a9ece65d0d78aabc264e0de850be9aa79e924f59aeaac7"
+        },
+        {
+          "path": "hooks/hooks.py",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 20488,
+          "sha256": "2243b2a80a71fd3a21650ba0c18fc3a89eb7a1761709b4102a4f2b2f844d5786"
+        },
+        {
+          "path": "hooks/hooks.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2080,
+          "sha256": "5a2c9a25bfababe681f126ed4bd10d9eec44b7082ec52cb158999c7aadcd31ba"
+        },
+        {
+          "path": "scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "scripts/keep-waiting.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 785,
+          "sha256": "ba887b9e1ca809609514961dececde97e7ba86c970249916151e919d1fe182ad"
+        },
+        {
+          "path": "scripts/lib",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "scripts/lib/__init__.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 58,
+          "sha256": "4673bbd8db2c97c8dd7f387345693a7b55f9ac8ce9d6a13f7ce0c4b6a4757981"
+        },
+        {
+          "path": "scripts/lib/absolute.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 849,
+          "sha256": "274b390e2ec1b45b514d6cfb5adcfa7367793059d8761142e75f8725bd0e119b"
+        },
+        {
+          "path": "scripts/lib/chain.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2126,
+          "sha256": "9ffe1168e340719d85cced9d3ec71e7d6e43588b0bad3efe771ad93315490025"
+        },
+        {
+          "path": "scripts/lib/console.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 585,
+          "sha256": "64fd95924c02e42696941e07df425cd4c326cedeb978dda1f9244fd7e5e4f374"
+        },
+        {
+          "path": "scripts/lib/cwe-categories.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 30049,
+          "sha256": "ebc4b1eff4fb1dfba2e1783f53c61371d1a66c6935a76098ed47c10e6d97dcc0"
+        },
+        {
+          "path": "scripts/lib/cwe.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2310,
+          "sha256": "24732e033eed4800ba14b5a39e3876b7e20cdddd5686dad76996ee423439e331"
+        },
+        {
+          "path": "scripts/lib/finding.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 17346,
+          "sha256": "696f51b5744f7bbc34ddb3bd6dc4dd6d66057430492e118d2ad955e46343ff03"
+        },
+        {
+          "path": "scripts/lib/git.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 912,
+          "sha256": "1194a377b419dfab18d990a1f0bc2053d2665eb3c20b91d811c52432eda4756a"
+        },
+        {
+          "path": "scripts/lib/link.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 693,
+          "sha256": "0f5991ed0bbf86b8f043ec41d3ffe76bad2e818868f2663a1ea7650864c19fc2"
+        },
+        {
+          "path": "scripts/lib/plugin.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1944,
+          "sha256": "ddd59daf34345e3d88fcf516500db38122dbf8d929d2662911f84b1ef5286459"
+        },
+        {
+          "path": "scripts/lib/revision.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 892,
+          "sha256": "36ebc075d805a3c85aac3b1c609c750e018cb4f0d7858a09cf3b175d0607cc64"
+        },
+        {
+          "path": "scripts/lib/sarif.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 15374,
+          "sha256": "888a95e8332174eb0a85e7e15bbbc15da2e2f428a9a4f054f4a402f6c99920cf"
+        },
+        {
+          "path": "scripts/lib/secret.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1813,
+          "sha256": "e44c15a5d7343e4e6b610be494a0d207e359ced9180c55a0b9cfbef4b3ef977b"
+        },
+        {
+          "path": "scripts/lib/source.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3560,
+          "sha256": "931c24e4d439083ee2f585107e2623c6d005120fcdfa2ae6c199c908bc7b90ce"
+        },
+        {
+          "path": "scripts/lib/strictjson.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2976,
+          "sha256": "5eeb94bf5046157aab855aacbc3335c2aeb89a65c89493ddf9a8475674b21896"
+        },
+        {
+          "path": "scripts/patch_artifacts.py",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 52407,
+          "sha256": "636c9f7cad43687be94bcad7639bddb95a4828651853d7caef19744bd40f67e1"
+        },
+        {
+          "path": "scripts/render_report.py",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 39202,
+          "sha256": "2884f1c99bbef75c7d0df7259ef2ce648369f1021a5b48867ada648e4b45c8c8"
+        },
+        {
+          "path": "scripts/save_result.py",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 22196,
+          "sha256": "e38c959da2199f3e7a14bf7ffd06803f7a239f4ecb5663c5ef80c216f1e017d4"
+        },
+        {
+          "path": "scripts/write_scan_meta.py",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 22359,
+          "sha256": "1cbf92f8fdfe51431edfdafacf10165fe0e5116f004376a034bb575db4374c4f"
+        },
+        {
+          "path": "skills",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/claude-security",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/claude-security/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5569,
+          "sha256": "58898a55aa8d086460bc4cc9c87e75b6198bf3b7cd55fe1fa231c0d66016480f"
+        },
+        {
+          "path": "skills/claude-security/jobs",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/claude-security/jobs/scan-changes.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 32899,
+          "sha256": "038279778115e5f81d15fed1ec348ce2587e8e2df13518701c825ff18fb3f7eb"
+        },
+        {
+          "path": "skills/claude-security/jobs/scan-codebase.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 28708,
+          "sha256": "bd03e0fc69a6f7f36b7a4ccc3443b3bcdb4d408e75f37d1653d679b1307c4e38"
+        },
+        {
+          "path": "skills/claude-security/jobs/suggest-patches.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 32493,
+          "sha256": "c4af04aa33b7038e968f436200a16c6a347ff56d62b1b3f5af369b9e0a07828f"
+        },
+        {
+          "path": "skills/claude-security/role.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10630,
+          "sha256": "3871c06865a02e7e25106a36b45ec8072a95a9f870d76c97aed37e41598c9560"
+        },
+        {
+          "path": "skills/claude-security/specs",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/claude-security/specs/patch-spec.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 11437,
+          "sha256": "dd7d48ecf53a1a18f4ec4036841c3c8bd2b1e23e661391635de576f40cb121ef"
+        },
+        {
+          "path": "skills/claude-security/specs/report-spec.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 14851,
+          "sha256": "138df8ea0f296d040a0de51872c6f15a8a227d34e51fb92e1f6cb1ce127a1ca6"
+        },
+        {
+          "path": "workflows",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "workflows/scan.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 60537,
+          "sha256": "a0bc7ba25dfb024878811b5c266c75eb6d73b84dcbc32fde462535dbfbc284f0"
+        }
+      ]
+    },
+    {
+      "name": "superpowers",
+      "root": "superpowers",
+      "repository": "https://github.com/obra/superpowers",
+      "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".agents/plugins",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".agents/plugins/marketplace.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 363,
+          "sha256": "2b94116c190896480e5054222a744e375976f8ae5bdb66ff0ab6b348dfad4182"
+        },
+        {
+          "path": ".antigravity-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".antigravity-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 668,
+          "sha256": "47fe1ae9311cdf7a1136e2d39d74194ee2bc06d4b9fe2fe8d8652a265ca4a57a"
+        },
+        {
+          "path": ".claude-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".claude-plugin/marketplace.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 514,
+          "sha256": "04015bf36c0c8e475e61509f4c0c2e72838abb1b6ab70a2c44f04be4317f79fa"
+        },
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 497,
+          "sha256": "6728b554d1aaf9235f7981c7838a32f50c191297284af97f4c2a808155f7c399"
+        },
+        {
+          "path": ".codex-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1730,
+          "sha256": "925b862a7ee38f170f4595a33a1d3c1cecd5e944f271b30d98efa55919febab0"
+        },
+        {
+          "path": ".cursor-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".cursor-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 578,
+          "sha256": "e74bbc3086286fec5595e3adc35f3c340ec255508afdf5030dd617a6a850afea"
+        },
+        {
+          "path": ".devin-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".devin-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 575,
+          "sha256": "5d1227aa357f7c44c07c6555190c3f8e106af24666b8cb48bf0475026113f3d7"
+        },
+        {
+          "path": ".gitattributes",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 373,
+          "sha256": "4702b23e09afad9638c184c8900b31af635673ba439c265ecc3d341efb54eaf8"
+        },
+        {
+          "path": ".github",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".github/FUNDING.yml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 62,
+          "sha256": "2f9cdda7b1f3ea4be28bbcc3444c2c6512d7739589e6c5e72fd4f95950d3e7d4"
+        },
+        {
+          "path": ".github/ISSUE_TEMPLATE",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2338,
+          "sha256": "c766d3023f9a12280019055997ad2424887778d9b701b4118ea86a7fbf1f7fdb"
+        },
+        {
+          "path": ".github/ISSUE_TEMPLATE/config.yml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 241,
+          "sha256": "e955d428a9ac46ed35f407b6532d74d1dade217d89d9a4c7f6b05b72872a004a"
+        },
+        {
+          "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2164,
+          "sha256": "a7aac80c9df2e46fce9a3c89a6e9e73e8d81e6de311dbd634ed9d5dfacb0bdc8"
+        },
+        {
+          "path": ".github/ISSUE_TEMPLATE/platform_support.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1525,
+          "sha256": "19f6d78322bf53b62ac8d7baf117492de3bbfae80851657c24c102980ea2aa26"
+        },
+        {
+          "path": ".github/PULL_REQUEST_TEMPLATE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6626,
+          "sha256": "d837f95474fafb23298bb6e295409ecc522d4c4db6a2e1eff955bbfb7a4a40d9"
+        },
+        {
+          "path": ".gitignore",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 347,
+          "sha256": "30b79670d7359590a4f1798e99112d9298d8eed889042aba2ee9a1722dc06ebb"
+        },
+        {
+          "path": ".hermes-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".hermes-plugin/__init__.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5092,
+          "sha256": "767b7956f86b0343a8244943ac733c4f9f2a38cb571162cf67b26d2704a8afb1"
+        },
+        {
+          "path": ".hermes-plugin/plugin.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 151,
+          "sha256": "31827794da38529aa1fd1b0020f29b6325a94029aaa425a1c3a1b329c47efec7"
+        },
+        {
+          "path": ".kimi-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".kimi-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3090,
+          "sha256": "fd150224125adf931a839b210adeff56a36ce7937c67916da93c7da428d22e44"
+        },
+        {
+          "path": ".muse-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".muse-plugin/marketplace.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 507,
+          "sha256": "cb77cc7e9cc87ca74892584ad6810288551b6ec71123ece2da112a20a6b190ae"
+        },
+        {
+          "path": ".muse-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2288,
+          "sha256": "56f1ce972975db8f6efe65e6b0136e7cbcc3a1c3ca22658e2fae01f132af7c9a"
+        },
+        {
+          "path": ".opencode",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".opencode/INSTALL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5379,
+          "sha256": "15a91f33314d5a156ed6b8fa9e243bfe85e6e9e4e60238f6e9b0e06b17640d2e"
+        },
+        {
+          "path": ".opencode/plugins",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".opencode/plugins/superpowers.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 19346,
+          "sha256": "e0a696ca06f0b05f9e76734ea302f0796fe747d6a79fe4910e34462822723043"
+        },
+        {
+          "path": ".pi",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".pi/extensions",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".pi/extensions/superpowers.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4359,
+          "sha256": "59774512277ffb41b706f6ed376b27fda83c3a04045a41560f4a2307591e3939"
+        },
+        {
+          "path": ".pre-commit-config.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 579,
+          "sha256": "73070dfddbcb1e94980a2e7172532e5d6403e44aa3f30ef5de30306b77684f32"
+        },
+        {
+          "path": ".version-bump.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1020,
+          "sha256": "cb4a788a2c54b06b798731aa40d929611bd6290e9c09463dad97f4f84adc6761"
+        },
+        {
+          "path": "AGENTS.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9911,
+          "sha256": "3d7c31b2ed1592d0816e436a90549c8af5829627bcb663fe1c886a30f427cabe"
+        },
+        {
+          "path": "CODE_OF_CONDUCT.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13724,
+          "sha256": "5604db48bb38684df7b0816cc2a8b2659a9c7efcfb2fa17936e6b16b1ec79316"
+        },
+        {
+          "path": "GEMINI.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 92,
+          "sha256": "0823da8b7277f8b623746d57c0bee75fda02e4c832fe57843e644d0fe633abbc"
+        },
+        {
+          "path": "LICENSE",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1070,
+          "sha256": "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 14847,
+          "sha256": "79f29f50c735862d2e304ea547b4c9aa67d9db6909ff6fb7b5ea922d7bcbc3e7"
+        },
+        {
+          "path": "RELEASE-NOTES.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 120808,
+          "sha256": "af121b6df7d328b0f325bdd016f31bbb59b1f23cfaf6c7f2a9ac2be8c7e0fc01"
+        },
+        {
+          "path": "assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "assets/antigravity-logo.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 16690,
+          "sha256": "d9eb1f1893e686de4afc7a8305d1e7a125fdf9df3741a28b2aa0999005e60a3a"
+        },
+        {
+          "path": "assets/app-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 48231,
+          "sha256": "b7477eb39b5109617fe37e51dd65d8bdd8dff6c40fda49adfbc21eec445777ee"
+        },
+        {
+          "path": "assets/superpowers-small.svg",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1733,
+          "sha256": "54a632d9ee6197ccbc10d43d42217e23d08375bea63ba8eb4b6af757c1535038"
+        },
+        {
+          "path": "docs",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "docs/README.kimi.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2691,
+          "sha256": "915b112731bbcb635885ed1c5f24a36b43248bc18689fa253bb4f89c937c6585"
+        },
+        {
+          "path": "docs/README.opencode.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9090,
+          "sha256": "7ce149e5b91bf7f55bab76732c0e054c0b7ff29dc2865b3a59a10085c793e5ae"
+        },
+        {
+          "path": "docs/plans",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "docs/plans/2025-11-22-opencode-support-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8831,
+          "sha256": "4688cb2e4bafa7e6124dd811be57c8873bfb4b8cccb95ddbd7032557a9cfd10b"
+        },
+        {
+          "path": "docs/plans/2025-11-22-opencode-support-implementation.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 27539,
+          "sha256": "2cc68cc29ee1174e13a65739b004f2346911a0d89a20744930f9f5b81963b4f3"
+        },
+        {
+          "path": "docs/plans/2025-11-28-skills-improvements-from-user-feedback.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 21033,
+          "sha256": "cce0b2e951209ac7d555fcbacfc858d8069b4036019d44dd95bb4334afaf2e65"
+        },
+        {
+          "path": "docs/plans/2026-01-17-visual-brainstorming.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 15107,
+          "sha256": "2ff9c06d8c7cf650becb588d74507c5681c55844c61e21160a290cbe26d41ca4"
+        },
+        {
+          "path": "docs/porting-to-a-new-harness.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 52650,
+          "sha256": "562a1436134babc815c11adf0379e2df00c8de0e73c362291faf495448b94f3e"
+        },
+        {
+          "path": "docs/superpowers",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "docs/superpowers/specs",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "docs/superpowers/specs/2026-01-22-document-review-system-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4723,
+          "sha256": "19dd839168b9e4a072985e8941aa3ae7cf9101357111620755d50dbeb1bea04b"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-02-19-visual-brainstorming-refactor-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9445,
+          "sha256": "f27d0f9c33cc4f34101fd676d48e73d6259e6cd4e1b3adc477ea81f4c7557af7"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-03-11-zero-dep-brainstorm-server-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6021,
+          "sha256": "8f29bac7d4df2b51062c005fe4d591140f1da3ab2030b28537df6f964637b9e9"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-03-23-codex-app-compatibility-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13369,
+          "sha256": "f351216f0b8abb5f08a9209d71ec3c218c79b1ba9d6a1c68aec990ef00e31a53"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-04-06-worktree-rototill-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 20120,
+          "sha256": "757ce61bbcd16dcb8f61fa69778ca7a3b1d26f7a11a0fcea3d302fd99a52ebae"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-05-05-platform-neutral-config-refs-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4886,
+          "sha256": "7a3c5e5fb77a3f8a500e9406283653cfee5edf1b98e58d5f267c5f21905eee19"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-05-05-platform-neutral-prose-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6038,
+          "sha256": "d55fa30a3b1422f8364a81f49c755ada9cc792b2cc10193b1dbd43c551918c19"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-05-05-platform-neutral-readme-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2100,
+          "sha256": "63eb346415386c6850832f4b7414d03570a033eaf37de0b60d2ec4834169896e"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-05-06-lift-drill-into-evals-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 21059,
+          "sha256": "fac3785f6f779bd899a6e93bcd60a934b4946ce4f7e8b6129d7910979650a6a1"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-06-09-sdd-task-scoped-review-dispatch-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 17835,
+          "sha256": "08b6b77be0d3b95e1d19a3dc320b93bba52917ca9beb0084fd74ecd75c015b59"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-06-10-positive-instruction-redesign-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10590,
+          "sha256": "3a87b9e873728a3a4331437eb90f9fc5f4c9d7d0b88a931cce2bc3bda041b68b"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-06-10-strict-cost-sdd-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 15315,
+          "sha256": "e8865d184479ffd4f2fe2c3072bf6a2b70179bbb4565cd6cefcbcb127c9f9b28"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-06-10-visual-companion-auth-hardening-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8314,
+          "sha256": "8d97d0384c61c0400fb67429a4384ad989bdc11953cce160069c368ac1f7e362"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-06-11-visual-companion-final-hardening-fixup-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12956,
+          "sha256": "78c4fbc2b609b1fe3ca0d7aba0f4d800511baf069355d25b37da5cf957dc0e7c"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-07-06-sdd-plan-scoped-workspace-eval-results.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 24547,
+          "sha256": "c4d2f3f086648ee6b949fd0ed999dd7b0a3a8d45ba290b2024389c66b2ed95b7"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-07-06-sdd-plan-scoped-workspace.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10210,
+          "sha256": "301328cb8dec833dc35e05e90b4c10a6e67ebd915b33a3a5d34f83927094815d"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-07-15-sdd-fix-loop-redesign-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10963,
+          "sha256": "9ed33fe2821fd9d61e198c03e0377a9151294737a6ea34074637c1eef98c1a06"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-07-30-codex-efficiency-fixes-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12583,
+          "sha256": "6a6f81dcea03ebb8ffa710536fc92faab285c7bc894430c3348eb0bfa3fea926"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-08-05-hermes-version-bump-wiring-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2196,
+          "sha256": "f649e3afbd3a14df4c1ac5bd1942ffb4846129836f20b5f2aa3263fd3c19ed69"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-08-27-diagnosing-superpowers-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 27158,
+          "sha256": "396a4951cda08633501deb638a77961a638560441b7fde53fb43fc1a6497d0bf"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-05-brainstorming-rebuild-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7480,
+          "sha256": "a15a0ceb2df039469ea15b8f66d001782e1b2c1d0690c0891070ac11389870a3"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-06-antigravity-marketplace-design.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8848,
+          "sha256": "db4b3e15709b9ce2b0c40a59c590a5f63ae551b28f6a1104df3306d1d542ab1d"
+        },
+        {
+          "path": "docs/testing.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3045,
+          "sha256": "2959880663be4abecbcf11331e64e435cfadffae2c9e2fb24eb5509224f51f30"
+        },
+        {
+          "path": "docs/windows",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "docs/windows/polyglot-hooks.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7658,
+          "sha256": "6691f1a4fedfecb456550610afda3bda56ad458cf6f2200bc5249fa3cd743a94"
+        },
+        {
+          "path": "gemini-extension.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 187,
+          "sha256": "acb18fa699f7e1b313ef46df10cea32904ea3681b833d6ef068ed87fb00f39b7"
+        },
+        {
+          "path": "hooks",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "hooks/hooks-cursor.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 137,
+          "sha256": "53d8ceb3ff5d8bb1c4f283f238cc868b8c1af22e40a3ac30f6d6e4173effefbd"
+        },
+        {
+          "path": "hooks/hooks.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 424,
+          "sha256": "19fa1af26a0ed32bfabee6c4d744e5447ea3bdf769efceba9e268f2d9f6dc263"
+        },
+        {
+          "path": "hooks/run-hook.cmd",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 3577,
+          "sha256": "324b298bd370d6f3ea71c165e0b732d5678e5cff68d0d7f7e47c13bc2cb2559a"
+        },
+        {
+          "path": "hooks/session-start",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4421,
+          "sha256": "38fdeed045b28b62034a809e45602e33358573acbc23c83787d76d449cb89902"
+        },
+        {
+          "path": "index.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 536,
+          "sha256": "f0132fd5339befeb99ba903b1619fd9530969e5b4a1ea8cecf0b0a7f0213a099"
+        },
+        {
+          "path": "package.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 433,
+          "sha256": "49004c08be59f027bf23a500d57ab1ba6a288deb5697d3cbd743432cf4a42059"
+        },
+        {
+          "path": "scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "scripts/bump-version.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 7639,
+          "sha256": "76dc971d2bb5d8b322eeb89b1d181f983b37f169a92bdf9883517fc746f657e8"
+        },
+        {
+          "path": "scripts/lint-shell.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4088,
+          "sha256": "aa34cc2dad4b130231bcf21fdd18f3f91e8fd7ab80d88a82a13e1395f32756f8"
+        },
+        {
+          "path": "scripts/package-codex-plugin.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 10338,
+          "sha256": "297c6f3e7c5ee9fabe2fe39765109a7a5e79e9b19c990775025586c5263121d4"
+        },
+        {
+          "path": "scripts/render-antigravity-logo.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2027,
+          "sha256": "48a8d329a7e048f5dba229bdb688f71bea7c9feaa1f139176d693ced4eccb9da"
+        },
+        {
+          "path": "scripts/sync-to-codex-plugin.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 15097,
+          "sha256": "68faa7e87b9df99ded0b9a1ed2e683c1007c36543593adfdbf55a9d57ab318d5"
+        },
+        {
+          "path": "skills",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/brainstorming",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/brainstorming/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 15190,
+          "sha256": "2c9ca71f94886f9ca9f4aef055f7cafb3e1a9bdf3aeebf8f4cb547c69405d207"
+        },
+        {
+          "path": "skills/brainstorming/builder-check-prompt.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 881,
+          "sha256": "36d51a4723d6f0a3ce5811a0ea3b3a8424f07533947e1355f5d8cb8cce40c55e"
+        },
+        {
+          "path": "skills/brainstorming/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/brainstorming/scripts/frame-template.html",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8094,
+          "sha256": "6a8a4e58bd6a44b904e2e3c57de774481d909204597e1498de53f1b2fecc4c4e"
+        },
+        {
+          "path": "skills/brainstorming/scripts/helper.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5615,
+          "sha256": "43c6d69954a46ec34a2a262bcc62a9a7e83e839c739f199cb72646d397c686e3"
+        },
+        {
+          "path": "skills/brainstorming/scripts/server.cjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 25699,
+          "sha256": "763abf96510e0b892a1141397b31aa82ef900cf87ed34dde94bc8782baf4a7ca"
+        },
+        {
+          "path": "skills/brainstorming/scripts/start-server.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 7315,
+          "sha256": "314dd68dc00e8dd94c7491aca8a5f004c7fddffc161e2b07482f29f48d13659a"
+        },
+        {
+          "path": "skills/brainstorming/scripts/stop-server.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 3263,
+          "sha256": "0b5ccbbd57f62d3ed88993f7940b5ee0e5c0fc9b21c550c623da4f6292e47daf"
+        },
+        {
+          "path": "skills/brainstorming/visual-companion.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13413,
+          "sha256": "6ffcb038b53254bd31debaa15e12dcd4ff24bd63d690e0b644ac6396701cf2e2"
+        },
+        {
+          "path": "skills/diagnosing-superpowers",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/diagnosing-superpowers/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6941,
+          "sha256": "3143de8695c5a2d63e8b1675f33837578076f464deb127c2ebdd0b46fceef886"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/analyst-common.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1582,
+          "sha256": "88801c36070be2a54a8a9a29632b01ab21db053e2e76ee49b5252a9b74ca4090"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/cost-and-time.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1640,
+          "sha256": "fe97a66d4db3b436816ef82694bda413b522b3a862dd41978da01e358fffecc4"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/plan-adherence.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1637,
+          "sha256": "1dcbab82033598a2e9c9ee42e950d4b1822d2c871c02cef9e102cdd5cbbda113"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/quality-evidence.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1476,
+          "sha256": "749d11cf678f379ed77a29274cad456634e0284aa523639a1a214a9f2b986eb1"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/repeated-work.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1469,
+          "sha256": "895027f2dfa4b1b8bcdb7ac9aec8d45a80bff212fad6ec6cad5ab38fa68322f5"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/request-conflicts.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1011,
+          "sha256": "e800e38d8b7752c212c76c5c3ed75cd78b749684263ea0c313586f26af6f4b5c"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/scrub-audit.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1363,
+          "sha256": "5cc48f05a7f81f5f7e05e0c7ceafc0fb8774bcaf75fe88dcb5c7e408026c70ad"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/scrub.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1471,
+          "sha256": "854cb3320cc5377b493cea2f72519d67983464882db68a0f408a7d0a0f040b8c"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/similar-session.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1711,
+          "sha256": "b190f713b463df2bb5ec3914647e204074d1bd50643a53159db6d13cace916c1"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/skill-timeline.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1646,
+          "sha256": "45d604d583b57a77b9033eced8eb875ef342af70fcd66cf7d15c6dc89964890f"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/prompts/stumbles.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1330,
+          "sha256": "1f2d1f048aff7b8b400006301f1ce8c232ecc7e9d5f705af27a849b2c03ea2e7"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/diagnosing-superpowers/references/context-safety.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 990,
+          "sha256": "e6be2bd3495f454d4bedee9484d728d245d1fa656e11fc4ceec5693c16e4730a"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/references/github-issues.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1636,
+          "sha256": "d26ef9197b4a6ae5159ae6d11abd162bcc624d95fc7ccf508e07b68f916a1b19"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/references/redaction-policy.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2243,
+          "sha256": "96b16f47074838fe2d7e609577d6f8b0ad460f8378b281a3f96ee23cb5a08bde"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/references/session-discovery.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1859,
+          "sha256": "6d1dced083e5d978448a78df298cf515531b0eb39b2854a4a2afbffeb69a7435"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/templates",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/diagnosing-superpowers/templates/bundle-README.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3672,
+          "sha256": "2e6ddc6b106028d5ebd00a50ad93a77111d675c219ee1273cd0857869e8d51ec"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/templates/case.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2983,
+          "sha256": "597892462be83bc478536ec91f7c285f6dd25d119c560734a3a180fe8471301d"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/templates/issue.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2680,
+          "sha256": "afd21779e5de5bc5adfe2f5a50a04e44ab8d50d9ad0f829243de248d6f023eed"
+        },
+        {
+          "path": "skills/diagnosing-superpowers/templates/report.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2359,
+          "sha256": "38295d0fd785e8608f330815c59ebd7047942002ec7085aecbed54681f56b0c1"
+        },
+        {
+          "path": "skills/dispatching-parallel-agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/dispatching-parallel-agents/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6078,
+          "sha256": "1968923066f3b707eb01d1992cdf4c42284c3855f70253b9cd5000ff45fca13c"
+        },
+        {
+          "path": "skills/executing-plans",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/executing-plans/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 18364,
+          "sha256": "deaf176fa179827e80f2ea3101db3ea90fdf562ebef340eba761e4687940f5f5"
+        },
+        {
+          "path": "skills/executing-plans/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/executing-plans/scripts/task-done",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1900,
+          "sha256": "ac0b5ebafc7d471507b7e94d88da77a11f187ba277c8d48fefaf8ff3e4fee50e"
+        },
+        {
+          "path": "skills/executing-plans/scripts/task-start",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1185,
+          "sha256": "4ae7ce3b6777c3240af786197836a6b4bbf3b0ee831c25f147c149ea8db54a21"
+        },
+        {
+          "path": "skills/finishing-a-development-branch",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/finishing-a-development-branch/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7781,
+          "sha256": "8db5a922b242dd4e1bf824cb91c13b3e8d8e8a86d6ceaf7f0774eb9cce909d65"
+        },
+        {
+          "path": "skills/receiving-code-review",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/receiving-code-review/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6203,
+          "sha256": "091df1629510af1b92fc4abd6f96732ebedb4cb2c0f3457e8f2740b0504a2438"
+        },
+        {
+          "path": "skills/requesting-code-review",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/requesting-code-review/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2974,
+          "sha256": "2180e14a448e9410bec88e6646a2d1f0ce7fdd58de27388c1e052e929679d2bc"
+        },
+        {
+          "path": "skills/requesting-code-review/code-reviewer.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6449,
+          "sha256": "82e370be6b3447523816286195571e4216ba56ba1ad6ad0e87862294c4c78dcb"
+        },
+        {
+          "path": "skills/subagent-driven-development",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/subagent-driven-development/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 19740,
+          "sha256": "1baf70e307bde682c462513c86116333f1f066168c6710f45145bf5f0b00828d"
+        },
+        {
+          "path": "skills/subagent-driven-development/implementer-prompt.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6335,
+          "sha256": "81dd9d5a3fb0b09b96b5829f03b9796842f3199ef7591d1ba1c2db2a515f64d0"
+        },
+        {
+          "path": "skills/subagent-driven-development/re-review-prompt.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4833,
+          "sha256": "ad54d0a10f1c2c8e656456e0a46e654af5dfe5ee6bcef63428cfd69b8dcd9311"
+        },
+        {
+          "path": "skills/subagent-driven-development/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/subagent-driven-development/references/batching.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 583,
+          "sha256": "b54dc7e23dbfb90db89bcb2fb3af591aabf6a271a165fbc0da4c6f9439980eac"
+        },
+        {
+          "path": "skills/subagent-driven-development/references/cannot-verify.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 513,
+          "sha256": "e698713a15e0eabf1a2ab26ffe1bb04bf70c9d6d2e2060d44a0f9a1bdd4408bf"
+        },
+        {
+          "path": "skills/subagent-driven-development/references/final-review.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2576,
+          "sha256": "6c9e12093e46c4ad0a203bc07709c17e3470f855f1b78e55c5e7b722a012a32c"
+        },
+        {
+          "path": "skills/subagent-driven-development/references/fix-loop.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4314,
+          "sha256": "1938ce707915efc44021e563ebc29666329e20ad861b6c50b89f305b8f4e8d8b"
+        },
+        {
+          "path": "skills/subagent-driven-development/references/handling-reports.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1062,
+          "sha256": "8f759cdd4936220c38aab05b6d6c48c6df8ac8f146b0f37a6d2facbf87133c67"
+        },
+        {
+          "path": "skills/subagent-driven-development/references/preflight.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1353,
+          "sha256": "3ea21c5fc1af1a190ac8a9d19ceb0849b47bf2ffe27b87dffcc21b6a0539776c"
+        },
+        {
+          "path": "skills/subagent-driven-development/references/resuming.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 614,
+          "sha256": "ff6e38bde2276faa2a7e93513086caded0ea10edbf2ec7f349a7e3b0d7c668c4"
+        },
+        {
+          "path": "skills/subagent-driven-development/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/subagent-driven-development/scripts/review-package",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2444,
+          "sha256": "aed7c6e09fc660417d28898ed975e84651cb9f18f4675141cd475edfb7037f3d"
+        },
+        {
+          "path": "skills/subagent-driven-development/scripts/sdd-repo",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2356,
+          "sha256": "6f8256a776968d394bae679572e41ce572fd45c72074b98f9a8eb8b4f160e06f"
+        },
+        {
+          "path": "skills/subagent-driven-development/scripts/sdd-workspace",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4823,
+          "sha256": "de3af5252fa595fc2000ba05cf69e06187d5c8aae9d283cced4c167ad1813061"
+        },
+        {
+          "path": "skills/subagent-driven-development/scripts/task-brief",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4769,
+          "sha256": "0f244a12e146393c552ba62069d3eedcc85cb3f76de67b01f4e11219e5ebbcd8"
+        },
+        {
+          "path": "skills/subagent-driven-development/task-reviewer-prompt.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9175,
+          "sha256": "61a04c2fb29907887d8babee1594f5e35ae26d461e7e584f5b7c283215165e08"
+        },
+        {
+          "path": "skills/systematic-debugging",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/systematic-debugging/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9530,
+          "sha256": "51c6435d98c83c42c96ba7c35725a0b2c376cd487fb1a4e6bd0ddbe7e33ef202"
+        },
+        {
+          "path": "skills/systematic-debugging/condition-based-waiting-example.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5054,
+          "sha256": "40ae5ebe497fdf310200e43fe986552546d0a22837c0d39e855db1cfd33eb88e"
+        },
+        {
+          "path": "skills/systematic-debugging/condition-based-waiting.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3516,
+          "sha256": "e89fec8400d6cd50f43407cec9fab50976ba4d55d0ec2eb51c0bd68036b54c26"
+        },
+        {
+          "path": "skills/systematic-debugging/defense-in-depth.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3650,
+          "sha256": "1e175fb86fc357e58c6aebf5441e481e1b7868b4380c0456b63a17eefbd18ba7"
+        },
+        {
+          "path": "skills/systematic-debugging/find-polluter.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1986,
+          "sha256": "dd7b8f13c4cc2a24b33ff87b18da9248f3e1c80a085c3316224f69ff0fa5c43c"
+        },
+        {
+          "path": "skills/systematic-debugging/root-cause-tracing.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5321,
+          "sha256": "75b933b6a8c40bdb2031b10f21654395b56ec6ab6bc7b018c18d3fe57aeb7fb8"
+        },
+        {
+          "path": "skills/test-driven-development",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/test-driven-development/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9578,
+          "sha256": "64b03fce4aee5a97a93160cea8111f3ba13a17b7c001db4bd5836d67fd10705d"
+        },
+        {
+          "path": "skills/test-driven-development/writing-good-tests.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8268,
+          "sha256": "51471c853306ff92ca8bb41dcaea05f31c0e46b03651f8f3c99754b7172f4ae1"
+        },
+        {
+          "path": "skills/using-git-worktrees",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/using-git-worktrees/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6813,
+          "sha256": "8cfb86f121269e8f7f12361e6795c4f6738828340e28964c9229d365666c9edd"
+        },
+        {
+          "path": "skills/using-superpowers",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/using-superpowers/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3192,
+          "sha256": "82c5c8866ad7f5dd4440ce66bd7806ba48a2f13771beae5cf112e53f08fe36ba"
+        },
+        {
+          "path": "skills/using-superpowers/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/using-superpowers/references/antigravity-tools.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1495,
+          "sha256": "4880f6de3da4e32f9659ebe7a72b9e0ebfff04e028c2ed96173f86d0387a04c0"
+        },
+        {
+          "path": "skills/using-superpowers/references/claude-code-tools.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1469,
+          "sha256": "21479a3fee27448cab8748a3b5687e53bb257883bda9c070426f9a1ab5cebf1b"
+        },
+        {
+          "path": "skills/using-superpowers/references/codex-tools.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4762,
+          "sha256": "1a38ad9b188c393052f58d95657a1c35ea6aafc8b5a27f198f3922912f70bbe7"
+        },
+        {
+          "path": "skills/using-superpowers/references/gemini-tools.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4598,
+          "sha256": "62b9157bcb0ee3c6784e3d0da0798ddfa5872f9e0c34bea48f3079dabea71965"
+        },
+        {
+          "path": "skills/using-superpowers/references/hermes-tools.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1964,
+          "sha256": "e2185c976a3c87503910e05e2aea58cc89bc8e569bb624b93df9958ac47a9190"
+        },
+        {
+          "path": "skills/using-superpowers/references/muse-tools.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1908,
+          "sha256": "5a1da5c575fe18456ca71cd47ebfd8a38c745f8d82a67fe64d5b83080000eeb3"
+        },
+        {
+          "path": "skills/using-superpowers/references/pi-tools.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1242,
+          "sha256": "703dbc83d23ecab9c6f388460c38abc482e9dee2fe6772a8c7a255152ad3a4d5"
+        },
+        {
+          "path": "skills/verification-before-completion",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/verification-before-completion/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3646,
+          "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3"
+        },
+        {
+          "path": "skills/writing-plans",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/writing-plans/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10335,
+          "sha256": "a6c67c1900064347c2a329990dd3c555657c51c3ec53b259a08aa01a2c26139a"
+        },
+        {
+          "path": "skills/writing-skills",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/writing-skills/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 16738,
+          "sha256": "8cb3ac68c6d8c4bb46886b998b09af7989643cab8bd0e46ee86dd62e64546bbe"
+        },
+        {
+          "path": "skills/writing-skills/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/writing-skills/references/CLAUDE_MD_TESTING.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5423,
+          "sha256": "0b379a3415e185d3c434b3ad283d8aa132f3022c2a4f210f168865b5986bcef0"
+        },
+        {
+          "path": "skills/writing-skills/references/anthropic-best-practices.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 46197,
+          "sha256": "217629b356c09c9bd11017c9788e8fc654ca1b32c92d4a51cd490e16dd65e59a"
+        },
+        {
+          "path": "skills/writing-skills/references/bulletproofing.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2577,
+          "sha256": "9397023e6bc85b556a57f3097371363bf03e28e755c57f403f470bcda90e0a23"
+        },
+        {
+          "path": "skills/writing-skills/references/discovery.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7616,
+          "sha256": "c6bbc74af3be90f693f7cbc986af6fa94e8df75f65109b52e96032587f5b92af"
+        },
+        {
+          "path": "skills/writing-skills/references/flowcharts.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1262,
+          "sha256": "8b1f542391f274f0d33f3457ac099a3d317d6877eaa3b8d3b1ebef151b55fda7"
+        },
+        {
+          "path": "skills/writing-skills/references/graphviz-conventions.dot",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5970,
+          "sha256": "e2890a593c91370e384b42f2f67b1a6232c9e69dddea7891a0c1c46d7b20b694"
+        },
+        {
+          "path": "skills/writing-skills/references/persuasion-principles.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5901,
+          "sha256": "a51bc9bf75189ea73a27b3fb504a2fdfdb966fb1f7f1cdf03203230a216ccc03"
+        },
+        {
+          "path": "skills/writing-skills/references/testing-skills-with-subagents.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12557,
+          "sha256": "ed8a6862c085900135962390530d9dc7637ad6d650b4324ce3b051287a5c3f22"
+        },
+        {
+          "path": "skills/writing-skills/render-graphs.js",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4968,
+          "sha256": "c7f412cc629461c4d10287e668731874c0497707023e3e3f74a5355eb2cee196"
+        },
+        {
+          "path": "tests",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/antigravity",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/antigravity/run-tests.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 319,
+          "sha256": "76355b01132d4f27cc5545c15926eb0c3614d38db2b5d6988a2d818918d9eaf1"
+        },
+        {
+          "path": "tests/antigravity/test-antigravity-tools.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1975,
+          "sha256": "c38a501650f5ba63337514044083636998824749adb4c564431253f3cc66254c"
+        },
+        {
+          "path": "tests/antigravity/test-logo.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1603,
+          "sha256": "d7d133df78b917bf00b24c93be19f7b21e185dbcb6d475542993eb3d5c0f3cc3"
+        },
+        {
+          "path": "tests/antigravity/test-plugin-manifest.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4804,
+          "sha256": "627d97c59d806a6d495e54dff5dd57447eba21d8a3293251b472898f28268c12"
+        },
+        {
+          "path": "tests/brainstorm-server",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/brainstorm-server/auth.test.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12084,
+          "sha256": "8efa43628b582973dcc543c0768e91066cf9834292e2e724657c6801b63df062"
+        },
+        {
+          "path": "tests/brainstorm-server/branding.test.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12213,
+          "sha256": "b116f645b46130a3a58867493863a1398cf5426375d695203c858c95eb5e8d02"
+        },
+        {
+          "path": "tests/brainstorm-server/browser-launcher.test.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1768,
+          "sha256": "ffb9ccecf27968b9359049ff96b50725669b1f86863f88b583b9aa0c3aa37c94"
+        },
+        {
+          "path": "tests/brainstorm-server/helper.test.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8240,
+          "sha256": "9917fc944e8c5594430ba2600035ff5fd8212119b9cae2d62c75f5725de94061"
+        },
+        {
+          "path": "tests/brainstorm-server/lifecycle.test.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 23089,
+          "sha256": "686e19a12c6ba9b3003f4dedf840161b05f5c42dfb87c49a6b9c8abc596f1156"
+        },
+        {
+          "path": "tests/brainstorm-server/package-lock.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 861,
+          "sha256": "80f45a9d8857e27d9363d47789284a26d13fb47388fa8596ef0db7207e6d7c10"
+        },
+        {
+          "path": "tests/brainstorm-server/package.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 374,
+          "sha256": "d785483894bfedbccf9731fd7ed52f959973f62dc9c42a8a7407fc7779d220c8"
+        },
+        {
+          "path": "tests/brainstorm-server/server.test.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 27226,
+          "sha256": "7e98be35f51747ac54def39b17fc5de1002fdd36ecbad17c3d026ca11e5d1f90"
+        },
+        {
+          "path": "tests/brainstorm-server/start-server.test.sh",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4879,
+          "sha256": "fc32961620c79a01230631a29e50760c0cc39e08638ac42aa5341ea5106b58a2"
+        },
+        {
+          "path": "tests/brainstorm-server/stop-server.test.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 6346,
+          "sha256": "35e150e95f0e97d50470f2c0a30bc7c9c8c5cb7721c53dcff887b430067490db"
+        },
+        {
+          "path": "tests/brainstorm-server/windows-lifecycle.test.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 12043,
+          "sha256": "7dc8e09edfe0a4cc34550fdb0e5ae5117758991d490756971be51c88e4f5908d"
+        },
+        {
+          "path": "tests/brainstorm-server/ws-protocol.test.js",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 15002,
+          "sha256": "abd0a10eaffe4e30a9918c79c7692775db36c8a3e132e04d52ec06d6cddaa132"
+        },
+        {
+          "path": "tests/claude-code",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/claude-code/README.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4724,
+          "sha256": "df8cc7a1709b5fd881f41f6e7afc180f1b686c14b97624c27e4957a174c09911"
+        },
+        {
+          "path": "tests/claude-code/analyze-token-usage.py",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 6733,
+          "sha256": "b3b124b975086e66540dca1328d7b6b75416450b0c93fc246f0d7d148fc2394c"
+        },
+        {
+          "path": "tests/claude-code/run-skill-tests.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 5334,
+          "sha256": "a7bffa447f489be5a9507114027ddcdb94409eba3156df88c9338307710502a4"
+        },
+        {
+          "path": "tests/claude-code/test-executing-plans-scripts.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 10352,
+          "sha256": "dabc5a81cc989331d27ae470bf107f691cb4412883fb4056035d55d5206a6b07"
+        },
+        {
+          "path": "tests/claude-code/test-helpers.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 5438,
+          "sha256": "b06a890c9d371195d8f256b1227607dd32ad28831658be1033756cc8dbcd86a7"
+        },
+        {
+          "path": "tests/claude-code/test-sdd-workspace.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 35023,
+          "sha256": "56fe0e161064e02ecd9dbb09b858da25731f80bab42553fce5b27e22fc9c1e29"
+        },
+        {
+          "path": "tests/claude-code/test-subagent-driven-development-integration.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 10779,
+          "sha256": "0794d17e3cc5d8a64c07a6c181538e1142819b86382d171f677510cfe6a3f722"
+        },
+        {
+          "path": "tests/claude-code/test-subagent-driven-development.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 5511,
+          "sha256": "37e9a1fbb20f9f6ca2e7eb62f16b4b04c90da2874ec48ec3d2cc5c73ed99155d"
+        },
+        {
+          "path": "tests/claude-code/test-worktree-native-preference.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 6680,
+          "sha256": "1c0a94fb097ad33186bb7ea2b0321b11d8ba92ed8c6ef61464a2246eec33acf6"
+        },
+        {
+          "path": "tests/claude-code/test-worktree-path-policy.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2546,
+          "sha256": "3498f973a9cf288f2959b7a02fc3acea09ee11650b46d689aef81b394f8ab85c"
+        },
+        {
+          "path": "tests/codex-plugin-sync",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/codex-plugin-sync/test-sync-to-codex-plugin.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 26160,
+          "sha256": "28e801f3b4792de2593178204b0bf696c434f0ce04a050381520569c4b6176c4"
+        },
+        {
+          "path": "tests/codex",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/codex/test-marketplace-manifest.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2889,
+          "sha256": "9c5afb24318bd959606f5063f444042e08e6fc2c6ff8c4988760476021e4ec90"
+        },
+        {
+          "path": "tests/codex/test-package-codex-plugin.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 10750,
+          "sha256": "671e0667b268947ea44d49687d0efb05ae5387621191c9122c318fc59ffc86fa"
+        },
+        {
+          "path": "tests/devin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/devin/test-devin-plugin.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2610,
+          "sha256": "e156be13b2e902449ef8bd1836b9dc60a7fc5f2f670896f4faf621d9a1f3a6e4"
+        },
+        {
+          "path": "tests/diagnosing-superpowers",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/diagnosing-superpowers/test-skill-structure.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 5449,
+          "sha256": "35baf007e9a744621c6d374200cfac3b597a5b969bbf824178975257f239854b"
+        },
+        {
+          "path": "tests/explicit-skill-requests",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts/action-oriented.txt",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 173,
+          "sha256": "4ee13db41ce891b5b328f8ad5284e516253f87dc65307df0e60a2713a47442d1"
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts/after-planning-flow.txt",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 551,
+          "sha256": "7da11dd7918b083c43087cd21e241d3b397d5488ba1e06bebed74488c4827d22"
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts/claude-suggested-it.txt",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 498,
+          "sha256": "cb46492d9f905ebf6098aa6d0884f046a1b863b39036e5ec9a3244991b758d6f"
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts/i-know-what-sdd-means.txt",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 366,
+          "sha256": "64f33d0b328471c800541e268996a91e360d625bfe151b476b65bb64f0f1cd8d"
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts/mid-conversation-execute-plan.txt",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 119,
+          "sha256": "601301c1da6e138427c5c1b18acf34b3931bdd08397c3aec7bc94bec30d5c606"
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts/please-use-brainstorming.txt",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 73,
+          "sha256": "de9508ffad9e29ee8ddda26ed9403b4a650e1081df39800edb6b56a6a3a859dd"
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts/skip-formalities.txt",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 171,
+          "sha256": "b4c1fc115fc67d9919a29db6d8ceaa57a41933bde343168bd0858a62cfe11c51"
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts/subagent-driven-development-please.txt",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 36,
+          "sha256": "c2499520cb588008437148facc965800e4a302baa1cc4d726f5b02bfcfc5f3e1"
+        },
+        {
+          "path": "tests/explicit-skill-requests/prompts/use-systematic-debugging.txt",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 52,
+          "sha256": "4aa7a8da6f68bb22d2b1fb66aeb26c1bed6fdf86d33d2d6f7a9752334856a990"
+        },
+        {
+          "path": "tests/explicit-skill-requests/run-all.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1977,
+          "sha256": "b657ef562b6ce3d02b3422eb5ab8571be5545525249088034ab36c27343b95cc"
+        },
+        {
+          "path": "tests/explicit-skill-requests/run-extended-multiturn-test.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 3407,
+          "sha256": "1004578e3ef68d6fda8646c9257d27dd4ca30c4c1bdc986a50fbcb929ea0934d"
+        },
+        {
+          "path": "tests/explicit-skill-requests/run-haiku-test.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4042,
+          "sha256": "27b92722271fd25dfcad9b04e8c45b81e2a51a51005c3bcf13dd9d5a70567d01"
+        },
+        {
+          "path": "tests/explicit-skill-requests/run-multiturn-test.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4564,
+          "sha256": "dc22f0b1ed0d367811ecf046c942430d15e87f4b8b2b4cc8260d60e00bee6ecb"
+        },
+        {
+          "path": "tests/explicit-skill-requests/run-test.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4327,
+          "sha256": "841f1d014f231c84f441cc6b91f388cc3e9e788012e6d36f5e78406c1f4c9b49"
+        },
+        {
+          "path": "tests/hermes",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/hermes/__init__.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "tests/hermes/conftest.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1036,
+          "sha256": "6cf5e434b124d912e1b53b4e6c1287f72c9af8d60aa01e8b49722c98e8a41dc8"
+        },
+        {
+          "path": "tests/hermes/test_bootstrap.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3341,
+          "sha256": "a4aaeb394779f3d22106866bfe67723301a5cf317dfad7a1386994eddd7a3031"
+        },
+        {
+          "path": "tests/hermes/test_plugin.py",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7609,
+          "sha256": "f15ef2b31a293113830a8e82441540372bf0cb3bd02ffa51ef690ec7207e5ff9"
+        },
+        {
+          "path": "tests/hooks",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/hooks/test-run-hook-cmd-windows.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 9491,
+          "sha256": "af80fc5779c806ca42bf4b16f62343cedada2b0cd12693bcdcb0416b2c007b70"
+        },
+        {
+          "path": "tests/hooks/test-session-start.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 13993,
+          "sha256": "23f462f38fc152d1f63b0bbe859acb88cc382adf51e7c8f9537b4e8f2e83b2af"
+        },
+        {
+          "path": "tests/kimi",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/kimi/run-tests.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 127,
+          "sha256": "fb53a9ce91ae119146764ef2d55c63a5d20b86198e2ee08759fbae8194177ff0"
+        },
+        {
+          "path": "tests/kimi/test-plugin-manifest.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2301,
+          "sha256": "d7ca4db2e67c8611d3d1fe1fbf28fe41a33b187155563f1a553212df04250aaa"
+        },
+        {
+          "path": "tests/opencode",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/opencode/run-tests.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 4735,
+          "sha256": "fa16ebeba28fd98adbb4c9a7572965de8e614e06de9912c287883f677114cf1c"
+        },
+        {
+          "path": "tests/opencode/setup.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2864,
+          "sha256": "0e8600fa5e56d7613f41d19732601397d2c18087a71da2801cc53443756a6348"
+        },
+        {
+          "path": "tests/opencode/test-bootstrap-caching.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 11198,
+          "sha256": "63c3156aebf3db49c25e97aadcff613932d6a7ceab59c66cef9ecff20f6e5019"
+        },
+        {
+          "path": "tests/opencode/test-bootstrap-caching.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1060,
+          "sha256": "b13d826fdae77feaf922f4009f544d0ad51ce722258dee997b252f76af70330a"
+        },
+        {
+          "path": "tests/opencode/test-hook-registration.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3464,
+          "sha256": "22bc8f8031787c20f291e0a4e852d9e6fbd8c7fd11931e75586433ba26134634"
+        },
+        {
+          "path": "tests/opencode/test-hook-registration.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 181,
+          "sha256": "f60323f6eab36d921d49a2312dc101752232b62e702079ab0595c6720e899b56"
+        },
+        {
+          "path": "tests/opencode/test-plugin-loading.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2589,
+          "sha256": "41389f92e160766cfb27bfd15849e3ef546427444f88d241506915044209bed0"
+        },
+        {
+          "path": "tests/opencode/test-priority.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 6994,
+          "sha256": "123a82b72f22a5a0d1be2c6cfb898bf4d8d772ee4c7ba2f4540562a1b62a0902"
+        },
+        {
+          "path": "tests/opencode/test-session-bootstrap.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9854,
+          "sha256": "fc1655c45f484e6c19e738b1aec162e9b2e825a89dbe7facdd90b3a8fcbe81d7"
+        },
+        {
+          "path": "tests/opencode/test-session-bootstrap.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 181,
+          "sha256": "8dd9605232ac6030f052ab0102fcea6109dfe6a44e74a2bbe15fd6eb450fe7db"
+        },
+        {
+          "path": "tests/opencode/test-skill-registration.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 9176,
+          "sha256": "779ba75046c2860096e232b5efa298c2073b459234e7279d87510e10fdeacd79"
+        },
+        {
+          "path": "tests/opencode/test-skill-registration.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 899,
+          "sha256": "0d01ec62a39b3d996ca8c3160a93e7d5f0bc3591941a8ee6d48f65dd61eddd28"
+        },
+        {
+          "path": "tests/opencode/test-tools.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 3383,
+          "sha256": "ae8bfae51fd2d25b9659177ec257c0551bc521d7f9e7c60c34110497b501e182"
+        },
+        {
+          "path": "tests/pi",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/pi/test-pi-extension.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7333,
+          "sha256": "807b0d5623600d70e8fc4bd4bb8ab836d0f45003a2fd044114b076d1ba3d4af5"
+        },
+        {
+          "path": "tests/sdd-helper-paths",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/sdd-helper-paths/test-sdd-helper-paths.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2202,
+          "sha256": "38e37aa1043a96eeaec08b6f26a4908d1088c6f740a118a6abcaf3d1b6bafd9d"
+        },
+        {
+          "path": "tests/shell-lint",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/shell-lint/test-lint-shell.sh",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4719,
+          "sha256": "e777907226ed8614fe1cbc06afd538e223e4081c368757b26a5f77dfb4355b40"
+        },
+        {
+          "path": "tests/skill-layout",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/skill-layout/test-no-dev-files-in-skills.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1062,
+          "sha256": "4ebc2c8e396998764d55855012efa3ad38dece864b9bef137ee81b30bfc61bc6"
+        },
+        {
+          "path": "tests/skill-size",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/skill-size/test-skill-size.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 1099,
+          "sha256": "82aa688a6f17cb04006954f2c7e6894578ef13009c273fd40777f90c87d8b99a"
+        },
+        {
+          "path": "tests/systematic-debugging",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/systematic-debugging/pressure-scenarios",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/systematic-debugging/pressure-scenarios/CREATION-LOG.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4257,
+          "sha256": "c24733a5b1821bd6bed1fc950261f0b9f4e90097e0bbb96459d8179713730789"
+        },
+        {
+          "path": "tests/systematic-debugging/pressure-scenarios/test-academic.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 653,
+          "sha256": "fe2ba480d78ac0d686dc025f41c2a32a43d642bf533f91b0c6053a04d35d6486"
+        },
+        {
+          "path": "tests/systematic-debugging/pressure-scenarios/test-pressure-1.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1900,
+          "sha256": "0b6a915db0054577819834c79be9eb614e97bddba10d73768e1fbe91cfed048a"
+        },
+        {
+          "path": "tests/systematic-debugging/pressure-scenarios/test-pressure-2.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2283,
+          "sha256": "b2030aeffba07050e8ad573ddf87486457c4a016a786bb326235bebd856f2016"
+        },
+        {
+          "path": "tests/systematic-debugging/pressure-scenarios/test-pressure-3.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2692,
+          "sha256": "96b50a52e2c7989c9cf20fb752c47c1e9a3a70dc362f8f7989f8f5b64dac7708"
+        },
+        {
+          "path": "tests/systematic-debugging/test-find-polluter.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2609,
+          "sha256": "7c5ae1adb7c6e292b73eccba6ba442501c442aefe8c883a94c9fdd809d592cea"
+        },
+        {
+          "path": "tests/version-bump",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/version-bump/test-bump-version.sh",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2864,
+          "sha256": "9979d56389d953449cd1bdb93017e1f9abbab5f5522e80e9b91dcd6a00baf820"
+        },
+        {
+          "path": "tests/writing-skills",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "tests/writing-skills/test-render-graphs.sh",
+          "kind": "file",
+          "mode": 509,
+          "bytes": 2660,
+          "sha256": "e758c2e751fcfa73ceaeac7114251d48cd7ece167ac535dd765c3f9d95a6a9a9"
+        }
+      ]
+    },
+    {
+      "name": "remotion",
+      "root": "codex/plugins/remotion",
+      "repository": "https://github.com/openai/plugins",
+      "commit": "981b02c0c44058b595f3b4180002c3ae3c806d40",
+      "pluginPath": "plugins/remotion",
+      "ecosystem": "codex",
+      "files": [
+        {
+          "path": ".codex-plugin",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".codex-plugin/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": ".codex-plugin/assets/composer-icon.svg",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1350,
+          "sha256": "c4acc0c249be250d94ce6c8d4413679bd24f0104580f677f87aff97a6fb4bc4d"
+        },
+        {
+          "path": ".codex-plugin/assets/logo-dark.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 38781,
+          "sha256": "15ba8180bd1103e36852adc59caf7912274c2831d25283110079bf67b252b60f"
+        },
+        {
+          "path": ".codex-plugin/assets/logo.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 37249,
+          "sha256": "d8a7965be77f75b74ef010a18f581b77d43770e9e9961b669636a14a860660eb"
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1683,
+          "sha256": "5080b825e6615af13f66e13d3b6b2aa91fda8fe0bbf124de81232aaa0574fbe8"
+        },
+        {
+          "path": "README.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 90,
+          "sha256": "b4b34d64ed14570eea83117efac2099b83b86dc3777c475a0ddc8314cf7d5ca2"
+        },
+        {
+          "path": "assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "assets/composer-icon.svg",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1350,
+          "sha256": "c4acc0c249be250d94ce6c8d4413679bd24f0104580f677f87aff97a6fb4bc4d"
+        },
+        {
+          "path": "assets/icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 37249,
+          "sha256": "d8a7965be77f75b74ef010a18f581b77d43770e9e9961b669636a14a860660eb"
+        },
+        {
+          "path": "assets/logo-dark.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 38781,
+          "sha256": "15ba8180bd1103e36852adc59caf7912274c2831d25283110079bf67b252b60f"
+        },
+        {
+          "path": "assets/logo.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 37249,
+          "sha256": "d8a7965be77f75b74ef010a18f581b77d43770e9e9961b669636a14a860660eb"
+        },
+        {
+          "path": "skills",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2939,
+          "sha256": "41119b9934a5c8252f4c8fe9afbfccde40914afe81c0f86924c8ee2897fae77f"
+        },
+        {
+          "path": "skills/remotion-best-practices/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 311,
+          "sha256": "66d3059cce8d9e49535a01dba01dd67f26a5da35cce3d3a32a3f513e957f71c9"
+        },
+        {
+          "path": "skills/remotion-best-practices/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-captions",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-captions/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 954,
+          "sha256": "a246e7031765a7c85dd9fd6d311592d3bf6fc990b53c63bb7142e7734d8ffd2b"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-captions/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-captions/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 305,
+          "sha256": "d115635f239714033447ca1ea5d39e115d2a746dd07211d6d8c6acdac8dd5282"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-captions/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-captions/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-captions/display-captions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5493,
+          "sha256": "f27fcdedaf4776659bced60effaa356244391f1e52a67dccb3c4e662eae8f85d"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-captions/import-srt-captions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2269,
+          "sha256": "cf5988aad6cba8192a81e5a030955ebf09e97473e0b5ce209e18973bf1a60633"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-captions/transcribe-captions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1897,
+          "sha256": "ad1a62af35fe176b37ac4d98f796451ca66bcc9983207a9710ec3eca6e847738"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-create",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-create/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2037,
+          "sha256": "05fc4e69c886b6f0ab6943f7ad50c7eda67abfe464aa42103128b65c402ef8f5"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-create/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-create/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 310,
+          "sha256": "337274103fbb5395a6355fa09d87dd01ba3708500afbba7edb10d742391aa6d3"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-create/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-create/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-create/tailwind.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 386,
+          "sha256": "3ef07d3225d212af6a5076e62797a04d22d394434dcdbe2c050dab0d92806f36"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-create/video-layout.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 498,
+          "sha256": "7ad94c22e3ad87671292ebb9b22f234c544d6c7fed13f8cb112b84b0f7077d4c"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-docs",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-docs/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1355,
+          "sha256": "8bd2b55175cbd479deddfd4c7258ae3a917f2b5ee695689056ea45495e1b53c1"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-docs/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-docs/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 307,
+          "sha256": "87c4045ace1c3852411e2095b35359268b4fc99e807108e8eb36e077131cfc26"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-docs/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-docs/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-interactivity",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-interactivity/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7442,
+          "sha256": "d135f977350f41ad6638d89bff0ab3f9fd6e0834bd566228a084450715c6a311"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-interactivity/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-interactivity/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 320,
+          "sha256": "c3983ddc6dc1c7d58c487017ceaabfb72d835d489400e719ea0466073b3f97e7"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-interactivity/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-interactivity/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1030,
+          "sha256": "ff3cad64dca7f2c3f8e18e3a8a1737fd1f5890142318dd31721e82631f8697e4"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 293,
+          "sha256": "39e5a9fb81d07e5aa9030d66f4d5d955698b4673cf9733cb6734d2dc75c4a9bd"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3909,
+          "sha256": "09057e77b67dcda23eed8ddbf1b5bd44541a952f380913a00b3bfddaa39ab675"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/assets/cesium-path.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12329,
+          "sha256": "329621928df19d115f93c472a0b7ddbd2463cad502a10722d3c23579a7441d44"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/assets/city-path.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 223,
+          "sha256": "3bb420736d196f726b856420b319e21a8d7fc24bca7e626d67e8b00b0544e630"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/assets/flight-path.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1240,
+          "sha256": "fab65d2d9cc0c4ca56f8a1422494d178c0e57f92a048a4720358d236ced980f0"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/assets/sample-river.geojson",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6409,
+          "sha256": "2c9f6dd35ac4aed56580078046941235ed7e1a5d432a6549dbf7fea4e8d1e9be"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/references/3d-data-sources.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1451,
+          "sha256": "23ac1acc576d49d599b33c812dc697b264ebe28849088c04e9827cb47b95275f"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/references/3d-flyover-architecture.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7887,
+          "sha256": "09e1891cec991a246eec60dbcf76c4ea84c52e0bee14321471197703395d0a91"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/references/3d-troubleshooting.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6741,
+          "sha256": "c803fe443f5bab1a50408f1f6aa6aded7913577eaefcb586b320c5a96c391bf2"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5561,
+          "sha256": "6dbb4d1ae3f5fef9f3f6eb23e2a6d58622750714bb847b088ff58a3533839463"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/mapbox",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/mapbox/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13166,
+          "sha256": "921ef62afc1057e66423a9fae11d3f849d4b3dcfbfa7e9970a281e0d12f37c22"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/mapbox/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/mapbox/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maplibre",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maplibre/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13403,
+          "sha256": "16f659a83e4dca4817c2cc93d5be2242f3aeada1fe2d6b31190dbde51ea21c0c"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maplibre/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maplibre/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4514,
+          "sha256": "7dfb5410b95d508cccfa8a00d90e17b78fd5996cf31e5867be53dd020f3e9c14"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2183,
+          "sha256": "c8137792824323b9db997a88c3b923e8072cf2886cd90c38d84fdbbaad8258ed"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/sample-data",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/sample-data/country-meta.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 333134,
+          "sha256": "470a76cc5a45e58e7e1702cd80f74fcacf9d6e8b1ef7b05011f69853a999ba7b"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/sample-data/yarlung-flow.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13082,
+          "sha256": "73a99e77a2ce31cb3ac39be8fe4775d53ecf127a56137b587fca090067dfbb96"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/tokens.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1256,
+          "sha256": "29ae05eedb4988b5b8f2eb44d241b9c472533fb6ed05d4b33df3e71e0eabc71c"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/references/map-data-sources.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4798,
+          "sha256": "b99680cbda8e7d70dc2cb1a8823f66247a21fc59d10c6dae0dd9ba24d2f15b80"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/references/map-explainer-architecture.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6871,
+          "sha256": "e09de8a4d00ea9a82b992918ec4d0302ee18979b73e6c777d584a9743092344f"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/references/map-geo-prep.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4098,
+          "sha256": "a97b1913f06195601889d4e090ad056db2fffb7b83918924c8cd92847b3829ef"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7553,
+          "sha256": "8265f56bd7c27a7d1a5fa528a77bbe1b29c6acc0e6730233583ca53e2632d490"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/static-map",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-maps/techniques/static-map/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1143,
+          "sha256": "d0de27f8088b48a954bc8216a037b476de86b860604c4981cc8e3708049b5c19"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/3d.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2292,
+          "sha256": "42cef6d68fb4a266ab495d35df0c60e03672b0d85c043f9b567f6aa7ff00dd0d"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10807,
+          "sha256": "56fd0b0d671fcd3e24f9d5e2faa0b108198d166307f4379533192d7673b1285a"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 310,
+          "sha256": "e466d0d7ede756e96d8b366e8d6b76f69dbde3d1d937e8e25b72287e045be95c"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/audio-visualization.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4892,
+          "sha256": "0f4043de86639b6390e5ab888eaa66a24a10a8bd540f1443327cb88107eae1e9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/audio.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3615,
+          "sha256": "59b03efd20139ec344c850add031bf5784e744927f896f7437242178d22ab932"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/calculate-metadata.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3498,
+          "sha256": "711743642a475970dcadddb71805939dd6ee8f348825818cc8897b6a01e1eef0"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/compositions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3190,
+          "sha256": "24bfaeebde3f65d973f03f4e351ca713f6501b2c139b29ac23809d0797d51e24"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/cropping.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1102,
+          "sha256": "66b470cb09d2a93939b08340a3503b6cb7aef6682c62c7ef478ca802994d622d"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/effects.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8904,
+          "sha256": "4f8abd99e3a89668aa1b6521d2cbde8a9b3d25aa9cb4ca2b135b96fe4e70fae7"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/embedding-videos.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3505,
+          "sha256": "543ddf73e53bd750019b0283506d2cc30e9acb605c8628fa12fc9dd3edbc145c"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/ffmpeg.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1099,
+          "sha256": "930d26b519b744e97f0c080608b55200b97ff15d6c366c6c5361bab56ff0e873"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/gifs.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3783,
+          "sha256": "91e17126f7f0d57efdbdbaf34e0c234f874bd6aa66ec7854b80f17b0e32c3b22"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/google-fonts.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1714,
+          "sha256": "fff29cf692ccab0cda263cd85255cf634dbb4d1d2d99e8372b01d9fedbd6cbfd"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/html-in-canvas.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3678,
+          "sha256": "58652afe3e884c830648e0db52f5b8959ba473514ba7b92bde89ba0d224212ea"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/images.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1466,
+          "sha256": "3a82065698ad8d4818164882212215dfe4dc78f00145c87f47513a691550b72b"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/light-leaks.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3212,
+          "sha256": "892c90340921b5aff5499588aadd23cf9fa79758d345f6ea3acf02ae0258ea73"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/local-fonts.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1533,
+          "sha256": "fcad2a2e3a05419d4555c59a75454c4891455dbea91ad596c1095e2887d26a11"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/lottie.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1806,
+          "sha256": "666268c8151d91042162f9efe3f02fe8c62b4c45053614eb1a9325c169428826"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/measuring-dom-nodes.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 995,
+          "sha256": "a677b976eaf1cbc3cdd29cf29a3fd546c557b9a31e6b1fd70e473fde7e828733"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/measuring-text.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2801,
+          "sha256": "4bed81d1ea818db3975f878152dc24ecbc17e163117dcab10761dc8690c33f0c"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/multi-scene-video.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2032,
+          "sha256": "9c81c5c1ad0cb7e4f614c34d78f78eea04d1da822b00458373ece3147d09ef96"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/parameters.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2403,
+          "sha256": "b002ac9959105b2b91da5786bcb20aa6ff4c6632ed37074b32711f248867dff0"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1030,
+          "sha256": "ff3cad64dca7f2c3f8e18e3a8a1737fd1f5890142318dd31721e82631f8697e4"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 293,
+          "sha256": "39e5a9fb81d07e5aa9030d66f4d5d955698b4673cf9733cb6734d2dc75c4a9bd"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3909,
+          "sha256": "09057e77b67dcda23eed8ddbf1b5bd44541a952f380913a00b3bfddaa39ab675"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/assets/cesium-path.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12329,
+          "sha256": "329621928df19d115f93c472a0b7ddbd2463cad502a10722d3c23579a7441d44"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/assets/city-path.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 223,
+          "sha256": "3bb420736d196f726b856420b319e21a8d7fc24bca7e626d67e8b00b0544e630"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/assets/flight-path.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1240,
+          "sha256": "fab65d2d9cc0c4ca56f8a1422494d178c0e57f92a048a4720358d236ced980f0"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/assets/sample-river.geojson",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6409,
+          "sha256": "2c9f6dd35ac4aed56580078046941235ed7e1a5d432a6549dbf7fea4e8d1e9be"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/references/3d-data-sources.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1451,
+          "sha256": "23ac1acc576d49d599b33c812dc697b264ebe28849088c04e9827cb47b95275f"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/references/3d-flyover-architecture.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7887,
+          "sha256": "09e1891cec991a246eec60dbcf76c4ea84c52e0bee14321471197703395d0a91"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/references/3d-troubleshooting.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6741,
+          "sha256": "c803fe443f5bab1a50408f1f6aa6aded7913577eaefcb586b320c5a96c391bf2"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5561,
+          "sha256": "6dbb4d1ae3f5fef9f3f6eb23e2a6d58622750714bb847b088ff58a3533839463"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/mapbox",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/mapbox/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13166,
+          "sha256": "921ef62afc1057e66423a9fae11d3f849d4b3dcfbfa7e9970a281e0d12f37c22"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/mapbox/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/mapbox/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maplibre",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maplibre/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13403,
+          "sha256": "16f659a83e4dca4817c2cc93d5be2242f3aeada1fe2d6b31190dbde51ea21c0c"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maplibre/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maplibre/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4514,
+          "sha256": "7dfb5410b95d508cccfa8a00d90e17b78fd5996cf31e5867be53dd020f3e9c14"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2183,
+          "sha256": "c8137792824323b9db997a88c3b923e8072cf2886cd90c38d84fdbbaad8258ed"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/sample-data",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/sample-data/country-meta.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 333134,
+          "sha256": "470a76cc5a45e58e7e1702cd80f74fcacf9d6e8b1ef7b05011f69853a999ba7b"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/sample-data/yarlung-flow.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13082,
+          "sha256": "73a99e77a2ce31cb3ac39be8fe4775d53ecf127a56137b587fca090067dfbb96"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/tokens.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1256,
+          "sha256": "29ae05eedb4988b5b8f2eb44d241b9c472533fb6ed05d4b33df3e71e0eabc71c"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/references/map-data-sources.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4798,
+          "sha256": "b99680cbda8e7d70dc2cb1a8823f66247a21fc59d10c6dae0dd9ba24d2f15b80"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/references/map-explainer-architecture.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6871,
+          "sha256": "e09de8a4d00ea9a82b992918ec4d0302ee18979b73e6c777d584a9743092344f"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/references/map-geo-prep.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4098,
+          "sha256": "a97b1913f06195601889d4e090ad056db2fffb7b83918924c8cd92847b3829ef"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7553,
+          "sha256": "8265f56bd7c27a7d1a5fa528a77bbe1b29c6acc0e6730233583ca53e2632d490"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/static-map",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/static-map/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1130,
+          "sha256": "d893297c5a6086fa9869c95ecaeb01a8620a8608ee738b27d687cda5b78d8991"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/sequencing.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3823,
+          "sha256": "4a245ce9ee4273ae7fb23b867f85a7e0c387d50ffc44d46b6c309218a8534489"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/sfx.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1806,
+          "sha256": "5397a44c2d7678bf642d746b7edbf4f51e10c31ac99c8054da4a4a7d70365dcd"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/silence-detection.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2548,
+          "sha256": "ed95d46d078f3749b87ec3c6e25c1c5b0c8485fdcb41156d649266369748fdc2"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/text-highlights.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1851,
+          "sha256": "70773952286e1aec2ba02f2f54d2d776dad7799d87744df03b0c75637ebfb21f"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/timing.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3310,
+          "sha256": "eb11bdb339de2ecba90b9eacc877fa520b082ae9650c2ef303004683a2105e58"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/transitions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6882,
+          "sha256": "41d69d0b5c862bcada825a68413064837fd4fcd55f81ad59492931db982a08ad"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/video-editing.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3404,
+          "sha256": "c43e1b419b0ea32c07b14ff6a17fb3bccb6acea7317de4051827ef0316f4262a"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-markup/voiceover.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3342,
+          "sha256": "28350a793939b6170c535a219b2c4702378346ea8485540f980da5ccc5fa19fc"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-multimedia",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-multimedia/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 705,
+          "sha256": "af8065ddca936b484d8ef2cce3d51764dcdf5472b0e22c677d910990bdc0d451"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-multimedia/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-multimedia/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 317,
+          "sha256": "9109fd8b176a930631ee7e822ae7b2cff28abf9d587f6ea68edc489f6468dbb8"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-multimedia/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-multimedia/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-multimedia/get-audio-duration.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1357,
+          "sha256": "720a5346ae79555e933498995d5cb04d1bfbeeee7232436d8835c3ec17d46281"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-multimedia/get-video-dimensions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1626,
+          "sha256": "ed1bb6e0ae742e4bfcb18e7c50af23fc782a9d699b90d367250437c7f6da7304"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-multimedia/get-video-duration.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1377,
+          "sha256": "ed594a0d73a5274483f21c30e612aba57089d5bbc5437041aa32d07a8e789fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-render",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-render/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 470,
+          "sha256": "9c51cee8d71219ad6ed727060c5d4ca83ee7ba88e0fce5cbed6022e87582b1b1"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-render/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-render/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 286,
+          "sha256": "292f401942c41e05bc92caae76b2f2c522f9b499e445e7fe0edaf42d5535b064"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-render/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-render/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-render/transparent-videos.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2267,
+          "sha256": "394ccda476e084522d544471fee92d7c65672e2cbaf2201a785c3dd5c74f31a4"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-saas",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-saas/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1051,
+          "sha256": "0825df790efe8395fa1518ca6f4624bf2fa4fcc075d94aff6e2b11ab6188fd36"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-saas/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-saas/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 283,
+          "sha256": "9d203fcf45639af3c932a03943d90ab2e0080ac4986d69b24016afca77b1951f"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-saas/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-saas/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-saas/framework.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1188,
+          "sha256": "d1071a392f88fbafde3166547e1000b18a920e89ab8433cd1783edc8cfadc151"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-saas/player.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 942,
+          "sha256": "cc2f2944f1158d6ff1ddfc421a6a790f99ae86f54bbe0f0b18ef8bc7485e1b05"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-saas/rendering.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3341,
+          "sha256": "8c94a3c92055f06fbe0b6c17ecdc2c47c8a4fe377a6dd796fa3ee3e77fc48705"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-studio",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-studio/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 958,
+          "sha256": "a2a615fbca1c1fe8809841a405e296f4131b80e88e3d52754b77c8b7d1eeeda4"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-studio/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-studio/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 237,
+          "sha256": "f416359bbdf397494fb60f60d9ba5f473be67696dc0673be49ab2f4a38370bd8"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-studio/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-studio/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-upgrade",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-upgrade/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1880,
+          "sha256": "f48c93b4089f68340a94a8075b52f53afa2174d6068511bf6ce22cd723c35500"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-upgrade/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-upgrade/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 282,
+          "sha256": "641150148be8a40fd8ae45970c863bf894d5a19420459541e5f37594a8ea2920"
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-upgrade/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-best-practices/remotion-upgrade/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-captions",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-captions/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 954,
+          "sha256": "a246e7031765a7c85dd9fd6d311592d3bf6fc990b53c63bb7142e7734d8ffd2b"
+        },
+        {
+          "path": "skills/remotion-captions/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-captions/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 305,
+          "sha256": "d115635f239714033447ca1ea5d39e115d2a746dd07211d6d8c6acdac8dd5282"
+        },
+        {
+          "path": "skills/remotion-captions/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-captions/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-captions/display-captions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5489,
+          "sha256": "0d594e4500318c6b24f3c9ef818f50d9e99a13f2992ab08694aea0a6a90d7ed3"
+        },
+        {
+          "path": "skills/remotion-captions/import-srt-captions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2269,
+          "sha256": "cf5988aad6cba8192a81e5a030955ebf09e97473e0b5ce209e18973bf1a60633"
+        },
+        {
+          "path": "skills/remotion-captions/transcribe-captions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1897,
+          "sha256": "ad1a62af35fe176b37ac4d98f796451ca66bcc9983207a9710ec3eca6e847738"
+        },
+        {
+          "path": "skills/remotion-create",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-create/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2209,
+          "sha256": "2d9f99837133a668c6f7a6004b6ba355f79a14a6a8276657837672a93fcfc722"
+        },
+        {
+          "path": "skills/remotion-create/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-create/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 310,
+          "sha256": "337274103fbb5395a6355fa09d87dd01ba3708500afbba7edb10d742391aa6d3"
+        },
+        {
+          "path": "skills/remotion-create/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-create/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-create/tailwind.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 386,
+          "sha256": "3ef07d3225d212af6a5076e62797a04d22d394434dcdbe2c050dab0d92806f36"
+        },
+        {
+          "path": "skills/remotion-create/video-layout.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 498,
+          "sha256": "7ad94c22e3ad87671292ebb9b22f234c544d6c7fed13f8cb112b84b0f7077d4c"
+        },
+        {
+          "path": "skills/remotion-docs",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-docs/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1379,
+          "sha256": "4b4eb8c41d8093ef7dae431bf18d9ee2e2e7609539c54dc89116e3a518478af1"
+        },
+        {
+          "path": "skills/remotion-docs/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-docs/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 307,
+          "sha256": "87c4045ace1c3852411e2095b35359268b4fc99e807108e8eb36e077131cfc26"
+        },
+        {
+          "path": "skills/remotion-docs/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-docs/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-interactivity",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-interactivity/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7442,
+          "sha256": "d135f977350f41ad6638d89bff0ab3f9fd6e0834bd566228a084450715c6a311"
+        },
+        {
+          "path": "skills/remotion-interactivity/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-interactivity/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 320,
+          "sha256": "c3983ddc6dc1c7d58c487017ceaabfb72d835d489400e719ea0466073b3f97e7"
+        },
+        {
+          "path": "skills/remotion-interactivity/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-interactivity/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-maps",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1030,
+          "sha256": "ff3cad64dca7f2c3f8e18e3a8a1737fd1f5890142318dd31721e82631f8697e4"
+        },
+        {
+          "path": "skills/remotion-maps/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 293,
+          "sha256": "39e5a9fb81d07e5aa9030d66f4d5d955698b4673cf9733cb6734d2dc75c4a9bd"
+        },
+        {
+          "path": "skills/remotion-maps/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-maps/techniques",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3909,
+          "sha256": "09057e77b67dcda23eed8ddbf1b5bd44541a952f380913a00b3bfddaa39ab675"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/assets/cesium-path.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12329,
+          "sha256": "329621928df19d115f93c472a0b7ddbd2463cad502a10722d3c23579a7441d44"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/assets/city-path.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 223,
+          "sha256": "3bb420736d196f726b856420b319e21a8d7fc24bca7e626d67e8b00b0544e630"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/assets/flight-path.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1240,
+          "sha256": "fab65d2d9cc0c4ca56f8a1422494d178c0e57f92a048a4720358d236ced980f0"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/assets/sample-river.geojson",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6409,
+          "sha256": "2c9f6dd35ac4aed56580078046941235ed7e1a5d432a6549dbf7fea4e8d1e9be"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/references/3d-data-sources.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1451,
+          "sha256": "23ac1acc576d49d599b33c812dc697b264ebe28849088c04e9827cb47b95275f"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/references/3d-flyover-architecture.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7887,
+          "sha256": "09e1891cec991a246eec60dbcf76c4ea84c52e0bee14321471197703395d0a91"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/references/3d-troubleshooting.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6741,
+          "sha256": "c803fe443f5bab1a50408f1f6aa6aded7913577eaefcb586b320c5a96c391bf2"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5561,
+          "sha256": "6dbb4d1ae3f5fef9f3f6eb23e2a6d58622750714bb847b088ff58a3533839463"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/mapbox",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/mapbox/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13166,
+          "sha256": "921ef62afc1057e66423a9fae11d3f849d4b3dcfbfa7e9970a281e0d12f37c22"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/mapbox/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/mapbox/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maplibre",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maplibre/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13403,
+          "sha256": "16f659a83e4dca4817c2cc93d5be2242f3aeada1fe2d6b31190dbde51ea21c0c"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maplibre/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maplibre/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4514,
+          "sha256": "7dfb5410b95d508cccfa8a00d90e17b78fd5996cf31e5867be53dd020f3e9c14"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2183,
+          "sha256": "c8137792824323b9db997a88c3b923e8072cf2886cd90c38d84fdbbaad8258ed"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/assets/sample-data",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/assets/sample-data/country-meta.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 333134,
+          "sha256": "470a76cc5a45e58e7e1702cd80f74fcacf9d6e8b1ef7b05011f69853a999ba7b"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/assets/sample-data/yarlung-flow.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13082,
+          "sha256": "73a99e77a2ce31cb3ac39be8fe4775d53ecf127a56137b587fca090067dfbb96"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/assets/tokens.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1256,
+          "sha256": "29ae05eedb4988b5b8f2eb44d241b9c472533fb6ed05d4b33df3e71e0eabc71c"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/references/map-data-sources.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4798,
+          "sha256": "b99680cbda8e7d70dc2cb1a8823f66247a21fc59d10c6dae0dd9ba24d2f15b80"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/references/map-explainer-architecture.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6871,
+          "sha256": "e09de8a4d00ea9a82b992918ec4d0302ee18979b73e6c777d584a9743092344f"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/references/map-geo-prep.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4098,
+          "sha256": "a97b1913f06195601889d4e090ad056db2fffb7b83918924c8cd92847b3829ef"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7553,
+          "sha256": "8265f56bd7c27a7d1a5fa528a77bbe1b29c6acc0e6730233583ca53e2632d490"
+        },
+        {
+          "path": "skills/remotion-maps/techniques/static-map",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-maps/techniques/static-map/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1135,
+          "sha256": "3d2dc68383e3ca44e5ad5c3e6095e26b9b339ee79dc6b137492510b949920623"
+        },
+        {
+          "path": "skills/remotion-markup",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/3d.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2282,
+          "sha256": "ae4a0f0b34001bc2566875ef507443ece239f501450f8075cbfbacfc0ba2ae2d"
+        },
+        {
+          "path": "skills/remotion-markup/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 10823,
+          "sha256": "4ffb825aad75e1134dac2331f7f9eae24a53656a59a0c9d102f7c365ab941fd5"
+        },
+        {
+          "path": "skills/remotion-markup/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 310,
+          "sha256": "e466d0d7ede756e96d8b366e8d6b76f69dbde3d1d937e8e25b72287e045be95c"
+        },
+        {
+          "path": "skills/remotion-markup/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-markup/audio-visualization.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4892,
+          "sha256": "0f4043de86639b6390e5ab888eaa66a24a10a8bd540f1443327cb88107eae1e9"
+        },
+        {
+          "path": "skills/remotion-markup/audio.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3615,
+          "sha256": "59b03efd20139ec344c850add031bf5784e744927f896f7437242178d22ab932"
+        },
+        {
+          "path": "skills/remotion-markup/calculate-metadata.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3498,
+          "sha256": "711743642a475970dcadddb71805939dd6ee8f348825818cc8897b6a01e1eef0"
+        },
+        {
+          "path": "skills/remotion-markup/compositions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3190,
+          "sha256": "24bfaeebde3f65d973f03f4e351ca713f6501b2c139b29ac23809d0797d51e24"
+        },
+        {
+          "path": "skills/remotion-markup/cropping.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1098,
+          "sha256": "b862b4a98e412870ab13172e52c7c0d73c7c17ebbf728046168dfd21240dce94"
+        },
+        {
+          "path": "skills/remotion-markup/effects.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 8904,
+          "sha256": "4f8abd99e3a89668aa1b6521d2cbde8a9b3d25aa9cb4ca2b135b96fe4e70fae7"
+        },
+        {
+          "path": "skills/remotion-markup/embedding-videos.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3503,
+          "sha256": "c2c1ccc867730f3bc856a25166f25e260d438bcf813e4f70dcbf5af55640004a"
+        },
+        {
+          "path": "skills/remotion-markup/ffmpeg.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1099,
+          "sha256": "930d26b519b744e97f0c080608b55200b97ff15d6c366c6c5361bab56ff0e873"
+        },
+        {
+          "path": "skills/remotion-markup/gifs.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3783,
+          "sha256": "91e17126f7f0d57efdbdbaf34e0c234f874bd6aa66ec7854b80f17b0e32c3b22"
+        },
+        {
+          "path": "skills/remotion-markup/google-fonts.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1714,
+          "sha256": "fff29cf692ccab0cda263cd85255cf634dbb4d1d2d99e8372b01d9fedbd6cbfd"
+        },
+        {
+          "path": "skills/remotion-markup/html-in-canvas.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3678,
+          "sha256": "58652afe3e884c830648e0db52f5b8959ba473514ba7b92bde89ba0d224212ea"
+        },
+        {
+          "path": "skills/remotion-markup/images.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1466,
+          "sha256": "3a82065698ad8d4818164882212215dfe4dc78f00145c87f47513a691550b72b"
+        },
+        {
+          "path": "skills/remotion-markup/light-leaks.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3212,
+          "sha256": "892c90340921b5aff5499588aadd23cf9fa79758d345f6ea3acf02ae0258ea73"
+        },
+        {
+          "path": "skills/remotion-markup/local-fonts.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1533,
+          "sha256": "fcad2a2e3a05419d4555c59a75454c4891455dbea91ad596c1095e2887d26a11"
+        },
+        {
+          "path": "skills/remotion-markup/lottie.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1804,
+          "sha256": "cd9e061b279d632e639042f6a5e2a7de4177b5aae991a8e94e46b0161db3d1ed"
+        },
+        {
+          "path": "skills/remotion-markup/measuring-dom-nodes.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 995,
+          "sha256": "a677b976eaf1cbc3cdd29cf29a3fd546c557b9a31e6b1fd70e473fde7e828733"
+        },
+        {
+          "path": "skills/remotion-markup/measuring-text.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2801,
+          "sha256": "4bed81d1ea818db3975f878152dc24ecbc17e163117dcab10761dc8690c33f0c"
+        },
+        {
+          "path": "skills/remotion-markup/multi-scene-video.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2032,
+          "sha256": "9c81c5c1ad0cb7e4f614c34d78f78eea04d1da822b00458373ece3147d09ef96"
+        },
+        {
+          "path": "skills/remotion-markup/parameters.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2403,
+          "sha256": "b002ac9959105b2b91da5786bcb20aa6ff4c6632ed37074b32711f248867dff0"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/REFERENCE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1030,
+          "sha256": "ff3cad64dca7f2c3f8e18e3a8a1737fd1f5890142318dd31721e82631f8697e4"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 293,
+          "sha256": "39e5a9fb81d07e5aa9030d66f4d5d955698b4673cf9733cb6734d2dc75c4a9bd"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3909,
+          "sha256": "09057e77b67dcda23eed8ddbf1b5bd44541a952f380913a00b3bfddaa39ab675"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/assets/cesium-path.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 12329,
+          "sha256": "329621928df19d115f93c472a0b7ddbd2463cad502a10722d3c23579a7441d44"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/assets/city-path.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 223,
+          "sha256": "3bb420736d196f726b856420b319e21a8d7fc24bca7e626d67e8b00b0544e630"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/assets/flight-path.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1240,
+          "sha256": "fab65d2d9cc0c4ca56f8a1422494d178c0e57f92a048a4720358d236ced980f0"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/assets/sample-river.geojson",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6409,
+          "sha256": "2c9f6dd35ac4aed56580078046941235ed7e1a5d432a6549dbf7fea4e8d1e9be"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/references/3d-data-sources.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1451,
+          "sha256": "23ac1acc576d49d599b33c812dc697b264ebe28849088c04e9827cb47b95275f"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/references/3d-flyover-architecture.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7887,
+          "sha256": "09e1891cec991a246eec60dbcf76c4ea84c52e0bee14321471197703395d0a91"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/references/3d-troubleshooting.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6741,
+          "sha256": "c803fe443f5bab1a50408f1f6aa6aded7913577eaefcb586b320c5a96c391bf2"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 5561,
+          "sha256": "6dbb4d1ae3f5fef9f3f6eb23e2a6d58622750714bb847b088ff58a3533839463"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/mapbox",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/mapbox/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13166,
+          "sha256": "921ef62afc1057e66423a9fae11d3f849d4b3dcfbfa7e9970a281e0d12f37c22"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/mapbox/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/mapbox/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maplibre",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maplibre/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13403,
+          "sha256": "16f659a83e4dca4817c2cc93d5be2242f3aeada1fe2d6b31190dbde51ea21c0c"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maplibre/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maplibre/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4514,
+          "sha256": "7dfb5410b95d508cccfa8a00d90e17b78fd5996cf31e5867be53dd020f3e9c14"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2183,
+          "sha256": "c8137792824323b9db997a88c3b923e8072cf2886cd90c38d84fdbbaad8258ed"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/assets/sample-data",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/assets/sample-data/country-meta.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 333134,
+          "sha256": "470a76cc5a45e58e7e1702cd80f74fcacf9d6e8b1ef7b05011f69853a999ba7b"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/assets/sample-data/yarlung-flow.json",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 13082,
+          "sha256": "73a99e77a2ce31cb3ac39be8fe4775d53ecf127a56137b587fca090067dfbb96"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/assets/tokens.ts",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1256,
+          "sha256": "29ae05eedb4988b5b8f2eb44d241b9c472533fb6ed05d4b33df3e71e0eabc71c"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/references",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/references/map-data-sources.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4798,
+          "sha256": "b99680cbda8e7d70dc2cb1a8823f66247a21fc59d10c6dae0dd9ba24d2f15b80"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/references/map-explainer-architecture.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6871,
+          "sha256": "e09de8a4d00ea9a82b992918ec4d0302ee18979b73e6c777d584a9743092344f"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/references/map-geo-prep.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 4098,
+          "sha256": "a97b1913f06195601889d4e090ad056db2fffb7b83918924c8cd92847b3829ef"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/references/render-stability.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3639,
+          "sha256": "96650329df3a870743b6255123e93dba866a37eb1ab1d07c8275efff0d4dead9"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/scripts",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 7553,
+          "sha256": "8265f56bd7c27a7d1a5fa528a77bbe1b29c6acc0e6730233583ca53e2632d490"
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/static-map",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-markup/remotion-maps/techniques/static-map/TECHNIQUE.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1122,
+          "sha256": "ffc6fbd55dcc89a90db6bb1762e386ca5b2729e14387b45f02f47aa55ccbb16d"
+        },
+        {
+          "path": "skills/remotion-markup/sequencing.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3823,
+          "sha256": "4a245ce9ee4273ae7fb23b867f85a7e0c387d50ffc44d46b6c309218a8534489"
+        },
+        {
+          "path": "skills/remotion-markup/sfx.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1806,
+          "sha256": "5397a44c2d7678bf642d746b7edbf4f51e10c31ac99c8054da4a4a7d70365dcd"
+        },
+        {
+          "path": "skills/remotion-markup/silence-detection.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2548,
+          "sha256": "ed95d46d078f3749b87ec3c6e25c1c5b0c8485fdcb41156d649266369748fdc2"
+        },
+        {
+          "path": "skills/remotion-markup/text-highlights.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1847,
+          "sha256": "e6210a022785fd6f93a4a1ed75b600da18bc3baff20eef9e656e1f48267bebfe"
+        },
+        {
+          "path": "skills/remotion-markup/timing.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3310,
+          "sha256": "eb11bdb339de2ecba90b9eacc877fa520b082ae9650c2ef303004683a2105e58"
+        },
+        {
+          "path": "skills/remotion-markup/transitions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 6882,
+          "sha256": "41d69d0b5c862bcada825a68413064837fd4fcd55f81ad59492931db982a08ad"
+        },
+        {
+          "path": "skills/remotion-markup/video-editing.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3404,
+          "sha256": "c43e1b419b0ea32c07b14ff6a17fb3bccb6acea7317de4051827ef0316f4262a"
+        },
+        {
+          "path": "skills/remotion-markup/voiceover.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3342,
+          "sha256": "28350a793939b6170c535a219b2c4702378346ea8485540f980da5ccc5fa19fc"
+        },
+        {
+          "path": "skills/remotion-multimedia",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-multimedia/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 705,
+          "sha256": "af8065ddca936b484d8ef2cce3d51764dcdf5472b0e22c677d910990bdc0d451"
+        },
+        {
+          "path": "skills/remotion-multimedia/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-multimedia/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 317,
+          "sha256": "9109fd8b176a930631ee7e822ae7b2cff28abf9d587f6ea68edc489f6468dbb8"
+        },
+        {
+          "path": "skills/remotion-multimedia/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-multimedia/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-multimedia/get-audio-duration.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1357,
+          "sha256": "720a5346ae79555e933498995d5cb04d1bfbeeee7232436d8835c3ec17d46281"
+        },
+        {
+          "path": "skills/remotion-multimedia/get-video-dimensions.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1626,
+          "sha256": "ed1bb6e0ae742e4bfcb18e7c50af23fc782a9d699b90d367250437c7f6da7304"
+        },
+        {
+          "path": "skills/remotion-multimedia/get-video-duration.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1377,
+          "sha256": "ed594a0d73a5274483f21c30e612aba57089d5bbc5437041aa32d07a8e789fd9"
+        },
+        {
+          "path": "skills/remotion-render",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-render/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 470,
+          "sha256": "9c51cee8d71219ad6ed727060c5d4ca83ee7ba88e0fce5cbed6022e87582b1b1"
+        },
+        {
+          "path": "skills/remotion-render/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-render/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 286,
+          "sha256": "292f401942c41e05bc92caae76b2f2c522f9b499e445e7fe0edaf42d5535b064"
+        },
+        {
+          "path": "skills/remotion-render/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-render/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-render/transparent-videos.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 2267,
+          "sha256": "394ccda476e084522d544471fee92d7c65672e2cbaf2201a785c3dd5c74f31a4"
+        },
+        {
+          "path": "skills/remotion-saas",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-saas/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1051,
+          "sha256": "0825df790efe8395fa1518ca6f4624bf2fa4fcc075d94aff6e2b11ab6188fd36"
+        },
+        {
+          "path": "skills/remotion-saas/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-saas/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 283,
+          "sha256": "9d203fcf45639af3c932a03943d90ab2e0080ac4986d69b24016afca77b1951f"
+        },
+        {
+          "path": "skills/remotion-saas/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-saas/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-saas/framework.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1188,
+          "sha256": "d1071a392f88fbafde3166547e1000b18a920e89ab8433cd1783edc8cfadc151"
+        },
+        {
+          "path": "skills/remotion-saas/player.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 942,
+          "sha256": "cc2f2944f1158d6ff1ddfc421a6a790f99ae86f54bbe0f0b18ef8bc7485e1b05"
+        },
+        {
+          "path": "skills/remotion-saas/rendering.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 3341,
+          "sha256": "8c94a3c92055f06fbe0b6c17ecdc2c47c8a4fe377a6dd796fa3ee3e77fc48705"
+        },
+        {
+          "path": "skills/remotion-studio",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-studio/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 958,
+          "sha256": "a2a615fbca1c1fe8809841a405e296f4131b80e88e3d52754b77c8b7d1eeeda4"
+        },
+        {
+          "path": "skills/remotion-studio/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-studio/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 237,
+          "sha256": "f416359bbdf397494fb60f60d9ba5f473be67696dc0673be49ab2f4a38370bd8"
+        },
+        {
+          "path": "skills/remotion-studio/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-studio/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        },
+        {
+          "path": "skills/remotion-upgrade",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-upgrade/SKILL.md",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1880,
+          "sha256": "f48c93b4089f68340a94a8075b52f53afa2174d6068511bf6ce22cd723c35500"
+        },
+        {
+          "path": "skills/remotion-upgrade/agents",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-upgrade/agents/openai.yaml",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 282,
+          "sha256": "641150148be8a40fd8ae45970c863bf894d5a19420459541e5f37594a8ea2920"
+        },
+        {
+          "path": "skills/remotion-upgrade/assets",
+          "kind": "directory",
+          "mode": 509
+        },
+        {
+          "path": "skills/remotion-upgrade/assets/remotion-icon.png",
+          "kind": "file",
+          "mode": 436,
+          "bytes": 1286,
+          "sha256": "662a084d72d99ab91b47c7a566dd0631f0ce0e4f0bf6032708c9200b0db09fd9"
+        }
+      ]
+    }
+  ]
+}

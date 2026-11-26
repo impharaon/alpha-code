@@ -6,6 +6,7 @@ import type { Capture, TreeNode } from "../../src/shared/host-extension-package-
 import provenance from "./provenance.json"
 import codex from "./codex/provenance.json"
 import opencode from "./opencode/provenance.json"
+import whole from "./whole/provenance.json"
 
 // Keep foreign Markdown only in pinned archives; all consumers read the same temporary tree.
 export const fixtureRoot = mkdtempSync(join(tmpdir(), "plugin-helper-samples-"))
@@ -14,6 +15,7 @@ cpSync(import.meta.dir, fixtureRoot, { recursive: true })
 for (const tree of [
   { root: "", archive: provenance.archive },
   { root: "codex", archive: codex.archive },
+  { root: "whole", archive: whole.archive },
   ...opencode.trees.map(tree => ({ root: join("opencode", tree.root), archive: tree.archive })),
 ]) {
   const target = join(fixtureRoot, tree.root)
@@ -23,6 +25,21 @@ for (const tree of [
 }
 export const fixtureCommit = provenance.commit
 export const digest = (bytes: Uint8Array) => `sha256:${createHash("sha256").update(bytes).digest("hex")}` as const
+
+/** Real package members, including original directory/file modes; selection never invents source bytes. */
+export async function captureWholeFixture(name: string, select?: (path: string) => boolean): Promise<Capture> {
+  const sample = whole.samples.find(sample => sample.name === name)!
+  const root = join(fixtureRoot, "whole", sample.root)
+  const nodes: TreeNode[] = sample.files.filter(file => !select || select(file.path)).map(file =>
+    file.kind === "directory" ? { kind: "directory", path: file.path, mode: file.mode }
+      : file.kind === "symlink" ? { kind: "symlink", path: file.path, target: "target" in file ? String(file.target) : "" }
+      : { kind: "file", path: file.path, mode: file.mode, bytes: "bytes" in file ? Number(file.bytes) : 0, digest: `sha256:${"sha256" in file ? file.sha256 : ""}` })
+  return {
+    source: { kind: "marketplace", locator: sample.repository, repository: sample.repository, commit: sample.commit, pluginPath: sample.pluginPath, entryName: sample.name, ecosystem: sample.ecosystem as "claude" | "codex" },
+    nodes,
+    readFile: async path => new Uint8Array(await Bun.file(join(root, path)).arrayBuffer()),
+  }
+}
 
 /** Captures our boundary from the recorded upstream files, with explicit controlled byte/path variants. */
 export async function captureFixture(plugin: string, changes: Record<string, string | null> = {}, ecosystem: "claude" | "codex" | "opencode" = "claude"): Promise<Capture> {

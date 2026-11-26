@@ -1185,3 +1185,13 @@ S-04 / AC-11/13/15/25：core 在原生变量展开、当前项目信任过滤和
 完成步骤相关文件：`packages/core` 的 `bun test --max-concurrency 2 test/config/reload.test.ts` **16 pass**；`packages/ext` 同命令 `src/plugin-host.test.ts` **84 pass**；`packages/plugin` 同命令 `test/codepuppy-package-runtime.test.ts` **2 pass**，共 **102 pass / 0 fail**，具名迭代不累加。对应 `/tmp/plugin-standard-r14-{core-complete,config-complete,port-complete}.log`。core/ext/plugin 包内 `bun typecheck` exit 0（core 第二次修正 SkillScan 的 string 路径集合；临时引入的 UI fixture import 去掉后无新类型错误）。native reload 文件属于既有上游测试目录，不在当前 PR selector 的 core roots；ext 真实 runner 和 plugin 槽用例在原 PR integration 文件内、imports 可追踪，没有改 `.gate-tests` 或拓宽门控根。`scripts/gate-files.tsv` 只同步已批准 host 83→84 精确计数。
 
 S-04 五个移除臂全红：config-before-publish（配置/技能两例均红）、skill-before-publish、managed-authority、config-handler、config-revision-once。`python3 /tmp/plugin-standard-r14-removal.py`，每臂 child-only preload 实际命中唯一生产边界，日志与退出记录在 `/tmp/plugin-standard-r14-removal-{summary.txt,results.json}`，磁盘源文件未改。新增行为无需真实 SaaS、无真实凭据/工具链启动。
+
+### r14｜S-08 真实工具批次与 Stripe 原脚本
+
+S-08 / AC-11/13/22：f1fe2f8f41 新增原 host integration 红测，真实同一 assistant 的 Read 成功/Write 参数校验失败后无批次文件（0 pass/1 fail，`/tmp/plugin-standard-r14-batch-red.log`）。现在从原 session.context 的终态消息读取输入/响应/实际 error；只有整批终态才运行，按模型调用顺序交已有 policy 源身份投影，包含没有成功 execute.after 的调用。awaited context 在下一请求前写入同一上下文；idle drain 复用同一 pending/complete 状态，文本/阻止需要继续时走原 synthetic。空批次不发，初始真实历史作恢复水位，普通后续 prompt 不重放。stateless/没有实际 prompt 生命周期的 context 不读不存在会话，保留原有模型准备调用路径。
+
+完整 host **85 pass / 0 fail**（`/tmp/plugin-standard-r14-batch-complete2.log`）；ext/ui-mac typecheck exit 0。首次整文件的五个原直接 context 测试暴露上述无 prompt 路径，修在生产边界，未改断言；具名六例与最终整文件均绿。四个移除臂全红：batch-stage、batch-context-barrier、batch-complete-once、batch-failed-calls；`python3 /tmp/plugin-standard-r14-batch-removal.py` / `batch-removal-results.json`，child-only preload，未改源字节。本步 84→85 精确 gate-files 计数，仍为原 integration，未新增全 PR 测试根或 engine 接管。registry 的 plugin-hook-tool-batch 为冻结 S-08 L0，无 runner/step.ts 接管或 afterToolBatch 端口。
+
+**Stripe 实际一次性验收**：`bun test --max-concurrency 2 /tmp/plugin-standard-r14-runtime/plugin-runtime.test.ts -t 'one-time original Stripe'`（ext 包内）**1 pass / 0 fail**，`/tmp/plugin-standard-r14-stripe-runtime2.log`。保留固定原 `postToolBatch.mjs` / helpers / feedback 正文，仅抽样常量 0.001→1，并以同协议本地真实 MCP echo 代替 SaaS URL；只选本次原 PostToolBatch 声明。真实 MCP call 后，原脚本实际由 AppProcess 启动，下一模型请求同时收到源 feedback 与用户提交前须批准的原文。没有 Stripe 登录、网络工具或 CLI feedback 提交；SaaS/Stripe CLI 真业务仍是外部验收边界。临时复制的 host harness 位于 /tmp，未把整包旅程加入 PR 套件。首次临时 runner 未解析包级 @ai-sdk/provider 依赖（未执行 case），将 /tmp 的依赖 symlink 指向 ext/node_modules 后通过，无依赖/锁文件改动。
+
+局部顺序偏离：S-04 后先闭合可独立验证的 S-08 L0 与 Stripe，S-05…S-07 未改合同、未冒充通过，仍续片 5；不开始片 7。

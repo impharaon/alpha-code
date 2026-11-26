@@ -2391,6 +2391,26 @@
           "name": "package runtime handlers share the native Location slot and release only their generation"
         }
       ]
+    },
+    {
+      "id": "plugin-hook-tool-batch",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-08: aggregate terminal native tool calls by actual assistant message ID, including validation failures, in model order. Drain once at the awaited context boundary before a request, or at native idle; use the same processed/pending state and existing synthetic continuation. Seed registration with actual history, never replay prior batches or emit an empty batch.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r14",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-package-hooks.ts",
+        "ladder": "L0: existing session.hook.context + experimental.idle + session.context and same-session synthetic. Existing policy identity projection supplies each source tool name/input/response; no runner/step.ts takeover or public afterToolBatch port."
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "PostToolBatch groups native terminal calls before the next request and never replays old batches"
+        }
+      ]
     }
   ]
 }

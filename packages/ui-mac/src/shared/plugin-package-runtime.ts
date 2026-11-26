@@ -16,6 +16,7 @@ export function pluginEntryRuntimeAvailable(entry: Entry): boolean {
         "PermissionRequest",
         "UserPromptExpansion",
         "ConfigChange",
+        "PostToolBatch",
       ].includes(entry.hook.event)) ||
       (entry.hook.type === "prompt" && entry.hook.event === "PreToolUse"))
   )

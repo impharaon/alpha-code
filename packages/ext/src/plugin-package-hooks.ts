@@ -37,6 +37,7 @@ type Contribution = {
   output?: Record<string, unknown>
 }
 type HookResult = Contribution & { exitCode: number }
+type BatchCall = { tool_use_id: string; tool_name: string; tool_input: unknown; tool_response: unknown; is_error: boolean; error?: string; is_interrupt?: boolean }
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value)
 
@@ -62,6 +63,7 @@ export async function registerPackageHooks(
   const promptEpoch = new Map<string, number>()
   const sessionEpoch = new Map<string, object>()
   const configResults = new Map<string, Map<string, { valid(): boolean; result: Promise<HookResult | undefined> }>>()
+  const batches = new Map<string, { complete: Set<string>; pending: Map<string, Promise<Contribution[]>> }>()
   let disposed = false
   const active = (installed: Installed) => {
     if (disposed) return false
@@ -94,6 +96,7 @@ export async function registerPackageHooks(
     failures.delete(sessionID)
     sessionEpoch.delete(sessionID)
     configResults.delete(sessionID)
+    batches.delete(sessionID)
     promptEpoch.delete(sessionID)
     stopTurns.delete(sessionID)
     for (const [controller, owner] of running) if (owner.sessionID === sessionID) controller.abort()
@@ -111,6 +114,7 @@ export async function registerPackageHooks(
     call?: GateCall,
     invocation?: InstructionScope,
     occurrenceId?: string,
+    batch?: readonly BatchCall[],
   ) => {
     const installed = allInstalledPluginPackages(input.root).filter(active)
     const handlers = installed.flatMap((installed) =>
@@ -236,33 +240,22 @@ export async function registerPackageHooks(
           }
           try {
             if (!handler.valid()) return
-            const source =
-              call &&
-              (await input.policy.packageToolCall(
-                call.tool,
-                call.input,
-                Object.fromEntries(
-                  handler.installed.description.entries.flatMap((entry) =>
-                    entry.kind === "mcp" ? [["mcp::" + entry.sourceName, handler.installed.hostNames[entry.id]!]] : [],
-                  ),
-                ),
-                "claude",
-              ))
-            const eventFields = source
-              ? {
-                  ...fields,
-                  tool_name: source.name,
-                  tool_input: source.input,
-                  tool_use_id: call!.id,
-                  ...("tool_response" in fields
-                    ? {
-                        tool_response: (
-                          await input.policy.packageToolCall(call!.tool, fields.tool_response, {}, "claude")
-                        ).input,
-                      }
-                    : {}),
-                }
-              : fields
+            const bindings = Object.fromEntries(handler.installed.description.entries.flatMap(entry =>
+              entry.kind === "mcp" ? [["mcp::" + entry.sourceName, handler.installed.hostNames[entry.id]!]] : [],
+            ))
+            const source = call && await input.policy.packageToolCall(call.tool, call.input, bindings, "claude")
+            const eventFields: Record<string, unknown> = {
+              ...fields,
+              ...(source ? {
+                tool_name: source.name, tool_input: source.input, tool_use_id: call!.id,
+                ...("tool_response" in fields ? { tool_response: (await input.policy.packageToolCall(call!.tool, fields.tool_response, {}, "claude")).input } : {}),
+              } : {}),
+              ...(batch ? { tool_calls: await Promise.all(batch.map(async item => {
+                const source = await input.policy.packageToolCall(item.tool_name, item.tool_input, bindings, "claude")
+                return { ...item, tool_name: source.name, tool_input: source.input,
+                  tool_response: (await input.policy.packageToolCall(item.tool_name, item.tool_response, {}, "claude")).input }
+              })) } : {}),
+            }
             if (handler.hook.if) {
               const rules = pluginToolRules(handler.hook.if, () => {
                 throw Error("hook condition has invalid tool rule syntax")
@@ -406,7 +399,7 @@ export async function registerPackageHooks(
               return {
                 installed: handler.installed,
                 valid: handler.valid,
-                block: ["UserPromptSubmit", "PreToolUse", "Stop", "SubagentStop", "ConfigChange"].includes(event),
+                block: ["UserPromptSubmit", "PreToolUse", "Stop", "SubagentStop", "ConfigChange", "PostToolBatch"].includes(event),
                 exitCode: 2,
                 order,
                 text: result.stderr,
@@ -505,10 +498,10 @@ export async function registerPackageHooks(
     const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && result.valid())
     const blocked = contributions.find((result) => result.block)
     if (blocked?.stopTurn && event !== "StopFailure") stopTurns.set(sessionID, blocked)
-    if (blocked && !["Stop", "SubagentStop", "PostToolUseFailure", "StopFailure", "ConfigChange"].includes(event))
+    if (blocked && !["Stop", "SubagentStop", "PostToolUseFailure", "StopFailure", "ConfigChange", "PostToolBatch"].includes(event))
       throw Error("runtime-failed: package hook blocked " + event + (blocked.text ? ": " + blocked.text : ""))
     return contributions
-      .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest" || event === "ConfigChange")
+      .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest" || event === "ConfigChange" || event === "PostToolBatch")
       .map((result) => ({
         installed: result.installed,
         valid: result.valid,
@@ -519,6 +512,43 @@ export async function registerPackageHooks(
         block: result.block,
         output: "output" in result ? result.output : undefined,
       }))
+  }
+  // The initial snapshot is the recovery watermark; old terminal calls are never replayed.
+  const rememberBatches = async (sessionID: string) => {
+    const history = await context.session.context({ sessionID })
+    batches.set(sessionID, { complete: new Set(history.filter(message => message.type === "assistant").map(message => message.id)), pending: new Map() })
+  }
+  let page = await context.session.list({})
+  for (;;) {
+    await Promise.all(page.data.map(session => rememberBatches(session.id)))
+    if (!page.cursor.next) break
+    page = await context.session.list({ cursor: page.cursor.next })
+  }
+  const drainToolBatches = async (sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"]) => {
+    if (!sessionEpoch.has(sessionID)) return []
+    const state = batches.get(sessionID) ?? { complete: new Set<string>(), pending: new Map<string, Promise<Contribution[]>>() }
+    batches.set(sessionID, state)
+    const contexts: Contribution[] = []
+    for (const message of await context.session.context({ sessionID })) {
+      if (message.type !== "assistant" || state.complete.has(message.id)) continue
+      const calls = message.content.flatMap<BatchCall>(part => {
+        if (part.type !== "tool" || (part.state.status !== "completed" && part.state.status !== "error")) return []
+        const failure = part.state.status === "error" ? part.state.error : undefined
+        return [{ tool_use_id: part.id, tool_name: part.name, tool_input: part.state.input,
+          tool_response: failure ? { is_error: true, error: failure.message, content: part.state.content } : part.state.content,
+          is_error: !!failure, ...(failure ? { error: failure.message, is_interrupt: (failure.type === "aborted" || failure.type === "AbortError") } : {}) }]
+      })
+      if (!calls.length || message.content.some(part => part.type === "tool" && (part.state.status === "streaming" || part.state.status === "running"))) continue
+      const pending = state.pending.get(message.id)
+      if (pending) { await pending; continue }
+      const processing = run("PostToolBatch", sessionID, { assistant_message_id: message.id }, undefined, undefined, undefined, calls)
+      state.pending.set(message.id, processing)
+      try {
+        contexts.push(...await processing)
+        state.complete.add(message.id)
+      } finally { state.pending.delete(message.id) }
+    }
+    return contexts
   }
   const runtime = registerPackageRuntime(context.location, {
     hasElicitationHandlers: () => false,
@@ -613,6 +643,7 @@ export async function registerPackageHooks(
   })
   await context.session.hook("prompt", async (event) => {
     if (!sessionEpoch.has(event.sessionID)) sessionEpoch.set(event.sessionID, {})
+    if (!batches.has(event.sessionID)) await rememberBatches(event.sessionID)
     continued.delete(event.sessionID)
     stopTurns.delete(event.sessionID)
     promptEpoch.set(event.sessionID, (promptEpoch.get(event.sessionID) ?? 0) + 1)
@@ -640,7 +671,11 @@ export async function registerPackageHooks(
     })
     promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })
-  await context.session.hook("context", (event) => {
+  await context.session.hook("context", async (event) => {
+    const contexts = await drainToolBatches(event.sessionID)
+    promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
+    const blocked = contexts.find(result => result.block && result.valid())
+    if (blocked) throw Error("runtime-failed: package hook blocked PostToolBatch" + (blocked.text ? ": " + blocked.text : ""))
     revoke()
     const stopped = stopTurns.get(event.sessionID)
     stopTurns.delete(event.sessionID)
@@ -661,6 +696,15 @@ export async function registerPackageHooks(
   })
   await context.session.hook("experimental.idle", async (event) => {
     continuing.delete(event.sessionID)
+    const contexts = await drainToolBatches(event.sessionID)
+    promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
+    const blocked = contexts.filter(result => (result.block || result.text) && result.valid())
+    if (blocked.length) {
+      continued.add(event.sessionID)
+      continuing.add(event.sessionID)
+      await context.session.synthetic({ sessionID: event.sessionID, text: blocked.map(result => result.text).join("\n"), resume: true })
+      return
+    }
     if (
       !allInstalledPluginPackages(input.root)
         .filter(active)
@@ -744,6 +788,7 @@ export async function registerPackageHooks(
       disposed = true
       runtime.dispose()
       configResults.clear()
+      batches.clear()
       releasePermissionRequest()
       events.abort()
       unwatchFile(membership, revoke)

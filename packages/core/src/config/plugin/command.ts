@@ -47,7 +47,12 @@ export const Plugin = define({
     const runInstruction = yield* FiberSet.makeRuntimePromise()
     yield* Effect.acquireRelease(
       Effect.sync(() => registerPackageInstructionRenderer(location, input =>
-        runInstruction(evaluateTemplate(input, { location, processes, shell })))),
+        runInstruction(evaluateTemplate(input, { location, processes, shell })), input =>
+        runInstruction(Effect.gen(function* () {
+          const executable = yield* shell.resolve({ priority: "config" })
+          const bound = bindTemplateNode({ kind: "shell", parts: input.parts.map(part => typeof part === "string" ? { source: part } : part) }, "literal", () => undefined)
+          return { executable, argv: ShellSelect.args(executable, bound.text), env: bound.env }
+        })))),
       registration => Effect.sync(() => registration.dispose()),
     )
     const load = Effect.fn("ConfigCommandPlugin.load")(function* () {

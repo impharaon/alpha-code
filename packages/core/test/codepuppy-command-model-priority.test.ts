@@ -30,6 +30,7 @@ import { AppProcess } from "@opencode/util/process"
 import { ChildProcess } from "effect/process"
 import { tmpdirScoped } from "./fixture/tmpdir"
 import { Location } from "@opencode/core/location"
+import { AbsolutePath } from "@opencode/core/schema"
 import { Mcp } from "@opencode/core/mcp/index"
 import { ShellSelect } from "@opencode/core/shell/select"
 import { Global } from "@opencode/util/global"
@@ -101,7 +102,7 @@ it.live("fenced shell source executes before arguments without executing bound f
 it.live("untrusted project fenced shell stays source and records deferred execution", () => Effect.gen(function* () {
   const location = yield* Location.Service
   const template = "```!\nprintf UNTRUSTED_SETUP\n```"
-  const filepath = location.directory + "/opencode.json"
+  const filepath = AbsolutePath.make(location.directory + "/opencode.json")
   CodePuppyProjectGate.install({ trusted: () => false })
   const gate = yield* CodePuppyProjectGate.begin({ directory: location.directory, home: location.directory + "/home" })
   const raw = { commands: { review: { template } } }

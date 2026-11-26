@@ -89,4 +89,4 @@ S-01 的 `@opencode/plugin/codepuppy-package-runtime` 只持有同进程、按 L
 `packages/ext/src/plugin-package-invocation.ts` 将已安装包的 command/agent/skill 接到原 command、skill 与 subagent 执行器，沿唯一 PackageAllowSetV3 检查分项和项目范围。调用期工具规则由既有 policy 绑定，下一用户输入/idle 清除；paths 用实际文件工具完成事件，preload 与 memory 在子会话上下文绑定，模型建议/effort 从原模型目录解析。指令模板只经 S-01 的 core renderer，源 shell 规则匹配复用纯 ShellScan，未新增执行循环或模板解释器。
 
 
-共享 converter 同时归一化 package/skill/agent hooks 与 session monitor 声明；`plugin-package.ts`、profile schema 和生成 ESM 保持同一形状。纯 `plugin-hook-events.ts` 持有事件名及五项无宿主时机原因，renderer 复用它展示逐项原因。该转换层不启动进程；hook/monitor 的运行接线仍待 S-01 shell 绑定接口增量。PackageAllowSetV3 的 bundle 根使用既有 root/effect/claim 算法表达整包活动与项目范围，不显示为组件行。
+共享 converter 同时归一化 package/skill/agent hooks 与 session monitor 声明；`plugin-package.ts`、profile schema 和生成 ESM 保持同一形状。纯 `plugin-hook-events.ts` 持有事件名及五项无宿主时机原因，renderer 复用它展示逐项原因。该转换层不启动进程；S-01 的 bind-only shell 端口现与指令渲染共用 core 绑定函数，返回当前 executable/argv/每次调用的 env，值不进入命令源码；hook/monitor 的运行消费者仍待接入。PackageAllowSetV3 的 bundle 根使用既有 root/effect/claim 算法表达整包活动与项目范围，不显示为组件行。

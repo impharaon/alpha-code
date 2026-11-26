@@ -8,6 +8,7 @@ import { createUpdaterController, feedHostBackend, type UpdaterReadyRecord } fro
 import { getLogger } from "./logging"
 import { getStore } from "./store"
 import { UPDATER_STORE } from "./store-keys"
+import { windowClose } from "./window-close"
 
 const { autoUpdater } = pkg
 const key = "ready"
@@ -86,7 +87,11 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
     backend: {
       checkForUpdates: feeds.checkForUpdates,
       downloadUpdate: feeds.downloadUpdate,
-      quitAndInstall: () => autoUpdater.quitAndInstall(),
+      quitAndInstall: () => {
+        // #1753:quitAndInstall 先逐个关窗、再 app.quit();不先标记,macOS 上关窗会被拦成隐藏而装不上。
+        windowClose.markQuitting()
+        autoUpdater.quitAndInstall()
+      },
       // [ac#1559] 用更新器自己的 currentVersion(SemVer)判新旧 —— 与它判「有无可用更新」同一把尺子。
       isNewer: (version) => autoUpdater.currentVersion.compare(version) < 0,
     },

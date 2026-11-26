@@ -11,7 +11,7 @@ test("§4.6 生产 setupAutoUpdater 的检查经香港转发入口、失败改�
   })
   const output = `${result.stdout.toString()}${result.stderr.toString()}`
   if (result.exitCode !== 0) throw new Error(output)
-  // 真实数字判据:fail 恰为 0 且 pass 恰为 2(cases 里的用例数;少了 = 有用例被删)。
+  // 真实数字判据:fail 恰为 0 且 pass 恰为 3(cases 里的用例数;少了 = 有用例被删)。
   expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
-  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("2")
+  expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("3")
 })

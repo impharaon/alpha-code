@@ -17,6 +17,7 @@ import { getStore } from "./store"
 import { PINCH_ZOOM_ENABLED_KEY } from "./store-keys"
 import { createUnresponsiveSampler } from "./unresponsive"
 import { markStartupTimeline } from "./startup-timeline"
+import { windowClose } from "./window-close"
 
 const root = dirname(fileURLToPath(import.meta.url))
 const rendererRoot = join(root, "../renderer")
@@ -214,6 +215,14 @@ export function createMainWindow() {
   wireWindowRecovery(win, "main")
   productWindowSet.add(win)
   win.on("closed", () => productWindowSet.delete(win))
+  // #1753:macOS 关最后一个窗口只隐藏(见 window-close.ts);别的窗口还在时照常关。
+  win.on("close", (event) =>
+    windowClose.onClose(
+      event,
+      win,
+      productWindows().some((other) => other !== win && (other.isVisible() || other.isMinimized())),
+    ),
+  )
   // Deep-link stream ownership (REQ-089 AC4). Wired HERE, not at the boot call site, because this
   // function is also the `window.new` menu action's window factory: a renderer that could drain
   // the queue but never report reload/crash/destruction would strand or lose links silently.

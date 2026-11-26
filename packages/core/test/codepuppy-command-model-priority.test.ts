@@ -168,6 +168,24 @@ for (const item of [
   expect(actual).toBe(item.prefix + item.value)
 }))
 
+it.live("bound package shells use the compatible shell while static native source keeps the configured shell", () => {
+  const priorities: (string | undefined)[] = []
+  return Effect.gen(function* () {
+    yield* runCommand({ template: "Initialize native command services" }, {})
+    const location = yield* Location.Service
+    const bound = yield* Effect.promise(() => bindPackageShellCommand(location, { parts: ["printf '%s' ", { boundValue: "bound value" }] }))
+    const render = (parts: Parameters<typeof renderPackageInstruction>[1]["parts"], rawArguments = "") => Effect.promise(() => renderPackageInstruction(location, { parts, rawArguments, arguments: [], syntax: "claude", cwd: location.directory }))
+    expect(yield* render(["!`printf '%s' ", { boundValue: "bound value" }, "`"])).toBe("bound value")
+    expect(yield* render(["!`cat <<'EOF'\n$0\nEOF\n`"], "argument")).toBe("argument")
+    expect(yield* render(["!`printf STATIC`"])).toBe("STATIC")
+    expect(priorities).toEqual(["compat", "compat", "compat", "config"])
+    expect(bound.executable).toBe("/bin/sh")
+  }).pipe(Effect.provideService(ShellSelect.Service, ShellSelect.Service.of({
+    resolve: input => Effect.sync(() => { priorities.push(input.priority); return input.priority === "compat" ? "/bin/sh" : "/bin/bash" }),
+    transform: () => Effect.die("unused"), reload: () => Effect.void,
+  })))
+})
+
 it.live("bind-only shell target shares the binding authority without executing", () => Effect.gen(function* () {
   yield* runCommand({ template: "Initialize native command services" }, {})
   const location = yield* Location.Service

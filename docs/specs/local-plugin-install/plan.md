@@ -851,3 +851,11 @@ AC 证据范围：AC-11/15 的解析与包作用域、AC-22 的解析/五项原�
 遗留去向：`packages/codepuppy-contracts-consumer/src/extension-package-artifact.test.ts:120` 的 live host ↔ alpha-web 已发布副本一致性为 **6 pass / 1 fail**（`/tmp/plugin-standard-r8-consumer.log`）；r7 accepted artifact 文件 SHA256=2be185a9426e76cb0ed52172ee2c59d9ed0875fdaca2f2ed3ba637a70b2afc9c，vendor 文件 SHA256=2d3b783ece9c7d59c465b2108b80202aea78941aa1ec21f75e894a61ef218a97，r8 前已不相同。交编排器已指定 alpha-web 发布/re-vendor，保留断言/真实 pin，不在本仓伪造外仓发布物。三条 core 旧断言与 docs 基线继承，不重新调查。已核 Codex（GPT-6）；OPTIONAL 无。
 
 本次共享转换提交前：单仓 docs-contract（实际 worktree，changed-since=origin/alpha）71 errors / 250 warnings，与 r7 相同；两条已接受 plan unknown-id 未改。日志 `/tmp/plugin-standard-r8-docs-final.json`。git diff --check exit 0；所有生成物检查与 UI typecheck 通过。
+
+r8 最终收口（19:26 UTC+08:00，约 28 分钟，未达原 8–12 小时预期的两倍线）：产品/合同安全子集提交 `de3b8e9558`；所有前台命令结束，只 commit。实际本轮为投影＋共享转换边界，非生成生产文件约 10 个，未扩大到 engine 运行接线。
+
+- 删除反臂 `/tmp/plugin-standard-r8-removal-results.jsonl`：bundle producer、bundle decoder、command type、prompt handler、exec args、skill scope、source order、monitor entries、unavailable diagnostic、五项具体 UI 原因、双 manifest monitor union，共 **11 项**各具名 **0 pass / 1 fail**。每次仅移除对应生产行为，运行同名 case，随后 scoped git restore；恢复字节与原提交逐字相同。未用生成物 drift 代替业务失败，未重复此前片 3/4 的反臂。
+- 最终相关绿集合 **522 pass**，另跨仓消费者 **6 pass / 1 个既有 pin fail**；没有将一次性 core 1 pass 或十包 schema probe 重复计入。三态 bundle 的先红证据继承 0d7703948c，修正与唯一 registry 登记同在 eae36414a9。共享 hook/monitor 声明先红证据为 cb77b1f354，双 manifest 先红为 4761803747。
+- UI/Ext 包内 bun typecheck 均 exit 0；最终 converter --check 和 artifact --check（20 files）均 exit 0；恢复后的 git diff --exit-code 为 0，plan 相对链接 8 pass，hooksPath=.githooks。文档保持 71 errors / 250 warnings 基线，两条已接受 unknown-id 原样。
+- `affected-tests --list` exit 0，**affected tests: 359 of 689 test files**（`/tmp/plugin-standard-r8-affected{,-scope}.txt`）；未扩大每 PR 的全局集、未动 `.gate-tests`。三条旧模型断言所在 command-subagent.test.ts 仍未选择，未修改/复跑。
+- 已核 Codex（GPT-6）。结论 **SEAM-CHANGE-NEEDED / 片 5 部分完成**；下一输入为上述 core 单一绑定权威的 shell command 目标合同。没有把运行 AC 标完成。遗留去向：S-01 补口 fix now 交编排器；外仓发布/re-vendor 与旧断言/docs 基线交原归属；真实 SaaS/工具链维持 integration acceptance。无新增 ARCH 或 OPTIONAL 项。

@@ -359,3 +359,7 @@ r4 安装步骤基线：先落当前 Location spawner 的固定 uv python instal
 r4 red-first：`bun test test/codepuppy-connector-launch.test.ts -t "excludes system tools"` 在安装步骤基线 616d06524b 上，absent / missing-directory 均因 marker 为 true 而失败（0 PASS / 2 FAIL；`/tmp/connector-r4-python-red.log`）。下一提交不改这两个断言。
 
 r4 guard green：原 absent/missing-directory 两个断言不改，生产步骤从 Environment.spawner 取得安全探测结果、用同一 Environment.files 检查目录。仅 uv python install 在缺工具时改为 uv/Node 两个随包目录 PATH，后续安装/服务及调用方原环境保持正常 PATH。前一轮首次 green 误用 Stream.drain（返回 Stream）导致 Not a valid effect，已按当前 Effect API 改 runDrain；随后文件 3 PASS / 11 assertions（`/tmp/connector-r4-python-green.log`），不是反复重跑不明红例。
+
+r4 已完成子链：真实探针 `gate slot -- bun /tmp/connector-r4-runtime-proof/install-python.ts` exit 0（`/tmp/connector-r4-managed-python.log`）。当前 Python pin 经唯一 authority 再验为 cache，R1 从 #1759 原函数取得；测试 seam 仅替换 developer probe 为 exit 1。真实 uv 以仅 uv/Node 目录的 PATH 安装 3.12.16，system marker=false，额外代理连接=0；Python `--version` 为 `Python 3.12.16`。uv 明确警告 install-name patch 未做，安装 exit 0；wheels 不受影响是 r4 裁定，并非本探针独立证明。无应用/utilityProcess 真围栏，不能当 AC-02 或整包 AC-01 通过。
+
+r4 准备收据：同一 core 新模块的 publishConnectorPreparation/readConnectorPreparation 只持久化 schema/ready/key/runner/真实版本/入口/所需文件，以 Location.files 写 part 后 rename；载入只读文件，无包管理器、TTL、刷新或环境持久化。prefix 内入口缺失/损坏/跨 runner/半成品不算 ready；调用输入每次绑定。`bun test test/codepuppy-connector-launch.test.ts` → 8 PASS / 36 assertions；`bun typecheck` → exit 0，2058 files / 2 projects。开发中按本地 Effect 4 API 修正 catchTag 和 fromJsonString 后通过。尚未接 prepareConnectorLaunch 的完整语法归一及调用者，不把 helper 的无进程读取等同 AC-10 整包启动。

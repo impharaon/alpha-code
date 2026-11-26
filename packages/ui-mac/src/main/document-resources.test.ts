@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { DOCUMENT_ASSET_BUILD_DIR, OFFICE_RUNTIME_BUILD_DIR, documentResources, documentRuntimeResources, officePythonPath, readDocumentAssets } from "./document-resources"
 import { checkOfficeRuntime } from "../../scripts/target-arch"
 
@@ -50,6 +50,28 @@ describe("document resources", () => {
       writeFileSync(join(assets, "assets.json"), JSON.stringify({ ...manifest, files: manifest.files.filter((file) => file.path !== removed) }))
     }
     expect(() => documentResources(input)).toThrow()
+  })
+
+  test("production asset FileSets survive the real electron-builder copier including root node_modules", async () => {
+    const { getConfig } = await import("../../electron-builder.config")
+    const builder = Bun.resolveSync("electron-builder", join(import.meta.dir, "../.."))
+    const copier = await import(Bun.resolveSync("app-builder-lib/out/fileMatcher.js", dirname(builder)))
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "document-real-copier-"))); temporary.push(root)
+    const entries = getConfig("prod").extraResources
+    if (!Array.isArray(entries)) throw Error("missing resources")
+    const source = join(import.meta.dir, "fixtures/document-assets")
+    const matchers = entries.flatMap((entry) => typeof entry !== "string" && entry.from.startsWith(DOCUMENT_ASSET_BUILD_DIR + "/") ? [new copier.FileMatcher(join(source, entry.from.slice(DOCUMENT_ASSET_BUILD_DIR.length)), join(root, entry.to), (value: string) => value, entry.filter)] : [])
+    await copier.copyFiles(matchers)
+    expect(readDocumentAssets(join(root, "document-assets")).files.length).toBeGreaterThan(0)
+    expect(readFileSync(join(root, "document-assets/node_modules/docx/LICENSE"))).toEqual(readFileSync(join(source, "node_modules/docx/LICENSE")))
+  })
+  test("afterPack rejects a packaged document asset tree without its npm closure", async () => {
+    const { getConfig } = await import("../../electron-builder.config")
+    const input = fixture(true)
+    rmSync(join(input.resourcesRoot, "document-assets/node_modules"), { recursive: true })
+    const afterPack = getConfig("prod").afterPack
+    if (typeof afterPack !== "function") throw Error("missing afterPack")
+    await expect(afterPack({ electronPlatformName: "win32", appOutDir: join(input.resourcesRoot, "..") } as never)).rejects.toThrow()
   })
 
   test("production packaging includes the one Office runtime and document asset roots", async () => {

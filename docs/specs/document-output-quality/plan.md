@@ -566,3 +566,9 @@ AC 对应的贡献与边界：AC-01..04/12 的默认路由、七技能/许可/�
 文档影响仍为入口行为与实施证据：canonical 本节及原两个 runtime skill；16 个相对链接 PASS，alpha profile 派生当前 worktree 的 `check-docs-contract` 本 plan findings=0（`docs-contract.json`），全仓既有 69 errors/253 warnings 不扩修。`affected-tests --list` exit 2：本旧基线缺 `.gate-tests`，无 scope line（`affected.scope`）；按 brief 留 ship 合入已有该文件的 origin/alpha，不改 gate。已核 Codex / GPT-6；工作从 10:56:52 UTC 开始，约 20 分钟（含共享 slot 等待），未倍增。目录发布/正式双平台与模型验收去向不变；未 push/PR/merge、发布或部署，无新 OPTIONAL。
 
 最后一次仅对视觉计费措辞的同步后，`cd packages/ui-mac && bun test src/main/factory-skills.test.ts src/main/codepuppy-factory-skill-hygiene.test.ts` **45 PASS / 0 FAIL**（`instructions-final.log`），不重复加总。最终文档契约输出 `docs-contract-final.json` 的本 plan findings=0；diff 检查 exit 0。所有前台执行/slot 已终结，hooksPath 仍为 `.githooks`，当前变更只含本节具名的 14 个文件（含 plan），目录两个生成输出没有变化。
+
+## R1 审查修正（r11，切片一至六）
+
+依据恢复 brief 的逐项采纳 A1..A10、B1..B8，冻结规格/设计不变；切片七保持其独立提交。开始 2026-11-26 11:15:48 UTC，预估约 90 分钟，先保留各正确反例再修生产代码，现有模块测试中添加用例；不跑全套或 gate run。A3 的本功能 retry 可以独立实现，#1760 现有 action 的生产代码在本分支尚不存在（`util/codepuppy-connector-launch.ts` 仅数据定义；实际 preload/main 无 connectorLaunch.retry 实现），接线须沿该拥有者的冻结面，不新增 DocumentHost/引擎 API 绕过。
+
+A1 red：新增既有 document-resources.test.ts 的真实 electron-builder 26.15.2 FileMatcher/copyFiles 用例（实际依赖解析，非 cpSync 模拟）及 afterPack 缺 npm 树的反例。`bun test src/main/document-resources.test.ts -t 'real electron-builder copier|afterPack rejects'` 为 0 PASS/2 FAIL（`/tmp/alpha-1761-r11/A1-red.log`）：前者实际丢根 node_modules 后 readDocumentAssets 报缺文件，后者当前 afterPack 在 win32 直接成功。这次只提交反例，下一提交加明确 npm FileSet 和真实打包目录资产验证。正式 package:mac 目录构建涉及完整引擎/签名资源，本轮选择 brief 允许的 closest real-copier 证据，不启动应用/Electron 窗口。

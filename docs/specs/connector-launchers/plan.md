@@ -432,3 +432,19 @@ Office 前置失败明确交接（继承 r3 事实，不重跑）：在 packages
 - core runtime：`bun test test/codepuppy-mcp-runtime.test.ts -t 'the command main writes|Office declarations bind|bundled slots bind|bundled declarations reject|launcher download classification|managed pinned|refuted managed|production MCP client registers pinned|ordinary MCP client|video progress follows each real SDK request'` → 12 PASS；投影提取后去掉分类/video 两个不受影响例的定向复核为 10 PASS。
 - ui-mac：`bun test src/main/connector-launchers.test.ts src/main/pinned-files.test.ts src/main/connector-launch-state.test.ts src/main/document-runtime.test.ts src/main/codepuppy-sidecar-wiring.test.ts src/main/video-service.test.ts src/renderer/extensions/connector-launch-presentation.test.ts` → 69 PASS；镜像步骤后的 `bun test src/main/connector-launchers.test.ts` → 22 PASS。
 - ext：`bun test src/policy/identity.test.ts src/policy/resolver.test.ts src/policy/register-policy.test.ts src/policy/tool-policy-rpc.test.ts src/policy/unattended.test.ts` → 136 PASS。
+
+## r5｜切片三/四/五继续：官方声明归一、许可前准备、开机重锚与诊断状态
+
+- 依据：SPEC v1 AC-01/02/04/05/06/07/08/10；冻结 DESIGN v1 §4.4–4.7、v2.1/v2.2 §4/§10；r4 收据 e6e72ec6d6，r5 IMPLEMENT 续接。
+- 核对：r4 PARTIAL 已由编排器接受；本轮按 r5 的 IMPLEMENT 继续，不重开冻结决策。Codex / GPT-6。
+- 起始：2026-11-26T18:08:43Z；预计约 90 分钟。Office compileall 已移交 documents，本轮不读其构建产物或运行构建。
+
+### 文件、顺序与证明
+1. **切片五：应用首方 Node/cache root 开机重锚**。在 `ui-mac/src/main/codepuppy-video.ts`/既有配置对账调用链消费同一个 expandFirstPartyCommand 与已安装身份，保留 enabled/业务配置；测试放既有 connector-launchers / config-injection 测试。只处理应用自有条目，严格身份 matcher 不放宽旧 Node 路径。证明当前 descriptor/归档路径尚未 ready 时仍锚到本代路径、第二次无写入、自定义/额外 env/cwd 不冒认首方。
+2. **切片三：许可前准备与直接执行**。`core/src/mcp/connection.ts`、`client.ts` 消费宿主私有准备结果；准备等待发生在 startPermits 和握手预算之前，失败不调用服务。测试放既有 `codepuppy-connector-launch.test.ts` / `codepuppy-mcp-runtime.test.ts`，用真实 Location/SDK 的事件屏障，不做墙钟/容量用例。原生命令保持原环境，first-party Node 只等 resolveAssets。
+3. **切片三：官方语法/key**。在同一 core launcher 模块及必要自有 helper 中使用随包 Node/npm 的官方参数解析和 bin 选择，uv 使用被钉版本的实际语法；逐步接非秘密解析内容指纹与现有准备收据。只在 Location spawner/files 上运行，服务参数/cwd/secret 不进入 key。不得以窄目录包名单或“第三方不支持”替代合法语法。官方本地文件/CLI read-only 探针先在 /tmp；大实物仅一次性 gate slot，不放常驻测试。
+4. **切片四：诊断/状态 producer**。复用 r4 的观察器与 util Host/LaunchSnapshot，生产本 attempt 的 preparing/connecting/connected/failed/disabled 和完整诊断；在既有模块测试中证明 seq/identity、取消/晚到结果及两入口状态消费。生产 controller/Host/root 组装仍等待 #1759，不复制其位置/最终投影。
+5. 最终仅相关测试、适用包 typecheck/build、必要移除臂与 affected-tests --list；记录 #1759 当前接口提交、准确未完成边界和文件偏离。无 gate run/bin/check、全层/计时/容量用例、应用或窗口、push/PR/merge。
+
+### 风险与偏离
+官方完整语法/解析配置的归一可能占主要时间；保持当前真实语义，不靠猜测过滤选项。若接缝不足，按事实返回；普通私有 helper 选择不转回设计。新文件与初始列表外的必要同链改动在实际提交补列。暂无其它偏离。

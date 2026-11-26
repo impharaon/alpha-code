@@ -227,14 +227,14 @@ test("package hook source names and fields use the verified tool identity", () =
   const input = base({ early: new Set(["write", "edit", "read", "shell"]) })
   for (const [native, source] of [["write", "Write"], ["edit", "Edit"], ["read", "Read"], ["shell", "Bash"]]) {
     const facts = toolFacts({ id: native!, name: native! }, input)
-    const value = native === "shell" ? { command: "printf fixture" } : { path: "fixture.ts", oldString: "before", newString: "after", replaceAll: false }
-    const result = packageToolCall(facts, value, {}, "claude")
+    const value = native === "shell" ? { command: "printf fixture" } : { path: "/project/fixture.ts", oldString: "before", newString: "after", replaceAll: false }
+    const result = packageToolCall(facts, value, {}, "claude", "/project")
     expect(result.name).toBe(source)
-    expect(result.input).toEqual(native === "shell" ? value : { file_path: "fixture.ts", old_string: "before", new_string: "after", replace_all: false })
-    expect(packageToolCall(facts, result.input, {}, "runtime").input).toEqual(value)
+    expect(result.input).toEqual(native === "shell" ? value : { file_path: "/project/fixture.ts", old_string: "before", new_string: "after", replace_all: false })
+    expect(packageToolCall(facts, result.input, {}, "runtime", "/project").input).toEqual(value)
   }
   const mcp = toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" }, ...mcpToolMark("policy", "paid_action") }, input)
-  expect(packageToolCall(mcp, { account: "fixture" }, { "mcp::source-server": "policy" }, "claude")).toEqual({ name: "mcp__source-server__paid_action", input: { account: "fixture" } })
+  expect(packageToolCall(mcp, { account: "fixture" }, { "mcp::source-server": "policy" }, "claude", "/project")).toEqual({ name: "mcp__source-server__paid_action", input: { account: "fixture" } })
 })
 
 

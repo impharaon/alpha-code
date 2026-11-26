@@ -337,7 +337,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     packageToolCall: async (tool, input, bindings, format) => {
       const facts = await factsFor(tool)
       if (!facts) throw Error("dependency-missing: tool identity " + tool)
-      return packageToolCall(facts, input, bindings, format)
+      return packageToolCall(facts, input, bindings, format, context.location.directory)
     },
     bindPackageAgent: (agent, invocation, bindings) => { packageAgents.set(agent, { invocation, bindings }) },
     bindPackageInvocation: (sessionID, invocation, bindings, active) => {

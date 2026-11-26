@@ -17,11 +17,15 @@ import { ASK_AGENT, READONLY_AGENT } from "../../ui-mac/src/shared/permission-ti
 import { PACKAGE_HOOK_CONTEXT_ID, renderWrapper } from "./context-injection"
 import { mkdtempSync, writeFileSync, chmodSync, rmSync, watchFile, unwatchFile } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { createHash } from "node:crypto"
 
 type Installed = ReturnType<typeof allInstalledPluginPackages>[number]
+type Instruction = ReturnType<typeof import("./plugin-package-skills").allInstalledPluginInstructions>[number]
+type InstructionScope = { item: Instruction; active(): boolean }
+export type PackageHookRuntime = Awaited<ReturnType<typeof registerPackageHooks>>
 type Contribution = {
+  valid(): boolean
   installed: Installed
   text: string
   order: number
@@ -39,14 +43,18 @@ export async function registerPackageHooks(
   input: { root: string; projectRoot(): string | undefined; log(line: string): void; policy: PolicyRegistration },
 ) {
   const processes = createPackageProcesses(context.location)
+  const instructions = new Map<string, Map<string, InstructionScope>>()
+  const expansions = new Map<string, Contribution[]>()
+  let preparePrompt: ((event: import("@opencode/plugin/promise/session").SessionPrompt) => Promise<void>) | undefined
   const directory = mkdtempSync(join(tmpdir(), "codepuppy-plugin-session-"))
   const created = new Set<string>()
   const continued = new Set<string>()
+  const continuing = new Set<string>()
   const starts = new Map<string, Promise<void>>()
   const sessionContexts = new Map<string, Contribution[]>()
   const promptContexts = new Map<string, Contribution[]>()
   const stopTurns = new Map<string, Contribution>()
-  const running = new Map<AbortController, { installed: Installed; sessionID: string }>()
+  const running = new Map<AbortController, { valid(): boolean; sessionID: string }>()
   const observed = new Set<string>()
   const promptEpoch = new Map<string, number>()
   const sessionEpoch = new Map<string, object>()
@@ -66,23 +74,25 @@ export async function registerPackageHooks(
     )
   }
   const revoke = () => {
-    for (const [controller, owner] of running) if (!active(owner.installed)) controller.abort()
+    for (const [controller, owner] of running) if (!owner.valid()) controller.abort()
     for (const contexts of [sessionContexts, promptContexts])
       for (const [sessionID, values] of contexts)
         contexts.set(
           sessionID,
-          values.filter((value) => active(value.installed) && value.lifetime === sessionEpoch.get(value.sessionID)),
+          values.filter((value) => value.valid() && value.lifetime === sessionEpoch.get(value.sessionID)),
         )
   }
   const membership = join(input.root, "skills-enabled.json")
   watchFile(membership, { interval: 100, persistent: false }, revoke)
   const events = new AbortController()
   const close = (sessionID: string) => {
+    instructions.delete(sessionID)
     sessionEpoch.delete(sessionID)
     promptEpoch.delete(sessionID)
     stopTurns.delete(sessionID)
     for (const [controller, owner] of running) if (owner.sessionID === sessionID) controller.abort()
     continued.delete(sessionID)
+    continuing.delete(sessionID)
     starts.delete(sessionID)
     created.delete(sessionID)
     sessionContexts.delete(sessionID)
@@ -104,14 +114,28 @@ export async function registerPackageHooks(
     sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"],
     fields: Record<string, unknown>,
     call?: GateCall,
+    invocation?: InstructionScope,
   ) => {
     const installed = allInstalledPluginPackages(input.root).filter(active)
     const handlers = installed.flatMap((installed) =>
-      installed.description.entries.flatMap((entry) =>
-        entry.kind === "hook" && pluginEntryRuntimeAvailable(entry) && entry.hook.event === event
-          ? [{ installed, entry, hook: entry.hook }]
-          : [],
-      ),
+      installed.description.entries.flatMap((entry) => {
+        if (entry.kind !== "hook" || !pluginEntryRuntimeAvailable(entry) || entry.hook.event !== event) return []
+        const scope =
+          entry.hook.scope.kind === "package"
+            ? undefined
+            : (instructions.get(sessionID)?.get(installed.key + ":" + entry.hook.scope.entryId) ??
+              (invocation?.item.installed.key === installed.key && invocation.item.entry.id === entry.hook.scope.entryId
+                ? invocation
+                : undefined))
+        if (entry.hook.scope.kind !== "package" && !scope) return []
+        const valid = () =>
+          active(installed) &&
+          (!scope ||
+            (scope.active() &&
+              (invocation === scope ||
+                instructions.get(sessionID)?.get(installed.key + ":" + scope.item.entry.id) === scope)))
+        return valid() ? [{ installed, entry, hook: entry.hook, scope, valid }] : []
+      }),
     )
     if (!handlers.length) return []
     const lifetime = sessionEpoch.get(sessionID) ?? {}
@@ -188,6 +212,9 @@ export async function registerPackageHooks(
       permission_mode:
         session.agent === READONLY_AGENT ? "plan" : session.agent === ASK_AGENT ? "default" : "bypassPermissions",
       hook_event_name: event,
+      ...(history.findLast((message) => message.type === "user")
+        ? { prompt_id: history.findLast((message) => message.type === "user")!.id }
+        : {}),
       stop_hook_active: continued.has(sessionID),
       last_assistant_message:
         history
@@ -203,7 +230,7 @@ export async function registerPackageHooks(
         const execute = async () => {
           const controller = new AbortController()
           let redact = (text: string) => text
-          running.set(controller, { installed: handler.installed, sessionID })
+          running.set(controller, { valid: handler.valid, sessionID })
           for (const file of ["current.json", INSTALLED_PLUGIN_SETTINGS_FILE]) {
             const pointer = join(input.root, "ext-store", handler.installed.key, file)
             if (!observed.has(pointer)) {
@@ -212,7 +239,7 @@ export async function registerPackageHooks(
             }
           }
           try {
-            if (!active(handler.installed)) return
+            if (!handler.valid()) return
             const source =
               call &&
               (await input.policy.packageToolCall(
@@ -274,6 +301,14 @@ export async function registerPackageHooks(
               settings: handler.installed.settings,
               pluginRoot: handler.installed.pluginRoot,
               projectDir: context.location.directory,
+              ...(handler.scope
+                ? {
+                    skillDir:
+                      handler.scope.item.entry.kind === "skill"
+                        ? join(handler.installed.pluginRoot, handler.scope.item.entry.directory)
+                        : dirname(join(handler.installed.pluginRoot, handler.scope.item.entry.sourcePath)),
+                  }
+                : {}),
               resolveEnvironment: (name) => process.env[name],
               resolveOptionSecret: (ref) => codepuppyCredential(ref.slice(6, -1)),
               resolveSecret: (id) => {
@@ -336,11 +371,11 @@ export async function registerPackageHooks(
                 (!judgment.ok && (typeof judgment.reason !== "string" || !judgment.reason.trim()))
               )
                 throw Error("prompt hook returned an invalid judgment")
-              if (!active(handler.installed) || controller.signal.aborted || sessionEpoch.get(sessionID) !== lifetime)
-                return
+              if (!handler.valid() || controller.signal.aborted || sessionEpoch.get(sessionID) !== lifetime) return
               const stopping = ["Stop", "SubagentStop"].includes(event)
               return {
                 installed: handler.installed,
+                valid: handler.valid,
                 block: !judgment.ok && (!stopping || judgment.impossible !== true),
                 stopTurn: !judgment.ok && !stopping && !handler.hook.continueOnBlock,
                 exitCode: 0,
@@ -365,11 +400,11 @@ export async function registerPackageHooks(
               timeoutSeconds: handler.hook.timeoutSeconds,
             })
             redact = result.redact
-            if (!active(handler.installed) || controller.signal.aborted || sessionEpoch.get(sessionID) !== lifetime)
-              return
+            if (!handler.valid() || controller.signal.aborted || sessionEpoch.get(sessionID) !== lifetime) return
             if (result.exitCode === 2)
               return {
                 installed: handler.installed,
+                valid: handler.valid,
                 block: ["UserPromptSubmit", "PreToolUse", "Stop", "SubagentStop"].includes(event),
                 exitCode: 2,
                 order,
@@ -387,6 +422,7 @@ export async function registerPackageHooks(
             const specific = record(output.hookSpecificOutput) ? output.hookSpecificOutput : undefined
             return {
               installed: handler.installed,
+              valid: handler.valid,
               block:
                 output.continue === false ||
                 (["Stop", "SubagentStop", "PreToolUse"].includes(event) && output.decision === "block") ||
@@ -412,7 +448,7 @@ export async function registerPackageHooks(
               lifetime,
             }
           } catch (error) {
-            if (controller.signal.aborted || !active(handler.installed)) return
+            if (controller.signal.aborted || !handler.valid()) return
             input.log(
               "runtime-failed: hook " +
                 handler.entry.id +
@@ -421,6 +457,7 @@ export async function registerPackageHooks(
             )
             return {
               installed: handler.installed,
+              valid: handler.valid,
               block: handler.hook.onFailure === "block",
               exitCode: -1,
               order,
@@ -435,12 +472,7 @@ export async function registerPackageHooks(
         if (handler.hook.type !== "command" || (!handler.hook.async && !handler.hook.asyncRewake)) return execute()
         void execute()
           .then(async (result) => {
-            if (
-              !result ||
-              !active(result.installed) ||
-              (event !== "SessionStart" && promptEpoch.get(sessionID) !== epoch)
-            )
-              return
+            if (!result || !result.valid() || (event !== "SessionStart" && promptEpoch.get(sessionID) !== epoch)) return
             if (sessionEpoch.get(sessionID) !== lifetime) return
             const contexts = event === "SessionStart" ? sessionContexts : promptContexts
             if (result.text) contexts.set(sessionID, [...(contexts.get(sessionID) ?? []), result])
@@ -452,9 +484,7 @@ export async function registerPackageHooks(
       }),
     )
     if (sessionEpoch.get(sessionID) !== lifetime) return []
-    const contributions = results.filter(
-      (result): result is NonNullable<typeof result> => !!result && active(result.installed),
-    )
+    const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && result.valid())
     const blocked = contributions.find((result) => result.block)
     if (blocked?.stopTurn) stopTurns.set(sessionID, blocked)
     if (blocked && !["Stop", "SubagentStop"].includes(event))
@@ -463,6 +493,7 @@ export async function registerPackageHooks(
       .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest")
       .map((result) => ({
         installed: result.installed,
+        valid: result.valid,
         text: result.text,
         order: result.order,
         sessionID,
@@ -481,7 +512,7 @@ export async function registerPackageHooks(
         result.output.hookSpecificOutput.decision.behavior === "allow",
     )
     if (allowed.length)
-      await input.policy.bindPackageHook(call, "allow", () => allowed.every((result) => active(result.installed)))
+      await input.policy.bindPackageHook(call, "allow", () => allowed.every((result) => result.valid()))
     const contexts = results.filter((result) => result.text)
     if (contexts.length)
       promptContexts.set(call.sessionID, [...(promptContexts.get(call.sessionID) ?? []), ...contexts])
@@ -503,9 +534,7 @@ export async function registerPackageHooks(
     })
     const decision = decisions.some((item) => item.decision === "ask") ? "ask" : decisions.length ? "allow" : undefined
     if (decision)
-      await input.policy.bindPackageHook(event, decision, () =>
-        decisions.every((item) => active(item.result.installed)),
-      )
+      await input.policy.bindPackageHook(event, decision, () => decisions.every((item) => item.result.valid()))
     const contexts = results.filter((result) => result.text)
     if (contexts.length)
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
@@ -526,30 +555,38 @@ export async function registerPackageHooks(
     stopTurns.delete(event.sessionID)
     promptEpoch.set(event.sessionID, (promptEpoch.get(event.sessionID) ?? 0) + 1)
     promptContexts.delete(event.sessionID)
+    await preparePrompt?.(event)
+    const pending = expansions.get(event.messageID)
+    expansions.delete(event.messageID)
+    if (pending?.length) promptContexts.set(event.sessionID, pending)
     if (!starts.has(event.sessionID))
       starts.set(
         event.sessionID,
-        run("SessionStart", event.sessionID, { source: created.delete(event.sessionID) ? "startup" : "resume" }).then(
-          (contexts) => {
-            sessionContexts.set(event.sessionID, [...(sessionContexts.get(event.sessionID) ?? []), ...contexts])
-          },
-        ),
+        run("SessionStart", event.sessionID, {
+          source: created.delete(event.sessionID) ? "startup" : "resume",
+          prompt_id: event.messageID,
+        }).then((contexts) => {
+          sessionContexts.set(event.sessionID, [...(sessionContexts.get(event.sessionID) ?? []), ...contexts])
+        }),
       )
     await starts.get(event.sessionID)
-    const contexts = await run("UserPromptSubmit", event.sessionID, { prompt: event.prompt.text ?? "" })
+    const contexts = await run("UserPromptSubmit", event.sessionID, {
+      prompt: event.prompt.text ?? "",
+      prompt_id: event.messageID,
+    })
     promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })
   await context.session.hook("context", (event) => {
     revoke()
     const stopped = stopTurns.get(event.sessionID)
     stopTurns.delete(event.sessionID)
-    if (stopped && active(stopped.installed) && stopped.lifetime === sessionEpoch.get(event.sessionID))
+    if (stopped && stopped.valid() && stopped.lifetime === sessionEpoch.get(event.sessionID))
       throw Error("runtime-failed: package hook blocked this turn: " + stopped.text)
     for (const contribution of [
       sessionContexts.get(event.sessionID) ?? [],
       promptContexts.get(event.sessionID) ?? [],
     ].flatMap((values) => values.toSorted((left, right) => left.order - right.order)))
-      if (active(contribution.installed) && contribution.lifetime === sessionEpoch.get(event.sessionID))
+      if (contribution.valid() && contribution.lifetime === sessionEpoch.get(event.sessionID))
         event.system.push({
           type: "text",
           text: renderWrapper(PACKAGE_HOOK_CONTEXT_ID, {
@@ -559,6 +596,7 @@ export async function registerPackageHooks(
         })
   })
   await context.session.hook("experimental.idle", async (event) => {
+    continuing.delete(event.sessionID)
     if (
       !allInstalledPluginPackages(input.root)
         .filter(active)
@@ -580,22 +618,75 @@ export async function registerPackageHooks(
     const blocking = results.filter((result) => result.block)
     if (!blocking.length) return
     continued.add(event.sessionID)
+    continuing.add(event.sessionID)
     await context.session.synthetic({
       sessionID: event.sessionID,
       text: blocking.map((result) => result.text).join("\n"),
       resume: true,
     })
   })
-  return async () => {
-    disposed = true
-    releasePermissionRequest()
-    events.abort()
-    unwatchFile(membership, revoke)
-    for (const pointer of observed) unwatchFile(pointer, revoke)
-    for (const controller of running.keys()) controller.abort()
-    // The host closes the Location stream scope after plugin cleanup; joining it here blocks that close.
-    void subscription
-    await processes.dispose()
-    rmSync(directory, { recursive: true, force: true })
+  return {
+    continuesTask(sessionID: string) {
+      return continuing.has(sessionID)
+    },
+    onPrompt(handler: NonNullable<typeof preparePrompt>) {
+      preparePrompt = handler
+      return () => {
+        if (preparePrompt === handler) preparePrompt = undefined
+      }
+    },
+    activateInstruction(sessionID: string, item: Instruction, allowed: () => boolean) {
+      const scopes = instructions.get(sessionID) ?? new Map<string, InstructionScope>()
+      const id = item.installed.key + ":" + item.entry.id
+      const scope = { item, active: allowed }
+      scopes.set(id, scope)
+      instructions.set(sessionID, scopes)
+      return () => {
+        if (scopes.get(id) === scope) scopes.delete(id)
+        revoke()
+      }
+    },
+    async beforeExpansion(
+      sessionID: string,
+      item: Instruction,
+      args: string,
+      messageID: string | undefined,
+      allowed: () => boolean,
+    ) {
+      const results = await run(
+        "UserPromptExpansion",
+        sessionID,
+        {
+          command_name:
+            item.installed.description.provider === "claude-code"
+              ? item.installed.description.name + ":" + item.entry.sourceName
+              : item.entry.sourceName,
+          args,
+          source: "plugin",
+          expansion_type: item.entry.kind === "command" ? "command" : "skill",
+          ...(messageID ? { prompt_id: messageID } : {}),
+        },
+        undefined,
+        { item, active: allowed },
+      )
+      if (messageID) expansions.set(messageID, [...(expansions.get(messageID) ?? []), ...results])
+      return results
+        .map((result) =>
+          renderWrapper(PACKAGE_HOOK_CONTEXT_ID, { label: result.installed.description.name, body: result.text }),
+        )
+        .join("\n")
+    },
+    dispose: async () => {
+      disposed = true
+      releasePermissionRequest()
+      events.abort()
+      unwatchFile(membership, revoke)
+      for (const pointer of observed) unwatchFile(pointer, revoke)
+      for (const controller of running.keys()) controller.abort()
+      // The host closes the Location stream scope after plugin cleanup; joining it here blocks that close.
+      void subscription
+      await processes.dispose()
+      rmSync(directory, { recursive: true, force: true })
+    },
   }
 }

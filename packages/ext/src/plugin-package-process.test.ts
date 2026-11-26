@@ -22,7 +22,7 @@ test("package commands receive typed options defaults secrets data and JSON stdi
       executable: process.execPath,
       argv: [
         "-e",
-        `const input = await Bun.stdin.json(); console.log(JSON.stringify({input,root:process.env.CLAUDE_PLUGIN_ROOT,data:process.env.CLAUDE_PLUGIN_DATA,debug:process.env.CLAUDE_PLUGIN_OPTION_CC_LANGFUSE_DEBUG,max:process.env.CLAUDE_PLUGIN_OPTION_CC_LANGFUSE_MAX_CHARS,host:process.env.CLAUDE_PLUGIN_OPTION_LANGFUSE_BASE_URL,secretHash:new Bun.CryptoHasher('sha256').update(process.env.CLAUDE_PLUGIN_OPTION_LANGFUSE_SECRET_KEY).digest('hex')}));console.error(process.env.CLAUDE_PLUGIN_OPTION_LANGFUSE_SECRET_KEY)`,
+        `const input = await Bun.stdin.json(); console.log(JSON.stringify({input,root:process.env.CLAUDE_PLUGIN_ROOT,skill:process.env.CLAUDE_SKILL_DIR,data:process.env.CLAUDE_PLUGIN_DATA,debug:process.env.CLAUDE_PLUGIN_OPTION_CC_LANGFUSE_DEBUG,max:process.env.CLAUDE_PLUGIN_OPTION_CC_LANGFUSE_MAX_CHARS,host:process.env.CLAUDE_PLUGIN_OPTION_LANGFUSE_BASE_URL,secretHash:new Bun.CryptoHasher('sha256').update(process.env.CLAUDE_PLUGIN_OPTION_LANGFUSE_SECRET_KEY).digest('hex')}));console.error(process.env.CLAUDE_PLUGIN_OPTION_LANGFUSE_SECRET_KEY)`,
       ],
       env: {},
     }),
@@ -34,6 +34,7 @@ test("package commands receive typed options defaults secrets data and JSON stdi
       source: {
         description,
         pluginRoot: join(root, "tree"),
+        skillDir: join(root, "tree", "skills", "scope"),
         projectDir: root,
         settings: {
           packageId: "claude:langfuse-observability",
@@ -57,6 +58,7 @@ test("package commands receive typed options defaults secrets data and JSON stdi
     expect(JSON.parse(result.stdout)).toMatchObject({
       input,
       root: join(root, "tree"),
+      skill: join(root, "tree", "skills", "scope"),
       data: expect.stringContaining("plugin-data"),
       debug: "false",
       max: "11",

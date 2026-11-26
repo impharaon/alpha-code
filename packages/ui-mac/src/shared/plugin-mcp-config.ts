@@ -39,6 +39,7 @@ type PluginProcessSource = {
   settings: import("./installed-plugin-settings").InstalledPluginSettingsV1
   pluginRoot: string
   projectDir: string
+  skillDir?: string
   resolveEnvironment(name: string): string | undefined
   resolveOptionSecret(reference: string): string | undefined
   resolveSecret(id: string): string | undefined
@@ -66,7 +67,7 @@ export function pluginProcessConfig(input: PluginProcessSource) {
     values.set(key, value as string | number | boolean)
     return value as string | number | boolean
   }
-  const bindings: PackageTextBindings = { pluginRoot: input.pluginRoot, projectDir: input.projectDir,
+  const bindings: PackageTextBindings = { pluginRoot: input.pluginRoot, projectDir: input.projectDir, skillDir: input.skillDir,
     pluginData: pluginDataDirectory(input.settings.dataHome, input.settings.packageId), resolveOption: option,
     resolveEnvironment: input.resolveEnvironment, resolveSecret: id => {
       const value = input.resolveSecret(id)
@@ -82,6 +83,7 @@ export function pluginProcessConfig(input: PluginProcessSource) {
       names.set(name, [...(names.get(name) ?? []), key])
     }
     const environment: Record<string, string> = { CLAUDE_PLUGIN_ROOT: input.pluginRoot, CLAUDE_PLUGIN_DATA: pluginDataDirectory(input.settings.dataHome, input.settings.packageId) }
+    if (input.skillDir) environment.CLAUDE_SKILL_DIR = input.skillDir
     for (const [name, keys] of names) {
       if (keys.length !== 1) continue
       const key = keys[0]!

@@ -4,6 +4,8 @@ import type { Schema } from "effect"
 import type { Plugin } from "@opencode/plugin"
 import type { AgentEditor } from "@opencode/plugin/promise/agent"
 import type { Info, ToolContext } from "@opencode/plugin/promise/tool"
+import type { PackageHookRuntime } from "./plugin-package-hooks"
+import { SessionMessage } from "../../schema/src/session-message"
 import type { PolicyRegistration } from "./policy/index"
 import { renderPackageInstruction } from "@opencode/plugin/codepuppy-package-runtime"
 import { pluginInstructionDefinition } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
@@ -24,7 +26,7 @@ type Scope = {
   text: string
   pendingPrompt: boolean
   via: "command" | "tool" | "task" | "path" | "attachment"
-  disposePolicy: () => void
+  dispose: () => void
   partial: boolean
 }
 const record = (input: unknown): input is Record<string, unknown> =>
@@ -37,6 +39,7 @@ export async function registerPackageInvocations(
     root: string
     projectRoot: () => string | undefined
     policy: PolicyRegistration
+    hooks: PackageHookRuntime
     log: (line: string) => void
   },
 ) {
@@ -62,6 +65,7 @@ export async function registerPackageInvocations(
       throw new Error("runtime-failed: package entry is disabled or unavailable: " + item.entry.sourceName)
   }
   const clear = (sessionID: string) => {
+    for (const scope of scopes.get(sessionID)?.values() ?? []) scope.dispose()
     scopes.delete(sessionID)
     input.policy.clearPackageInvocation(sessionID)
   }
@@ -101,16 +105,21 @@ export async function registerPackageInvocations(
   const bind = (sessionID: string, item: Instruction, text: string, via: Scope["via"]) => {
     const id = item.installed.key + ":" + item.entry.id
     const current = scopes.get(sessionID) ?? new Map<string, Scope>()
-    current.get(id)?.disposePolicy()
-    const disposePolicy = input.policy.bindPackageInvocation(sessionID, invocationRules(item), bindings(item), () =>
+    current.get(id)?.dispose()
+    const releasePolicy = input.policy.bindPackageInvocation(sessionID, invocationRules(item), bindings(item), () =>
       allowed(item),
     )
+    const releaseHooks = input.hooks.activateInstruction(sessionID, item, () => allowed(item))
+    const dispose = () => {
+      releaseHooks()
+      releasePolicy()
+    }
     const scope: Scope = {
       item,
       text,
       pendingPrompt: via === "command" || via === "task",
       via,
-      disposePolicy,
+      dispose,
       partial: false,
     }
     current.set(id, scope)
@@ -225,6 +234,7 @@ export async function registerPackageInvocations(
     toolContext: ToolContext,
     via: "command" | "tool",
     incoming: Record<string, unknown> = {},
+    expansion = "",
   ) => {
     requireActive(item)
     const original = tools.get("subagent")
@@ -242,14 +252,15 @@ export async function registerPackageInvocations(
                 candidate.entry.sourceName === named,
             )?.name ?? named)
           : "general"
-    if (via === "command") await context.permission.assert({
-      sessionID: parent.id,
-      agent: toolContext.agent,
-      action: "subagent",
-      resources: [target],
-      save: [],
-      metadata: {},
-    })
+    if (via === "command")
+      await context.permission.assert({
+        sessionID: parent.id,
+        agent: toolContext.agent,
+        action: "subagent",
+        resources: [target],
+        save: [],
+        metadata: {},
+      })
     const sourceModel =
       typeof incoming.model === "string"
         ? incoming.model
@@ -261,7 +272,7 @@ export async function registerPackageInvocations(
       (typeof incoming.background === "boolean"
         ? incoming.background
         : item.installed.description.provider === "claude-code" && (!parent.parentID || item.entry.kind === "skill"))
-    const text = await prepared(item, rawArguments)
+    const text = [expansion, await prepared(item, rawArguments)].filter(Boolean).join("\n\n")
     const forwarded: Record<string, unknown> = {
       ...incoming,
       agent: target,
@@ -334,13 +345,34 @@ export async function registerPackageInvocations(
           requireActive(item)
           const frame = await manualContext(invocation.sessionID)
           if (item.entry.invocation.fork || item.entry.invocation.agent) {
-            await delegate(item, invocation.prompt.text, "", frame, "command")
+            const expansion = await input.hooks.beforeExpansion(
+              invocation.sessionID,
+              item,
+              invocation.prompt.text,
+              undefined,
+              () => allowed(item),
+            )
+            await delegate(item, invocation.prompt.text, "", frame, "command", {}, expansion)
             return
           }
-          const text = await prepared(item, invocation.prompt.text)
-          bind(invocation.sessionID, item, text, "command")
+          const messageID = SessionMessage.ID.create()
+          const scope = bind(invocation.sessionID, item, "", "command")
+          let text: string
+          try {
+            await input.hooks.beforeExpansion(invocation.sessionID, item, invocation.prompt.text, messageID, () =>
+              allowed(item),
+            )
+            text = await prepared(item, invocation.prompt.text)
+            scope.text = text
+          } catch (error) {
+            scope.dispose()
+            if (scopes.get(invocation.sessionID)?.get(item.installed.key + ":" + item.entry.id) === scope)
+              scopes.get(invocation.sessionID)?.delete(item.installed.key + ":" + item.entry.id)
+            throw error
+          }
           const session = await context.session.get({ sessionID: invocation.sessionID })
-          const suggestion = !session.model && (await resolvePackageModel(context, item.entry.invocation.model, input.log))
+          const suggestion =
+            !session.model && (await resolvePackageModel(context, item.entry.invocation.model, input.log))
           if (suggestion) {
             const [providerID, ...id] = suggestion.split("/")
             await context.session.switchModel({
@@ -351,6 +383,7 @@ export async function registerPackageInvocations(
           await context.session.prompt({
             ...invocation.prompt,
             sessionID: invocation.sessionID,
+            id: messageID,
             text,
             delivery: invocation.delivery,
           })
@@ -410,7 +443,8 @@ export async function registerPackageInvocations(
           )
             throw new Error("runtime-failed: skill requires an explicit invocation: " + item.entry.sourceName)
           const loaded = await original({ ...data, id: selected?.id ?? "skill--" + item.name }, frame)
-          if (item.entry.invocation.fork || item.entry.invocation.agent) return delegate(item, rawArguments, "", frame, "tool")
+          if (item.entry.invocation.fork || item.entry.invocation.agent)
+            return delegate(item, rawArguments, "", frame, "tool")
           const text = await prepared(item, rawArguments)
           bind(frame.sessionID, item, text, "tool")
           const body = selected?.content.trim()
@@ -425,14 +459,14 @@ export async function registerPackageInvocations(
         }
       })
   })
-  await context.session.hook("prompt", async (event) => {
+  const releasePrompt = input.hooks.onPrompt(async (event) => {
     for (const scope of scopes.get(event.sessionID)?.values() ?? []) {
       if (scope.pendingPrompt) {
         scope.pendingPrompt = false
         continue
       }
       if (scope.via !== "task") {
-        scope.disposePolicy()
+        scope.dispose()
         scopes.get(event.sessionID)?.delete(scope.item.installed.key + ":" + scope.item.entry.id)
       }
     }
@@ -444,8 +478,15 @@ export async function registerPackageInvocations(
           listed?.path === join(candidate.installed.pluginRoot, candidate.entry.sourcePath),
       )
       if (!item) continue
-      const text = await prepared(item, "")
-      bind(event.sessionID, item, text, "attachment")
+      const scope = bind(event.sessionID, item, "", "attachment")
+      try {
+        await input.hooks.beforeExpansion(event.sessionID, item, "", event.messageID, () => allowed(item))
+        scope.text = await prepared(item, "")
+      } catch (error) {
+        scope.dispose()
+        scopes.get(event.sessionID)?.delete(item.installed.key + ":" + item.entry.id)
+        throw error
+      }
       event.prompt.skills = event.prompt.skills?.filter((skill) => skill.id !== attachment.id)
     }
   })
@@ -502,7 +543,7 @@ export async function registerPackageInvocations(
     event.request = new Request(event.request, { body: JSON.stringify(body) })
   })
   await context.session.hook("experimental.idle", (event) => {
-    clear(event.sessionID)
+    if (!input.hooks.continuesTask(event.sessionID)) clear(event.sessionID)
   })
   await context.tool.hook("execute.after", async (event) => {
     if (event.status !== "completed" || !["read", "edit", "write"].includes(event.tool) || !record(event.input)) return
@@ -534,7 +575,7 @@ export async function registerPackageInvocations(
       for (const [key, scope] of entries) {
         if (allowed(scope.item)) continue
         if (scope.via === "task") await context.session.interrupt({ sessionID: sessionID as ToolContext["sessionID"] })
-        scope.disposePolicy()
+        scope.dispose()
         entries.delete(key)
       }
   }
@@ -546,6 +587,7 @@ export async function registerPackageInvocations(
     transformAgents,
     dispose: async () => {
       disposed = true
+      releasePrompt()
       unwatchFile(membershipFile, changed)
       await revoke()
       for (const sessionID of scopes.keys()) clear(sessionID)

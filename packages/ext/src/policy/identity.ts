@@ -25,6 +25,7 @@
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
+import { resolve } from "node:path"
 import { governedMcpEvidence, type GovernedCloudMcp } from "../../../plugin/src/alpha-cloud-authority"
 import type { ToolAuthority, ToolIdentity, ToolLocation } from "../../../schema/src/tool-identity"
 import { registeredByMcpLayer } from "../../../schema/src/codepuppy-tool-policy"
@@ -48,13 +49,13 @@ export function packageToolRule(rule: ToolRule, facts: ToolFacts, bindings: Read
 }
 
 /** Source hooks and invocation rules consume this same verified identity/field authority. */
-export function packageToolCall(facts: ToolFacts, input: unknown, bindings: Readonly<Record<string, string>>, format: "claude" | "runtime") {
+export function packageToolCall(facts: ToolFacts, input: unknown, bindings: Readonly<Record<string, string>>, format: "claude" | "runtime", directory: string) {
   const name = facts.identity.source === "mcp"
     ? "mcp__" + (Object.entries(bindings).find(([key, value]) => key.startsWith("mcp::") && value === facts.identity.origin)?.[0].slice(5) ?? facts.identity.origin) + "__" + facts.identity.name
     : facts.identity.source === "builtin" ? Object.entries(aliases).find(([, value]) => value === facts.identity.name)?.[0] ?? facts.identity.name : facts.technicalId
   const fields: Readonly<Record<string, string>> = facts.identity.source === "builtin" && ["read", "write", "edit"].includes(facts.identity.name) ? { path: "file_path", oldString: "old_string", newString: "new_string", replaceAll: "replace_all" } : {}
   const mapping = format === "claude" ? fields : Object.fromEntries(Object.entries(fields).map(([runtime, source]) => [source, runtime]))
-  return { name, input: input && typeof input === "object" && !Array.isArray(input) ? Object.fromEntries(Object.entries(input).map(([key, value]) => [mapping[key] ?? key, value])) : input }
+  return { name, input: input && typeof input === "object" && !Array.isArray(input) ? Object.fromEntries(Object.entries(input).map(([key, value]) => [mapping[key] ?? key, format === "claude" && key === "path" && fields.path && typeof value === "string" ? resolve(directory, value) : value])) : input }
 }
 
 /** Registry entry as the promise plugin API lists it. */

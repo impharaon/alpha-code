@@ -372,7 +372,7 @@ status.
 | `PLAN-build-identity` | [specs/build-identity/plan.md](specs/build-identity/plan.md) | alpha-code#237 一段:账户浮层版本行可点复制一行构建身份,非正式发布包带标记 | active |
 | `SPEC-build-identity` | [specs/build-identity/spec.md](specs/build-identity/spec.md) | 报问题时能复制准确的构建身份，验收边界来自原始需求。 | approved |
 | `SPEC-byok-output-limits` | [specs/byok-output-limits/spec.md](specs/byok-output-limits/spec.md) | 自带密钥的模型按自己的实测上限输出，保留历史条款、有效裁决和交付证据边界。 | approved |
-| `DESIGN-child-process-write-fence` | [specs/child-process-write-fence/design.md](specs/child-process-write-fence/design.md) | 用户亲手打开的项目当场可写、不重启引擎:围栏只认私有扩展类且围栏内五种方式都签不出;用户打开动作登记「本机引擎 + 目录」并冻结,主进程签发只能由当前引擎进程消费的令牌;真源只收已登记目录;「只读」与「重新启动」退出常规路径 | approved |
+| `DESIGN-child-process-write-fence` | [specs/child-process-write-fence/design.md](specs/child-process-write-fence/design.md) | 保留已批准的运行期目录授权设计；v4 增补包管理器缓存、全局安装、本人批准文件夹与用户配置契约，复用同一围栏权威；Homebrew 嵌套围栏入口未成立，增量保持草案。 | draft |
 | `SPEC-child-process-write-fence` | [specs/child-process-write-fence/spec.md](specs/child-process-write-fence/spec.md) | 连接器与语言服务的子进程也受写入范围约束，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-engine-config-fence` | [specs/engine-config-fence/spec.md](specs/engine-config-fence/spec.md) | 被围栏的进程树写不进决定「运行什么程序、哪些工具不问就放行、凭据交给谁」的配置位置；引擎不采用引擎库里三类跨回合的放行记录；写者改在主进程；计划文件改存引擎数据目录。 | approved |
 | `SPEC-stored-credentials-fence` | [specs/stored-credentials-fence/spec.md](specs/stored-credentials-fence/spec.md) | 被围栏的进程树读不到、拷不走、挪不走、改不了 Code Puppy 存在本机的凭据文件；引擎只从主进程交来的内存表取值；改写配置把凭据引到别处由 SPEC-engine-config-fence 关闭。 | approved |

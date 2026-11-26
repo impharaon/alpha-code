@@ -809,7 +809,7 @@ type PackageManagerExecutionLease = {
 }
 // v4.4：在 Shell 源码运行前经私有描述符交给解释器的字节；Core 只透传，不解释
 type ShellPrivateInput = {
-  fd: number // 3–9（posix 方言只认一位数描述符）；由 main 的 H1 计划选定，前导读同一个号
+  fd: number // 3–9（posix 方言只认一位数描述符）；由 main 的 H1 计划选定，前导读同一个号；前导在原命令第一个词之前读空并关闭它，与各叶自身的重定向无关
   data: Uint8Array // 按 nodes 顺序每节点一行：64 个小写 hex + "\n"
 }
 function authorizePackageManagerExecution(
@@ -839,7 +839,7 @@ Promise 侧契约按现有 Plugin adapter 转 Effect。ext 调 H2，main 用 H1 
 
 main 将 lease 绑定当前 sidecar 代、真实 Tool.Context（callID=context.id）和 Shell/会话身份、已通过原 gate/permission.assert 的 source/cwd 快照及 main 自己的 H1 计划。完整调用身份由 ShellTool 内部上下文传给 core，不从模型 tool input/metadata 猜测。登记/绑定/取消只接受真实 sidecar 宿主连接；helper 的公开数据口、`permission.replied`、`approved:true` 或 ID 字符串都不能登记 lease。授权登记不接受 caller env；本代普通工具环境来自 main 已保存的 `createSidecarEnv` + v4 R1/R2 投影。
 
-**R1-F2：每个已批准 brew 节点只消费一次。** main 原子记录 pending → claimed（只交给一个 helper 进程身份）→ started → terminal；取消、身份失效或未到达节点可从未启动状态直接 terminal，不能再领能力；claim 后的能力只允许该节点的一次 spawn，不能换 invocationID 再领一次，也不因断连/错误恢复为 pending。不再有 caller 自定的无限实例 ID 或 expansion 槽。lease 容器随原 Shell/sidecar 生命期清理，尚未消费的节点不是可供其它叶任意构造执行材料的权限。**v4.4**：pending 节点由 main 持有其凭据；只有凭据定长比较一致且 peer 核验通过才原子 pending → claimed，同时抹去凭据；凭据或 peer 任一不符返回 `unauthorized`，节点**保持 pending**（乱发请求作废不了真实叶，32 字节随机值不可猜）；进入 terminal 时抹去未用凭据。未到达节点的凭据从未离开原 Shell 解释器，finish/cancel 时随节点 terminal 作废；同一节点再次到达时凭据已用，得 `node-consumed`。
+**R1-F2：每个已批准 brew 节点只消费一次。** main 原子记录 pending → claimed（只交给一个 helper 进程身份）→ started → terminal；取消、身份失效或未到达节点可从未启动状态直接 terminal，不能再领能力；claim 后的能力只允许该节点的一次 spawn，不能换 invocationID 再领一次，也不因断连/错误恢复为 pending。不再有 caller 自定的无限实例 ID 或 expansion 槽。lease 容器随原 Shell/sidecar 生命期清理，尚未消费的节点不是可供其它叶任意构造执行材料的权限。**v4.4**：pending 节点由 main 持有其凭据（32 字节）；`nodeProof` 必须恰为 64 个小写 hex 字符，否则不做比较、直接 `unauthorized`；解码后的 32 字节与节点簿所存值做常数时间比较（Node `crypto.timingSafeEqual`，两侧都是 32 字节缓冲，v4.4 R1-F2）。只有比较一致且 peer 核验通过才原子 pending → claimed，同时抹去凭据；凭据或 peer 任一不符返回 `unauthorized`，节点**保持 pending**（乱发请求作废不了真实叶，32 字节随机值不可猜）；进入 terminal 时抹去未用凭据。未到达节点的凭据从未离开原 Shell 解释器，finish/cancel 时随节点 terminal 作废；同一节点再次到达时凭据已用，得 `node-consumed`。
 
 「全部批准」走原 gate 后直接登记；「请求审批」原卡批准及 prepare 成功后才登记；deny、拒绝和只读档不能登记/启动。没有新卡、工具、档位名单、独立有效期、持久重放或新运行超时；原命令仍是同一个 Shell/Job。
 
@@ -871,7 +871,7 @@ type PackageManagerProcessFrame =
 ```ts
 type PackageManagerNodeClaim = {
   executionID: string; nodeID: string
-  nodeProof: string // v4.4：helper 从 --proof-fd 读出的 64 位小写 hex；不是 bearer，不进 argv/env/日志
+  nodeProof: string // v4.4：helper 从 --proof-fd 读出的 64 个小写 hex 字符（32 字节）；不是 bearer，不进 argv/env/日志
 }
 type PackageManagerNodeGrant =
   | { kind: "delegated"; brokerPort: number; authorization: string }
@@ -893,8 +893,8 @@ main 核对 peer 为受保护的随包 helper、生产签名/代码完整性且�
 
 1. **签发**：H2 登记时 main 为每个节点用 CSPRNG 生成 32 字节凭据，只存节点簿，随 lease 的 `shellPrivateInput` 交 ext → Core（H2 v4.4）。
 2. **进入 R**：Core 在原 spawn 上以私有描述符交给 R，写完即结束写端；`executionSource` 的前导在原命令第一个词之前、于 R 内只用内建命令把全部凭据读进**不导出**的 shell 变量并关闭该描述符。前导在 allexport 下也不导出它们，不向用户标准流输出任何内容（含 xtrace）。此后启动的任何外部程序叶都拿不到该描述符，管道也已读空。
-3. **交给到达的叶**：每个 helper 叶的改写构造只在该叶实际执行时，由 R 的 shell 映像子进程先关 xtrace、再用内建 `printf` 把本节点凭据写进一条匿名管道，作为 helper 的 `--proof-fd` 描述符；helper 的原标准输入经保存的描述符还原，构造的退出状态即 helper 的退出状态。凭据不进任何 argv、环境、源码文本、here-doc/here-string 或临时文件。构造只用 posix 语法（管道、`{ }` 组、一位数描述符复制），bash/zsh/posix 三种方言共用；用到的两个描述符号由 main 避开该叶自身的显式重定向。brew 由 H3 在 main 下 spawn，本来就不继承 helper 的 3 号以上描述符，这些叶上的用户重定向语义不变。
-4. **helper 与 main**：helper 启动后先读 `--proof-fd` 并关闭它，再发 claim；走 fenced 分支 exec 原叶前不保留凭据。main 在既有 peer 核验之外对 `nodeProof` 做定长比较，两者都通过才 claimed（状态语义见 H2 R1-F2 v4.4）。
+3. **交给到达的叶**：每个 helper 叶的改写构造只在该叶实际执行时，由 R 的 shell 映像子进程先关 xtrace、再用内建 `printf` 把本节点凭据写进一条匿名管道，作为 helper 的 `--proof-fd` 描述符；helper 的原标准输入经保存的描述符还原，构造的退出状态即 helper 的退出状态。凭据不进任何 argv、环境、源码文本、here-doc/here-string 或临时文件。构造只用 posix 语法（管道、`{ }` 组、`if`、一位数描述符复制），bash/zsh/posix 三种方言共用。**重定向次序（v4.4 R1-F1 修订，取代「避开该叶自身的显式重定向」）**：该叶自身的全部显式重定向按原文、原顺序移到包住交付构造的外层组上，先于构造内任何内部绑定、在原上下文中求值。因此它们的副作用（建文件、截断）、失败（该叶不执行，退出码同原 shell 对同一重定向失败的处理）和对用户已有描述符的引用（如 `2>&9`）都与原叶一致。构造内部的两个描述符号是固定常数（凭据 9，暂存标准输入 8），在外层重定向之后才绑定，遮住用户在这两个号上留下的绑定或关闭；遮住只对内建 `printf` 与 helper 生效，helper 读完凭据即关闭 9，8 在 exec helper 前关闭。brew 由 H3 在 main 下 spawn，不继承 helper 的 3 号以上描述符，被遮住的绑定对 brew 不可观察。所以不做避让、不扩大号段，ShellScan 接受的任何重定向组合（含 `3>&- … 9>&-` 全部关闭）都保留分流。标准输入已关闭时（叶上的 `<&-` 或外围已关闭），构造先用普通内建 `true` 探测 0 号能否复制（不用特殊内建 `:`，它的重定向失败会让非交互 shell 退出），不能复制就让 helper 以关闭的 0 号运行、向 brew 交 EOF；构造本身不失败、不输出。
+4. **helper 与 main**：helper 启动后先读 `--proof-fd` 并关闭它，再发 claim；走 fenced 分支 exec 原叶前不保留凭据。main 先校验 `nodeProof` 恰为 64 个小写 hex 字符（否则 `unauthorized`，不比较），再把解码后的 32 字节与节点簿值做常数时间比较（`crypto.timingSafeEqual`），并做既有 peer 核验，全部通过才 claimed（状态语义见 H2 R1-F2 v4.4）。
 
 **拒绝时用户看到什么**：claim 被拒（`unauthorized` / `node-consumed` / `inactive-execution`）时 0 次 brew spawn；helper 向 stderr 写一行带该稳定错误码的原因并以 126 退出，外层 shell 按此状态继续 `&&/||`/pipeline。仍是同一张命令卡、原审批、原输出与原取消；不回退到围栏内再执行一次（避免已被领取的节点重复执行），不新增卡片、按钮、确认或重试。实际到达的叶在正常路径上没有任何可见差异。
 
@@ -916,7 +916,7 @@ main 按真实 ChildProcess/进程组绑定 lease，shell.remove、工具 abort�
 | 主进程环境 | `createSidecarEnv` / `sidecarEgressProxyEnv`（V5-P06）及 v4 R1/R2；H3 新增本代快照与源码赋值投影、固定剥离键 | main 是唯一值来源，helper 不供 env/cwd/argv |
 | 既有控制往返 | `createHubBridge`（`ext/src/hub-bridge.ts:80`）、`createCodePuppySidecarHost`（`hub-view.ts:501`）、`server.ts:779-802`；H2 新增对应 request/reply | 原宿主连接，公开数据口不登记 lease |
 | 仅叶能力交付 | H4 新增 `claimPackageManagerNode`、NativeHelperPeer 的内核 audit/映像签名核对和私有 Mach 交付；原生 audit token 先例（V5-P08）不是现成实现 | ui-mac native/main/helper；不把能力交给整个 Shell/任何非 brew 子进程 |
-| 叶执行凭据（v4.4） | 私有描述符用既有 effect `ChildProcess.make` 的 `additionalFds` input 流（`ChildProcess.ts:612`；`util/src/cross-spawn-spawner.ts:205-212,250-262,294-297`），落在 Shell.create 原 spawn（`core/src/shell.ts:309-317`）；新增 `PreparedShellDelegate.privateInput` 透传、main 节点簿凭据签发与定长比较、H1 前导与叶交付构造、helper `--proof-fd` 读取 | main 唯一签发与比较方；Core 只透传字节、不解释不记录；ext 不持久 |
+| 叶执行凭据（v4.4） | 私有描述符用既有 effect `ChildProcess.make` 的 `additionalFds` input 流（`ChildProcess.ts:612`；`util/src/cross-spawn-spawner.ts:205-212,250-262,294-297`），落在 Shell.create 原 spawn（`core/src/shell.ts:309-317`）；新增 `PreparedShellDelegate.privateInput` 透传、main 节点簿凭据签发与常数时间比较（Node `crypto.timingSafeEqual`）、H1 前导与叶交付构造、helper `--proof-fd` 读取 | main 唯一签发与比较方；Core 只透传字节、不解释不记录；ext 不持久 |
 | 一次节点/流式运行 | H3/H4 新增 main 节点状态机/HTTP 精确路由，当前 `network-egress-proxy.ts:242` 只有 405；随包 helper 同链打包签名 | 不再有任意 invocationID；每节点至多一次，不重放 |
 | 原结果/取消/退出 | `Shell.create`（`core/src/shell.ts:333-434`）、ShellResult.output、ShellTool interrupt → shell.remove（`:211-224`）、`index.ts:715-726`；H4 新增跨边界取消/正常退出清理 | 原 Shell/Job，main 持有句柄；崩溃残留如 §5 |
 
@@ -936,7 +936,7 @@ main 按真实 ChildProcess/进程组绑定 lease，shell.remove、工具 abort�
 
 R1 的反向材料必须进入同一真实入口证明：改写/删除 launcher、重指 Intel 软链和替换 repository/Library 失败，同时普通 npm bin 安装仍成功；PATH 影子 brew、项目 clone 和不合格形态都实际在围栏内运行。`brew install jq && npm install` 的非 brew 叶及 postinstall 获得 0 能力；同 node 换任意 ID/重复请求仍只有一次 spawn，额外 env/cwd/argv/展开材料改变不了 main 计划。BASH_ENV/ENV/函数导出/选项/PS4 不进入 brew；可追溯 PATH/代理赋值与确定 cd 正确。仅对 helper 的 native 交付、签名/进程身份、防注入与 pidversion 绑定不能用 caller PID 字符串或共享 env 替代。其实现均尚未实跑，属于明确的 H1–H4 raise/实施证明义务。
 
-**v4.4 证明义务**（同一真实入口；具体语料、文件与顺序归 plan.md）：① r8 反例转绿：同一 `/usr/bin/python3 …/nonbrew.py && false && brew --prefix` 在真实围栏、Mach audit peer 与严格签名 helper 下，普通叶 re-exec helper 的 claim 得 `unauthorized`、0 次 main spawn，外层 exit 1，结束后该节点 terminal；已知坏对照（凭据改走 helper argv，或 main 跳过凭据比较）必须重新得到 grant。② 真实 brew 叶照常：`cd p && brew install jq` 与含 `&&/||` 的复合命令（如 `false || brew install jq && echo ok`、`brew install jq && npm install`）经原卡/全部批准档完成，输出与退出同原结果机制；H1 前置词形态（如 zsh `exec brew …`）的退出与后续语义不变；非 brew 叶与 postinstall 0 凭据。③ 并发兄弟与后台作业扫描全部同用户进程 argv/env 及自身 3–9 号描述符，看不到任何凭据；helper 与 brew 无多余描述符；R 的私有描述符在原命令第一个词之前已关闭。④ allexport、xtrace 打开时环境与输出都没有凭据；bash、zsh 与 posix 方言各跑一遍。⑤ 解释器内残留（`set | 普通叶`、启动文件抢读描述符）按残留留档，不计为通过；启动文件抢读时真实 brew 叶必须可见失败（126 + 错误码），不得放行。
+**v4.4 证明义务**（同一真实入口；具体语料、文件与顺序归 plan.md）：① r8 反例转绿：同一 `/usr/bin/python3 …/nonbrew.py && false && brew --prefix` 在真实围栏、Mach audit peer 与严格签名 helper 下，普通叶 re-exec helper 的 claim 得 `unauthorized`、0 次 main spawn，外层 exit 1，结束后该节点 terminal；已知坏对照（凭据改走 helper argv，或 main 跳过凭据比较）必须重新得到 grant。② 真实 brew 叶照常：`cd p && brew install jq` 与含 `&&/||` 的复合命令（如 `false || brew install jq && echo ok`、`brew install jq && npm install`）经原卡/全部批准档完成，输出与退出同原结果机制；H1 前置词形态（如 zsh `exec brew …`）的退出与后续语义不变；非 brew 叶与 postinstall 0 凭据。③ 并发兄弟与后台作业扫描全部同用户进程 argv/env 及自身 3–9 号描述符，看不到任何凭据；helper 与 brew 无多余描述符；R 的私有描述符在原命令第一个词之前已关闭。④ allexport、xtrace 打开时环境与输出都没有凭据；bash、zsh 与 posix 方言各跑一遍。⑤ 解释器内残留（`set | 普通叶`、启动文件抢读描述符）按残留留档，不计为通过；启动文件抢读时真实 brew 叶必须可见失败（126 + 错误码），不得放行。⑥ 重定向次序（R1-F1）：`brew --prefix 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&-` 在 bash、zsh 与 posix 方言都保留分流并正常完成；`exec 9>log; brew … 2>&9` 的 stderr 落进用户的 log；`brew … 9>out` 照常建出 out；`brew … <in`、pipeline 输入、叶上 `<&-` 与外围 `<&-` 分别得到文件内容、管道内容、EOF、EOF，构造不报错；`brew … <missing` 0 次 claim，退出码同原 shell 对该失败重定向的处理，节点在结束时 terminal。已知坏对照：把内部绑定移回用户重定向之前，第一条必须拿不到凭据。⑦ 比较（R1-F2）：格式不符的 `nodeProof` 不进入比较即 `unauthorized`；错误凭据之后节点仍 pending，真实叶随后照常 claim；比较实现为 `crypto.timingSafeEqual` 于两段 32 字节缓冲，由代码审查核对（计时测试不作为证据）。
 
 复合/路径限定、pipeline/重定向、stdout/stderr/exit/signal、后台与大输出继续沿原结果机制；正常取消、超时、sidecar 断开/应用退出结束在途进程，force-quit 残留如 §5。具体语料/文件/顺序留 plan.md，不因证明义务添加新用户步骤。
 
@@ -976,11 +976,11 @@ R1 的反向材料必须进入同一真实入口证明：改写/删除 launcher�
 
 ### v4.4 增量｜Homebrew 节点只能由实际执行到的语法叶领取（#1759 r8 接缝）
 
-**状态：frozen；rounds=0，未运行独立审查，不冒称审查通过。** 输入：SPEC v6 BR-09/AC-11，设计基线 `origin/alpha@b0a9d0298d`，实施 lane `df6bc7a271` 的 plan.md:690「SEAM-CHANGE-NEEDED: H4 `claimPackageManagerNode` 的逐节点执行来源」。只改 v5 的 H1 末段、H2 契约及其 v4.4 段与 R1-F2 段、H4 的 claim 契约与能力交付段、§4.5 一行、§6 一段；v4/v5 其它决定、R1 处置与 v4.1–v4.3 不变。frontmatter 的 `review` 收据保持原样，只在 summary 加注本增量。H2/H4 是安全绑定，是否做限定范围审查（仅 v4.4 改动及直接后果）由编排者按 delivery-review 决定。
+**状态：frozen。** 送审稿 `a30fb8b79d` 经 R1 独立审查（见下方「R1 处置」），两项按处置修正；不声称修订稿又获复审。输入：SPEC v6 BR-09/AC-11，设计基线 `origin/alpha@b0a9d0298d`，实施 lane `df6bc7a271` 的 plan.md:690「SEAM-CHANGE-NEEDED: H4 `claimPackageManagerNode` 的逐节点执行来源」。只改 v5 的 H1 末段、H2 契约及其 v4.4 段与 R1-F2 段、H4 的 claim 契约与能力交付段、§4.5 一行、§6 一段；v4/v5 其它决定、R1 处置与 v4.1–v4.3 不变。frontmatter 的 `review` 收据保持原样（仍为 v4.2 的），只在 summary 加注本增量；v4.4 的审查收据在本节。
 
 | 裁决 | 依据 | 落点 / 残留 |
 | --- | --- | --- |
-| claim 另须出示 main 签发的每节点一次凭据：Core 私有描述符 → R 的前导读进不导出变量并关闭 → 只在该叶执行时经匿名管道交给 helper；main 定长比较，与既有 peer 核验同时成立才 claimed | 测（实施 lane，本机、未入库）：lane 工作树 `packages/ui-mac/node_modules/.cache/package-manager-scenario-vf8vnnjs/r8/h4/` 中，`result.json` 两行 peer 都满足冻结 H4 全部谓词且 `granted: true`，其中 `nonbrew-reexec-before-false` 行 `rootExitCode: 1`（节点未到达）；`inspection.json` 的不变式检查 exit 1；`scanner.json` 显示原 scanner 对该命令返回 scanned；`nonbrew.py` 只读自身父进程 `KERN_PROCARGS2` 后 exec 同一 helper；签名为 ad hoc 严格 hardened，非生产 Team 证书（digest 见 inspection.json） | H1 末段、H2、H4、§4.5、§6；残留见 H4「威胁边界」 |
+| claim 另须出示 main 签发的每节点一次凭据：Core 私有描述符 → R 的前导读进不导出变量并关闭 → 只在该叶执行时经匿名管道交给 helper；main 校验格式并做常数时间比较，与既有 peer 核验同时成立才 claimed | 测（实施 lane，本机、未入库）：lane 工作树 `packages/ui-mac/node_modules/.cache/package-manager-scenario-vf8vnnjs/r8/h4/` 中，`result.json` 两行 peer 都满足冻结 H4 全部谓词且 `granted: true`，其中 `nonbrew-reexec-before-false` 行 `rootExitCode: 1`（节点未到达）；`inspection.json` 的不变式检查 exit 1；`scanner.json` 显示原 scanner 对该命令返回 scanned；`nonbrew.py` 只读自身父进程 `KERN_PROCARGS2` 后 exec 同一 helper；签名为 ad hoc 严格 hardened，非生产 Team 证书（digest 见 inspection.json） | H1 末段、H2、H4、§4.5、§6；残留见 H4「威胁边界」 |
 | 交付通道取私有描述符加匿名管道，不取 argv 或环境 | 测（本轮 designer，本机 `/tmp/fence1759-v44-probe/`，未入库、不是产品证据；在围栏外跑，同用户可见性是围栏内的上界，lane 已证真实 profile 下 `KERN_PROCARGS2` 可读）。`/bin/bash`(3.2)、`/bin/zsh`、`/bin/sh`、`/bin/dash`、`/bin/ksh` 各 5 个正臂：未到达节点 0 凭据外泄、helper 不运行；`cd /tmp && echo yes \| <叶>` 收到本节点凭据且 stdin 为 yes；并发兄弟扫描全部进程 argv/env 与 3–9 号描述符 0 凭据，`\|\|` 分支节点收到自己的凭据；退出码 3 透传；allexport+xtrace 下环境与 stderr 0 凭据。两个 RED 臂（argv、前缀环境交付）被并发兄弟读到凭据（`result.jsonl` sha256 `f6255b81e5e2…`）。残留臂：启动期代码读空描述符拿到全部凭据、真实叶得空凭据（`residual.jsonl` `26498dd7a0ad…`）；`set \| 普通叶` 读到未到达节点凭据（`residual-set.jsonl` `e8669febc4c4…`）。首轮 harness 把凭据误放进 attacker argv、且 fd 被 `pass_fds` 关闭，结果作废后修正；初版 set 臂 attacker 未读 stdin，属假阴性，已重跑 | 残留上界：本条已批准命令中 main 已规划的 brew 节点，各至多一次 |
 | 拒绝 = 0 spawn、stderr 稳定错误码、退出 126、同一张卡；不回退到围栏内重跑 | 本设计 v5 §1「沿用普通命令卡、原审批、输出和取消，无新页面、按钮、批准卡或用户步骤」；CLAUDE.md 原则 1 | 不新增步骤、确认或限制 |
 | 不收窄子命令、不因解释器级代码取消分流 | U-38；U-41（I-47 rejected，owner「我倾向不收窄」） | 解释器内代码残留如实写入 H4，不转成限制 |
@@ -990,6 +990,15 @@ R1 的反向材料必须进入同一真实入口证明：改写/删除 launcher�
 **传播核对**：`rg -n 'PackageManagerNodeClaim|PreparedShellDelegate|claimPackageManagerNode|PackageManagerExecutionLease|ShellPrivateInput' docs --glob '*.md' -c` 改前改后都只命中本设计（基线 8 行、本增量后 15 行）；`packages` 下 0 命中（exit 1），H2/H4 尚无实现。lane plan.md 切片五引用的是旧 claim 形状，由编排者把本增量交给 lane 更新。
 
 **仍属推断或未验证**：生产 Team 签名 helper、真实 Mach/HTTP/brew 全链与本交付构造的组合尚未实跑；前导和叶交付构造的确切 shell 文本由实施确定，按 §6 v4.4 证明；附加调试器读取 R 内存的可能性未验证；here-doc 临时文件窗口为推断。没有 owner 待决项。
+
+#### v4.4 R1 处置（审查 `a30fb8b79d` 的 v4.4 改动）
+
+审查方 Codex GPT-6.1（只读），第 1/1 轮，结论 FIX-THEN-MERGE；编排者裁决两项均修正，其余审查内容照原样接受。只改 H4 第 3、4 步、H2 的 R1-F2 v4.4 句与 `ShellPrivateInput.fd` 注释、claim 类型注释、§4.5 一行、§6 ⑥⑦ 和本节第一行；不重开其它 v4.4 决定。
+
+| finding / 处置 | 修订决定及原因 | 核对 / 尚待实施证明 |
+| --- | --- | --- |
+| R1-F1 Major（:896，另见 :812），accepted / corrected | 原规则要求两个内部描述符避开该叶全部显式重定向，号段又只有 3–9：`brew --prefix 3>&- … 9>&-` 能被 ShellScan 接受却无号可用，合法节点会退回已知的 Homebrew 失败（AC-11）。改为：叶自身重定向按原文、原顺序移到外层组，先在原上下文求值；内部固定用 9（凭据）与 8（暂存标准输入），之后才绑定并遮住同号，helper 读后关闭 9、exec 前关闭 8；brew 不继承 helper 的 3 号以上描述符，故遮住不可观察。不扩大号段：测 `echo hi 12>/dev/null`，bash 与 `/bin/sh`（bash 3.2 posix 模式）输出 hi（按 12 号重定向），zsh、dash、ksh 输出为空（12 被当成参数、标准输出被重定向），扩号只对 bash 有效，规则会分方言；按次序求值对所有方言成立。`ShellPrivateInput.fd` 由前导在第一个词之前读空关闭，不受叶重定向影响，只加注释 | 测（designer，本机 `/tmp/fence1759-v44-probe/r1/`，未入库、不是产品证据）：`/bin/bash`、`/bin/zsh`、`/bin/sh`、`/bin/dash`、`/bin/ksh` 各 8 臂共 40/40 通过（`result-r1.jsonl` sha256 `35838ea17a30…`）：全部关闭 3–9 仍拿到凭据且退出 0；`exec 9>log` 后 `2>&9` 写进用户 log；`9>out` 建出文件；`<in`、pipeline 输入、叶上和外围 `<&-` 分别得到文件内容、管道内容、关闭的 0 号；`<missing` 时 helper 不运行。另测五个 shell 中简单命令与 `{ }` 组遇同一失败重定向的退出码一致（bash/zsh/sh/ksh 1，dash 2）。首轮用特殊内建 `:` 探测 0 号，sh/dash/ksh 在 0 号关闭时整个 shell 退出（5 臂失败），改用普通内建 `true` 后重跑通过；首轮输出已被重跑覆盖，不作证据。真实入口按 §6 ⑥ |
+| R1-F2 Minor（:842、:897），accepted / corrected | 「定长比较」不等于常数时间；节点保持 pending 时普通叶可反复启动签名 helper 发等长猜测，契约没有排除计时侧信道。改为：先校验 `nodeProof` 恰为 64 个小写 hex 字符（否则不比较、`unauthorized`），再对解码后的两段 32 字节做 `crypto.timingSafeEqual`；错误凭据仍不改变 pending | §6 ⑦；常数时间由实现与代码审查核对，不以计时测试作证据 |
 
 
 # v4.1 增量｜Cargo 使用真实 Home 的缓存与锁（SPEC v6）

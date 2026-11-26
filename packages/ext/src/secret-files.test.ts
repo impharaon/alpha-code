@@ -213,3 +213,23 @@ const target=roots.pathVariables.GOOGLE_APPLICATION_CREDENTIALS;const document=J
 console.log(JSON.stringify({fresh:files.values().some(v=>Buffer.from(v).toString()==='fixture-after-refresh')}));files.dispose();
 `)).toEqual({ fresh: true })
 })
+
+test("encrypted stores retain only the latest bytes at each path", async () => {
+  const { roots, files } = await setup()
+  const keychain = path.join(roots.home, "Library", "Keychains", "login.keychain-db")
+  await mkdir(path.dirname(keychain), { recursive: true })
+  await writeFile(keychain, "fixture-encrypted-before")
+  await writeFile(path.join(roots.project, ".env"), await env("fixture-env-before"))
+  await files.refresh()
+  const previous = files.values().find((value) => Buffer.from(value).toString() === "fixture-encrypted-before")!
+  await writeFile(keychain, "fixture-encrypted-after")
+  await writeFile(path.join(roots.project, ".env"), await env("fixture-env-after"))
+  await files.refresh()
+  expect(contains(files, "fixture-encrypted-before")).toBe(false)
+  expect(contains(files, "fixture-encrypted-after")).toBe(true)
+  expect(contains(files, "fixture-env-before") && contains(files, "fixture-env-after")).toBe(true)
+  expect(previous.every((byte) => byte === 0)).toBe(true)
+  const snapshot = files.values()
+  await files.refresh()
+  expect(files.values()).toBe(snapshot)
+})

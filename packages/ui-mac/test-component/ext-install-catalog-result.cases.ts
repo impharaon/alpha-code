@@ -733,3 +733,23 @@ for(const kind of ["catalog","candidate"] as const)test("R14 B8 submitted "+kind
   fetchSpy.mockRestore()
  }
 })
+
+
+test("an explicit package off immediately after content completion cancels its queued default activation", async () => {
+ const {captureFixture}=await import("../test-fixtures/plugin-helper/fixture")
+ const {fixtureFetch}=await import("../test-fixtures/plugin-helper/source-fetch")
+ const {readPackageLedgerStateV1}=await import("../src/main/ext-receipt-v2")
+ const fetchSpy=spyOn(globalThis,"fetch").mockImplementation(fixtureFetch)
+ try {
+  const prepared=await pluginSources.prepareCapture(await captureFixture("external_plugins/context7"))
+  if(prepared.kind!=="package")throw Error("expected real package")
+  const result=await handlers.get("ext-install-from-source")!({sender:{id:1}},{requestId:"off_before_default_activation",source:{kind:"candidate",candidateId:prepared.candidateId},effect:{kind:"all-projects"},via:"hub"}) as import("../src/shared/plugin-install").InstallOutcomeV1
+  if(!result.ok)throw Error(result.detail)
+  expect(await handlers.get("ext-set-package-state")!({sender:{id:1}},{packageId:result.packageId,state:"disabled"})).toMatchObject({ok:true})
+  await new Promise<void>(resolve=>setImmediate(resolve))
+  const state=readPackageLedgerStateV1(codepuppyGlobalRoot())
+  if(!state.ok)throw Error(state.reason)
+  const graph=state.packageGraphs.find(graph=>graph.packageId===result.packageId)!
+  expect([graph.root,...graph.children].map(node=>state.records.find(record=>record.kind===node.kind&&record.name===node.name)!.desiredState)).toEqual(["disabled","disabled"])
+ } finally {fetchSpy.mockRestore()}
+})

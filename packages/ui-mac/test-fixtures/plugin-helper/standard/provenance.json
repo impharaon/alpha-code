@@ -1,7 +1,7 @@
 {
   "archive": {
     "path": "selection.tar.gz",
-    "sha256": "b1eedcca1cfeef65dcaa0adcd421ff6ce36f61a417ed4a175bd94322ec84ef48"
+    "sha256": "e586191eb843ed2c1c90a309ea863d413bb9b1b9c7316c932f9fd51c03b47c3b"
   },
   "samples": [
     {
@@ -899,6 +899,13 @@
           "mode": 420,
           "bytes": 9738,
           "sha256": "a0058960f0441ba8c551ceb7e092c5bd985e52353f986dabaf6dfe91950915aa"
+        },
+        {
+          "path": ".claude-plugin/marketplace.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 261,
+          "sha256": "15c84313a1a2bfec9455186278ab101be7e8d2c4822b08d4c9c93a476603ed6a"
         }
       ]
     },

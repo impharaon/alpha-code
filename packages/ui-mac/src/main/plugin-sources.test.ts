@@ -11,7 +11,7 @@ import { gunzipSync, gzipSync } from "node:zlib"
 import { join } from "node:path"
 import catalog from "../renderer/extensions/codepuppy-catalog.json"
 import codex from "../../test-fixtures/plugin-helper/codex/provenance.json"
-import { fixtureCommit, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
+import { captureStandardFixture, fixtureCommit, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
 
 const sourcesModule = () => import("./plugin-sources")
 const marketplace = () => Bun.file(join(fixtureRoot, ".claude-plugin/marketplace.json")).text()
@@ -808,4 +808,16 @@ test("§4.7 转发入口回 429(GitHub 限流转发机)⇒ 不等 Retry-After,�
   } finally {
     jest.useRealTimers()
   }
+})
+
+
+test("a plugin root with its own marketplace remains a plugin candidate", async () => {
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [] })
+  const capture = await captureStandardFixture("claude:codspeed")
+  expect(capture.nodes.some(node => node.path.endsWith("marketplace.json"))).toBe(true)
+  const prepared = await sources.prepareCapture({ ...capture, source: { ...capture.source, kind: "folder" } })
+  expect(prepared.kind).toBe("package")
+  if (prepared.kind !== "package") throw Error("Real plugin root was mistaken for a market")
+  const converted = await sources.convertCandidate(prepared.candidateId)
+  expect(converted.ok && converted.package.entries.some(entry => entry.kind === "mcp" && entry.sourceName === "CodSpeed")).toBe(true)
 })

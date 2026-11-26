@@ -908,4 +908,3 @@ export async function documentContainerKind(bytes: Uint8Array) {
     await reader.close()
   }
 }
-

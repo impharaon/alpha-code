@@ -463,6 +463,7 @@ docs/design/current/composer/design.html	alpha-code alpha-ask alpha-readonly	1	h
 docs/design/current/conversation-timeline/components.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/conversation-timeline/design.css	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/conversation-timeline/design.html	alpha-code	8	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
+docs/design/current/conversation-timeline/design.html	alpha-code	2	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 docs/design/current/conversation-timeline/design.html	alpha-code :alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/customization-center/components.md	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 docs/design/current/customization-center/design.html	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
@@ -1145,6 +1146,7 @@ scripts/gate-files.tsv	cloud_cloud_vision	1	historical	#1568 已改掉的旧模�
 scripts/gate-files.tsv	alpha-web	2	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/gate-files.tsv	alpha-code	6	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/gate-files.tsv	alpha-platform alpha-bundled	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
+scripts/gate-files.tsv	alpha-web	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	alpha-bundled	2	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/gate-files.tsv	/code-puppy	1	user-content	用户默认工作目录 ~/code-puppy:owner 现有工作区与绑定它的会话(派发书判断点 1)
 scripts/gate-files.tsv	alpha-word_read_docx	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
@@ -1243,4 +1245,3 @@ docs/architecture/modules.md	https://github.com/impharaon/alpha-code/tree/767de0
 docs/architecture/modules.md	https://github.com/impharaon/alpha-code/tree/450e7b92412c780a7b5a75226bb8d49aaca24e22/github	1	external-anchor	#1775 r11: fixed historical Git link to the removed upstream module; the repository identity is an external source anchor.
 docs/architecture/modules.md	https://github.com/impharaon/alpha-code/tree/77264eb66ea85bc34cd0dae1f916b59cd0a5bb44/perf	1	external-anchor	#1775 r11: fixed historical Git link to the removed upstream module; the repository identity is an external source anchor.
 packages/ui-mac/src/shared/project-hidden-dir.ts	.code-puppy	1	migration-source	#1775 r11: existing legacy project directory identity moved to the shared authority; main migration and read-only identity consume the same constant.
-packages/ui-mac/src/engine-adapter/fixtures/events.json	/Users/pharaon/app/wt/alpha-code-feat-1775-video-desktop/packages/cli	21	user-content	#1775 r11: unmodified real engine sampler event path; recorded source identity is fixture data, not product branding.

@@ -571,7 +571,7 @@
       "codeSha256": {
         "video-mcp/server.js": "9f019e3da938fc9a9fcdde925b9585dd2b5508da0dbe5f77cb0d99892586fe90",
         "video-mcp/speech-worker.js": "26473728b39b2eefe761559460e6cf3fd942a03113a7455302709dde9153e86e",
-        "video-mcp/runtime.json": "028efdb7e3fc279b21b83b62c656533fbac01b0e743d74d35707df619ac50dd1",
+        "video-mcp/runtime.json": "f90ec0dd214810f4c976e59012202a1ea51055a1e1c0dcb76e50924ed5b3a78b",
         "video-mcp/build.lock.json": "e3c679d089219386640c1c7adbc517b8a3b934ab4d52639ce8f796f933bcbf61",
         "video-mcp/helpers/vision": "79cc60fd94abeb3cc8750bb84472667cbfd548b03561570bac1d2ab9bb86c1dc",
         "video-mcp/licenses.json": "56239280d9929cda4946bde0edd36426794859c22c5aa8778f2e5dfb24a8aaea",
@@ -595,7 +595,7 @@
         "video-mcp/licenses/whisper-cpp.txt": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
         "video-mcp/licenses/whisper-node.txt": "dcf058ad1c7a2eac57e41d3d45baae7b10eb3da71b9fa4c7f899b99e56fe3a7e",
         "video-mcp/licenses/ytdlp-LICENSE": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c",
-        "video-mcp/node_modules/@fugood/node-whisper-darwin-arm64/index.node": "986b94b99d4f0fba5158944da90fe8aa617df4cf4d3e5a88e4d66ae4ad4cda4e",
+        "video-mcp/node_modules/@fugood/node-whisper-darwin-arm64/index.node": "e6c2a981c1327525d51de301d5a9593d0d57d953bb8a1a274d8cdbd153a2d00e",
         "video-mcp/node_modules/@fugood/node-whisper-darwin-arm64/package.json": "d3d9e36d2c014c58e3abe5936551508dac9994be56844dbcccf3719f560d56cd",
         "video-mcp/node_modules/@fugood/whisper.node/lib/binding.js": "0132443efbc54234273960667c24fe06e02b23bac289a75f755d05d9b399d325",
         "video-mcp/node_modules/@fugood/whisper.node/lib/binding.ts": "8f17179acb435f75e1db32a82f6ad98dd16cca050910db01911bac40a91a0cb7",

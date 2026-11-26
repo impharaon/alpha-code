@@ -824,3 +824,46 @@ all bun (packages/codepuppy-contracts-consumer) tests: bun.lock changed (manifes
 登记表三方逐 key 比较只有 core MCP runtime 被双方同时修改（共同基线 24，双方各 25）；实际合并用例为 26（trusted-Python 与 video progress 各新增一条），slot 真实测量通过后只同步其 count=26。collision 3→4 是 origin 单边改动，保留 4，并在同一相关运行中实际通过。双方其它登记/理由保留。旧名登记中的实际采样命中在最终 sampler 完成后按同一 hitTokens 核对，不保留失效的采样路径。
 
 bun.lock 改变，bun install --frozen-lockfile exit 0（5 packages installed），husky 后已恢复并核对 .githooks。初次相关运行 ext / packaging / core 均 exit 0，逐文件实际 JUnit 与类型检查日志在 /tmp/alpha-1761-r15。采样器拒绝未提交的引擎闭包，所以先提交已解决的合并树，再在此真实提交上运行 sampler，生成结果另一次提交；中间保留有来源的原 JSON 仅为采样前置，绝不视为最终一致性证据。
+
+
+r15 生成后的两项具体红因：第一次从仓库根运行视频 bundler，产物注释以 packages/ui-mac/... 开头，与既有 snapshot 在包目录运行时的 resources/... 注释不同，导致源声明摘要红；改从规定包目录运行同一 builder+generator，不改摘要断言或 native 校验。旧名表不能按 key 全局去重（它允许同 key 的多行累计），首轮误去重导致已有 doc/registry 命中少登记；从三方原文重做合并，保留非冲突累计行，fixture 行才按真实新采样逐 key 同步。两项消费者断言原样保留后单独复验。初次生成后的其它 fixture 消费者均通过，最终只重跑这两份失败文件。
+
+直接检查同步：git diff origin/alpha --check 点名 r14 新移入的 shared/ooxml.ts:911 有多余 EOF 空行，仅删除这一空行（额外文件的唯一理由），未改解析或权限行为；不改 origin 视频许可证或其它上游空白。
+
+
+r15 旧名表最终合形核对：恢复原累计行后，两边同时新增的两条完全相同 Pillow API 行重复，原守卫要求 (文件,词元,类别) 唯一；只移除这两条重复副本，保留不同类别的累计登记。前一轮 Office snapshot 已 2 PASS，后续只单跑 old-name，未放宽合形断言。
+
+
+r15 已完成证据（本轮未运行全层/全套）：
+
+| 冲突模块/消费者 | 最终已测证据 | 解决方式 |
+| --- | --- | --- |
+| core/mcp/index.ts | codepuppy-mcp-runtime 26、collision 4 PASS | Python 环境 + 视频 progress 两路保留；26 只测一次 |
+| ext cloud-vision-hooks.ts / cloud-vision.test.ts | cloud-vision 26 PASS | 文档页回执与 frame/OCR/按需视觉同一权威；两侧断言保留 |
+| ext plugin.ts | plugin-host 56、document-render 9、video-understanding 2 PASS | 文档生命周期、共享 Python、视频 transforms 一并接线 |
+| context-injection inventory | context-injection 44 PASS | 原生成器 107 fragments / 31743 bytes / 170496 limits |
+| electron-builder.config.ts / mac-target-arch.test.ts | mac-target-arch 40、document-resources 14、video-assets fast 2 + integration 6、video-runtime-artifacts 3 PASS | extraResources 与准备/装包后检查语义组合，保留视频签名链 |
+| NOTICE.txt | 实际两个完整署名段落已读；factory-skills 26 PASS | 非生成文件，合并文档与视频许可署名，不删原文 |
+| office-mcp-tools-snapshot.test.ts / tools.json | 真实 schema 变异与生成核验 2 PASS | 原生成器在 ui-mac cwd，原生视频运行时实际构建通过后生成 |
+| release-source.test.ts | 14 PASS | Linux 不受影响 + 正式 Mac 源检查均保留 |
+| tool-card-model.ts / test.ts | 60 PASS | 可信身份分派下保留两类步骤，标题共用原 helper |
+| engine fixtures/*.json | 原 sampler 的 17 文件；fixture identity 5 PASS，14 个直接 consumers 163 PASS | 从已提交合并树真实重采，非选一侧或手改身份 |
+
+其余最终排队验证为 old-name / NUL / 独立 video progress。原始报告 ext.integration.xml（137）、packaging.integration.xml（138）、core.integration.xml（30）；生成后报告 235 条中 233 PASS/2 FAIL 的两项命名原因与后续修正见上，未把该报告说成全绿。其余通过文件不重跑；Office 后续两条已绿，旧名表按实际最终行再单测。完整日志在 /tmp/alpha-1761-r15。
+
+类型/制作：core bun typecheck 为 2054 files / 2 projects、ext 与 ui-mac 各自 bun typecheck 均 exit 0；ext 自包含 build exit 0。真实视频 runtime builder（darwin-arm64）完整成功并由既有 checkVideoRuntime 校验，随后原 video bundler/Office generator 成功；没有替换真实二进制为夹具、上传或发布资产。Windows 实机仍属既有外依赖，本轮只是其打包检查与真实头样本测试。
+
+
+r15 最终收据：上述排队项目全部执行结束，old-name-final.log **10 PASS/0 FAIL**；video-progress.log **1 PASS/0 FAIL**；nul.log 原入口 exit 0，6070 个受检文本零字面 NUL，1340 个已登记二进制/4 个非文本/11260 个原样上游条目按原规则跳过，4000 地板不变。所有相关文件最终 **34 文件、539 个独立用例 PASS、0 FAIL**（按实际文件去重，不累加复验）；最终逐文件数量可从本机 final-per-file-counts.json 与各原始 JUnit/后续具名日志核对。Office 最终两条已通过，仅旧名的完全重复新增行修正后再单跑该文件。原 235 条生成后报告中两项失败及第二次旧名合形红均保留，不改说全绿。
+
+merge commit 为 aa763db0be（父 4e74d7830f / 2142240b16）；跟随提交写入原 sampler 的 17 份真实 JSON、原 Office generator 产物、只按实际样本同步的旧名登记和本收据，满足采样器必须从已提交引擎树采样的前置条件。二进制构建输出均为 ignored 构建资产，没有把本机路径放进产品配置/新的路径约定；JSON 内的原始采样路径只按既有外部样本规则登记。
+
+core/ext/ui-mac 三包 typecheck 均 exit 0；JSON 重采后仅 ui-mac 因新类型输入再核一次，亦 exit 0。ext bundle build exit 0。git diff --check 与相对 origin/alpha 的 diff --check 均通过，hooksPath=.githooks，16 个相对链接通过。docs contract 全仓输出 56 errors/251 warnings，本 plan findings=0，不扩修其它保护文档。
+
+PR scope（仅 --list，未执行其全量范围）：
+
+```text
+all bun (packages/codepuppy-contracts-consumer) tests: bun.lock changed (manifest or lockfile); all bun (packages/ext) tests: bun.lock changed (manifest or lockfile); all bun (packages/ui-mac/src) tests: bun.lock changed (manifest or lockfile); all bun (packages/codepuppy-app/src) tests: bun.lock changed (manifest or lockfile); all bun (packages/codepuppy-app/test-browser/[p]rompt-attachments.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/ai/test/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/core/test/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/schema/test/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/plugin/test/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/util/src/codepuppy-*.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/core/test/plugin/[p]lan.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/core/test/[m]cp.test.ts) tests: bun.lock changed (manifest or lockfile); all bun (packages/core/test/[o]auth-page.test.ts) tests: bun.lock changed (manifest or lockfile)
+```
+
+已核 Codex / GPT-6，r15 集成完成；没有真正不兼容的冻结行为分歧。已定勿重开：两功能共用既有视觉/权限权威，两个资源闭包及其许可/签名核验都保留；没有新引擎 API 或新下载器。下一步：编排器在此树执行 ship。遗留去向：既有 #1760、发布/relay、Windows/真实 LO 验收沿原归属；无新产品 OPTIONAL。本轮未运行 gate run、bin/check 或全层/全套；未 push、开 PR、部署或 rebase，所有本轮前台命令结束后交回。实际约 17 分钟（含共享 slot 排队），未超预计 75 分钟。

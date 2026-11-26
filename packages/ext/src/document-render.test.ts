@@ -181,3 +181,25 @@ test("rendering uses a private profile without reinstalling the prepared runtime
     expect(installer.mock.calls).toHaveLength(0)
   } finally { installer.mockRestore() }
 })
+
+for (const failure of ["receipt", "malformed", "process"] as const) test(`Excel ${failure} calculation failure still produces layout pages and an incomplete-calculation diagnostic`, async () => {
+  const f = fixture()
+  const source = join(f.root, "sales.xlsx")
+  copyFileSync(join(f.input.assets, "templates/chinese-analysis.xlsx"), source)
+  const environment = f.input.host.environment
+  f.input.host.environment = async (caller) => ({ ...await environment(caller), renderState: { phase: "ready", version: "fixture", executable: "/runtime/LibreOffice.app/Contents/MacOS/soffice" } })
+  const process = await import("./document-process")
+  const calculation = spyOn(process, "runDocumentPython").mockImplementation(async () => {
+    if (failure === "process") throw Error("calculation process unavailable")
+    return { stdout: failure === "receipt" ? JSON.stringify({ status: "failed", code: "calculation", detail: "unsupported formula" }) : "invalid receipt", stderr: "", exitCode: 0 }
+  })
+  try {
+    const render = createDocumentRenderer({ ...f.input, execute: async (job) => { const output = await f.input.execute(job); const result = JSON.parse(output.stdout); return { ...output, stdout: JSON.stringify({ ...result, renderer: "libreoffice-pdfium" }) } } })
+    const result = await render(f.caller, { kind: "xlsx", path: source })
+    expect(result.status).toBe("rendered")
+    if (result.status !== "rendered") throw Error(JSON.stringify(result))
+    expect(result.receipt.pages).toHaveLength(2)
+    expect(result.receipt.diagnostics.join("\n")).toContain("Excel recalculation did not complete")
+    expect(result.receipt.diagnostics.join("\n")).not.toContain('"recalculationId"')
+  } finally { calculation.mockRestore() }
+})

@@ -1,7 +1,7 @@
 // REQ-236 `#1553` AC8 —— 附件路径只有一个来源:隐藏目录名只来自 PROJECT_HIDDEN_DIR,绝对路径只由 attachmentAbsolutePath 算出,
 // 附件代码里没有隐藏目录名或附件目录的字面量;metadata 形状的读取 fail-closed。
 import { afterAll, describe, expect, test } from "bun:test"
-import { copyFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { resolveProjectCodePuppyRoot } from "../main/codepuppy-workdir"

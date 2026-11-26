@@ -731,7 +731,7 @@ bun.lock 随 origin 改变，`bun install --frozen-lockfile` exit 0（2 packages
 
 2026-11-26 12:21:41 UTC 开始，预估 90 分钟（共享 slot 排队另记），仅按 r14 的失败文件/检查逐项定位；不跑全套、gate run 或 bin/check。调度方已提供 origin/alpha b0a9d0298d 的逐文件绿色基线，不重新扩大基线调查。每文件通过 `gate slot -- bun test --max-concurrency 2 --timeout 90000 <file>` 独立复现，日志 /tmp/alpha-1761-r14/red-*.log / red-results.json。
 
-已复现：fixture-identity 4 PASS/1 FAIL（core/util tree 身份已改变，需真实重采，分类 c）；engine-cases 25 PASS/1 FAIL（无人值守子文件两种拒绝错误未投影，分类 a，正在核对）；ext-security 7 PASS/1 FAIL（document Chromium 窗口漏 webviewTag:false，分类 a，窗口清单新增点属 c）。OfficeExcel 15 PASS 与 schema snapshot 2 PASS 单独均绿，而 full gate 的 Python import 缺 text_budget.py / circular import，加上 installOfficeExcel 每次先删安装目录，表明必须修正共享环境的并行安装（分类 a），不能称 flaky。old-name 扫描 9 PASS/1 FAIL，唯一 stale 行为旧 office-docs 的 /code-puppy 计数（分类 c）。
+已复现：fixture-identity 4 PASS/1 FAIL（core/util tree 身份已改变，需真实重采，分类 c）；engine-cases 25 PASS/1 FAIL（无人值守子文件两种拒绝错误未投影，分类 a，正在核对）；ext-security 7 PASS/1 FAIL（document Chromium 窗口漏 webviewTag:false，分类 a，窗口清单新增点属 c）。OfficeExcel 15 PASS 与 schema snapshot 2 PASS 单独均绿，而 full gate 的 Python import 缺 text_budget.py / circular import，加上 installOfficeExcel 每次先删安装目录，表明必须修正共享环境的并行安装（分类 a），不能称 flaky。old-name 扫描 9 PASS/1 FAIL，唯一 stale 行为旧 office-docs 的旧工作目录词元计数（分类 c）。
 
 静态入口复现：`bash -c 'source scripts/docs-gates.sh; docs_gate_nul'` exit 1，实际 Office/解释器二进制 fixture 未在既有 binary 机制登记（分类 c）；`bash scripts/assert-seed-assets.sh` exit 1，默认制作入口重写后漏掉原社区 Excel 明确退役事实（分类 b，片 7 / §4.1/4.8 并未复活社区连接器，将恢复该事实而不放宽 guard）。后续修正均保留原守卫规则、阈值和地板。
 
@@ -755,6 +755,8 @@ r14 websearch 消费者（b）：red-8.log 的同步 transform 字面锚与 §4.
 
 r14 attachment 临时模块（b）：red-11.log 为拷平 office-advisories 后找不到新增 util/document 依赖。测试只想变更 PROJECT_HIDDEN_DIR，故复制的真实 attachment 模块仍 import 实际 advisories owner，只有隐藏目录常量保留本地替换。原路径正反断言不改，避免复制第二套运行时依赖（§4.10/R13 的唯一宿主环境校验）。
 
-r14 旧名登记（c）：red-5.log 唯一 stale 行为 office-docs 的 /code-puppy，片 7 重写根路由后已无此命中，删除该精确失效行；其余 0/new-hit、计数、类别规则均不改。
+r14 旧名登记（c）：red-5.log 唯一 stale 行为 office-docs 的旧工作目录词元，片 7 重写根路由后已无此命中，删除该精确失效行；其余 0/new-hit、计数、类别规则均不改。
 
 r14 围栏消费者（b）：red-6.log 四项失败均来自现 server 已移除 writer/旧 Excel 不能在 uv-only 环境使用共享模块。按片 7 / §4.1/4.8，四种成品由随包库制作而 reader 只读；原 #1564 用例在同一生产 sandbox-exec/env 中运行共用真实样本脚本，再逐格式用原四条生产命令读回，依旧 PATH 无 uv、代理零出网、uv cache 未创建。三条通用 uv-cache 判据以仍受支持的真实 Word reader 为消费者，保留冷下载、W3 缓存/默认缓存拒绝及所有安装命令/receipt 字节不变断言；不声称旧 Excel uv 命令仍是产品能力，不删测试用例。样本脚本从原 builder 单一函数原样提为同模块常量供两处执行，无复制脚本或第二安装器。
+
+r14 阶段核对：Chromium webview 安全 target 1 PASS；四个 Office/uv 缓存围栏 target **4 PASS / 0 FAIL**（fence-target.log，51.55s），新制作用固定原生脚本在原生产围栏内执行、四 reader 读回且无出网；write-sites 原 --check 为 62 条登记/65 调用点一致。旧名说明也不把已移除的旧工作目录词元重新写进当前 plan；附件临时模块清去不再使用的 import。

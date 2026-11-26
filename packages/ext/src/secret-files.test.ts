@@ -190,3 +190,26 @@ const files=createSecretFiles(JSON.parse(process.argv[2]));await files.refresh()
 console.log(JSON.stringify({captured:files.values().some(v=>Buffer.from(v).toString()==='fixture-dot-directory-token')}));files.dispose();
 `)).toEqual({ captured: true })
 })
+
+test("refresh arriving during capture waits for a fresh generation", async () => {
+  const { root, roots } = await setup()
+  const target = path.join(root, "external", "adc.json")
+  await mkdir(path.dirname(target))
+  const document = await Bun.file(fixture("gcp.json")).json()
+  await writeFile(target, JSON.stringify({ ...document, refresh_token: "fixture-before-refresh" }))
+  roots.pathVariables = { GOOGLE_APPLICATION_CREDENTIALS: target }
+  await writeFile(path.join(root, "audit.mjs"), `
+import fs from 'node:fs/promises';
+let release,ready;export const blocked=new Promise(r=>ready=r);const resumed=new Promise(r=>release=r);export const resume=()=>release();let first=true;
+export const readFile=async (...args)=>{const bytes=await fs.readFile(...args);if(first&&String(args[0]).endsWith('/adc.json')){first=false;ready();await resumed}return bytes};
+export const stat=fs.stat,readdir=fs.readdir,realpath=fs.realpath;
+`)
+  expect(await nodeCollector(root, roots, `
+import fs from 'node:fs/promises';import path from 'node:path';import {registerHooks} from 'node:module';
+registerHooks({resolve(name,context,next){return next(name==='node:fs/promises'&&context.parentURL?.endsWith('/collector.mjs')?new URL('./audit.mjs',import.meta.url).href:name,context)}});
+const roots=JSON.parse(process.argv[2]);const {createSecretFiles}=await import('./collector.mjs');const audit=await import('./audit.mjs');
+const files=createSecretFiles(roots);const first=files.refresh();await audit.blocked;
+const target=roots.pathVariables.GOOGLE_APPLICATION_CREDENTIALS;const document=JSON.parse(await fs.readFile(target,'utf8'));document.refresh_token='fixture-after-refresh';await fs.writeFile(target,JSON.stringify(document));const second=files.refresh();audit.resume();await Promise.all([first,second]);
+console.log(JSON.stringify({fresh:files.values().some(v=>Buffer.from(v).toString()==='fixture-after-refresh')}));files.dispose();
+`)).toEqual({ fresh: true })
+})

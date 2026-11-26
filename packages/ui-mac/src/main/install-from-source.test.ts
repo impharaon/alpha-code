@@ -49,7 +49,7 @@ async function sourceHarness(temporary: string) {
   })
   const candidate = async (query: string, source = "claude-marketplace") => (await sources.searchSources(query)).candidates.find((row) => row.source === source)!.id
   const request = (candidateId: string, requestId = "request_a2_01") => ({ requestId, source: { kind: "candidate" as const, candidateId }, effect: { kind: "all-projects" as const }, via: "chat" as const })
-  return { install, sources, root, temporary, activation, reloads, candidate, request, fetched }
+  return { install, installContent: install, sources, root, temporary, activation, reloads, candidate, request, fetched }
 }
 
 test("whole plugin skills retain sibling directories and root resources", () => installerHarness(async h => {
@@ -869,3 +869,20 @@ test("remote plugin declarations retain explicit transport in their installed MC
     }
   }
 })
+
+
+test("source installation returns committed content before default enable and runtime activation", () => installerHarness(async h => {
+  const capture = await captureStandardFixture("claude:sap-hana-cli")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const result = await h.installContent(h.request("sap", "install_before_activation"))
+  expect(result.ok).toBe(true)
+  const before = readPackageLedgerStateV1(h.root)
+  expect(before.ok && before.records.every(record => record.desiredState === "disabled")).toBe(true)
+  expect(h.activation).toEqual([])
+  expect(readdirSync(join(h.root, "ext-tx/journal")).map(file => JSON.parse(readFileSync(join(h.root, "ext-tx/journal", file), "utf8")).state)).toEqual(["committed"])
+  await new Promise<void>(resolve => setImmediate(resolve))
+  const after = readPackageLedgerStateV1(h.root)
+  expect(after.ok && after.records.every(record => record.desiredState === "enabled")).toBe(true)
+  expect(h.activation).toEqual([result.ok ? result.packageId : ""])
+}))

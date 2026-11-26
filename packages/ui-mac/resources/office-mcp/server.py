@@ -215,7 +215,7 @@ def reject_unknown_keys(arguments: dict[str, Any], allowed: Any, label: str) -> 
 def read_xlsx(path: Path, arguments: dict[str, Any]) -> dict[str, Any]:
     require_existing(path)
     from codepuppy_office import OfficeExcel
-    if arguments.get('sheet'):
+    if arguments.get('sheet') or arguments.get('cursor'):
         return OfficeExcel.inspect(json.dumps({**arguments,'path':str(path),'action':'range'}))
     structure=OfficeExcel.inspect(json.dumps({'path':str(path),'action':'workbook'}))
     return {'path':str(path),'sheets':[{'name':sheet['name'],**OfficeExcel.inspect(json.dumps({**arguments,'path':str(path),'sheet':sheet['name'],'action':'range'}))} for sheet in structure['sheets']]}

@@ -163,7 +163,12 @@ def describe_sheet(workbook,sheet):
 
 
 def inspect(input_json):
-    try: request = INSPECT.validate_json(input_json)
+    payload=json.loads(input_json)
+    if isinstance(payload,dict) and payload.get('action')=='range' and not payload.get('sheet') and payload.get('cursor'):
+        cursor=json.loads(base64.urlsafe_b64decode(payload['cursor']))
+        if not isinstance(cursor,dict):raise ValueError('invalid-input: invalid read cursor')
+        payload['sheet']=cursor.get('sheet')
+    try: request = INSPECT.validate_python(payload)
     except ValidationError as error: raise ValueError('invalid-input: '+str(error)) from error
     source = file_digest(request.path)
     values = load_workbook(request.path,data_only=True)
@@ -215,7 +220,7 @@ def inspect(input_json):
                         output.append(record);used+=cost;index+=1
                     if next_offset is not None:break
                 if next_offset is not None:break
-            cursor=base64.urlsafe_b64encode(json.dumps({'binding':fingerprint,'offset':next_offset,'sourceSha256':source}).encode()).decode() if next_offset is not None else None
+            cursor=base64.urlsafe_b64encode(json.dumps({'binding':fingerprint,'offset':next_offset,'sourceSha256':source,'sheet':request.sheet}).encode()).decode() if next_offset is not None else None
             if file_digest(request.path)!=source:raise ValueError('source-changed: workbook changed during read')
             return {'sheet':request.sheet if request.sheet else None,'range':getattr(request,'range',None) or (sheets[0].calculate_dimension() if len(sheets)==1 else None),'cells':output,'errors':errors,'uncalculated':reasons,'nextCursor':cursor,'sourceSha256':source}
     finally: values.close()

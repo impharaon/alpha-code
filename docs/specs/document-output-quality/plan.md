@@ -650,3 +650,5 @@ B7 cache red：原 office-excel 文件两个原生 Python 子进程用例，以�
 B7 cache green：office-excel 文件 15 PASS（B7-cache-green.log）。同一原子替换前保留源权限，commit 临界区 SIGTERM 转为退出并执行 finally 删除临时文件，随后恢复原处理器；真实缓存与原稿保真断言保留。Windows ACL/实机验证仍归既有平台验收。
 
 B7 cursor red：原 stdio 模块新增以真实工具生成的 Data 游标续读、不再传 sheet 的用例，现工具把同一游标套给 Summary 而拒绝，target 1 FAIL（B7-cursor-red.log）。下一提交由 OfficeExcel 单一拥有者从它生成的不透明游标还原 sheet，再走原 source/binding 校验；stdio 仅委托，不另抄校验。
+
+B7 cursor green：stdio 原文件 12 PASS（B7-cursor-green.log），未指定 sheet 的续页只回到原游标工作表。cursor 的 sheet 来源/绑定仍由 OfficeExcel 所有，工具 schema 不增字段，tools.json 仅重生 server 摘要。

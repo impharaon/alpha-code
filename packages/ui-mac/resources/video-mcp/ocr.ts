@@ -6,9 +6,9 @@ import type { Frame } from "./contracts"
 type Ocr = Frame["ocr"]
 
 export function ocrBox(left:number,top:number,right:number,bottom:number,width:number,height:number): [number,number,number,number] {
-  const clamp=(value:number)=>Math.min(1,Math.max(0,value))
-  const x=clamp(left/width),y=clamp(top/height)
-  return [x,y,Math.max(0,clamp(right/width)-x),Math.max(0,clamp(bottom/height)-y)]
+  const clamp=(value:number,maximum:number)=>Math.min(maximum,Math.max(0,value))
+  const x=clamp(left,width),y=clamp(top,height)
+  return [x/width,y/height,Math.max(0,clamp(right,width)-x)/width,Math.max(0,clamp(bottom,height)-y)/height]
 }
 
 export function tesseractLines(tsv: string, width: number, height: number): Ocr {

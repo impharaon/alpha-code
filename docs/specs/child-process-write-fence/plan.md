@@ -655,3 +655,39 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - **r8 Bun ruling（编排者 Claude Opus 5.5，2026-11-27）。** 本轮据续接明确修正 R1 的 Bun 输入与派生环境，不改其它冻结决定。生产来源：`server.ts:480–489` 的 `resolveShellProbeRoots` 总把 `roots.cacheHome`（未导出时由 `process-fence-profile.ts:98` 取 HOME/.cache）写进 probe context；`server.ts:506` 的 `preferAppEnv` 经 `shell-env.ts:15–21` 的可信根恢复写回 main，`index.ts:719–720` 在 fork 前调用；`server.ts:639` 的 createSidecarEnv 与 `sidecar-env.ts:71` 的 XDG 前缀把它交给子进程。`sidecar.ts:298` 只补 state，不是 cache 的来源。因此 app 确实会补 XDG_CACHE_HOME，不能把补后的值误当用户原始导出。实施保留补值前的用户 Bun/XDG 快照，R1 新增 nullable xdgCacheHome/bunInstall，按 ruling 的优先级落两个准确子树并走原 R7；用户未设置 BUN_INSTALL 时只给围栏/probe 子进程注入其真实 Bun 根，不把 probe 回吐的派生值写成 main 的用户配置。用户已设置则保留其值，仍走正常原环境继承；sidecar EXACT 仅增该非秘密路径键。新增输入传播到 profile/plan/server 和其既有调用测试；场景仅补 Bun 未闭合行，不重跑已通过工具。首条纯解析回归先红，日志 `/tmp/fence1759-r8-bun-red.log`；这不是对 owner 决定的重新归因。
 - r8 Bun 实施：主进程在 prepare/prefer 的首次调用按 userData 身份保留原始两个字段，后续启动/重查询消费同一快照；Bun 根作为新权限位置事实，不接受 shell cache/rc 回吐改根，配置值保留为最初可信导出。未设置时的 BUN_INSTALL 仅进入 planner 给 probe/sidecar/R2 的投影，所有同步/缓存/异步合并都不把它变成 main 用户环境。profile/planner/sidecar-env 三文件 **120 pass**，server **54 pass**，ui-mac 类型 exit 0。新增回归在既有 fast/integration 文件，正常 import 可追溯，gate 表只同步 **47/54** 条；config-fence.cases 与 wiring.test 仅补新必填 nullable 输入。
 - `gate slot -- bun test ./node_modules/.cache/package-manager-scenario-vf8vnnjs/r8/bun.test.ts` **1 pass / 66 expect**：真实生产 prepareShellProbeFence → preferAppEnv → spawnLocalServer → sidecar/fence → 原助手 Shell 工具，三种用户环境正臂、原审批/拒绝/只读及只撤 Bun 两条 W21 共七臂。全部批准 0 卡，请求审批 1 张原卡；真实 Bun 安装后，在原用户环境、围栏外用 Node 调实际 bin 的 semver 得到 1.2.3。默认用户根为 HOME/.bun，即使应用后补了 HOME/.cache；用户 XDG 根和显式 BUN_INSTALL 的优先级与原生查询相同。旧缓存目录前后 hash 不变；显式 root/install/cache 事后也为 0 文件。撤两条新规则 exit 1/EPERM、0 CLI 落盘。工具版本/来源沿 r4/r7 摘要，结果 `r8/bun-results.json`。AC-11 非 brew 已闭合；不重跑 r7 其它管理器或 AC-10/12。
+
+- r8 收口：较宽相关六文件 `bun test --max-concurrency 2 src/main/naming-migration-wiring.test.ts src/main/keychain-boot-order.test.ts src/main/process-fence-wiring.test.ts src/main/shell-env.test.ts src/main/custom-provider-truth.test.ts src/main/package-manager-environment.test.ts` **51 pass / 0 fail / 483 expect**。这次误将 wiring 文件内既有 Office 冷/暖真实下载用例一并带出 slot 运行；这些隔离缓存行已结束且通过，不重跑、不计为 #1759 新证明；本轮测试选择的偏离在此明示。ui-mac 类型 exit 0，north-star exit 0，旧名 **10 pass**。`affected-tests --list` exit 2：基线缺根 `.gate-tests`，没有 scope 行，不改 gate。
+
+## 交付切片五｜Homebrew 围栏外执行的接缝核实
+
+- 依据：#1759；spec v6 AC-11 的 brew；design v4.2 的 v5 §4.1–4.4、§6 与 §10 R1-F2 @ `6a292250bc`；r8 允许同轮继续，遇未定设计问题返回。
+- 核对：实施前核实发现 H4 接缝不足，尚未形成可执行的完整文件/提交计划，不将本段报为 PLAN-READY。Bun 的两个提交不依赖此接缝。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| 本计划 | 留下 H4 新接缝的可复现事实、未证明边界和需要设计所有者补充的条件。 |
+| 场景根 `r8/h4/{probe.m,nonbrew.py,production.sb,result.json,scanner.json,inspection.json}`（临时、未入库） | 最小原生 Mach/audit/签名/真实围栏证据；不写生产 H2/H4，不冒充已经接通的产品入口。 |
+
+### 顺序
+
+1. 先核 H4 能区分真实到达的 helper 叶和普通叶再次 exec 同一 helper；这决定 H2/native 的接线能否满足冻结不变量。
+2. 以下探针证实当前 H4 输入不能区分两者，按 frozen seam 不足返回；待设计所有者补足可信的逐节点执行来源，再写 H1→H2→H3/H4→真实 formula 的完整实施段。不实现一个已知违反 §4.1/§4.4 的放行口。
+
+### 风险
+
+- H4 的 executable/CDHash/签名/防注入与真实 Shell 祖先检查能确认进程映像和归属，不能确认该进程由源中的哪个语法叶到达。另一个普通叶 exec 同一签名 helper 后也满足检查；不需要篡改程序、伪造 audit token 或获得 bearer。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-11 brew；H4/复合命令保真 | `r8/h4/result.json`、`inspection.json`；scratch CLI 编译/adhoc runtime+restrict+kill 签名后，两条真实 Mach request/reply；两条 root Shell 均由真实 `sandbox-exec -f production.sb` 启动，额外 literal resource subtree 拒写保护 probe helper。原 scanner 对 `/usr/bin/python3 …/nonbrew.py && false && brew --prefix` 返回 scanned。 | 一次性新接缝前提探针，约半秒；无包安装、窗口、生产协议修改。不是产品已接通的 scenario。 | 正常叶命中 pinned 映像/签名、真实 audit peer、root PID/pidversion/祖先与 pending node；反臂中普通叶仅从自己父 Shell 的 `kern.procargs2` 读公开 service/IDs 后 exec 同一 helper，也命中全部条件并获 grant，外层随后因 false exit 1，原计划 helper 叶从未到达。断言“反臂不获 grant”真实 **exit 1**。 |
+
+### 偏离记录
+
+- **SEAM-CHANGE-NEEDED: H4 `claimPackageManagerNode` 的逐节点执行来源。** frozen `design.md:789` 保留原 shell 的 `&&/||`，`:836` 不得提前破坏控制流，`:875` 又仅以同一 helper 映像与绑定 Shell 自身/后代来核 peer，并声称其它叶/孩子不获能力。上述真实探针的两个 peer 都通过全部核验：相同 CDHash/identifier、动态签名有效、hardened runtime、无 entitlements、规范化 executable、内核 PID/pidversion、活 root 身份与后代、同 node 未 claim；普通叶仍能冒领尚未到达的节点。最小所需补充是 main 可核的“本次已批准语法叶实际执行”绑定，而非仅 Shell 后代；不能通过换 ID、放宽 peer、缩窄 brew 子命令、新卡或放弃控制流不变量绕过。此处只返还受影响 H2/H4，不重开 Bun/R1 或其它已接受切片。
+- 探针采用 adhoc 签名的严格 hardened CLI，不声称实测生产 Team 签名；相同二进制被普通叶再次 exec，其签名/映像事实仍相同。reply 只记录 grant 事件，不运行 brew 或发真实 HTTP 能力；生产 helper、流式取消/退出及触发 Homebrew 内部 Sandbox 的 formula 尚未实施/证明。初版 `/tmp` 与 kernel `/private/tmp` 的别名比较、Foundation 路径归一均使正臂误拒；改 POSIX realpath 后才计证据。`/bin/ps` 在真实 profile 不能 exec，观察改为只读自己父进程的 sysctl，不修改围栏。所有初版结果也保留。
+- 本轮约 40 分钟：Bun 两个提交约 11 分钟，其余约 30 分钟用于切片五接线阅读、轻量接缝核实与收口。曾把轻量 Mach 前提探针排入 gate slot；见需等待其它 ship 约一小时，取消自己的排队任务后按轻量原生探针直接运行。没有执行重安装场景、改 gate、launch app、push/PR/merge。按 r8 的未定接缝规则返回，未展开完整切片五文件列表或代码。
+- 文档契约用原工作树单仓 profile 收口 **exit 1 / 70 error / 252 warning**，finding 与 r7 已接受基线逐项相同；最初误用 portfolio 全仓 profile 的查询不作为此工作树结果。完整本轮清单、命令、计数、偏离和证据边界写入原场景根 `r8/summary.json`，总索引 `record.json` 保留 r7 并指向 r8；代码只提交 Bun 的既定文件，切片五只有本计划证据。

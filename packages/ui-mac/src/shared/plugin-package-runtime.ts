@@ -11,6 +11,8 @@ export function pluginEntryRuntimeAvailable(entry: Entry): boolean {
         "Stop",
         "PreToolUse",
         "PostToolUse",
+        "PostToolUseFailure",
+        "StopFailure",
         "PermissionRequest",
         "UserPromptExpansion",
       ].includes(entry.hook.event)) ||

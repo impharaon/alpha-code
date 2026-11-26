@@ -45,6 +45,7 @@ export async function registerPackageHooks(
   const processes = createPackageProcesses(context.location)
   const instructions = new Map<string, Map<string, InstructionScope>>()
   const expansions = new Map<string, Contribution[]>()
+  const failures = new Map<string, Contribution[]>()
   let preparePrompt: ((event: import("@opencode/plugin/promise/session").SessionPrompt) => Promise<void>) | undefined
   const directory = mkdtempSync(join(tmpdir(), "codepuppy-plugin-session-"))
   const created = new Set<string>()
@@ -87,6 +88,7 @@ export async function registerPackageHooks(
   const events = new AbortController()
   const close = (sessionID: string) => {
     instructions.delete(sessionID)
+    failures.delete(sessionID)
     sessionEpoch.delete(sessionID)
     promptEpoch.delete(sessionID)
     stopTurns.delete(sessionID)
@@ -98,17 +100,6 @@ export async function registerPackageHooks(
     sessionContexts.delete(sessionID)
     promptContexts.delete(sessionID)
   }
-  const subscription = (async () => {
-    for await (const event of context.event.subscribe({
-      types: ["session.created", "session.archived", "session.deleted"],
-      signal: events.signal,
-    })) {
-      if (event.type === "session.created") created.add(event.data.sessionID)
-      else close(event.data.sessionID)
-    }
-  })().catch((error) => {
-    if (!events.signal.aborted) input.log("runtime-failed: package event subscription: " + String(error))
-  })
   const run = async (
     event: HookEvent,
     sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"],
@@ -376,8 +367,13 @@ export async function registerPackageHooks(
               return {
                 installed: handler.installed,
                 valid: handler.valid,
-                block: !judgment.ok && (!stopping || judgment.impossible !== true),
-                stopTurn: !judgment.ok && !stopping && !handler.hook.continueOnBlock,
+                block: !judgment.ok && event !== "PermissionRequest" && (!stopping || judgment.impossible !== true),
+                stopTurn:
+                  !judgment.ok &&
+                  !stopping &&
+                  event !== "PostToolUseFailure" &&
+                  event !== "PermissionRequest" &&
+                  !handler.hook.continueOnBlock,
                 exitCode: 0,
                 order,
                 text: config.secretValues.size
@@ -474,9 +470,15 @@ export async function registerPackageHooks(
           .then(async (result) => {
             if (!result || !result.valid() || (event !== "SessionStart" && promptEpoch.get(sessionID) !== epoch)) return
             if (sessionEpoch.get(sessionID) !== lifetime) return
-            const contexts = event === "SessionStart" ? sessionContexts : promptContexts
+            const contexts =
+              event === "SessionStart" ? sessionContexts : event === "StopFailure" ? failures : promptContexts
             if (result.text) contexts.set(sessionID, [...(contexts.get(sessionID) ?? []), result])
-            if (handler.hook.type === "command" && handler.hook.asyncRewake && result.exitCode === 2)
+            if (
+              event !== "StopFailure" &&
+              handler.hook.type === "command" &&
+              handler.hook.asyncRewake &&
+              result.exitCode === 2
+            )
               await context.session.synthetic({ sessionID, text: result.text, resume: true })
           })
           .catch((error) => input.log("runtime-failed: asynchronous package hook: " + String(error)))
@@ -486,8 +488,8 @@ export async function registerPackageHooks(
     if (sessionEpoch.get(sessionID) !== lifetime) return []
     const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && result.valid())
     const blocked = contributions.find((result) => result.block)
-    if (blocked?.stopTurn) stopTurns.set(sessionID, blocked)
-    if (blocked && !["Stop", "SubagentStop"].includes(event))
+    if (blocked?.stopTurn && event !== "StopFailure") stopTurns.set(sessionID, blocked)
+    if (blocked && !["Stop", "SubagentStop", "PostToolUseFailure", "StopFailure"].includes(event))
       throw Error("runtime-failed: package hook blocked " + event + (blocked.text ? ": " + blocked.text : ""))
     return contributions
       .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest")
@@ -502,6 +504,27 @@ export async function registerPackageHooks(
         output: "output" in result ? result.output : undefined,
       }))
   }
+  const subscription = (async () => {
+    for await (const event of context.event.subscribe({
+      types: ["session.created", "session.archived", "session.deleted", "session.execution.failed"],
+      signal: events.signal,
+    })) {
+      if (event.type === "session.created") created.add(event.data.sessionID)
+      else if (event.type === "session.execution.failed") {
+        void run("StopFailure", event.data.sessionID, {
+          error: event.data.error.type,
+          error_details: event.data.error.message,
+        })
+          .then((contexts) => {
+            if (contexts.length)
+              failures.set(event.data.sessionID, [...(failures.get(event.data.sessionID) ?? []), ...contexts])
+          })
+          .catch((error) => input.log("runtime-failed: package failure hook: " + String(error)))
+      } else close(event.data.sessionID)
+    }
+  })().catch((error) => {
+    if (!events.signal.aborted) input.log("runtime-failed: package event subscription: " + String(error))
+  })
   const releasePermissionRequest = input.policy.onPackagePermissionRequest(async (call) => {
     const results = await run("PermissionRequest", call.sessionID, {}, call)
     const allowed = results.filter(
@@ -540,13 +563,20 @@ export async function registerPackageHooks(
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })
   await context.tool.hook("execute.after", async (event) => {
-    if (event.status !== "completed") return
-    const contexts = await run(
-      "PostToolUse",
-      event.sessionID,
-      { tool_response: event.result.output ?? event.result.content },
-      event,
-    )
+    const contexts =
+      event.status === "completed"
+        ? await run(
+            "PostToolUse",
+            event.sessionID,
+            { tool_response: event.result.output ?? event.result.content },
+            event,
+          )
+        : await run(
+            "PostToolUseFailure",
+            event.sessionID,
+            { error: event.error.message, is_interrupt: event.error.name === "AbortError" },
+            event,
+          )
     if (contexts.length)
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })
@@ -554,11 +584,13 @@ export async function registerPackageHooks(
     continued.delete(event.sessionID)
     stopTurns.delete(event.sessionID)
     promptEpoch.set(event.sessionID, (promptEpoch.get(event.sessionID) ?? 0) + 1)
-    promptContexts.delete(event.sessionID)
+    promptContexts.set(event.sessionID, failures.get(event.sessionID) ?? [])
+    failures.delete(event.sessionID)
     await preparePrompt?.(event)
     const pending = expansions.get(event.messageID)
     expansions.delete(event.messageID)
-    if (pending?.length) promptContexts.set(event.sessionID, pending)
+    if (pending?.length)
+      promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...pending])
     if (!starts.has(event.sessionID))
       starts.set(
         event.sessionID,

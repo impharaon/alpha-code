@@ -425,7 +425,7 @@ status.
 | `SPEC-resident-project-watchers` | [specs/resident-project-watchers/spec.md](specs/resident-project-watchers/spec.md) | 长期使用项目时监听与内存保持受控，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-responsive-session-rail` | [specs/responsive-session-rail/spec.md](specs/responsive-session-rail/spec.md) | 右栏可以调宽并为聊天区保留空间，按历史条文与实际证明登记范围。 | approved |
 | `SPEC-route-manifest-authority` | [specs/route-manifest-authority/spec.md](specs/route-manifest-authority/spec.md) | 应用导航由一份页面清单决定，保留历史条款、有效裁决和交付证据边界。 | approved |
-| `DESIGN-secrets-usable-not-visible` | [specs/secrets-usable-not-visible/design.md](specs/secrets-usable-not-visible/design.md) | 共享受保护名单与非密钥规则；在工具结果进入会话前遮盖，并在 shell 捕获写盘前处理实时输出；记录采集保证的缺口与必要接管。 | draft |
+| `DESIGN-secrets-usable-not-visible` | [specs/secrets-usable-not-visible/design.md](specs/secrets-usable-not-visible/design.md) | 共享保护名单与非密钥规则；工具输出在命令前后采集后整份发布，遮盖失败只交付固定说明；冻结已批准的 shell 捕获接缝与接管登记。 | frozen-pending-review |
 | `SPEC-session-results-workspace` | [specs/session-results-workspace/spec.md](specs/session-results-workspace/spec.md) | 会话右栏统一查看文件、产物和修改，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-startup-model-availability` | [specs/startup-model-availability/spec.md](specs/startup-model-availability/spec.md) | 启动时及时出现可用模型且不显示虚假失败，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `DESIGN-stored-credentials-fence` | [specs/stored-credentials-fence/design.md](specs/stored-credentials-fence/design.md) | 凭据文件留在原处;围栏对 Code Puppy 的凭据存放点与崩溃转储目录一律拒读拒写,连同它们的真实目标,并禁止改名其上的每一级目录(profile 最后的文件规则);引擎进程的值只来自主进程:启动消息带全表,续期后推全表,每次引擎配置装载各自向主进程拉全表再解析,只在一张封闭清单的凭据位置代入(内联文档 / 同名连接器条目);主进程不替别名读凭据;经可写引擎配置改变交付去向的一类残留由 INT-safety I-13 关闭;配置里的 {file:} 引用一字不变;用户无感 | approved |

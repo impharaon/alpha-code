@@ -373,3 +373,27 @@ test("video privacy-card cancellation never dispatches media",async()=>{
  for(let i=0;i<1000;i++){if(JSON.parse(await readFile(file,"utf8")).attempts[0].state === "cancelled")break;await Bun.sleep(1)}
  expect(h.requests).toHaveLength(0)
 })
+
+test("video network retry reuses the same in-process consent without a second privacy card",async()=>{
+ const h=await harness("/project/.ssh/speech.mp4")
+ let issues=0
+ h.deps.upload=createMainUploadService({identity:h.deps.identity,issue:async input=>{
+  issues++
+  const manifest=JSON.parse(input.manifestJson)
+  const claims={schema_version:1,iss:"codepuppy-web",aud:"codepuppy-platform-upload",sub:"tenant-a",token_use:"upload_consent",purpose:"artifact.upload",scope:["artifact.upload"],iat:1,exp:4000000000,jti:"test",manifest_id:manifest.manifest_id,manifest_sha256:input.manifestSha256,egress:manifest.egress}
+  return `${Buffer.from("{}").toString("base64url")}.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.signature`
+ },dispatch:async()=>{throw Error("not text")},log:()=>{}})
+ const normal=h.deps.dispatch
+ h.deps.dispatch=async input=>{if(!h.requests.length){h.requests.push(input);await input.progress(input.clip.bytes);return {error:"network"}}return normal(input)}
+ const service=createMainVideoService(h.deps),started=await service.start(call,await h.prepared())
+ try{
+  for(let i=0;!h.deps.upload.videoPreviews(1).length&&i<1000;i++)await Bun.sleep(1)
+  const preview=h.deps.upload.videoPreviews(1)[0]!
+  await h.deps.upload.confirm(1,preview.requestId)
+  for(let i=0;h.requests.length<2&&!h.deps.upload.videoPreviews(1).length&&i<1000;i++)await Bun.sleep(1)
+  expect(h.deps.upload.videoPreviews(1)).toEqual([])
+  expect((await state(service,started.requestId)).result).toBeDefined()
+  expect(issues).toBe(1)
+  expect(h.requests[1]!.uploadConsent).toBe(h.requests[0]!.uploadConsent)
+ }finally{await service.cancel(started.requestId,call)}
+})

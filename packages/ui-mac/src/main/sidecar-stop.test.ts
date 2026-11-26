@@ -195,3 +195,23 @@ test("#1647 AC2 a hung engine close stays inside the five-second stop budget", a
     vi.useRealTimers()
   }
 })
+
+test("main waits for SessionEnd acknowledgements before sending the sidecar stop command", async () => {
+  const { requestSidecarStop } = await import("./sidecar-stop")
+  const { createPluginSessionRequester, notePluginSessionViewed } = await import("./plugin-session-lifecycle")
+  const messages: Array<{ id: number }> = []
+  const requester = createPluginSessionRequester(message => { messages.push(message) })
+  notePluginSessionViewed(1776, "ses_shutdown")
+  const seen: string[] = []
+  let exited!: () => void
+  const exit = new Promise<void>(resolve => { exited = resolve })
+  const stopped = requestSidecarStop({ postMessage: () => { seen.push("stop"); exited() }, kill: () => { seen.push("kill") } }, exit)
+  await Promise.resolve()
+  expect(seen).toEqual([])
+  expect(messages).toHaveLength(1)
+  requester.receive({ id: messages[0]!.id, ok: true })
+  await stopped
+  expect(seen).toEqual(["stop"])
+  requester.close()
+  notePluginSessionViewed(1776, undefined)
+})

@@ -260,3 +260,13 @@
 .a-permission-panel-footer {
   padding: var(--a-space-3) 16px 12px;
 }
+
+/* The network request lives in the conversation dock; it reuses the approval card's interior. */
+.a-network-egress-card {
+  margin-block: var(--a-space-2);
+  min-width: 0;
+}
+
+.a-network-egress-card .a-permission-resources code {
+  overflow-wrap: anywhere;
+}

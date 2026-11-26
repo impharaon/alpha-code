@@ -191,7 +191,9 @@
   --a-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ── Layout ──────────────────────────────────────────────────────────── */
-  --a-rail-w: 48px;
+  --a-rail-w: 64px;
+  --a-rail-button-size: 44px;
+  --a-rail-icon-stroke: 1.75;
   --a-topbar-h: 44px;
   --a-frame-gap: 4px;  /* working surface to the window's right/bottom edge (owner 2026-11-18/19: gray band narrowed 8 → 4px) */
   /* macOS 26.3.1: NSWindow `_cornerRadius` of a titled + fullSizeContentView window without a toolbar

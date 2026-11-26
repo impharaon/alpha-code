@@ -202,7 +202,7 @@ subscribe 只发失效通知；消费者先订阅再 list，并按 revision 缓�
 
 ### 4.4 站点与用户级真源
 
-**新增接缝 N4：** main 的站点归一函数，输入仅为已通过既有地址准入的 host；从完整 PSL（含 ICANN、PRIVATE、通配与例外）求可注册域。决定使用直接依赖 `tldts@7.6.0` 的 `getDomain(host,{allowPrivateDomains:true})`，由 main 随包携带表，不在运行时下载 PSL，不复用只有 ICANN 的间接构建依赖。这是 AC-09 必需的唯一新增运行时依赖，不自建后缀算法。
+**新增接缝 N4：** main 的站点归一函数，输入仅为已通过既有地址准入的 host；从完整 PSL（含 ICANN、PRIVATE、通配与例外）求可注册域。决定使用直接依赖 `tldts@7.5.5` 的 `getDomain(host,{allowPrivateDomains:true})`，由 main 随包携带表，不在运行时下载 PSL，不复用只有 ICANN 的间接构建依赖。这是 AC-09 必需的唯一新增运行时依赖，不自建后缀算法。
 
 ```ts
 type SiteKey =
@@ -359,6 +359,8 @@ main 单一服务串行处理批准、撤销与 store 更新。同一决定不�
 不适用。新增用户真源没有旧记录迁移；本增量不设计兼容期、旧行为开关或回退通路。
 
 ## 10. 裁决与审查结论
+
+2026-11-26 编排器 r2 裁决：tldts 精确版本由 7.6.0 改为 7.5.5，以满足仓库 minimumReleaseAge；库与 PSL 语义不变，不添加发布年龄豁免。
 
 | 当前裁决 | 依据与适用版本 |
 | --- | --- |

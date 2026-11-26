@@ -4,7 +4,7 @@ title: 密钥文件程序可以用、助手看不到
 summary: 项目里和电脑上的密钥文件，程序照常使用；助手读不到其中的值，命令输出里出现时先遮盖；「全部批准」档读项目外的文件不再询问。
 kind: spec
 status: approved
-version: 3
+version: 4
 approved_by: owner
 approved_at: 2026-11-26
 owners: [owner]
@@ -59,6 +59,7 @@ last_reviewed: 2026-11-26
 | 遮盖按原样匹配：恰好与某个密钥值相同的普通文字也会被遮；程序把密钥编码或拆开后再输出的，遮不住 | 知道遮盖不是绝对保证 | owner 2026-11-25 批准本规格 | 同上 | 讨论 P-08 的边界 |
 | （v2）命令运行中临时生成、打印再删掉的密钥，加密保存、由程序解密后才输出的密钥，遮不住 | 知道遮盖只覆盖名单内文件里事先能读到的值 | owner 2026-11-26「好的。」 | 同上 | impharaon/alpha-work INT-safety U-38（owner 2026-11-26「好的。」） |
 | （v3）命令先把一个新密钥打印出来、之后才写进名单内的文件时，这个值可能在运行中的实时输出里短暂出现，助手读运行中的输出也可能看到；命令结束后的结果和对话记录里是遮盖后的 | 知道实时输出里有这一个窄缺口 | owner 2026-11-26「按你的建议吧。」 | 命令运行中照常看到实时输出 | impharaon/alpha-work INT-safety U-39（owner 2026-11-26「按你的建议吧。」） |
+| （v4）如果把密钥值写进了 AGENTS.md 这类给助手看的说明文件，这些值不遮盖（说明文件本来就会在对话开始时原样交给助手） | 不要把密钥写进说明文件 | owner 2026-11-27「同意。」 | 不为此再改引擎 | impharaon/alpha-work INT-safety U-42（owner 2026-11-27「同意。」） |
 | （v2）遮盖这一步出错时（很少见），这一次的输出看不到，只有一句说明 | 需要时让助手换个方式重跑 | owner 2026-11-26「好的。」 | 不会因为出错把密钥原样放出 | impharaon/alpha-work INT-safety U-38（owner 2026-11-26「好的。」） |
 | 「全部批准」档下助手读项目外的文件不再先问 | 无 | owner 提出 | 少打断 | U-32「适当放松，但是要有一些名单」 |
 
@@ -87,5 +88,6 @@ last_reviewed: 2026-11-26
 | --- | --- | --- | --- | --- | --- |
 | 1 | 2026-11-25 | Claude Fable 5.2：BR 与 AC 一一对应；限制三条都有出处；补入 Windows | owner | 「批准。」；「还需要考虑 windows 系统，现在没发 windows 包后续是需要发的。」（alpha-work INT-safety U-34） | Windows 真机验收随 Windows 包发布 |
 | 0 | 2026-11-25 | Claude Fable 5.2：BR 与 AC 一一对应；限制三条都有出处或标明待批 | — | 草稿 | 无 |
+| 4 | 2026-11-27 | Claude Opus 5.5：限制表增一行（说明文件里的密钥不遮盖） | owner | 「同意。」（impharaon/alpha-work INT-safety U-42（owner 2026-11-27「同意。」）） | 无 |
 | 3 | 2026-11-26 | Claude Opus 5.5：BR-03 补实时输出逐段遮盖，BR-06 补结构化文件只遮凭据字段，限制新增一条，新增 AC-09、AC-10 | owner | 「这两个你的建议是什么，按你的建议吧。」（impharaon/alpha-work INT-safety U-39（owner 2026-11-26「按你的建议吧。」）；Claude 建议原文见该条） | 无 |
 | 2 | 2026-11-26 | Claude Opus 5.5：BR-03 补遮盖对象的边界，新增 BR-07 与 AC-08，限制新增两条，待决清空 | owner | 「…好的。」（impharaon/alpha-work INT-safety U-38（owner 2026-11-26「好的。」）；Claude 的三项问题与建议原文见该条） | 无 |

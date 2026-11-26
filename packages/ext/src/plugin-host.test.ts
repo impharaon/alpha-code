@@ -2144,3 +2144,31 @@ packageIt.live("package agent bodies keep dollar amounts and shell examples lite
   const requests = yield* llm.requests()
   expect(JSON.stringify(requests)).toContain(JSON.stringify(literal).slice(1, -1))
 })))
+
+packageIt.live("a path-activated package skill renders once until the next user prompt", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("codex:temporal"))
+  const path = "skills/temporal-developer/SKILL.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const location = yield* Location.Service
+  // Controlled Claude-syntax variant of the pinned skill so its setup has an observable temp-only side effect.
+  const claude = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const command = new TextDecoder().decode(yield* Effect.promise(() => claude.readFile("commands/feature-dev.md")))
+  const sample = yield* invocationSample("claude:feature-dev", { "skills/temporal-developer/SKILL.md": source.replace("\n---\n", '\npaths: ["src/**"]\n---\n') + '\n!`printf x >> ${CLAUDE_PROJECT_DIR}/path-render-count`\n', "commands/feature-dev.md": command })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const skills = yield* Skill.Service
+  yield* ext.finish(skills.list().pipe(Effect.map(list => list.some(item => item.name === sample.hostNames["skill:skills/temporal-developer/SKILL.md"]))))
+  const file = join(location.directory, "src", "workflow.ts")
+  mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, "export const workflow = 1")
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Path once", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_path_first", "read", { path: file }), TestLLM.toolCall("call_path_second", "read", { path: file }), TestLLM.text("Read twice", "path-twice"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Read twice" })
+  yield* sessions.wait(parent.id)
+  expect(readFileSync(join(location.directory, "path-render-count"), "utf8")).toBe("x")
+  yield* llm.push(TestLLM.toolCall("call_path_next_prompt", "read", { path: file }), TestLLM.text("Read again", "path-again"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "New prompt" })
+  yield* sessions.wait(parent.id)
+  expect(readFileSync(join(location.directory, "path-render-count"), "utf8")).toBe("xx")
+})))

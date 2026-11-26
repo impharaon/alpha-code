@@ -135,3 +135,11 @@ test("重启后追加截断半行尾巴，保留完整记录并继续记录", as
   expect(readFileSync(f.file, "utf8")).toBe(before + JSON.stringify(records[1]) + "\n")
   expect(restarted.snapshot()).toMatchObject({ persistence: "ok", passes: [{ count: 2 }] })
 })
+
+test("设置按规范 host:port 合并数字短写和点分地址的真实 CONNECT", async () => {
+  const f = await fixture()
+  expect(await f.request("134744072")).toContain("pass-ok")
+  expect(await f.request("8.8.8.8")).toContain("pass-ok")
+  expect(f.passes.snapshot()).toMatchObject({ persistence: "ok", passes: [{ destination: { host: "8.8.8.8", port: 443 }, count: 2 }] })
+  expect(f.passes.snapshot().passes).toHaveLength(1)
+})

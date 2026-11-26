@@ -3,6 +3,7 @@ import type { UnattendedState } from "./policy/unattended"
 import type { PolicyRegistration } from "./policy/index"
 import type { GateCall } from "./policy/gate"
 import type { Plugin } from "@opencode/plugin"
+import type { InvocationContext } from "@opencode/plugin/promise/registration"
 import type { ElicitationAnswer } from "@opencode/plugin/codepuppy-package-runtime"
 import { Schema } from "effect"
 import { releasePackageSessionMcp, registerPackageRuntime } from "@opencode/plugin/codepuppy-package-runtime"
@@ -56,7 +57,7 @@ export async function registerPackageHooks(
   const instructions = new Map<string, Map<string, InstructionScope>>()
   const expansions = new Map<string, Contribution[]>()
   const failures = new Map<string, Contribution[]>()
-  let preparePrompt: ((event: import("@opencode/plugin/promise/session").SessionPrompt) => Promise<void>) | undefined
+  let preparePrompt: ((event: import("@opencode/plugin/promise/session").SessionPrompt, call: InvocationContext) => Promise<void>) | undefined
   const directory = mkdtempSync(join(tmpdir(), "codepuppy-plugin-session-"))
   const created = new Set<string>()
   const endings = new Map<string, Promise<void>>()
@@ -304,6 +305,7 @@ export async function registerPackageHooks(
     invocation?: InstructionScope,
     occurrenceId?: string,
     batch?: readonly BatchCall[],
+    callSignal?: AbortSignal,
   ) => {
     const handlers = handlersFor(event, sessionID, invocation)
     if (!handlers.length) return []
@@ -343,6 +345,7 @@ export async function registerPackageHooks(
       handlers.map(async (handler, order) => {
         const execute = async (): Promise<HookResult | undefined> => {
           const controller = new AbortController()
+          const signal = callSignal ? AbortSignal.any([controller.signal, callSignal]) : controller.signal
           let redact = (text: string) => text
           running.set(controller, { valid: handler.valid, sessionID, kind: event === "FileChanged" ? "watcher" : handler.hook.type === "command" && (handler.hook.async || handler.hook.asyncRewake) ? "async" : "decision" })
           watchPackage(handler.installed)
@@ -414,6 +417,7 @@ export async function registerPackageHooks(
                   : (await context.model.default()).data)
               let timeout: ReturnType<typeof setTimeout> | undefined
               let abort: (() => void) | undefined
+              signal.throwIfAborted()
               const response = await Promise.race([
                 context.experimental.generate.text({
                   prompt:
@@ -425,15 +429,15 @@ export async function registerPackageHooks(
                   abort = () =>
                     reject(
                       Error(
-                        controller.signal.reason instanceof Error ? controller.signal.reason.message : "hook cancelled",
+                        signal.reason instanceof Error ? signal.reason.message : "hook cancelled",
                       ),
                     )
-                  controller.signal.addEventListener("abort", abort, { once: true })
+                  signal.addEventListener("abort", abort, { once: true })
                   timeout = setTimeout(() => reject(Error("prompt hook timed out")), handler.hook.timeoutSeconds * 1000)
                 }),
               ]).finally(() => {
                 if (timeout) clearTimeout(timeout)
-                if (abort) controller.signal.removeEventListener("abort", abort)
+                if (abort) signal.removeEventListener("abort", abort)
               })
               const judgment: unknown = JSON.parse(response.text)
               if (
@@ -444,7 +448,7 @@ export async function registerPackageHooks(
                 (!judgment.ok && (typeof judgment.reason !== "string" || !judgment.reason.trim()))
               )
                 throw Error("prompt hook returned an invalid judgment")
-              if (!handler.valid() || controller.signal.aborted || sessionEpoch.get(sessionID) !== lifetime) return
+              if (!handler.valid() || signal.aborted || sessionEpoch.get(sessionID) !== lifetime) return
               const stopping = ["Stop", "SubagentStop"].includes(event)
               return {
                 installed: handler.installed,
@@ -470,12 +474,12 @@ export async function registerPackageHooks(
               ...(handler.hook.args === undefined ? {} : { args: handler.hook.args }),
               environment: { CLAUDE_ENV_FILE: ["SessionStart", "FileChanged"].includes(event) ? file : undefined },
               ...(file ? { environmentFile: file } : {}),
-              signal: controller.signal,
+              signal: signal,
               stdin: { ...payload, ...eventFields },
               timeoutSeconds: handler.hook.timeoutSeconds,
             })
             redact = result.redact
-            if (!handler.valid() || controller.signal.aborted || sessionEpoch.get(sessionID) !== lifetime) return
+            if (!handler.valid() || signal.aborted || sessionEpoch.get(sessionID) !== lifetime) return
             if (result.exitCode === 2)
               return {
                 installed: handler.installed,
@@ -532,7 +536,7 @@ export async function registerPackageHooks(
               lifetime,
             }
           } catch (error) {
-            if (controller.signal.aborted || !handler.valid()) return
+            if (signal.aborted || !handler.valid()) return
             input.log(
               "runtime-failed: hook " +
                 handler.entry.id +
@@ -585,6 +589,7 @@ export async function registerPackageHooks(
         return undefined
       }),
     )
+    callSignal?.throwIfAborted()
     if (sessionEpoch.get(sessionID) !== lifetime) return []
     const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && result.valid())
     const blocked = contributions.find((result) => result.block)
@@ -638,17 +643,19 @@ export async function registerPackageHooks(
       catch (error) { input.log("runtime-failed: package file watch: " + String(error)) }
     }
   }
-  const startSession = async (sessionID: string, messageID?: string) => {
+  const startSession = async (sessionID: string, messageID?: string, signal?: AbortSignal) => {
     if (children.has(sessionID)) return
     if (!sessionEpoch.has(sessionID)) sessionEpoch.set(sessionID, {})
-    if (!starts.has(sessionID)) starts.set(sessionID,
-      run("SessionStart", sessionID, {
+    if (!starts.has(sessionID)) {
+      const starting = run("SessionStart", sessionID, {
         source: created.delete(sessionID) ? "startup" : "resume",
         ...(messageID ? { prompt_id: messageID } : {}),
-      }).then(contexts => {
+      }, undefined, undefined, undefined, undefined, signal).then(contexts => {
         sessionContexts.set(sessionID, [...(sessionContexts.get(sessionID) ?? []), ...contexts])
-      }),
-    )
+      })
+      starts.set(sessionID, starting)
+      void starting.catch(() => { if (starts.get(sessionID) === starting) starts.delete(sessionID) })
+    }
     await starts.get(sessionID)
   }
   const finishDeparted = async (sessionID: string) => {
@@ -726,7 +733,7 @@ export async function registerPackageHooks(
     if (!page.cursor.next) break
     page = await context.session.list({ cursor: page.cursor.next })
   }
-  const drainToolBatches = async (sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"]) => {
+  const drainToolBatches = async (sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"], signal?: AbortSignal) => {
     if (!sessionEpoch.has(sessionID)) return []
     const state = batches.get(sessionID) ?? { complete: new Set<string>(), pending: new Map<string, Promise<Contribution[]>>() }
     batches.set(sessionID, state)
@@ -743,7 +750,7 @@ export async function registerPackageHooks(
       if (!calls.length || message.content.some(part => part.type === "tool" && (part.state.status === "streaming" || part.state.status === "running"))) continue
       const pending = state.pending.get(message.id)
       if (pending) { await pending; continue }
-      const processing = run("PostToolBatch", sessionID, { assistant_message_id: message.id }, undefined, undefined, undefined, calls)
+      const processing = run("PostToolBatch", sessionID, { assistant_message_id: message.id }, undefined, undefined, undefined, calls, signal)
       state.pending.set(message.id, processing)
       try {
         contexts.push(...await processing)
@@ -870,8 +877,8 @@ export async function registerPackageHooks(
     if (contexts.length)
       promptContexts.set(call.sessionID, [...(promptContexts.get(call.sessionID) ?? []), ...contexts])
   })
-  await context.tool.hook("execute.before", async (event) => {
-    const results = await run("PreToolUse", event.sessionID, {}, event)
+  await context.tool.hook("execute.before", async (event, call) => {
+    const results = await run("PreToolUse", event.sessionID, {}, event, undefined, undefined, undefined, call.signal)
     for (const result of results) {
       const specific =
         result.output && record(result.output.hookSpecificOutput) ? result.output.hookSpecificOutput : undefined
@@ -892,25 +899,25 @@ export async function registerPackageHooks(
     if (contexts.length)
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })
-  await context.tool.hook("execute.after", async (event) => {
+  await context.tool.hook("execute.after", async (event, call) => {
     const contexts =
       event.status === "completed"
         ? await run(
             "PostToolUse",
             event.sessionID,
             { tool_response: event.result.output ?? event.result.content },
-            event,
+            event, undefined, undefined, undefined, call.signal,
           )
         : await run(
             "PostToolUseFailure",
             event.sessionID,
             { error: event.error.message, is_interrupt: event.error.name === "AbortError" },
-            event,
+            event, undefined, undefined, undefined, call.signal,
           )
     if (contexts.length)
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
   })
-  await context.session.hook("prompt", async (event) => {
+  await context.session.hook("prompt", async (event, call) => {
     if (departed.delete(event.sessionID)) starts.delete(event.sessionID)
     preparing.add(event.sessionID)
     try {
@@ -921,18 +928,18 @@ export async function registerPackageHooks(
       promptEpoch.set(event.sessionID, (promptEpoch.get(event.sessionID) ?? 0) + 1)
       promptContexts.set(event.sessionID, failures.get(event.sessionID) ?? [])
       failures.delete(event.sessionID)
-      await preparePrompt?.(event)
+      await preparePrompt?.(event, call)
       const pending = expansions.get(event.messageID)
       expansions.delete(event.messageID)
       if (pending?.length)
         promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...pending])
       reconcileFileWatches(event.sessionID)
-      await startSession(event.sessionID, event.messageID)
+      await startSession(event.sessionID, event.messageID, call.signal)
       startMonitors(event.sessionID)
       const contexts = children.has(event.sessionID) ? [] : await run("UserPromptSubmit", event.sessionID, {
         prompt: event.prompt.text ?? "",
         prompt_id: event.messageID,
-      })
+      }, undefined, undefined, undefined, undefined, call.signal)
       promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
     } catch (error) {
       preparing.delete(event.sessionID)
@@ -940,8 +947,8 @@ export async function registerPackageHooks(
       throw error
     } finally { preparing.delete(event.sessionID) }
   })
-  await context.session.hook("context", async (event) => {
-    const contexts = await drainToolBatches(event.sessionID)
+  await context.session.hook("context", async (event, call) => {
+    const contexts = await drainToolBatches(event.sessionID, call.signal)
     promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
     const blocked = contexts.find(result => result.block && result.valid())
     if (blocked) throw Error("runtime-failed: package hook blocked PostToolBatch" + (blocked.text ? ": " + blocked.text : ""))
@@ -963,9 +970,9 @@ export async function registerPackageHooks(
           }),
         })
   })
-  await context.session.hook("experimental.idle", async (event) => {
+  await context.session.hook("experimental.idle", async (event, call) => {
     continuing.delete(event.sessionID)
-    const contexts = await drainToolBatches(event.sessionID)
+    const contexts = await drainToolBatches(event.sessionID, call.signal)
     promptContexts.set(event.sessionID, [...(promptContexts.get(event.sessionID) ?? []), ...contexts])
     const stopped = contexts.find(result => result.stopTurn && result.valid())
     if (stopped) throw Error("runtime-failed: package prompt hook stopped this turn: " + stopped.text)
@@ -993,7 +1000,7 @@ export async function registerPackageHooks(
     const results = await run(children.has(session.id) ? "SubagentStop" : "Stop", event.sessionID, {
       background_tasks: event.background,
       session_crons: [],
-    })
+    }, undefined, undefined, undefined, undefined, call.signal)
     const blocking = results.filter((result) => result.block)
     if (!blocking.length) return
     continued.add(event.sessionID)
@@ -1005,10 +1012,11 @@ export async function registerPackageHooks(
     })
   })
   return {
-    async instructionEnvironment(sessionID: string, item: Instruction, allowed: () => boolean) {
-      const starting = startSession(sessionID)
+    async instructionEnvironment(sessionID: string, item: Instruction, allowed: () => boolean, callSignal: AbortSignal) {
+      callSignal.throwIfAborted()
+      const starting = startSession(sessionID, undefined, callSignal)
       const lifetime = sessionEpoch.get(sessionID)!
-      const valid = () => allowed() && sessionEpoch.get(sessionID) === lifetime
+      const valid = () => !callSignal.aborted && allowed() && sessionEpoch.get(sessionID) === lifetime
       await starting
       if (!valid()) throw Error("runtime-failed: package invocation ended before instruction rendering")
       const file = environmentFile(sessionID, lifetime, false)
@@ -1016,7 +1024,7 @@ export async function registerPackageHooks(
       const controller = new AbortController()
       running.set(controller, { sessionID, valid, kind: "decision" })
       try {
-        const variables = await processes.environment({ source: processSource(item.installed, { item }), environment: { CLAUDE_ENV_FILE: undefined }, environmentFile: file, signal: controller.signal })
+        const variables = await processes.environment({ source: processSource(item.installed, { item }), environment: { CLAUDE_ENV_FILE: undefined }, environmentFile: file, signal: AbortSignal.any([callSignal, controller.signal]) })
         if (!valid()) throw Error("runtime-failed: package invocation ended before instruction rendering")
         return variables
       } finally {
@@ -1061,8 +1069,9 @@ export async function registerPackageHooks(
       args: string,
       messageID: string | undefined,
       allowed: () => boolean,
+      signal: AbortSignal,
     ) {
-      await startSession(sessionID, messageID)
+      await startSession(sessionID, messageID, signal)
       const results = await run(
         "UserPromptExpansion",
         sessionID,
@@ -1074,7 +1083,7 @@ export async function registerPackageHooks(
           ...(messageID ? { prompt_id: messageID } : {}),
         },
         undefined,
-        { item, active: allowed },
+        { item, active: allowed }, undefined, undefined, signal,
       )
       if (messageID) expansions.set(messageID, [...(expansions.get(messageID) ?? []), ...results])
       return results

@@ -303,6 +303,8 @@ OpenCode 共用服务、库与凭证。
 
 S-01 r19（orchestrator ruling 2026-11-27 / Claude Opus 5.5）：PreparedInstruction 增可选 environment，携真实 Invocation Session 的 ENV_FILE export delta；既有 command.ts 合成 env 时以原绑定槽为优先，仍先编译 source 再插入值，不增 renderer、进程原语或上游接管文件。ext 在实际首个展开前 await 同一 SessionStart promise，native 附加 skills 先登记全部作用域，再展开；同一个 AppProcess source 保持变量归属、unset 与会话隔离。核心 inline-env 例、真实 command/attached-skill 首次/更新例为具名 proof；登记仍归 plugin-invocation-semantics，设计 §10 镜像由编排器持有。
 
+S-01 r22（orchestrator ruling 2026-11-27 / Claude Opus 5.5，B7）：promise command.execute 与 Hooks/ModelHooks callback 增调用级 InvocationContext.signal，唯一 Effect→Promise adapter 注入其真实执行 signal；ext 原样传给 ENV_FILE source，并与 runner 归属取消合并，既有 ToolContext.signal 继续复用。不增加 timeout、wire DTO、执行器或旁路释放。精确新增接管为 `packages/plugin/src/promise/adapter.ts`、`promise/command.ts`、`promise/registration.ts` 三文件的 callback signature/forwarding；L0 在旧回调拿不到该 signal，pre-admission source 不能靠 session execution 事件收尾，L1/L2 仍改同一 adapter 并增源码/产物同步，故沿已批准 r22 选择此窄 L3。原 host 的 SessionStart-written ENV_FILE command/attachment/expansion-hook 三例握住真实子 PID 与调用中断；registry id 仍为 plugin-invocation-semantics，north-star 仅同步这三个授权路径，算法不变。其余裁决不变，design §10 镜像由编排器持有。
+
 ### #1776 S-04 / S-06 配置与压缩窄边界
 
 S-04 依据 DESIGN-local-plugin-install v3.1 §6/§10 与 orchestrator ruling 2026-11-27（r14）：既有 config.ts / config/plugin/skill.ts 的读取、watcher 与 rescan 在原生发布链调用同一个 beforeConfigChange；raw revision 仍经当前项目 trust/parser，拒绝不改用户文件，托管策略不可阻止。登记 `plugin-hook-config-change` 与原 `project-opencode-config-trust`，无额外接管文件或 DTO。

@@ -2,7 +2,7 @@ import type { CommandApi } from "@opencode/client/promise/api"
 import type { PromptInput } from "@opencode/schema/prompt-input"
 import type { Session } from "@opencode/schema/session"
 import type { SessionInbox } from "@opencode/schema/session-inbox"
-import type { Transform } from "./registration.js"
+import type { InvocationContext, Transform } from "./registration.js"
 
 export interface CommandInvocation {
   readonly sessionID: Session.ID
@@ -13,7 +13,7 @@ export interface CommandInvocation {
 export interface CommandDefinition {
   readonly name: string
   readonly description?: string
-  readonly execute: (input: CommandInvocation) => Promise<void>
+  readonly execute: (input: CommandInvocation, context: InvocationContext) => Promise<void>
 }
 
 export interface CommandEditor {

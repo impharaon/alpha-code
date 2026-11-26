@@ -130,8 +130,10 @@ export async function registerPackageInvocations(
     item: Instruction,
     rawArguments: string,
     sessionID: string,
+    signal: AbortSignal,
     ancestors: ReadonlySet<string> = new Set(),
   ): Promise<string> => {
+    signal.throwIfAborted()
     const key = item.installed.key + ":" + item.entry.id
     if (ancestors.has(key)) throw new Error("dependency_missing: cyclic preload skill " + item.entry.sourceName)
     const visited = new Set([...ancestors, key])
@@ -155,7 +157,7 @@ export async function registerPackageInvocations(
       arguments: item.entry.invocation.arguments,
       rawArguments,
       cwd: context.location.directory,
-      environment: await input.hooks.instructionEnvironment(sessionID, item, () => allowed(item)),
+      environment: await input.hooks.instructionEnvironment(sessionID, item, () => allowed(item), signal),
     })
     requireActive(item)
     const preload: string[] = []
@@ -169,7 +171,7 @@ export async function registerPackageInvocations(
       if (skill) {
         if (!skill.entry.invocation.implicitInvocation)
           throw new Error("dependency_missing: preload skill is manual-only: " + source)
-        preload.push(await prepared(skill, "", sessionID, visited))
+        preload.push(await prepared(skill, "", sessionID, signal, visited))
         continue
       }
       const managed = (await context.skill.list()).data.find((skill) => skill.id === source || skill.name === source)
@@ -216,6 +218,7 @@ export async function registerPackageInvocations(
   const tools = new Map<string, Info>()
   const manualContext = async (
     sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"],
+    signal: AbortSignal,
   ): Promise<ToolContext> => {
     const session = await context.session.get({ sessionID })
     const agent = session.agent ?? (await context.agent.list()).data[0]?.id
@@ -225,7 +228,7 @@ export async function registerPackageInvocations(
       agent: agent as ToolContext["agent"],
       messageID: "msg_package_instruction" as ToolContext["messageID"],
       id: "call_package_instruction" as ToolContext["id"],
-      signal: new AbortController().signal,
+      signal,
       progress: async () => {},
     }
   }
@@ -274,7 +277,7 @@ export async function registerPackageInvocations(
       (typeof incoming.background === "boolean"
         ? incoming.background
         : item.installed.description.provider === "claude-code" && (!parent.parentID || item.entry.kind === "skill"))
-    const text = [expansion, await prepared(item, rawArguments, toolContext.sessionID)].filter(Boolean).join("\n\n")
+    const text = [expansion, await prepared(item, rawArguments, toolContext.sessionID, toolContext.signal)].filter(Boolean).join("\n\n")
     const forwarded: Record<string, unknown> = {
       ...incoming,
       agent: target,
@@ -343,16 +346,16 @@ export async function registerPackageInvocations(
       editor.add({
         name: item.name,
         description: pluginInstructionDefinition(item.entry.instruction).description,
-        execute: async (invocation) => {
+        execute: async (invocation, call) => {
           requireActive(item)
-          const frame = await manualContext(invocation.sessionID)
+          const frame = await manualContext(invocation.sessionID, call.signal)
           if (item.entry.invocation.fork || item.entry.invocation.agent) {
             const expansion = await input.hooks.beforeExpansion(
               invocation.sessionID,
               item,
               invocation.prompt.text,
               undefined,
-              () => allowed(item),
+              () => allowed(item), call.signal,
             )
             await delegate(item, invocation.prompt.text, "", frame, "command", {}, expansion)
             return
@@ -362,9 +365,9 @@ export async function registerPackageInvocations(
           let text: string
           try {
             await input.hooks.beforeExpansion(invocation.sessionID, item, invocation.prompt.text, messageID, () =>
-              allowed(item),
+              allowed(item), call.signal,
             )
-            text = await prepared(item, invocation.prompt.text, invocation.sessionID)
+            text = await prepared(item, invocation.prompt.text, invocation.sessionID, call.signal)
             scope.text = text
           } catch (error) {
             scope.dispose()
@@ -447,7 +450,7 @@ export async function registerPackageInvocations(
           const loaded = await original({ ...data, id: selected?.id ?? "skill--" + item.name }, frame)
           if (item.entry.invocation.fork || item.entry.invocation.agent)
             return delegate(item, rawArguments, "", frame, "tool")
-          const text = await prepared(item, rawArguments, frame.sessionID)
+          const text = await prepared(item, rawArguments, frame.sessionID, frame.signal)
           bind(frame.sessionID, item, text, "tool")
           const body = selected?.content.trim()
           const replace = (content: string) => (body ? content.replace(body, () => text) : text)
@@ -461,7 +464,7 @@ export async function registerPackageInvocations(
         }
       })
   })
-  const releasePrompt = input.hooks.onPrompt(async (event) => {
+  const releasePrompt = input.hooks.onPrompt(async (event, call) => {
     for (const scope of scopes.get(event.sessionID)?.values() ?? []) {
       if (scope.pendingPrompt) {
         scope.pendingPrompt = false
@@ -487,8 +490,8 @@ export async function registerPackageInvocations(
       const scope = current.scope
       const item = scope.item
       try {
-        await input.hooks.beforeExpansion(event.sessionID, item, "", event.messageID, () => allowed(item))
-        scope.text = await prepared(item, "", event.sessionID)
+        await input.hooks.beforeExpansion(event.sessionID, item, "", event.messageID, () => allowed(item), call.signal)
+        scope.text = await prepared(item, "", event.sessionID, call.signal)
       } catch (error) {
         for (const pending of attached.slice(attached.indexOf(current))) {
           pending.scope.dispose()
@@ -555,7 +558,7 @@ export async function registerPackageInvocations(
   await context.session.hook("experimental.idle", (event) => {
     if (!input.hooks.continuesTask(event.sessionID)) clear(event.sessionID)
   })
-  await context.tool.hook("execute.after", async (event) => {
+  await context.tool.hook("execute.after", async (event, call) => {
     if (event.status !== "completed" || !["read", "edit", "write"].includes(event.tool) || !record(event.input)) return
     const raw = event.input.path ?? event.input.filePath ?? event.input.file_path
     if (typeof raw !== "string") return
@@ -575,7 +578,7 @@ export async function registerPackageInvocations(
       if (!item.entry.invocation.paths.some((pattern) => Glob.match(pattern, file))) continue
       const current = scopes.get(event.sessionID)?.get(item.installed.key + ":" + item.entry.id)
       if (current && allowed(current.item)) continue
-      const text = await prepared(item, "", event.sessionID)
+      const text = await prepared(item, "", event.sessionID, call.signal)
       bind(event.sessionID, item, text, "path")
     }
   })

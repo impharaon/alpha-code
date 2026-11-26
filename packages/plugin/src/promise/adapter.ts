@@ -305,7 +305,7 @@ export function fromPromise(plugin: Plugin) {
           aisdk: {
             hook: (name, callback, options) =>
               register(
-                host.aisdk.hook(name, (event) => Effect.promise(() => Promise.resolve(callback(event))), options),
+                host.aisdk.hook(name, (event) => Effect.promise((signal) => Promise.resolve(callback(event, { signal }))), options),
               ),
           },
           command: {
@@ -318,7 +318,7 @@ export function fromPromise(plugin: Plugin) {
                       editor.add({
                         ...definition,
                         execute: (input) =>
-                          Effect.tryPromise({ try: () => definition.execute(input), catch: (cause) => cause }),
+                          Effect.tryPromise({ try: (signal) => definition.execute(input, { signal }), catch: (cause) => cause }),
                       }),
                   }),
                 ),
@@ -478,7 +478,7 @@ export function fromPromise(plugin: Plugin) {
           },
           permission: {
             hook: (name, callback) =>
-              register(host.permission.hook(name, (event) => Effect.promise(() => Promise.resolve(callback(event))))),
+              register(host.permission.hook(name, (event) => Effect.promise((signal) => Promise.resolve(callback(event, { signal }))))),
             list: adaptApiMethod(PermissionEndpoints["session.permission.list"], host.permission.list),
             get: adaptApiMethod(PermissionEndpoints["session.permission.get"], host.permission.get),
             reply: adaptApiMethod(PermissionEndpoints["session.permission.reply"], host.permission.reply),
@@ -545,7 +545,7 @@ export function fromPromise(plugin: Plugin) {
                 ),
               ),
             hook: (name, callback) =>
-              register(host.tool.hook(name, (event) => toolHook[name](() => Promise.resolve(callback(event))))),
+              register(host.tool.hook(name, (event) => toolHook[name]((signal) => Promise.resolve(callback(event, { signal }))))),
           },
           vcs: {
             get: adaptApiMethod(VcsEndpoints["vcs.get"], host.vcs.get),
@@ -622,7 +622,7 @@ export function fromPromise(plugin: Plugin) {
           session: {
             hook: (name, callback, options) =>
               register(
-                host.session.hook(name, (event) => Effect.promise(() => Promise.resolve(callback(event))), options),
+                host.session.hook(name, (event) => Effect.promise((signal) => Promise.resolve(callback(event, { signal }))), options),
               ),
             list: adaptApiMethod(SessionEndpoints["session.list"], host.session.list),
             create: adaptApiMethod(SessionEndpoints["session.create"], host.session.create),
@@ -659,7 +659,7 @@ export function fromPromise(plugin: Plugin) {
           },
           shell: {
             hook: (name, callback) =>
-              register(host.shell.hook(name, (event) => Effect.promise(() => Promise.resolve(callback(event))))),
+              register(host.shell.hook(name, (event) => Effect.promise((signal) => Promise.resolve(callback(event, { signal }))))),
           },
         }
 
@@ -684,7 +684,7 @@ const toolError = (error: unknown) =>
 
 // Only execute.before may reject a call; a rejection fails that call alone, like an Effect hook.
 const toolHook: {
-  readonly [Name in keyof ToolHooks]: (run: () => Promise<void>) => Effect.Effect<void, ToolFailures[Name]>
+  readonly [Name in keyof ToolHooks]: (run: (signal: AbortSignal) => Promise<void>) => Effect.Effect<void, ToolFailures[Name]>
 } = {
   "execute.before": (run) => Effect.tryPromise({ try: run, catch: toolError }),
   "execute.after": (run) => Effect.promise(run),

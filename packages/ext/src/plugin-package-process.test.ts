@@ -146,3 +146,23 @@ test("secret redaction preserves control fields in real hook JSON", async () => 
     expect(result.redact("SessionStart")).toBe("[redacted]")
   } finally { await runner.dispose(); registration.dispose(); rmSync(root, { recursive: true, force: true }) }
 })
+
+test("session environment uses actual shell exports before bindings without changing the host or accumulating PATH", async () => {
+  const { createPackageProcesses } = await import("./plugin-package-process")
+  const root = mkdtempSync(join(tmpdir(), "package-session-environment-"))
+  const environmentFile = join(root, "session-shell.sh")
+  writeFileSync(environmentFile, 'export R18_SESSION_VALUE="$(printf \'space ; $(id) literal\')"\nexport PATH="$PATH:/session-extra"\nunset R18_SESSION_CLEARED\n', { mode: 0o600 })
+  const description = (await convertPluginTree(await captureStandardFixture("claude:langfuse-observability"))).package
+  const runner = createPackageProcesses({ directory: root })
+  try {
+    const source = { description, pluginRoot: join(root, "tree"), projectDir: root, settings: { packageId: "claude:langfuse-observability", dataHome: root, values: {}, secretRefs: {}, versions: {}, mcpVersions: {} }, resolveEnvironment: () => undefined, resolveSecret: () => undefined, resolveOptionSecret: () => undefined }
+    for (const iteration of [1, 2]) {
+      const result = await runner.command({ source, command: [process.execPath], args: [["-e"], ["console.log(JSON.stringify({value:process.env.R18_SESSION_VALUE,cleared:process.env.R18_SESSION_CLEARED??null,arg:process.argv[1],path:process.env.PATH}))"], [{ environment: { name: "R18_SESSION_VALUE" } }]], environment: { R18_SESSION_CLEARED: "present" }, environmentFile, signal: new AbortController().signal, stdin: {}, timeoutSeconds: 10 })
+      expect(result.exitCode).toBe(0)
+      const output = JSON.parse(result.stdout)
+      expect(output).toMatchObject({ value: "space ; $(id) literal", cleared: null, arg: "space ; $(id) literal" })
+      expect(output.path.split(":").filter((part: string) => part === "/session-extra")).toHaveLength(1)
+      expect(process.env.R18_SESSION_VALUE).toBeUndefined()
+    }
+  } finally { await runner.dispose(); rmSync(root, { recursive: true, force: true }) }
+})

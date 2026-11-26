@@ -1160,7 +1160,6 @@ scripts/gate-files.tsv	alpha-cloud alpha-bundled	1	historical	#1568 已改掉的
 scripts/known-fails-compare.py	alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
 scripts/module-size-ratchet.tsv	alpha-web alpha-ask alpha-code	1	historical	#1568 已改掉的旧模型可见名 / 注册常量,这里是描述旧名的历史说明
 scripts/worktree-link-deps.sh	@alpha-code	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含以仓库名指称本产品的说明,及由仓库名派生的 vendor 目录 / 锁文件 / 消费方夹具名),owner D3 未裁,不改
-packages/ui-mac/src/engine-adapter/fixtures/events.json	/Users/pharaon/app/wt/alpha-code-feat-1761-document-output/packages/cli	21	external-anchor	#1761 / e7dc2837e4 重采:真实引擎事件的 CLI 工作目录;保留实际事件原文,不是产品旧品牌。处数由 old-name-scan.ts 的 hitTokens 逐行计算。
 packages/ui-mac/src/engine-adapter/fixtures/approval-actions.json	alpha-code	1	external-anchor	#1697 放回 r4:采样出处中的真实仓库名,不是产品旧品牌。
 packages/ui-mac/test-component/hub-package.fixture.json	impharaon/alpha-web	1	external-anchor	GitHub 仓库名 alpha-code / alpha-web / alpha-platform / alpha-work(含由仓库名派生的 producer 夹具来源),保留真实样本外部锚点
 packages/ui-mac/test-fixtures/plugin-helper/catalog-scope/provenance.json	https://github.com/impharaon/alpha-code	1	external-anchor	真实目录来源的 GitHub 仓库地址；用于定位 pinned commit 与摘要，不是产品名称

@@ -319,3 +319,5 @@ r7 收尾：源代码仍为 `cc604a9bcb`，本轮只更新本节证据。三个�
 R1-2：活动 revision 在档位查询中变化时重读至稳定，沿用拨号 signal 限定等待。必要同调用链文件 `network-egress-grants.ts` 仅把已有 signal 传入 main 的 pass 查询，未改 wire 合同。`83ba2c44b2` 的两条回归在旧实现为 0 pass / 2 fail（`/tmp/egress-r8-2-red.log`）；U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts` 修复后为 10 pass / 0 fail（`/tmp/egress-r8-2-green.log`）。
 
 R1-1：CONNECT 共用同一卡片路径和一次结束状态；路由重查丢失通放依据后重新询问，用户等待暂停拨号剩余预算，不重置预算。只有真实用户授权存在时才写 granted。`c8fa1937a1` 的回归为 0 pass / 2 fail（`/tmp/egress-r8-1-red.log`，缺卡片与 504 后第二条 403）；修复后 proxy 完整文件 28 pass / 0 fail（`/tmp/egress-r8-1-green.log`），登记数量同步为 28。
+
+R1-3：DIRECT 的 TCP lookup 只返回完整已检查集合，保留自动族回退；代理逐个尝试检查过的 IP，SOCKS4 只选 IPv4，不再次解析。`052f9c37d8` 两条回归旧代码 0 pass / 2 fail（`/tmp/egress-r8-3-red.log`）；修复后 upstream 完整文件 8 pass / 0 fail（`/tmp/egress-r8-3-green.log`）。双栈测试仅在隔离子进程的传输边界把公开 IP 映射到本地 IPv4-only TCP peer，真实 connect 执行 IPv6 失败到 IPv4 的回退，检查交给传输的完整固定集合；不关闭公网判据，不外拨公网。

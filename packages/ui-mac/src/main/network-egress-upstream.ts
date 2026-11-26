@@ -1,5 +1,6 @@
 import { connect, isIP, type Socket } from "node:net"
 import dns from "node:dns/promises"
+import type { LookupAddress } from "node:dns"
 import http from "node:http"
 import https from "node:https"
 import type { Destination } from "../shared/network-egress-wire"
@@ -46,27 +47,34 @@ export async function resolveEgressRoutes(target: Destination, signal: AbortSign
 
 export async function dialEgressUpstream(target: Destination, routes: UpstreamRoute[], policy: EgressDialPolicy, signal: AbortSignal): Promise<UpstreamTunnel> {
   signal.throwIfAborted()
-  let destination = target
+  let checked: LookupAddress[] | undefined
   if (policy.kind === "allow-all") {
     const admitted = admitEgressPass(target)
     if (!admitted) throw failure("ENONPUBLIC")
     const addresses = isIP(admitted.host) ? [{ address: admitted.host, family: isIP(admitted.host) }] : await abortable(dns.lookup(admitted.host, { all: true }), signal)
     if (!addresses.length || addresses.some((entry) => isNonPublicEgressAddress(entry.address))) throw failure("ENONPUBLIC")
-    destination = { host: addresses[0]!.address, port: target.port }
+    checked = addresses
     signal.throwIfAborted()
     policy.onPass()
   }
   let last: unknown = failure("EPROXYCONFIG")
   for (const route of routes) {
-    signal.throwIfAborted()
-    try {
-      const socket = route.kind === "direct" ? await connectSocket(destination, signal)
-        : route.kind === "http" || route.kind === "https" ? await httpTunnel(destination, route, signal)
-          : await socksTunnel(destination, route, signal)
-      return { socket, route }
-    } catch (error) {
+    // DIRECT gives TCP the whole checked set for family fallback. Proxy protocols
+    // receive pinned IPs too; SOCKS4 can only represent the IPv4 subset.
+    const destinations = !checked || route.kind === "direct" ? [target]
+      : checked.filter((entry) => route.kind !== "socks4" || entry.family === 4).map((entry) => ({ host: entry.address, port: target.port }))
+    if (!destinations.length) last = failure("EPROXYCONNECT")
+    for (const destination of destinations) {
       signal.throwIfAborted()
-      last = error
+      try {
+        const socket = route.kind === "direct" ? await connectSocket(destination, signal, checked)
+          : route.kind === "http" || route.kind === "https" ? await httpTunnel(destination, route, signal)
+            : await socksTunnel(destination, route, signal)
+        return { socket, route }
+      } catch (error) {
+        signal.throwIfAborted()
+        last = error
+      }
     }
   }
   throw last
@@ -81,10 +89,13 @@ function abortable<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
   })
 }
 
-function connectSocket(target: Destination, signal: AbortSignal): Promise<Socket> {
+function connectSocket(target: Destination, signal: AbortSignal, checked?: LookupAddress[]): Promise<Socket> {
   signal.throwIfAborted()
   return new Promise((resolve, reject) => {
-    const socket = connect({ host: target.host, port: target.port, autoSelectFamily: true })
+    const socket = connect({ host: target.host, port: target.port, autoSelectFamily: true, ...(checked ? { lookup: (_host, options, callback) => {
+      if (options.all) callback(null, checked)
+      else callback(null, checked[0]!.address, checked[0]!.family)
+    } } : {}) })
     const abort = () => socket.destroy(signal.reason instanceof Error ? signal.reason : failure("ABORT_ERR"))
     signal.addEventListener("abort", abort, { once: true })
     socket.once("close", () => signal.removeEventListener("abort", abort))

@@ -450,7 +450,53 @@ D3 代码/实物提交：`9929af424c`、`6bc8ccbf0a`；本收据提交继续包�
 
 ## D4 处理进度与帧的模型投影
 
-待本片 PLAN 展开；范围、AC 和依赖见总览，实施依据为视频设计 §4.3/§5 卡片进度/§6 D4。
+- 依据：impharaon/alpha-work:SPEC-video-understanding v1 @ `25afeda6285b66b3de9d83531fa2e5a6cafa468f` 的 AC-04/07/14/16；冻结视频设计 §4.3、§5「卡片进度」、§6 D4、§10 @ `870002ed698f1a83efa9d6ecb359ea5a0d0d41af`；#1775 r6 续派。D3 的 pins、原调用/SDK 取消与真实组件证明继承 `9929af424c`、`6bc8ccbf0a`、`07d05e8291`，不重跑模型/构建/签名测量。
+- 核对：本节提交后由 r6 的「append D4's plan section and implement it in the same round unless it reveals an undecided design question」授权接续；第一实施提交填写计划提交及续派依据，不自称独立审查通过。
+
+### 改动
+
+本片只接处理通知、已有卡片与同一 vision authority；不实现 #1760 preparation/expander/generation 机制，不建视频云识图客户端，不实施 D5。沿 delivery-implement / delivery-docs 的既有工作流，文档影响落本节及必要的模块职责行。
+
+| 文件（相对本仓） | 改什么 |
+| --- | --- |
+| `packages/schema/src/codepuppy-video-progress.ts`（新） | 持有本仓视频处理进度的类型、窄 metadata 键与纯校验；服务、core、UI 消费同一份，不能各列一份 phase/unit 或接受通知自填 callId |
+| `packages/ui-mac/resources/video-mcp/runtime.ts`、`server.ts`、既有 `src/main/video-service.test.ts` / `video-tools.test.ts` | 服务发送完整 phase/completed/total?/unit，经真实 MCP token 关联；同一调用的通知顺序与完成边界不伪造百分比，不在取消后继续发布处理状态 |
+| `packages/core/src/mcp/codepuppy-video-progress.ts`（新）、既有 `mcp/client.ts` / `mcp/index.ts` / `tool/mcp.ts` | 自有 helper 消费 SDK progress 的视频 metadata；现有已收编 MCP 文件仅作标注的小接线，从本次 Tool.Context 捕获 Effect context，逐层交本次 SDK request，不借 initialize 的 Location，也不修改 #1760 冻结 preparation 签名。生命周期沿 SDK 当前 request/signal，旧请求不写另一调用 |
+| `packages/core/test/codepuppy-mcp-runtime.test.ts`、`test/fixture/codepuppy-mcp-startup-stdio.ts`（必要时） | 用现有真实 MCP/Location harness 核处理进度到本次 Tool.Context、并发调用/取消/终态的归属；不手写 SDK 格式夹具，不加入时间性能/容量用例 |
+| `packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.ts` / `tool-cards.tsx`、既有模型与组件测试、`src/renderer/i18n/{zh,en}.ts` | 在已有卡片/步骤复用现有文字和事实行呈现 phase、真实时间/字节/项；无 total 不显示百分比。只对已持久化首方视频 display snapshot 显示视频解释；已治理 vision 调用的帧来源显示实际时间点，不让同名第三方冒充 |
+| `packages/ext/src/cloud-vision-hooks.ts`、`cloud-vision.ts`、`plugin.ts`、必要的 `policy/index.ts` | 同一登记/投影 authority 接入 frames 的真实 image、frameId/sourceId/actualMs/OCR；沿现有 policy facts 判已核验工具，不能凭 namespace 授信。当前模型能看图就保留图与 OCR；不能看图只给 OCR/时间及按需引用，空 OCR 也不自动上传。vision 追问沿现有压缩/路由/缓存，并将实际帧时间交原工具卡 metadata |
+| `packages/ext/src/context-injection.ts`、既有 inventory snapshot / `cloud-vision.test.ts` / `context-injection.test.ts` / policy 相关测试 | 注册必要的 OCR 不可信内容 wrapper 与 frameId 追问说明；在模块既有测试中核零自动网络、按需原 vision 路线、图文模型、空 OCR、多个帧引用与重建。仅同步实际登记条目，不放宽内容注入上限/来源规则 |
+| `docs/specs/video-understanding/plan.md`、`docs/architecture/modules.md`（必要时）、既有 manifest producer 输出 | 记录实际接线、删除对照、范围与 pending；服务编译字节变化时由 D3 producer 同步 codeSha256，不手改摘要、不重建 native |
+
+### 顺序
+
+1. 提交本计划。进度先走 producer → 真实 SDK → 原 MCP/Tool.Context → 已有卡片；在已收编文件内只加消费自有 helper 的调用/参数，不新增上游接管路径、公共 HTTP/Server API 或第二个进度状态机。D3 的 preparing 仍由 #1760 接收。
+2. 在原 vision authority 接 frames。结果内容从 D2 schema 与实际 MCP 转换路径读取；文本正文继续是不可信材料。登记帧引用不能被现有普通图片的 32 项内存淘汰规则默默截掉；按帧这个域处理，不为视频加新配额，也不改变普通图片的既有行为。
+3. 将按需 vision 的实际 frame 引用/时间映射到原卡片，完成组件行为验证。最后仅扩展到真实 import/枚举读方一次，执行包 typecheck、affected-tests --list、文档核对和删除对照，提交收据。不跑 gate/全包/应用/真实模型或付费上游。
+
+### 风险
+
+- MCP client 当前 `onprogress: () => {}`；插件 API 只提供 MCP 配置 editor，没有通知 hook。读取已收编文件和 ADR-047 精确接管面后，在原 MCP 链上加本次调用 callback；若实施证明需要新增未收编上游路径或改变 #1760 的冻结接口，停止回报具体接缝，不绕到新连接/IPC。
+- core 与模型历史的 ToolResult 内容不是原始 MCP structuredContent 形状；以实际转换源码与 SDK/真消息类生成结果核对，不能把自制 payload 误认成外部格式。frame 元数据必须与同一次返回的图片按顺序/身份绑定，不按文件名猜图。
+- VisionSession 当前按内容去重并限制普通图片登记数；同字节不同时间点的帧仍需各自 frameId 引用，不能覆盖时间点、丢后面的帧或把 OCR 成功视为视觉理解。
+- 首方 identity 的 #1760 producer 尚未实施；本片消费该 authority 的真实判定面并明确 pending，不伪造 bundled 证据让同名服务通过。真实包/模型/出网记录仍不由轻测代替。
+
+### 证明
+
+| AC / D4 分工 | 具名证据 / 命令（从相应包执行） | 层与运行时机 | 删除行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-04 处理进度 | `ui-mac: bun test src/main/video-service.test.ts src/main/video-tools.test.ts` 的真实 SDK 处理通知；`core: bun test test/codepuppy-mcp-runtime.test.ts -t "video progress"` 的本次 Context/并发/取消归属 | integration；受影响 PR 与 nightly | 去掉完整 metadata、client callback 或 Tool.Context 接线，通知/归属断言变红；不会用 server 自报 callId 或 initialize context 填补 |
+| AC-04/16 既有卡片 | tool-card-model 既有文件与 `test-component/session-timeline.cases.ts` 中具名视频进度/无 total/第三方/取消状态断言 | fast 或 integration；按既有 runner 的受影响 PR 与 nightly | 去掉 phase/实数投影、制造百分比、接受无首方 display，会使模型/真实 DOM 断言变红 |
+| AC-07 能看图模型 | `ext: bun test src/cloud-vision.test.ts -t "video frame"`：真消息类/生产 context hook 保留图+OCR，桩 endpoint 请求数为 0 | integration；受影响 PR 与 nightly | 自动 transcribe、丢 OCR 或图片运输/注册会让内容与零请求断言失败 |
+| AC-07 非视觉先 OCR | 同文件：有 OCR 与空 OCR 都只本机投影，frameId/source/time 完整；正文定界符按原 wrapper 安全规则处理 | integration；受影响 PR 与 nightly | 删除 OCR 分支会出网或只留下 unsupported media，断言失败；不靠模型桩“答对”伪造 AC-07 真引擎验收 |
+| AC-07 按需 vision | 同文件：后续按 frameId 调原 vision，走原压缩/固定模型/缓存面，当前卡片 metadata 是实际帧时间；同字节多个 frameId 可分别引用 | integration；受影响 PR 与 nightly | 不登记 frameId、错误去重时间、复制新云客户端或丢卡片来源会失败 |
+| AC-14 本机默认不出网 | 上述 frame context 的桩 endpoint 计数 + 无访问凭据情况下仍能获得 OCR；既有普通贴图/Read 用例保持原行为 | integration；受影响 PR 与 nightly；真实出网/断网包为一次性 pending | 视频 OCR 路径若依赖 cloudVisionAccess/transcribeEntry 即变红；不宣称这些轻测已证明 OS 出网记录 |
+
+计划删除对照：去掉 producer 完整 progress、切断 client→Tool.Context、去掉卡片来源/计数、让视频重新走自动 transcribe、去掉 frameId 登记、丢按需 vision 的时间 metadata。每个以具名断言变红后恢复；不继承 D3 的七臂当作本片证据。
+
+### 偏离记录
+
+暂无。r6 允许同轮计划后实施；本节不重作冻结技术决定，不新增界面稿。D3 接缝/发布/真模型/Windows 实测仍 pending；D5 不在本轮。
 
 ## D5 平台视频理解桌面接线
 

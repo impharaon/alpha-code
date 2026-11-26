@@ -502,6 +502,8 @@ D3 代码/实物提交：`9929af424c`、`6bc8ccbf0a`；本收据提交继续包�
 - 视觉投影用仓内原始 `packages/ai/test/fixtures/images/edit-source.jpg`（128×128 JFIF、Lavc60.31.102）不改字节，配 D2 output schema 与实际 Message/ToolResultPart 类；仅证明投影/路由，不称它是 OCR/ffmpeg 实测样本。没有新增虚构媒体格式。
 - 服务 JS 字节变化由 D3 原 producer 重生同一清单；组件/native/pin 不重建。组件集合初次外层命令触发 Bun 默认 5 秒超时（75 PASS、1 timeout）；具名原因是嵌套集合的外层时限，按既有 runner 单独执行 cases 完成 125 PASS / 6.07 秒，最终用命令行 `--timeout 30000` 检查受影响集合，不改断言或生产限制。
 
+- 最终联集首次 core 225 PASS / 1 FAIL：`mcp.test.ts` 的既有请求数据精确断言遇到新增 callback 字段。尝试同步其两条期望后单文件 107 PASS，但 north-star 指出该上游测试不在接管面；已恢复该文件，未改 gate/ADR。最终把本次运行期 callback 与请求数据分开，以 `callTool(input, videoProgress?)` 沿已收编链传递；原上游请求字段和测试均不改，SDK/本次 Context/原断言定向 3 PASS，最终相关集另核。这是 callback 的私有传递位置调整，没有 #1760 preparation 字段/协议更改、兼容分支或新工具参数。
+
 r6 允许同轮计划后实施；本节不重作冻结技术决定，不新增界面稿。D3 接缝/发布/真模型/Windows 实测仍 pending；D5 不在本轮。
 
 ## D5 平台视频理解桌面接线

@@ -196,8 +196,8 @@ export interface Connection {
       readonly name: string
       readonly args?: Record<string, unknown>
       readonly sessionID?: Session.ID
-      readonly videoProgress?: (update: VideoProgress) => Promise<void> // codepuppy(#1775)
     } & PerRequest,
+    videoProgress?: (update: VideoProgress) => Promise<void>, // codepuppy(#1775): callback is not request data
   ) => Effect.Effect<CallToolResult, Error>
   readonly onClose: (callback: (reason: string) => void) => void
   readonly onSessionExpired: (callback: () => void) => void
@@ -547,10 +547,10 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
             { signal: claim(signal, input), timeout: execution },
           ),
         ),
-      callTool: (input) => {
+      callTool: (input, videoProgress) => {
         const call = Effect.tryPromise({
           try: (signal) =>
-            withVideoProgress(signal, input.videoProgress, (onprogress) => client.callTool(
+            withVideoProgress(signal, videoProgress, (onprogress) => client.callTool(
               {
                 name: input.name,
                 arguments: input.args ?? {},

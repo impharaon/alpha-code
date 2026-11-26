@@ -713,8 +713,8 @@ describe("video progress", () => {
       const first: unknown[] = []
       const second: unknown[] = []
       yield* Effect.all([
-        mcp.callTool({ server: "progress", name: "video_progress", args: { completed: 1000 }, videoProgress: async (update) => { first.push(update) } }),
-        mcp.callTool({ server: "progress", name: "video_progress", args: { completed: 2000 }, videoProgress: async (update) => { second.push(update) } }),
+        mcp.callTool({ server: "progress", name: "video_progress", args: { completed: 1000 } }, async (update) => { first.push(update) }),
+        mcp.callTool({ server: "progress", name: "video_progress", args: { completed: 2000 } }, async (update) => { second.push(update) }),
       ], { concurrency: 2 })
       expect(first).toEqual([{ phase: "decoding", completed: 1000, total: 10000, unit: "ms" }, { phase: "transcribing", completed: 1000, total: 10000, unit: "ms" }])
       expect(second).toEqual([{ phase: "decoding", completed: 2000, total: 10000, unit: "ms" }, { phase: "transcribing", completed: 2000, total: 10000, unit: "ms" }])

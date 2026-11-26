@@ -229,3 +229,30 @@ test("without a viewed Session main posts stop immediately and waits for the rea
   await stopped
   requester.close()
 })
+
+test("a deaf child with a viewed Session is killed within the existing stop budget", async () => {
+  const { requestSidecarStop } = await import("./sidecar-stop")
+  const { createPluginSessionRequester, notePluginSessionViewed } = await import("./plugin-session-lifecycle")
+  const requester = createPluginSessionRequester(() => {})
+  notePluginSessionViewed(1776, "ses_deaf_shutdown")
+  let exited!: () => void
+  const exit = new Promise<void>(resolve => { exited = resolve })
+  let kills = 0
+  vi.useFakeTimers()
+  const stopping = requestSidecarStop({ postMessage: () => {}, kill: () => { kills++; exited() } }, exit)
+  try {
+    vi.advanceTimersByTime(5_999)
+    await Promise.resolve()
+    expect(kills).toBe(0)
+    vi.advanceTimersByTime(1)
+    await Promise.resolve()
+    expect(kills).toBe(1)
+    await stopping
+  } finally {
+    exited()
+    requester.close()
+    notePluginSessionViewed(1776, undefined)
+    await stopping
+    vi.useRealTimers()
+  }
+})

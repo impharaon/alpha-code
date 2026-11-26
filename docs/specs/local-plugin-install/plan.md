@@ -1442,3 +1442,5 @@ A1 实现：Location 的 ext setup 完成 seal 后，经既有 HubBridge/parentP
 A1 相关 main coordinator/view/message 三文件 **49 pass**，ext bridge **14 pass**（`A1-main-files.log` / `A1-bridge.log`）。ui-mac 初次类型检查指出 ReloadCoordinator 的声明缺新方法，已同步同一个私部接口；原 wire/session/install DTO 未变。其余最终检查与后续 finding 的证据接本段，不以 A1 通过代表全审查完成。
 
 A1 收口：最终 ext host **111 pass**，ui-mac/ext typecheck exit 0（`A1-host-file.log`、`A1-ui-types-green.log`、`A1-ext-types.log`）。A1 的原 engine 文件已完整一次，不在后续无改动时重跑；engine-cases 宿主只同步固定 pass count，没有运行整层 wrapper。
+
+A2：`3827cff1c4` 单独红测，native/package inline shell 从实际 process PATH/HOME 观察继承，`bun test --max-concurrency 2 test/codepuppy-command-model-priority.test.ts -t 'native and package inline shells inherit'` **0 pass / 1 fail**（`/tmp/plugin-standard-r20-A2-red.log`）。原 ChildProcess 仅补 extendEnv:true，保持 Invocation env/绑定槽的覆盖顺序；未复制或读取凭据/代理值。具名 **1 pass**，原 core 文件 **15 pass / 0 fail**（`A2-green.log` / `A2-core-file.log`）。同提交同步原 registry proof 和 gate-files count 14→15；核心类型/相关消费者在 A3/A4 同模块收口后统一核对，不跑整包。

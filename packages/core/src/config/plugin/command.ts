@@ -275,7 +275,7 @@ function evaluateTemplate(
     const outputs = yield* Effect.forEach(rendered, node => {
       if (node.kind !== "shell") return Effect.succeed(node.text)
       if (!shell) return Effect.succeed(node.delimiter === "```" ? "```!" + node.text + "```" : "!`" + node.text + "`")
-      return services.processes.run(ChildProcess.make(shell, ShellSelect.args(shell, node.text), { cwd: input.cwd, stdin: "ignore", env: { ...input.environment, ...node.env } }), { combineOutput: true }).pipe(
+      return services.processes.run(ChildProcess.make(shell, ShellSelect.args(shell, node.text), { cwd: input.cwd, stdin: "ignore", extendEnv: true, env: { ...input.environment, ...node.env } }), { combineOutput: true }).pipe(
         Effect.map(result => (result.output ?? Buffer.concat([result.stdout, result.stderr])).toString("utf8")),
         Effect.mapError(error => new Error("Shell interpolation failed: " + error.message)),
       )

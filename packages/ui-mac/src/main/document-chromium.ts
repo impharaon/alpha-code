@@ -341,6 +341,7 @@ export async function documentChromium(input: Parameters<typeof renderDocumentCh
             sandbox: true,
             contextIsolation: true,
             nodeIntegration: false,
+            webviewTag: false,
             backgroundThrottling: false,
             webSecurity: true,
           },

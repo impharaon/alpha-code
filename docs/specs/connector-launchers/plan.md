@@ -401,3 +401,28 @@ r4 Python 本地镜像的产品步骤：同一 launcher authority.ensureFile 包
 r4 最终收敛：SDK handler 复用同一 first-party 模块的 listedFirstPartyTools，原 declaredListedTools 委托同一既有投影，避免新 handler 再维护另一份工具规范化。该必要同链模块为 r4 文件清单补项；原公开函数签名/行为未改。最终受影响纯身份/真实 SDK 10 PASS / 85 assertions（`/tmp/connector-r4-final-first-party.log`），ext `bun run build` exit 0，未出现 tracked dist 差异。
 
 #1759 接缝复核到分支提交 `ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f`：R1 输入/resolve 函数及 R2 install/project/refresh/requester 签名保持上表；planPackageManagerCaches 的实际返回补列 excluded:string[]。当前 R1 不含 npm_config_prefix，表内旧括注按源码修正；本票 npm 准备仍使用冻结的显式 --prefix，不另投影此键。Root 必须消费同一次绑定的 env/cacheEnv/rules/locations，R2 沿其 engine/package-manager-spawner 最终投影，未复制任何位置键表或绑定实现。真实探针只用其候选 resolve，不能当已绑定 fence 证明。
+
+### r4 最终交付收据
+
+依据版本：SPEC v1、冻结 DESIGN v2.2、r4 编排器裁定。已核：Codex / GPT-6，结论 PARTIAL。已定勿重开：随包 uv/Node、唯一 pinned authority、#1759 R1/R2 所有权、严格首方身份、仅 uv python install 的无 CLT PATH 裁定。本轮没有新设计分叉或用户批准问题。
+
+- AC-01/05 子链：marker red-first 在 616d06524b 为 0 PASS / 2 FAIL，guard 后通过；真实 pinned 3.12.16 与新产品镜像步骤通过（上文两份实际探针记录）。缺 CLT 仅缺 install-name patch，wheels 影响沿 r4 裁定，不冒称真干净 Mac/正式包验收。
+- AC-02/10 子链：持久收据只保存包事实、原子发布、缺文件/坏收据不命中；重新加载不调解析器/进程，当前业务输入重新绑定。Environment 的 Python 安装和执行观察已实跑。完整 prepareConnectorLaunch、真实包语法/规范化 key 尚未实现，不能把这些私有步骤称为整包写入围栏或离线重启通过。
+- AC-06/07/08 子链：r3 的一份呈现/runtime.retry/助手首条消息证据继承；本轮完整 stderr 的遮密 tee、真实 exit/signal、未 spawn 的 null、连接成功后退出、实际 stdio 所读 masked bytes 有新增证据。core changed/diagnostic 的生产 producer/窄桥仍未接，不声称应用行已由新链驱动。
+- v2：受管 SDK handler、活跃调用/Effect context、取消/期限、entryFor 请求/进度、main 逐字身份与代码重验、单一下载 authority、配方展开/验证/缓存均已落；真实 Slot/root→McpConnection 的 managed binding 构造和 Host 发布尚未装配，不能称视频端到端完成。
+
+最终相关检查（所有命令 exit 0，除已说明的红例）：
+- core：5 个明确文件（connector-launch / tool-collision / tool-generation / mcp-attach / mcp-instructions）41 PASS / 161 assertions；MCP runtime 12 个命名轻例 12 PASS / 97 assertions，跳过其余 23 个含引擎/时序例。投影收敛后只复核受影响的身份/SDK 10 例，10 PASS / 85 assertions。日志 `/tmp/connector-r4-core-related.log`、`connector-r4-core-runtime-related.log`、`connector-r4-final-first-party.log`。
+- UI/main：7 个明确文件 69 PASS / 457 assertions；新镜像步骤后只跑受影响的 launcher 文件，22 PASS / 104 assertions。日志 `/tmp/connector-r4-ui-related.log`、`connector-r4-main-final.log`。
+- ext：identity/resolver/register-policy/tool-policy-rpc/unattended 5 文件 136 PASS / 461 assertions（`/tmp/connector-r4-ext-related.log`）；类型/构建均 exit 0。core / util / ui-mac 的 bun typecheck 也均 exit 0，core 2060 files / 2 projects、util 114 files。包内无独立 lint 命令，git diff --check 通过。
+- MCP mock 中旧精确断言按新内部 contract 补齐（上文 red→green），保留其原字段比较。环境 pure 用例只构造 DTO，未复用 marker 的写盘 fixture；此测试数据整理只复核该三例和共用 DTO 的 Python 正例，4 PASS（`/tmp/connector-r4-pure-fixtures.log`），无新 IO/clock/全局测试输入。
+- 八个移除臂分别移走：收据命中、遮密、显式 env/cwd 比较、recipe ID 拒绝、Tool.Context 传递、宿主运行时环境隔离、recipe 入口（改回原始归档）、Python 镜像步骤；均 exit 1 且是相应行为失败，随后 scoped git restore。日志 `/tmp/connector-r4-removal-<receipt|diagnostic|identity|pinned_ids|tool_context|runtime_environment|entry_path|python_mirror>.log`。前六在 wider-related 恢复绿，后两 `/tmp/connector-r4-final-restored.log` 2 PASS / 15 assertions。
+- `affected-tests --list`：**affected tests: 380 of 742 test files**，exit 0，无全量 fallback（`/tmp/connector-r4-affected-final.scope` / `.list`）。未改 gate/global 输入；没有拓宽每个 PR 的全局测试层。两次 list 中第二次是后续新消费者/测试变化后的最终选集，不执行测试。
+
+当前下一步（仍归 #1760）：完整 uv/npx 官方语法适配、非秘密解析内容 key、包持久安装/bin 与 prepareConnectorLaunch 组合（含 Location 内运行目录准备/自动恢复）；接到 startPermits 前，prepared 直接入口再启服务；生产 attempt identity/state/诊断 producer、runtimeDep/git/secret/egress 事实与动作；首方 Node/cache root 的 boot 重锚与 mandatory bootstrap.launchers；将上述 Host、entryFor/DocumentRuntime.retry 和诊断查询装到当前代 root。#1759 合入只消除 R1/R2 位置/绑定依赖，不自动补完本票余项。AC-01/02/03/04/05/09/10 的正式包、干净账户、国内节点、原生模块与离线时钟，及 AC-06/07/08 真引擎整链仍待验收；本轮未运行应用、窗口或计时/容量/全层用例。
+
+Office 前置失败明确交接（继承 r3 事实，不重跑）：在 packages/ui-mac 执行 `gate slot -- bun scripts/build-office-runtime.ts`；最终失败命令为 `native/office-runtime/build/arm64.staging/python/bin/python3 -I -m compileall -q -f -j 0 -s native/office-runtime/build/arm64.staging/python --invalidation-mode unchecked-hash native/office-runtime/build/arm64.staging/python/lib/python3.11`，exit 1、stderr 空。包装器 `scripts/build-office-runtime.ts:398` 没有保留 stdout；原因未确定。前两次 pip --only-binary/:all: --require-hashes 的安装也 exit 1、stderr 空，完整原命令在 `/tmp/connector-r3-office-build.log`。未将此归因于本轮 3.12.16 的 install-name 警告。
+
+遗留去向：本票余项→#1760 下一轮；#1759→合入后按接口表消费；Office Python 前置→编排器处理本机/构建前置；docs/README.md 既有 index.stale 等→既有文档治理。官方 docs check_repo 对本 worktree 的 plan 0 finding，仓级 58 errors / 249 warnings 与 r3 相同；不顺修。无迁移、无其它仓修改、无 push/PR/merge，hooksPath=.githooks；OPTIONAL：无。
+
+本轮最终规模：17 files changed, 2351 insertions(+), 79 deletions(-)（含计划、测试与必要格式化）；核对时间 2026-11-26T18:04:04Z，自本轮 16:40:15Z 起用时 83 分 49 秒，原预计约 90 分钟。

@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 import { dirname, resolve } from "node:path"
 import { packageManagerScanSource } from "../engine/package-manager-scan-transform"
 
 export const PACKAGE_MANAGER_SCANNER = "virtual:codepuppy-shell-scan"
-export const PACKAGE_MANAGER_SCANNER_SOURCE = resolve(import.meta.dirname, "../../core/src/shell/scan.ts")
+export const PACKAGE_MANAGER_SCANNER_SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), "../../core/src/shell/scan.ts")
 
 export function packageManagerScannerCode() {
   const select = readFileSync(resolve(dirname(PACKAGE_MANAGER_SCANNER_SOURCE), "select.ts"), "utf8")

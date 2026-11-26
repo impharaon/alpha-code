@@ -369,9 +369,21 @@ const { spawnSync } = require('node:child_process')
     const target = new URL(rawUrl(reference))
     const authorization = target.username || target.password ? 'Basic ' + Buffer.from(decodeURIComponent(target.username) + ':' + decodeURIComponent(target.password)).toString('base64') : undefined
     target.username = ''; target.password = ''
-    const response = await npmRequire('make-fetch-happen')(target.href, { headers: authorization ? { authorization } : {}, proxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY, noProxy: process.env.NO_PROXY, cachePath: path.join(input.sourceCache, 'connector-requirements'), cache: 'force-cache' })
-    if (!response.ok) throw Error('Requirement source HTTP ' + response.status + ' ' + target.origin)
-    return response.text()
+    const cache = path.join(input.sourceCache, 'connector-requirements')
+    fs.mkdirSync(cache, { recursive: true, mode: 0o700 })
+    const snapshots = npmRequire('cacache')
+    const key = 'requirements:' + sanitize(target.href)
+    const cached = () => snapshots.get(cache, key).then(value => value.data.toString('utf8'))
+    if (input.declaration.offline) return cached().catch(error => {
+      if (error.code !== 'ENOENT') throw error
+      throw Object.assign(Error('Requirement source unavailable offline ' + target.origin), { code: 'ENOTCACHED' })
+    })
+    return npmRequire('make-fetch-happen')(target.href, { headers: authorization ? { authorization } : {}, proxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY, noProxy: process.env.NO_PROXY, cachePath: cache, cache: 'default', retry: 0 }).then(async response => {
+      if (!response.ok) throw Error('Requirement source HTTP ' + response.status + ' ' + target.origin)
+      const text = await response.text()
+      await snapshots.put(cache, key, text)
+      return text
+    }, error => cached().catch(() => { throw error }))
   }
   const read = async reference => {
     const canonical = /^https?:/.test(reference) ? reference : fs.realpathSync(reference.startsWith('file:') ? fileURLToPath(reference) : reference)
@@ -520,6 +532,7 @@ export function parseUvToolSettings(text: string) {
         withEditable: strings(fields.with_editable!, "list"),
         environmentFiles: strings(fields.env_file!, "list"),
         noEnvironmentFiles: fields.no_env_file === "true",
+        offline: /\bconnectivity:\s*Offline\b/.test(text.slice(0, start.index)),
         // This includes effective resolver options and operational/volatile settings. The
         // content-key stage must select non-secret resolution facts, not this entire object.
         fields,

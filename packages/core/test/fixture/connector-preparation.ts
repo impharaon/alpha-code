@@ -2,8 +2,8 @@
 // IO are real; controlled processes replace only application-owned CLI dispatch and Python probes.
 import path from "node:path"
 import { strict as assert } from "node:assert"
-import { mkdirSync, writeFileSync, readdirSync, existsSync, symlinkSync } from "node:fs"
-import { Deferred, Effect, Fiber, Layer, References, Stream } from "effect"
+import { mkdirSync, writeFileSync, readdirSync, existsSync, symlinkSync, rmSync } from "node:fs"
+import { Deferred, Effect, Fiber, Layer, PlatformError, References, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { Environment } from "@opencode/core/environment/index"
 import { prepareConnectorLaunch } from "@opencode/core/mcp/codepuppy-connector-launch"
@@ -32,6 +32,7 @@ module.exports = async process => {
  if(process.env.OWN_BLOCK==='true'&&!fs.existsSync(path.join(root,'release'))){
   await new Promise(resolve=>{const watcher=fs.watch(root,()=>{if(fs.existsSync(path.join(root,'release'))){watcher.close();resolve()}});process.stderr.write('Owned installer activity\n')})
  }
+ process.stderr.write('Owned installer resumed\n')
  const prefix=process.argv[process.argv.indexOf('--prefix')+1]
  fs.mkdirSync(path.join(prefix,'node_modules/.bin'),{recursive:true})
  fs.cpSync(process.env.OWN_SOURCE,path.join(prefix,'node_modules/semver'),{recursive:true})
@@ -42,12 +43,14 @@ module.exports = async process => {
 `)
 const identity = (attempt: string) => ({ directory: root, server: "owned", attempt })
 const progress: Record<string, { stage: string; value: PreparationProgress }[]> = {}
-const begun: string[] = [], ended: string[] = [], installs: string[][] = []
+const begun: string[] = [], ended: string[] = []
+const installs: ChildProcess.StandardCommand["args"][] = []
 let downloads = 0, pythonInstalls = 0, installCount = 0, aborted = 0
+let recovering = false
 let late: ((received: number, total: number) => void) | undefined
 let resolveLate: (() => void) | undefined
 const downloaded = Deferred.makeUnsafe<void>(), started = Deferred.makeUnsafe<void>(), joined = Deferred.makeUnsafe<void>()
-const live: Effect.Effect<boolean>[] = []
+const live: Effect.Effect<boolean, PlatformError.PlatformError>[] = []
 const host: ConnectorLaunchHost = {
   resolveAssets: () => input.scenario === "resolve-cancel" ? new Promise(resolve => { resolveLate = () => resolve(launchers); Effect.runSync(Deferred.succeed(downloaded, undefined)) }) : Promise.resolve(launchers),
   ensureFile: async (_id, signal, report) => {
@@ -58,11 +61,11 @@ const host: ConnectorLaunchHost = {
     }
     if (input.scenario === "download-recover" && downloads === 1) return { result: { ok: false, error: "network" }, failure: { kind: "connect", detail: "owned refused download" } }
     if (input.scenario === "download-deterministic") return { result: { ok: false, error: "network" }, failure: { kind: "http", status: 404, detail: "owned missing original" } }
-    return { result: { ok: true, path: path.join(root, "verified-archive"), cached: true } }
+    return { result: { ok: true, path: path.join(root, "verified-archive"), via: "cache" } }
   },
   beginEgress: async value => { begun.push(value.attempt); return { proxyEnvironment: { OWN_EGRESS_ATTEMPT: value.attempt } } },
   endEgress: value => { ended.push(value.attempt) },
-  egressEvidence: async value => input.scenario.startsWith("egress") ? [{ identity: input.scenario === "egress-other-attempt" ? identity("other") : value, host: input.scenario === "egress-other-host" ? "other.invalid" : "registry.invalid", port: 443, outcome: "refused" }] : [],
+  egressEvidence: async value => input.scenario.startsWith("egress") ? [{ identity: input.scenario === "egress-other-attempt" ? identity("other") : { ...value, ...(input.scenario === "egress-other-directory" ? { directory: "/other" } : {}), ...(input.scenario === "egress-other-server" ? { server: "other" } : {}) }, host: input.scenario === "egress-other-host" ? "other.invalid" : "registry.invalid", port: input.scenario === "egress-other-port" ? 8443 : 443, outcome: "refused" }] : [],
   changed() {}, runtimeDependencies: async () => ({ runtimeDep: [], executables: {}, missing: [] }), prepareFiles: async () => ({ ok: false, error: "unknown-file" }),
 }
 publishConnectorLaunchHost(host)
@@ -84,13 +87,13 @@ const layer = Layer.effect(Environment.Service, Effect.gen(function* () {
     let options = command.options
     let installing = false
     if (command.command === launchers.node && options.stdin && typeof options.stdin === "object" && "stream" in options.stdin) {
-      const bytes = yield* Stream.mkUint8Array(options.stdin.stream)
+      const bytes = yield* Stream.mkUint8Array((options.stdin as { stream: Stream.Stream<Uint8Array, PlatformError.PlatformError> }).stream)
       const operation = (JSON.parse(new TextDecoder().decode(bytes)) as { operation?: { kind: string } }).operation
       options = { ...options, stdin: { ...options.stdin, stream: Stream.succeed(bytes) } }
       if (operation?.kind === "install") {
         installCount++; installing = true
         const detail = input.scenario === "deterministic" ? "Requirement source HTTP 404 https://registry.invalid" : "Requirement source HTTP 503 https://registry.invalid"
-        const fail = input.scenario === "recover" ? installCount === 1 : ["failed", "deterministic"].includes(input.scenario) || input.scenario.startsWith("egress")
+        const fail = input.scenario === "recover" ? installCount === 1 : ["failed", "failure-restart", "deterministic"].includes(input.scenario) && !recovering || input.scenario.startsWith("egress")
         if (fail) return yield* current.spawner.spawn(ChildProcess.make(process.execPath, ["-e", "process.stderr.write(process.argv[1]);process.exitCode=1", detail], options))
       }
     }
@@ -104,7 +107,7 @@ const prepare = (attempt: string) => prepareConnectorLaunch({ runner: "npm-exec"
   HOME: path.join(root, "home"), PATH: process.env.PATH!, OWN_ROOT: root, OWN_SOURCE: input.source,
   OWN_MANIFEST: new URL("./npm-launch/installed-package.json", import.meta.url).pathname,
   OWN_LOCK: new URL("./npm-launch/installed-package-lock.json", import.meta.url).pathname,
-  OWN_BLOCK: ["merge", "cancel-waiter", "cancel-owner"].includes(input.scenario) ? "true" : "false",
+  OWN_BLOCK: ["merge", "cancel-waiter", "cancel-owner", "cancel-owner-peer"].includes(input.scenario) ? "true" : "false",
 }, runtimeDep: { runtimeDep: [], executables: {}, missing: [] } }).pipe(Effect.provideService(ConnectorPreparationProgress, (stage, value) => {
   ;(progress[attempt] ??= []).push({ stage, value })
   if (attempt === "second" && stage === "packages" && value.unit === "activity" && value.detail === "Preparing connector packages") Effect.runSync(Deferred.succeed(joined, undefined))
@@ -117,10 +120,10 @@ const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
     const count = progress.first?.length
     late?.(9, 10); resolveLate?.(); yield* Effect.yieldNow
     assert.equal(progress.first?.length, count); assert.equal(installCount, 0); assert.equal(pythonInstalls, 0); assert.equal(readyFiles().length, 0)
-    if (input.scenario === "download-cancel") assert.equal(aborted, 1)
+    if (input.scenario === "download-cancel") { assert.equal(aborted, 1); assert.ok(progress.first!.some(item => item.value.unit === "bytes" && item.value.completed === 5 && item.value.total === 10)) }
     return { cancelled: true }
   }
-  if (["merge", "cancel-waiter", "cancel-owner"].includes(input.scenario)) {
+  if (["merge", "cancel-waiter", "cancel-owner", "cancel-owner-peer"].includes(input.scenario)) {
     const first = yield* Effect.forkScoped(Effect.scoped(prepare("first")))
     yield* Deferred.await(started)
     if (input.scenario === "cancel-owner") {
@@ -134,18 +137,31 @@ const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
     }
     const second = yield* Effect.forkScoped(Effect.scoped(prepare("second")))
     yield* Deferred.await(joined)
+    assert.ok(progress.first!.filter(item => item.value.unit === "activity" && item.value.detail === "Preparing connector packages").length >= 2)
     const count = progress.second!.length
+    if (input.scenario === "cancel-owner-peer") {
+      yield* Fiber.interrupt(first)
+      assert.equal(yield* live[0]!, false)
+      const previous = progress.first!.length
+      writeFileSync(path.join(root, "release"), "continue")
+      const value = yield* Fiber.join(second)
+      assert.equal(installCount, 2); assert.equal(progress.first!.length, previous)
+      return { key: value.key, cancelled: true, recovered: true }
+    }
     if (input.scenario === "cancel-waiter") yield* Fiber.interrupt(second)
     assert.equal(installCount, 1)
     writeFileSync(path.join(root, "release"), "continue")
     const a = yield* Fiber.join(first)
-    if (input.scenario === "merge") assert.equal((yield* Fiber.join(second)).key, a.key)
+    if (input.scenario === "merge") {
+      assert.equal((yield* Fiber.join(second)).key, a.key)
+      assert.ok(progress.second!.filter(item => item.value.unit === "activity" && item.value.detail === "Preparing connector packages").length >= 2)
+    }
     if (input.scenario === "cancel-waiter") assert.equal(progress.second!.length, count)
     assert.equal(installCount, 1)
     return { key: a.key, merged: true }
   }
   const outcome = yield* Effect.scoped(prepare("first")).pipe(Effect.result)
-  if (["failed", "deterministic", "egress", "egress-other-attempt", "egress-other-host", "download-deterministic"].includes(input.scenario)) {
+  if (["failed", "failure-restart", "deterministic", "egress", "egress-other-attempt", "egress-other-host", "egress-other-port", "egress-other-directory", "egress-other-server", "download-deterministic"].includes(input.scenario)) {
     assert.equal(outcome._tag, "Failure")
     if (outcome._tag !== "Failure") throw Error("expected controlled failure")
     assert.equal(readyFiles().length, 0)
@@ -153,14 +169,27 @@ const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
     assert.equal(outcome.failure.kind, kind)
     assert.equal(installCount, input.scenario === "download-deterministic" ? 0 : ["egress", "deterministic"].includes(input.scenario) ? 1 : 2)
     if (input.scenario === "download-deterministic") assert.equal(downloads, 1)
+    if (input.scenario === "failure-restart") {
+      recovering = true
+      yield* Effect.scoped(prepare("second"))
+      assert.equal(installCount, 3); assert.equal(readyFiles().length, 1)
+      return { failure: outcome.failure, recovered: true }
+    }
     return { failure: outcome.failure }
   }
   assert.equal(outcome._tag, "Success", outcome._tag === "Failure" ? JSON.stringify(outcome.failure) : "")
   if (outcome._tag !== "Success") throw Error("expected preparation")
   assert.equal(readyFiles().length, 1)
   if (input.scenario === "recover") assert.equal(installCount, 2)
-  if (input.scenario === "download-recover") assert.equal(downloads, 2)
+  if (input.scenario === "download-recover") { assert.equal(downloads, 2); assert.ok(progress.first!.some(item => item.value.unit === "bytes" && item.value.completed === 5 && item.value.total === 10)) }
   if (input.scenario.startsWith("damaged")) { assert.equal(pythonInstalls, 1); assert.ok(installs.some(args => args.includes("--reinstall"))) }
+  if (["missing-entry", "invalid-receipt"].includes(input.scenario)) {
+    const prefix = path.join(root, "prepared", outcome.success.key)
+    if (input.scenario === "missing-entry") rmSync(path.join(prefix, "node_modules/semver/bin/semver.js"))
+    if (input.scenario === "invalid-receipt") writeFileSync(path.join(prefix, "ready.json"), "{interrupted write")
+    const repaired = yield* Effect.scoped(prepare("repair"))
+    assert.equal(repaired.key, outcome.success.key); assert.equal(installCount, 2)
+  }
   const before = { downloads, pythonInstalls, installCount }
   const next = yield* Effect.scoped(prepare("second"))
   assert.equal(next.key, outcome.success.key); assert.deepEqual({ downloads, pythonInstalls, installCount }, before)

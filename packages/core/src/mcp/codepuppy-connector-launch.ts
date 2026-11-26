@@ -166,6 +166,7 @@ export function prepareConnectorLaunch(input: {
       const prefix = path.join(launchers.runtimeRoot, "prepared", key)
       const prepared = yield* Effect.acquireUseRelease(Effect.sync(() => {
         const listeners = preparationListeners.get(prefix) ?? new Set<typeof progress>(); listeners.add(report); preparationListeners.set(prefix, listeners)
+        report("packages", { unit: "activity", detail: "Preparing connector packages" })
       }), () => Effect.gen(function* () {
         const cached = yield* readConnectorPreparation({ runtimeRoot: launchers.runtimeRoot, key, runner: input.runner })
         if (cached) return cached

@@ -36,6 +36,7 @@ import type {
   LauncherEnvironment,
   PreparedLaunch,
 } from "@opencode/util/codepuppy-connector-launch"
+import { isConnectorLaunchFailure } from "@opencode/util/codepuppy-connector-launch"
 import { Environment } from "@opencode/core/environment/index"
 import {
   installConnectorPython,
@@ -1876,7 +1877,7 @@ test("uv remote requirements keep credential rotation offline and detect changed
     const launchers = { ...input.launchers, environment: { ...input.launchers.environment, XDG_CACHE_HOME: path.join(input.root, "owned-cache") } }
     const invoke = (offline: boolean, token: string, version = "one") => {
       const replace = (value: string) => value.replaceAll(capture.remoteOrigin.slice("http://".length), origin.slice("http://".length)).replaceAll(capture.remoteOrigin.split(":").at(-1)!, String(server.port)).replaceAll("owned-first", token).replaceAll("version=one", "version=" + version)
-      return Effect.runPromise(Effect.scoped(normalizeUvLaunchDeclaration({ ...input, launchers, python, cwd: input.root, environment: { ...input.environment, HTTPS_PROXY: "", HTTP_PROXY: "", NO_PROXY: "127.0.0.1", XDG_CACHE_HOME: path.join(input.root, "unbound-cache") }, syntax: "uvx", arguments: [...(offline ? ["--offline"] : []), ...capture.remoteArguments.map(replace)], declaration: parseUvToolSettings(replace(offline ? capture.remoteOfflineSettings : capture.remoteSettings)) })).pipe(Effect.provide(layer)))
+      return Effect.runPromise(Effect.scoped(normalizeUvLaunchDeclaration({ ...input, launchers, python, cwd: input.root, environment: { ...input.environment, HTTPS_PROXY: "", HTTP_PROXY: "", NO_PROXY: "127.0.0.1", XDG_CACHE_HOME: path.join(input.root, "unbound-cache"), BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(input.root, "test-bun-cache") }, syntax: "uvx", arguments: [...(offline ? ["--offline"] : []), ...capture.remoteArguments.map(replace)], declaration: parseUvToolSettings(replace(offline ? capture.remoteOfflineSettings : capture.remoteSettings)) })).pipe(Effect.provide(layer)))
     }
     const key = (value: Awaited<ReturnType<typeof invoke>>) => connectorPreparationKey({ runner: "uv-tool", launchers, ...value })
     const first = await invoke(false, "owned-first")
@@ -1886,18 +1887,49 @@ test("uv remote requirements keep credential rotation offline and detect changed
     expect(key(cached)).toBe(key(first))
     expect(requests).toBe(1)
     expect(existsSync(path.join(input.root, "unbound-cache"))).toBe(false)
-    const miss = await invoke(true, "owned-rotated", "missing").then(() => undefined, error => String(error))
+    const miss = await invoke(true, "owned-rotated", "missing").then(() => undefined, error => isConnectorLaunchFailure(error) && "detail" in error ? error.detail : String(error))
     expect(miss).toContain("offline")
     expect(requests).toBe(1)
     body = "packaging<24\n"
     expect(key(await invoke(false, "owned-first"))).not.toBe(key(first))
     expect(requests).toBe(2)
     status = 403
-    const denied = await invoke(false, "owned-denied").then(() => undefined, error => String(error))
+    const denied = await invoke(false, "owned-denied").then(() => undefined, error => isConnectorLaunchFailure(error) && "detail" in error ? error.detail : String(error))
     expect(denied).toContain("Requirement source HTTP 403")
     expect(requests).toBe(3)
     const facts = JSON.stringify({ requirements: cached.requirements, options: cached.options, configuration: cached.configuration })
     expect(facts).not.toContain("owned-first")
     expect(facts).not.toContain("owned-fake-secret")
   } finally { server.stop(true) }
+})
+
+test("connector preparation merges simultaneous requests and fans out actual installer progress", async () => {
+  expect(await preparationTransaction("merge")).toMatchObject({ merged: true, installCount: 1, downloads: 0 })
+})
+
+test("connector preparation releases cancelled subscribers and recovers after the owner is interrupted", async () => {
+  expect(await preparationTransaction("cancel-waiter")).toMatchObject({ merged: true, installCount: 1 })
+  for (const scenario of ["cancel-owner", "cancel-owner-peer"]) expect(await preparationTransaction(scenario)).toMatchObject({ cancelled: true, recovered: true, installCount: 2 })
+})
+
+test("connector preparation aborts downloads and ignores late asset and progress results", async () => {
+  for (const scenario of ["resolve-cancel", "download-cancel"]) expect(await preparationTransaction(scenario)).toMatchObject({ cancelled: true, installCount: 0, pythonInstalls: 0 })
+})
+
+test("connector preparation retries transient downloads and installers once and preserves deterministic failures", async () => {
+  expect(await preparationTransaction("download-recover")).toMatchObject({ cached: true, downloads: 2, installCount: 1 })
+  expect(await preparationTransaction("recover")).toMatchObject({ cached: true, installCount: 2 })
+  expect(await preparationTransaction("failed")).toMatchObject({ installCount: 2, failure: { kind: "download" } })
+  expect(await preparationTransaction("deterministic")).toMatchObject({ installCount: 1, failure: { kind: "unknown" } })
+  expect(await preparationTransaction("download-deterministic")).toMatchObject({ downloads: 1, installCount: 0, failure: { kind: "unknown" } })
+})
+
+test("connector preparation names egress only for the current attempt directory server host and port", async () => {
+  expect(await preparationTransaction("egress")).toMatchObject({ installCount: 1, failure: { kind: "egress", host: "registry.invalid", port: 443 } })
+  for (const field of ["attempt", "directory", "server", "host", "port"]) expect(await preparationTransaction("egress-other-" + field)).toMatchObject({ installCount: 2, failure: { kind: "download" } })
+})
+
+test("connector preparation replaces incomplete readiness and succeeds on a later retry", async () => {
+  for (const scenario of ["missing-entry", "invalid-receipt"]) expect(await preparationTransaction(scenario)).toMatchObject({ cached: true, installCount: 2 })
+  expect(await preparationTransaction("failure-restart")).toMatchObject({ recovered: true, installCount: 3, failure: { kind: "download" } })
 })

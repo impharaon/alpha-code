@@ -768,7 +768,7 @@ prepareConnectorLaunch 的 frozen 输入/返回现已定义并组合：先依赖
 - 核对：Codex / GPT-6，IMPLEMENT；起始2026-11-26T23:20:16Z，预计90分钟；本轮不重做已接受子链，不改#1759或生产组装。
 - 文件：core/mcp/codepuppy-connector-launch.ts（缺损Python修复/总事务），codepuppy-uv-launch.ts（远端来源缓存边界）；既有 core/test/codepuppy-connector-launch.test.ts，必要隔离Host进程的fixture（只承担本模块测试装配，静态import可追踪）；唯一文档为本plan。
 - 顺序：先命名回归与真实pinned UV准备探针；红先补缺损Python/远端缓存缺陷并最小修复；总入口验证同key合并、取消、失败重试、进度和egress事实；最后相关消费者/typecheck/移除臂/scope收据。真实原件沿已有/tmp缓存，重实物命令经gate slot，不重复下载。
-- 风险：Host进程内仅发布一次，常驻测试用独立子进程避免污染其它模块；外部格式沿真实samples，受控故障只发生在应用自有进程/Host边界。私有来源的认证不写key/ready；缓存不跨权限凭据复用未授权内容。取消必须在锁释放前结束子进程，并保证晚到progress/结果不重新spawn。
+- 风险：Host进程内仅发布一次，常驻测试用独立子进程避免污染其它模块；外部格式沿真实samples，受控故障只发生在应用自有进程/Host边界。来源认证不写key/ready，缓存只使用descriptor给出的应用专用根，认证轮换后的内容复用沿冻结内容身份。取消必须在锁释放前结束子进程，并保证晚到progress/结果不重新spawn。
 - 证明：AC-02/04/05→真实UV全prepare及Python缺损恢复；AC-06→总入口各等待者阶段/字节/真实活动；AC-07→一次瞬时恢复、确定故障不重试、egress精确identity/目标；AC-08→失败原文沿既有诊断生产；AC-10→有效ready快路径和远端源离线重启。组件/集成层只运行受影响命名例，阶段结束完整本文件一次，最终相关消费者一次；移除对应行为应使命名证据失败。
 - #1759接口与待接生产点沿r8准确表，最终只读复核；不复制位置/最终绑定authority。偏离随实现提交记录。
 
@@ -777,3 +777,17 @@ r9 Python红先：真实 pinned uv 在移走已安装解释器的可执行文件
 r9 Python修复：有效receipt只做随包解释器 -I/-S 的版本启动检查（无解析/联网）；失败/文件缺失才进入原单一下载authority并在锁内 `uv python install --reinstall`，仍保留r4的CLT探测与PATH规则，安装后再次启动检查成功才发布receipt。没有新增用户选项/公共API/位置authority；明确重装只发生于无健康receipt的准备miss。红例断言不变转绿1 PASS/4 assertions；阶段整文件52 PASS/298 assertions（`/tmp/connector-r9-python-green.log`、`/tmp/connector-r9-python-file.log`）。
 
 r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pinned packaging/pip新输入回复已录入既有uv-requirements.json（命令`gate slot -- bun /tmp/connector-r5-npm-proof/remote-capture-r9.ts`及remote-parser-r9.ts，exit0；仅明确假凭据）。组件用真实HTTP服务+bundled同类npm缓存依赖+该真实协议样本，首次带Basic认证读取后，换signed token并offline仍发起第二次HTTP：`bun test test/codepuppy-connector-launch.test.ts -t 'uv remote requirements keep' --max-concurrency=2` →0 PASS/1 FAIL，requests期望1实际2（`/tmp/connector-r9-remote-red.log`）。未改产品代码。夹具脚本最初因根包type=module而把extensionless parser当ESM，已在红例提交前改用.cjs；这不是产品故障。
+
+### r9 远端缓存与总事务已落
+
+远端requirements以实际 pinned GlobalSettings 的 connectivity 读取offline事实，不再由本地适配猜CLI。在线读取沿 bundled npm make-fetch-happen 的正常HTTP缓存/更新语义；offline在同一descriptor XDG缓存内，通过原key owner去掉URL凭据/签名后的逻辑源名读取cacache快照。网络不可达可复用上次成功内容；403/404等HTTP失败不被快照掩盖，响应内容读取/写缓存失败也不进入传输fallback。没有自己的TTL/registry更新器、第二个固定文件下载器或用户缓存选项；fetch自身retry=0，准备事务只恢复一次。缓存body是私有来源内容，key/ready不写认证。红例原断言保留，补正测试的typed failure解码和Bun自有transpiler缓存位置（确认非绑定目录里只有bun子目录），组件13 assertions通过；实际原厂uv/Node/Python探针 `gate slot -- bun /tmp/connector-r5-npm-proof/remote-native-r9.ts` exit0，3次HTTP覆盖首次认证、内容变化、403，签名轮换offline和服务器关闭后offline均无请求（`/tmp/connector-r9-remote-native-real.log`）。探针先因Bun server.stop后port变0误造URL，固定持有原port后通过；产品代码未因此改变。
+
+总入口新增既有文件7个组件/集成例（含前述Python/remote共本轮8例）：同key并发仅安装一次，真实installer stderr活动转发给两个订阅者；等待者取消不杀持有者；持有者中断后原子关闭子进程再释放锁，另一个等待者/后续attempt能恢复；晚到Host/下载进度不重新spawn；瞬时下载和安装各恢复一次、确定404不重试、持续失败不写ready、联网后新attempt成功；缺失入口/坏ready重建，随后有效ready不再下载/安装；egress按attempt/directory/server/host/port全字段匹配，逐字段负对照不误报拒绝。测试隔离全局Host而不新增产品注入接口，真实Location files/spawner和npm Config/内容/捕获/执行绑定均运行。只在自有CLI dispatch边界控制故障/暂停并复制既有真实npm产物样本，不模拟外部输出。同步点是Deferred/实际stderr/文件事件，没有时钟性能断言或计时扫描。产品仅给新加入准备的订阅者发一次当前packages活动，便于一直呈现准备态；仍同一producer，不另建状态权威。
+
+**实际原件链**：
+- `gate slot -- bun /tmp/connector-r5-npm-proof/prepare-uv-product-r9.ts` exit0：完整public UV入口，真实随包uv/Node、Python pin，editable源+解释器目标，首次ensure1/install1，两处Location同key、当前输入正确（`/tmp/connector-r9-prepare-uv.log`）。
+- `gate slot -- bun /tmp/connector-r5-npm-proof/prepare-python-repair-r9.ts` exit0：分别移走可执行文件、标准库encodings；public prepare各自动修复并执行Python3.12.16/import当前源；ensure2/Python install2/package install0，第三次warm不安装，同key/ready复用，begin/end各3（`/tmp/connector-r9-python-repair-real.log`）。
+- `gate slot -- bun /tmp/connector-r5-npm-proof/prepare-uv-source-boundaries-r9.ts` exit0：带空格editable/requirements路径、带引号的递归include、stdin EOF，完整准备后真实执行，ensure1/install1、两处Location同key（`/tmp/connector-r9-uv-sources-real.log`）。这补齐r8列明的本地源边界，没有要求用户附加输入。
+- `gate slot -- bun /tmp/connector-r5-npm-proof/prepare-npm-cold-r9.ts` exit0：空runtime冷准备，第一次注入connect失败、第二次同一authority复用已验原件，installer1；真实SDK MCP stdio两次连接，当前argv/cwd/env正确，begin/end各2（`/tmp/connector-r9-npm-cold-real.log`）。r8冷MCP探针缺口已补齐。大原件没有再次从公网下载；全部探针只在/tmp只读导入#1759准确R1/R2，非生产围栏装配。
+
+阶段整行为文件 `bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2` →59 PASS/351 assertions（`/tmp/connector-r9-final-file.log`）；core `bun typecheck` →exit0、2071 files/2projects（`/tmp/connector-r9-final-types.log`）。fixture初版4个TS错误（via字段、Word/Stream/PlatformError类型）已按现有契约修正；并发进度断言移至第二订阅者已加入的确定同步点，没有修改断言。初次写编辑脚本有语法错误未执行产品变更，已更正；测试一次性记录没有当作性能/容量检查。最终移除臂/相关调用方/scope与#1759准确余项在最终收据补记。

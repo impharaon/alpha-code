@@ -788,3 +788,26 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 只读 `affected-tests --list` exit 0：**`affected tests: 157 of 736 test files`**。两份 TSV 数据以实际 guard 检验，没有适用的生产 TS typecheck/lint 变化；没有重复 r13 已通过的包级检查。git diff --check 与本次 plan.md 文档合同通过，hooksPath 仍 `.githooks`。
 
 证据：原日志 `~/.cache/alpha-orch/2026-11-26/review/1758-gate4.log`；本轮 `/tmp/secrets-r14-{old-name,risk,config}-{red,green}.log`、`name-counts.json`、`gate-counts-{red,green,final}.log`、`registry-consumer.log`、`affected.log`、`receipt.json` 与 `reports-{red,green}/`。偏离仅为按限定范围使用原检查入口代替全表 --update；没有新选项、判据副本、豁免类型、known-fails 或门槛改动，无 fetch/merge/rebase/push/PR。指定四个失败项已消除，遗留去向 none；无新增 ARCH/OPTIONAL。
+
+## r15 文档 alpha 合并与采样收据
+
+依据：r15 授权 fetch + merge origin/alpha；spec v4、design v3.3 与 SC-01/SC-02 不变。已核 Codex / GPT-6。开始 2026-11-26 14:03:18 UTC，验证于 14:16 UTC 完成，约 13 分钟（含 slot 排队）。本轮文档影响仅本计划的执行证据。
+
+- `git fetch origin` exit 0；合并提交 **`e9e073fa0265d156918071cfcee1bce2cc3ce466`**，两父为 `94440d23f4`、文档 alpha **`510b573c702ca68f29143d12182f5455cfe67797`**。没有 rebase。只有题述 TSV 与 17 份 JSON 发生文本冲突；其余源码自动合并，没有发现相反的行为决定。
+- `scripts/old-name-exceptions.tsv` 合并时保留两侧行；采样后使用原 `OLD_NAME` / `hitTokens` 实测，当前 secrets worktree 的 CLI 路径仍有 **21** 行命中，保留原 user-content 登记；文档 worktree CLI 路径命中 **0**，只删除该失效登记行，其余两侧行保留。没有改扫描规则或新增豁免类型。
+- 只对实际冲突的 17 个 fixture 路径用 scoped git restore 选择 HEAD 作为中间输入；合并提交之后运行原采样器 **`gate slot -- bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts`**，exit 0。17 份 JSON 均由采样器生成，逐份检查 `_source` 为 **e9e073fa02**、`_engine.packages` tree 等于合并后 HEAD；没有手工编辑 JSON。采样使用原有隔离 HOME/XDG、临时项目与 mock 服务，没有启动 app/Electron/窗口。生成物与失效行修正提交 **`65cf73bc08`**。
+- bun.lock 改变后 `bun install --frozen-lockfile` exit 0：Checked 2178 installs across 2587 packages (no changes)；安装后恢复并读回 `core.hooksPath = .githooks`。未手改依赖与锁文件。
+- 原 inventory 生成器 `bun packages/ext/scripts/context-injection-inventory.ts --write` exit 0：**107 fragments / 31743 injected bytes / 170496 limits**，结果与自动合入快照相同。`bun packages/ui-mac/scripts/process-fence-write-sites.ts --check` exit 0：**66 unique rows / 69 call sites**。Ext `bun run build` exit 0。
+- 对 merge-base `2142240b16`、本分支 `94440d23f4`、alpha `510b573c70` 的 gate-files 按键比较，**两侧同时改变的计数行交集为空**，没有新增测试用例或改计数；未运行逐条执行全表的更新模式。
+
+所有下列测试从 `packages/ui-mac` 经 `gate slot -- bun test --max-concurrency 2 --timeout 90000 <显式文件>` 各运行一次，日志均为 0 fail：
+
+| 点名文件 | PASS / FAIL |
+| --- | --- |
+| `src/main/old-name-scan.test.ts` | **10 / 0**，2487 expect；双向登记均通过 |
+| `src/engine-adapter/fixture-identity.test.ts` | **5 / 0**，16 expect |
+| 直接夹具消费者 14 文件：command-reply、contract-cases、event-projection、failure-code、file-watcher、passthrough-reads、permission-reply、permission-shape、projection-parity、staged-attachment、todo-route、tool-display、tool-shapes、turn-diffs.test.ts | **163 / 0**，517 expect；JUnit 顶层 tests=163 / failures=0 |
+
+本轮共 **178 个不同用例 PASS**。`bun typecheck` 从 ext、ui-mac、schema 各自目录执行，均 exit 0（schema 145 files）；没有额外整层或整套测试。`affected-tests --list` exit 0：**`affected tests: 162 of 746 test files`**，只列范围。相对 origin/alpha 的 `git diff --check` exit 0，本计划文档合同检查通过。
+
+证据统一前缀 `/tmp/secrets-r15-`：install、inventory、write-ledger、build、sample、old-name、fixture-identity、fixture-consumers、ext-typecheck、ui-typecheck、schema-typecheck、affected.log；消费者原 JUnit 为 `fixture-consumers.xml`；`name-counts.json`、`name-deltas.json`、`count-intersection.json`、`receipt.json` 记录实测事实。无未解冲突、生产行为变更或新设计决定；没有修改 known-fails、门槛、.gate-tests，无 push/PR/merge PR。偏离仅为题述授权的合并、采样与失效登记同步；遗留去向 none；无新增 ARCH/OPTIONAL。

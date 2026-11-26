@@ -7,6 +7,8 @@ import pins from "../../resources/pinned-files.json"
 import type { PinnedFiles, PinnedFileId } from "../../../util/src/codepuppy-pinned-files"
 import { CODEPUPPY_GITHUB_RELAY_HOST } from "../shared/codepuppy-config"
 import { createPinnedFileAuthority, parsePinnedFiles, readPinnedFiles } from "./pinned-files"
+import { createPinnedFileRequester, type PinnedFileRequest } from "../../../util/src/codepuppy-connector-launch"
+import { createPinnedFileMainBridge } from "./connector-launch-host"
 
 // Opaque transport bytes from the actual shipped manifest, not a stand-in archive format.
 const payload = readFileSync(new URL("../../resources/pinned-files.json", import.meta.url))
@@ -207,4 +209,54 @@ test("cancelled transfer publishes no cache and a fresh request can retry", asyn
   expect(existsSync(host.targetPath(file.id))).toBe(false)
   expect(await host.run()).toEqual({ ok: true, path: host.targetPath(file.id), via: "relay" })
   expect(host.calls).toHaveLength(2)
+})
+
+test("ID-only host bridge uses the shared authority and rejects URL overrides without I/O", async () => {
+  const host = authority(() => response())
+  const requests: unknown[] = []
+  const replies: unknown[] = []
+  const client = createPinnedFileRequester((value) => { requests.push(value); main.receive(value) }, "one")
+  const main = createPinnedFileMainBridge(host, "one", (value) => { replies.push(value); client.receive(value) })
+  const progress: number[] = []
+  const result = await client.ensureFile(file.id, new AbortController().signal, (received) => progress.push(received))
+  expect(result).toEqual({ result: { ok: true, path: host.targetPath(file.id), via: "relay" } })
+  expect(progress.at(-1)).toBe(payload.length)
+  expect(requests).toEqual([{ type: "codepuppy.pinned-file.ensure", id: 1, sidecarGeneration: "one", fileId: file.id }])
+  expect(main.receive({ type: "codepuppy.pinned-file.ensure", id: 2, sidecarGeneration: "one", fileId: file.id, url: "https://untrusted.test/file" })).toBe(true)
+  expect(replies.at(-1)).toMatchObject({ id: 2, delivery: { result: { ok: false, error: "unknown-file" } } })
+  expect(host.calls).toHaveLength(1)
+  main.receive({ type: "codepuppy.pinned-file.ensure", id: 77, sidecarGeneration: "old", fileId: file.id })
+  expect(replies.at(-1)).toMatchObject({ id: 77, sidecarGeneration: "old", delivery: { result: { ok: false, error: "cancelled" } } })
+  expect(await client.ensureFile("python/any/unknown", new AbortController().signal, () => {})).toEqual({ result: { ok: false, error: "unknown-file" } })
+  expect(host.calls).toHaveLength(1)
+  client.close()
+  await main.dispose()
+})
+
+test("bridge cancellation belongs to one request, and generation close releases all waiters", async () => {
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  const host = authority(async () => { await gate; return response() })
+  const client = createPinnedFileRequester((value) => main.receive(value), "one")
+  const main = createPinnedFileMainBridge(host, "one", (value) => client.receive(value))
+  const controller = new AbortController()
+  const first = client.ensureFile(file.id, controller.signal, () => {})
+  const second = client.ensureFile(file.id, new AbortController().signal, () => {})
+  controller.abort()
+  expect(await first).toEqual({ result: { ok: false, error: "cancelled" } })
+  release()
+  expect((await second).result.ok).toBe(true)
+  expect(host.calls).toHaveLength(1)
+  client.close()
+  await main.dispose()
+
+  const messages: PinnedFileRequest[] = []
+  const disconnected = createPinnedFileRequester((value) => { if (value.type === "codepuppy.pinned-file.ensure") messages.push(value); else throw Error("port closed") }, "new")
+  const waiting = disconnected.ensureFile(file.id, new AbortController().signal, () => { throw Error("old progress consumed") })
+  const another = disconnected.ensureFile(file.id, new AbortController().signal, () => {})
+  disconnected.receive({ type: "codepuppy.pinned-file.progress", id: messages[0]!.id, sidecarGeneration: "old", received: 1, total: 2 })
+  disconnected.receive({ type: "codepuppy.pinned-file.result", id: messages[0]!.id, sidecarGeneration: "old", delivery: { result: { ok: true, path: "/old", via: "cache" } } })
+  disconnected.close()
+  expect(await waiting).toEqual({ result: { ok: false, error: "cancelled" } })
+  expect(await another).toEqual({ result: { ok: false, error: "cancelled" } })
 })

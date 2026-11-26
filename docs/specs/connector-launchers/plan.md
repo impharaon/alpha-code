@@ -135,7 +135,7 @@ last_reviewed: 2026-11-26
 ## 五（先行子链）：固定文件 ID-only 宿主桥
 
 - 依据：DESIGN v1 §4.7/R2/R7、v2 §4.2 的原始归档消费域；SPEC AC-03/06/07 下载子链；r2 IMPLEMENT。受管 entryFor/recipe/tools-call 和首方 matcher 仍须后续完整接线，不以本子链冒称 VIDEO-L1 完成。
-- 核对：r2 同轮计划/实施授权；Codex / GPT-6 作者核对，未新增设计决定。
+- 核对：计划 `98e3d3a0ce`；r2 Phase IMPLEMENT 同轮计划/实施授权；Codex / GPT-6 作者核对，未新增设计决定。
 
 ### 改动
 

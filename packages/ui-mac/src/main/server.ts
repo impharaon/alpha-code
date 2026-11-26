@@ -82,6 +82,7 @@ import { homedir } from "node:os"
 import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { receiveToolPolicyWrite } from "../../../ext/src/policy/store"
+import { createPinnedFileMainBridge, pinnedFileAuthority } from "./connector-launch-host"
 
 export type HealthCheck = { wait: Promise<void> }
 
@@ -761,6 +762,7 @@ export async function spawnLocalServer(
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
+  const pinnedFiles = createPinnedFileMainBridge({ ensureFile: (id, signal, progress) => pinnedFileAuthority(options.userDataPath).ensureFile(id, signal, progress) }, String(options.generation ?? 0), (message) => child.postMessage(message))
   // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
   let credentialRespawnRequested = false
   const credentialReplies = {
@@ -777,6 +779,7 @@ export async function spawnLocalServer(
   // SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.5):ext 的工具策略改写由 main 写进这一代 sidecar 环境算出的数据目录(ext 读的同一处),写完再回复
   const toolPolicyBaseDir = defaultPolicyBaseDir(dataDir)
   child.on("message", (message: unknown) => {
+    if (pinnedFiles.receive(message)) return
     if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
     if (writeGrants.receive(message)) return
@@ -794,6 +797,7 @@ export async function spawnLocalServer(
   }
   const pushThisGeneration = () => child.postMessage({ type: "credentials", credentials: credentialTable(options.userDataPath, credentialLog) } satisfies CredentialsMessage)
   child.once("exit", (code) => {
+    void pinnedFiles.dispose()
     if (pushCredentialTable === pushThisGeneration) pushCredentialTable = undefined
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
     stopExplicitConfigWatch()
@@ -922,6 +926,7 @@ export async function spawnLocalServer(
 
   const listener: SidecarListener = {
       kill: () => {
+        void pinnedFiles.dispose()
         if (!exited) child.kill()
       },
       projectConfigView: (directory: string) => projectConfigViews.request(directory),
@@ -930,6 +935,7 @@ export async function spawnLocalServer(
       grantWrite,
       generationWrites,
       stop: () => {
+        void pinnedFiles.dispose()
         if (stopping) return stopping
         if (exited) return Promise.resolve()
         child.postMessage(SIDECAR_STOP_COMMAND)

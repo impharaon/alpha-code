@@ -57,6 +57,24 @@ test("H1 follows successful cd and literal exports without taking skipped branch
   expect(plan("(cd p && brew --prefix); brew --prefix").map((node) => node.cwd)).toEqual([join(root, "p"), root])
 })
 
+test("H3 environment carries only exported variables and the leaf's own prefix assignments, as the real shell does", () => {
+  const snapshot = { HOME: root, PATH: "/usr/bin:/bin", VALUE: "hello world" }
+  const planned = (command: string, shell: string) => ({ ...snapshot, ...Object.fromEntries(plan(command, shell)[0].assignments.map((entry) => [entry.name, entry.value])) }) as Record<string, string>
+  expect(planned("X=1; brew --prefix", "/bin/bash").X).toBeUndefined()
+  expect(planned("export X=1; brew --prefix", "/bin/bash").X).toBe("1")
+  expect(planned("X=1 brew --prefix", "/bin/bash").X).toBe("1")
+  expect(plan("X=jq; brew install \"$X\"")[0].argv).toEqual(["install", "jq"])
+  // Oracle: the same source in each real interpreter with /usr/bin/env in the brew position.
+  const sources = ["X=1; brew --prefix", "export X=1; brew --prefix", "X=1 brew --prefix", "X=1; export X; brew --prefix", "export X; X=1; brew --prefix", "set -a; X=1; brew --prefix", "set -a; set +a; X=1; brew --prefix", "PATH=/bin:/usr/bin; brew --prefix", "VALUE=changed; brew --prefix"]
+  for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) for (const source of sources) {
+    const real = spawnSync(shell, ["-c", source.replace("brew --prefix", "/usr/bin/env")], { cwd: root, env: snapshot, encoding: "utf8" })
+    expect(real.status).toBe(0)
+    const actual = Object.fromEntries(real.stdout.trim().split("\n").map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]))
+    const expected = planned(source, shell)
+    for (const name of ["X", "PATH", "VALUE"]) expect(`${shell} ${source} ${name}=${expected[name]}`).toBe(`${shell} ${source} ${name}=${actual[name]}`)
+  }
+})
+
 test("H4 three real interpreters preserve leaf redirections, stdin and private proof under tracing", async () => {
   const proof = "a1".repeat(32)
   const helper = join(root, "helper")

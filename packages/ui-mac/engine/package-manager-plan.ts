@@ -10,7 +10,8 @@ export type PackageManagerCommand = {
   leafStart: number; leafEnd: number; redirects: readonly { start: number; end: number }[]
   prefix: string; exec: boolean; wrapper: string
 }
-type State = { cwd: string | null; env: Readonly<Record<string, string | null>>; assignments: readonly PackageManagerAssignment[] }
+// `env` holds shell values for expansion; only exported names (or all, under allexport) reach brew's environment.
+type State = { cwd: string | null; env: Readonly<Record<string, string | null>>; assignments: readonly PackageManagerAssignment[]; exported: ReadonlySet<string>; allexport: boolean }
 type Outcome = { success?: State; failure?: State }
 type Leaf = Exclude<PackageManagerSyntax, { kind: "separator" }>
 
@@ -35,11 +36,18 @@ export function planPackageManagerExecution(input: {
     }
     if (leaf.opaque) return { success: state, failure: state }
     const prefixes = leaf.words.slice(0, leaf.command < 0 ? leaf.words.length : leaf.command)
+    // An assignment-only statement changes shell values; brew sees a name only if it is exported.
+    if (leaf.command < 0) return { success: prefixes.reduce((current, raw) => {
+      const parsed = assignment(raw, current, "export")
+      const name = parsed?.name ?? /^([A-Za-z_][A-Za-z0-9_]*)=/.exec(raw.raw)?.[1]
+      if (!name) return current
+      if (current.allexport || current.exported.has(name)) return parsed ? exported(current, parsed) : unknown(current, name)
+      return { ...current, env: { ...current.env, [name]: parsed ? parsed.value : null } }
+    }, state) }
     const node = prefixes.reduce((current, raw) => {
       const parsed = assignment(raw, current, "prefix")
       return parsed ? assigned(current, parsed) : current
     }, state)
-    if (leaf.command < 0) return { success: node }
     let index = leaf.builtin
     if (word(leaf.words[index]?.raw ?? "", state) === "env") {
       index++
@@ -52,11 +60,26 @@ export function planPackageManagerExecution(input: {
     if (program === "export") {
       const next = leaf.words.slice(index + 1).reduce((current, raw) => {
         const parsed = assignment(raw, state, "export")
-        if (parsed) return assigned(current, parsed)
+        if (parsed) return exported(current, parsed)
         const name = /^([A-Za-z_][A-Za-z0-9_]*)=/.exec(raw.raw)?.[1]
-        return name ? { ...current, env: { ...current.env, [name]: null }, assignments: current.assignments.filter((entry) => entry.name !== name) } : current
+        if (name) return unknown(current, name)
+        // `export NAME` exports the shell's current value, if any.
+        const bare = /^[A-Za-z_][A-Za-z0-9_]*$/.exec(raw.raw)?.[0]
+        if (!bare) return current
+        const value = current.env[bare]
+        return typeof value === "string" ? exported(current, { name: bare, value, origin: "export", start: raw.start, end: raw.end }) : { ...current, exported: new Set([...current.exported, bare]) }
       }, state)
       return invert({ success: next }, leaf.negated)
+    }
+    if (program === "set") {
+      let allexport = state.allexport
+      for (let at = 0; at < args.length; at++) {
+        const option = args[at]
+        if (option === undefined || option === "--" || option === "-" || !/^[-+]/.test(option)) break
+        if (option === "-o" || option === "+o") { if (args[at + 1] === "allexport") allexport = option === "-o"; at++; continue }
+        if (option.slice(1).includes("a")) allexport = option.startsWith("-")
+      }
+      return invert({ success: { ...state, allexport } }, leaf.negated)
     }
     if (program === "cd") {
       const target = args[0] === "--" ? args[1] : args[0] ?? state.env.HOME
@@ -109,12 +132,18 @@ export function planPackageManagerExecution(input: {
     }
     return result
   }
-  sequence(facts, { cwd: input.cwd, env: input.env, assignments: [] })
+  sequence(facts, { cwd: input.cwd, env: input.env, assignments: [], exported: new Set(Object.keys(input.env)), allexport: false })
   return plans
 }
 
 function assigned(state: State, value: PackageManagerAssignment): State {
   return { ...state, env: { ...state.env, [value.name]: value.value }, assignments: [...state.assignments.filter((entry) => entry.name !== value.name), value] }
+}
+function exported(state: State, value: PackageManagerAssignment): State {
+  return { ...assigned(state, value), exported: new Set([...state.exported, value.name]) }
+}
+function unknown(state: State, name: string): State {
+  return { ...state, env: { ...state.env, [name]: null }, assignments: state.assignments.filter((entry) => entry.name !== name), exported: new Set([...state.exported, name]) }
 }
 function join(a?: State, b?: State): State | undefined {
   if (!a) return b
@@ -123,6 +152,8 @@ function join(a?: State, b?: State): State | undefined {
     cwd: a.cwd === b.cwd ? a.cwd : null,
     env: Object.fromEntries([...new Set([...Object.keys(a.env), ...Object.keys(b.env)])].map((key) => [key, a.env[key] === b.env[key] ? a.env[key] : null])),
     assignments: a.assignments.filter((entry) => b.assignments.some((other) => JSON.stringify(entry) === JSON.stringify(other))),
+    exported: new Set([...a.exported].filter((name) => b.exported.has(name))),
+    allexport: a.allexport && b.allexport,
   }
 }
 function invert(outcome: Outcome, negated: boolean): Outcome { return negated ? { success: outcome.failure, failure: outcome.success } : outcome }

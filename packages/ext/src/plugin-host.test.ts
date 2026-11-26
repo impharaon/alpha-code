@@ -3630,3 +3630,49 @@ packageIt.live("first command and attached skill shells wait for SessionStart an
   expect(rows().filter(row=>row.hook_event_name==="SessionStart")).toHaveLength(2)
   expect(process.env.R19_SESSION_VALUE).toBeUndefined()
 })))
+
+
+// Fixed feature-dev/Temporal inputs and dash0 SessionStart group; the temporary helper holds a real export source.
+for (const entry of ["command", "attached skill"] as const) packageIt.live(`cancelling a ${entry} call closes its SessionStart-written ENV_FILE source`, () => packageJourney(Effect.gen(function* () {
+  const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+  const skillTree = yield* Effect.promise(() => captureStandardFixture("codex:temporal"))
+  const skill = new TextDecoder().decode(yield* Effect.promise(() => skillTree.readFile("skills/temporal-developer/SKILL.md")))
+  const line = 'export R22_BLOCKED="$(' + JSON.stringify(process.execPath) + ' "$CLAUDE_PLUGIN_ROOT/source-blocker.mjs")"\n'
+  for (const group of source.hooks.SessionStart) for (const hook of group.hooks) {
+    hook.command = process.execPath
+    hook.args = ["-e", "const fs=require('node:fs');await Bun.stdin.json();fs.appendFileSync(process.env.CLAUDE_ENV_FILE," + JSON.stringify(line) + ")"]
+  }
+  const sample = yield* invocationSample("claude:feature-dev", {
+    "hooks/hooks.json": JSON.stringify({ hooks: { SessionStart: source.hooks.SessionStart } }),
+    "skills/temporal-developer/SKILL.md": skill,
+    "source-blocker.mjs": "import fs from 'node:fs';fs.writeFileSync('source-reader.pid',String(process.pid));while(!fs.existsSync('release-source'))await Bun.sleep(10);console.log('export completed')",
+  })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const skills = yield* (yield* Skill.Service).list()
+  const attached = skills.find(item => item.name === sample.hostNames["skill:skills/temporal-developer/SKILL.md"])!
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Source cancellation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const call = yield* (entry === "command"
+    ? commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Use the session exports" }, delivery: "queue" } })
+    : sessions.prompt({ sessionID: session.id, text: "Use the session exports", skills: [{ id: attached.id }] })).pipe(Effect.forkScoped)
+  yield* Effect.gen(function* () {
+    yield* ext.finish(Effect.promise(() => Bun.file(join(location.directory, "source-reader.pid")).exists()))
+    const pid = Number(readFileSync(join(location.directory, "source-reader.pid"), "utf8"))
+    expect(pid).toBeGreaterThan(0)
+    expect(() => process.kill(pid, 0)).not.toThrow()
+    yield* Fiber.interrupt(call)
+    const result = yield* Fiber.await(call)
+    expect(Exit.isFailure(result) && Cause.hasInterruptsOnly(result.cause)).toBe(true)
+    yield* ext.finish(Effect.sync(() => { try { process.kill(pid, 0); return false } catch { return true } }))
+    expect(() => process.kill(pid, 0)).toThrow()
+    expect(yield* (yield* TestLLM.Test).requests()).toHaveLength(0)
+  }).pipe(Effect.ensuring(Effect.sync(() => writeFileSync(join(location.directory, "release-source"), ""))))
+})))

@@ -1510,3 +1510,9 @@ core/ext/ui-mac 的包内 bun typecheck 均 exit 0（`r21-{core,ext,ui}-types.lo
 Host checkpoint：`bun src/shared/host-extension-package-contract/generate-artifact.ts --check` **20 files / exit 0**；aggregate **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7**，r21 相对 67fbda8e16 的 artifact 成员变化 **0**。实查 manifest 与 git diff，相对 1db6a3bbf5 仍仅九个成员：CONTRACT.md、plugin-package.ts、plugin-hook-events.ts、plugin-conversion.mjs、plugin-conversion.d.mts、generate-artifact.ts、profiles/plugin-package.v1.schema.json、testvectors/plugin-package-description.v1.json、testvectors/decoder-corpus.v1.json。consumer pin/vendor 未改，checkpoint 与 design §10 镜像交编排器；本轮没有新的 engine 文件接管，仅 S-05 原 owner 的通知不等待修正与原 L0 生命周期/模型可见绑定修正。
 
 已核 Codex（GPT-6），05:09–05:33 UTC+08:00 约 24 分钟；已验证部分均独立提交，未开始片 7。遗留去向：B7 cancellation callback seam→编排器裁决后 fix now；已接受 docs/旧三断言基线沿原去向，无新增 OPTIONAL。git diff --check exit 0、hooksPath=.githooks，工作树最终干净；未 push/PR/merge/rebase、启动应用/窗口、操作真实凭据或跨仓文件，所有前台命令完成。B3–B9 的逐项红测/实现提交与本节命令输出共同构成复核证据，不把尚未实施的 B7 提案记为既定设计。
+
+### r22｜B7 调用取消接缝与片 3–5 审查收口
+
+核对：IMPLEMENT — r22，orchestrator / Claude Opus 5.5，2026-11-27；r21 B3–B6/B8/B9 与 71c38ad38b accepted。偏离记录（orchestrator ruling 2026-11-27）：promise command.execute 与 hook callback 增调用级 `{ signal: AbortSignal }`，由原 Effect→Promise adapter 注入，透传 ENV_FILE source；复用原执行/取消权威，不加 timeout。该 ruling 是 r21 B7 的明确增量授权，设计 §10 镜像交编排器。本轮不开始片 7。
+
+B7 红先行：原 host 文件增加 command/attached-skill 两个 integration 变体，源是固定 feature-dev command、Temporal SKILL.md 与 dash0 SessionStart group；只加入临时受控 exporter。真实 SessionStart 写 `export ...="$(...source-blocker.mjs)"`，调用进入原 Bash source 后记录实际子 PID，再中断实际 Command.execute / Session.prompt fiber。旧实现调用已返回中断，子 PID 仍活，**0 pass / 2 fail / 12 expects**（`env -u CLAUDE_CODE_SESSION_ID bun test --max-concurrency 2 src/plugin-host.test.ts -t 'SessionStart-written ENV_FILE source'`，`/tmp/plugin-standard-r22-B7-red.log`）。失败点是 source 存活的功能观察，未上调原 test timeout 或增加性能/计时测量；fixture ensuring 释放受控 exporter，两个命令均正常前台结束。

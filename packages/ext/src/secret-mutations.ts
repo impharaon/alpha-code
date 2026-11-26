@@ -42,8 +42,9 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
     }
     const source = Bom.split(before.replaceAll("\r\n", "\n")).text
     const names = new Set(envAssignments(input.oldString).filter((item) => item.value === ProtectedFiles.REDACTED).map((item) => item.name))
-    const masked = maskTemplate(source, names)
-    const query = maskTemplate(input.oldString.replaceAll("\r\n", "\n"), names).text
+    const layout = input.oldString.split(/\r?\n/).includes(ProtectedFiles.REDACTED) ? "line-slots" : "assignments"
+    const masked = maskTemplate(source, names, layout)
+    const query = maskTemplate(input.oldString.replaceAll("\r\n", "\n"), names, layout).text
     const matches = [...masked.text.matchAll(new RegExp(escape(query), "g"))].map((match) => ({ start: masked.position(match.index!), end: masked.position(match.index! + match[0].length) }))
     if (!matches.length) {
       // A unique assignment sequence supplies values; Core retains its own whitespace/unicode matching tiers.
@@ -93,7 +94,8 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
     }
     const source = Bom.split(before.replaceAll("\r\n", "\n")).text
     const names = new Set(hunk.chunks.flatMap((chunk) => envAssignments([...chunk.oldLines, ...chunk.newLines, chunk.changeContext ?? ""].join("\n")).filter((item) => item.value === ProtectedFiles.REDACTED).map((item) => item.name)))
-    const view = maskTemplate(source, names)
+    const layout = hunk.chunks.some((chunk) => [...chunk.oldLines, ...chunk.newLines].includes(ProtectedFiles.REDACTED)) ? "line-slots" : "assignments"
+    const view = maskTemplate(source, names, layout)
     try {
       const next = Patch.derive(hunk.path, hunk.chunks, view.text).content
       const chunks = hunk.chunks.map((chunk, index) => {
@@ -140,9 +142,9 @@ function restoreFields(text: string, current: ReturnType<typeof envAssignments>,
     return result.slice(0, item.valueStart) + prior.rhs + result.slice(end)
   }, text)
 }
-function maskTemplate(text: string, names: ReadonlySet<string>) {
+function maskTemplate(text: string, names: ReadonlySet<string>, layout: "line-slots" | "assignments") {
   const records = envAssignments(text).filter((item) => names.has(item.name)).map((item) => ({
-    ...item, replacement: item.rhs.split(/\r?\n/).map(() => ProtectedFiles.REDACTED).join("\n"),
+    ...item, replacement: (layout === "line-slots" ? item.rhs.split(/\r?\n/) : [item.rhs]).map(() => ProtectedFiles.REDACTED).join("\n"),
   }))
   const spans = records.map((item, index) => {
     const delta = records.slice(0, index).reduce((sum, entry) => sum + entry.replacement.length - entry.valueEnd + entry.valueStart, 0)

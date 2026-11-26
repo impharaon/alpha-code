@@ -110,7 +110,8 @@ export function secretScalar(name: string, value: unknown): Uint8Array[] {
   if (value !== null && typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
     throw new Error("Invalid credential scalar")
   if (value === null || value === "" || ProtectedFiles.isPublicValue({ name, value })) return []
-  return [Buffer.from(String(value))]
+  const text = String(value)
+  return [...new Set([text, ...text.split(/\r?\n/)])].filter((part) => part.length > 0).map((part) => Buffer.from(part))
 }
 
 function leaves(value: unknown, prefix: readonly string[] = [], ancestors = new Set<object>()): { path: readonly string[]; value: unknown }[] {

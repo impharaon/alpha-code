@@ -205,4 +205,145 @@ U/E 各运行 `bun typecheck`，仅处理本片造成的问题；若包已有适
 
 ## 切片二：全部批准通放与系统代理
 
-本轮仅保留交付边界，后续 PLAN 再展开。AC-08 的真引擎/真围栏三条及去档位判断对照、AC-13 的系统代理证明仍为整票必需证据。AC-13 按设计 §4.7、§10：日常从 `resolveEgressRoutes` 注入路由并走真实上游握手；另由编排器安排**一次**真实机器已设本地测试系统代理的真引擎/真围栏验收，连接仅经它可达的目标，保留测试代理连接记录，并对照无系统代理。日常注入不计作系统配置读取已验证。本片不启动 Electron、不改本机系统代理；缺少那次实机记录时，最终 AC-13 不能记为通过。
+- 依据：#1757 r6；[规格 v2 / AC-08、AC-13](spec.md)，[冻结设计 §4.2、§4.5、§4.7、§4.8、§5、§10](design.md) @ `4948d952f3`（tldts 补丁版裁决已随切片一合入）。代码基线 `cd8649b31a`，切片一已经合入。
+- 核对：计划 `ba413f12a3`；r6 明确授权先提交本节，再在同轮实施；如出现未决设计问题则只交 PLAN-READY。实机系统代理证据由编排器另行安排，本轮只做路由注入，不改本机设置、不启动应用或 Electron。
+
+### 改动
+
+路径 U 为 `packages/ui-mac/`，E 为 `packages/ext/`。
+
+| 文件 | 改什么 |
+| --- | --- |
+| U `src/main/network-egress-grants.ts` 及已有测试 | N7 的数字目标归一与唯一公网地址判据，消费 IANA 2025-10-09 原表及 fake-IP 例外；旧卡片准入保持既有合同。 |
+| U `src/main/network-egress-upstream.ts`、`.test.ts`（新） | N7 路由解码、system Session 查询、异步原始隧道；目标 lookup 固定地址、公网检查、HTTP(S)/SOCKS 握手、取消及失败分层。 |
+| U `src/main/network-egress-proxy.ts` 及已有测试 | 消费 N7 就绪合同，串联政策判定、路由查询后授权复核、期限与隧道字节流；逐次政策事件关联连接 ID、拒非公网与自身代理循环。 |
+| U `src/main/network-egress-approval.ts` 及已有测试 | 从 N2 完整非空快照读取可信档位；空/不完整 pending 恢复时重新判定；N5 记录接入现有 settings revision 与持久化状态。 |
+| U `src/main/network-egress-passes.ts`、`.test.ts`（新），`egress-grant-records.ts`，`index.ts` | N5 环境隔离的 main-only 追加/读取绑定、严格完整行解码、按 ID 去重和设置聚合；复用既有状态根和日志出口。 |
+| U `src/shared/network-egress-wire.ts` | 补 N5 的 EgressPass 纯类型，已有 settings summary 合同不变。 |
+| U `src/renderer/codepuppy-ui/settings-network-egress.tsx`、已有 `network-egress-card.test.ts`，`src/renderer/i18n/{zh,en}.ts` | 在已批准的联网清单里复用行样式展示首次/最近政策放行与次数、记录写入失败；沿用设置订阅。 |
+| U `src/main/network-egress.engine.cases.ts`、`test-component/network-egress-engine-peer.ts`（如需），已有 `engine-cases` scenario 宿主 | 在既有真引擎/真围栏夹具内增加通放、混合档、私网拒绝与注入系统代理路由；只跑新用例，不重跑 45 秒臂。 |
+| U 已有代理消费者测试：`network-egress-fence.test.ts`、`process-fence-{engine,wiring}.test.ts`、`net-failure-real-stack.test.ts`、`relay-wiring.cases.ts`、`endpoint-route.engine.cases.ts`、`test-component/official-connectors.cases.ts` | 同调用链机械同步原同步 dial 为 N7 异步就绪合同；不改变这些用例原判据。Electron 宿主不在本轮运行。 |
+| `scripts/gate-files.tsv`，U 已有写点/登记/披露测试 | 仅按实际用例数和受托方同步登记，不运行完整登记步骤或 gate。新 main-only 写者不能进入 sidecar 闭包。 |
+
+### 顺序
+
+1. **公网判据与异步上游。** 实现 grants/N7 和代理接线，一起同步受影响的 dial 消费者。先跑新增用例，再完整跑 grants、upstream、proxy 三文件各一次；保持原失败层和 head/背压/静默行为。
+2. **通放决定与记录。** 一起接全 allow 快照、pending 恢复、N5 真实磁盘绑定及设置投影，完整跑 approval、passes、proxy 相关文件。记录失败不阻断已获准拨号。
+3. **设置与真实入口证明。** 增补既有 renderer 测试和 scenario 用例；窄跑新的设置用例，再完整跑 `network-egress-card.test.ts`。一次运行新增真引擎/真围栏用例（按 `-t '通放与混合档|通放拒绝非公网|系统路由注入'`），包含 AC-08 的三条情形和 AC-13 日常代理记录；不重跑旧 45 秒臂。对照在隔离临时副本运行同一判据：去掉全 allow 判断时通放用例出现卡片而红；绕过注入路由时代理记录/目标响应判据红；去掉地址过滤时非公网判据红。每臂只运行所覆盖的新用例一次，保留命令、输出和退出码。
+4. **一次较宽相关集及登记。** 以 rg 查消费变动导出的测试和枚举项，运行 activity、IPC、derived、registry、disclosure、write-sites、gate-file-registry、shared wire；E 的 network-egress/context-injection（若 N6 消费没有改动，不重跑其它 E 宿主）。分别运行受影响的 relay/endpoint/official-connectors 具名 cases，不运行整个 engine-cases 宿主。U `bun typecheck`；locale 独立进程；旧名扫描在每次提交前运行。只同步实际计数，禁止完整 suite/bin/check/gate。
+
+### 风险
+
+- 旧 dial 在多个真实夹具里使用，漏同步会导致其它用例把 TCP 连接误当隧道就绪；通过类型检查、rg 消费者清单及具名调用链测试捕获。
+- DNS 重绑定、短数字与混合地址集：公网判据只在 grants 一处；lookup 测试用 Node 对 localhost 的实际返回结构，生产隧道使用检查过的地址，代理握手核对收到固定 IP。
+- 活动在异步检查中变化、路由等待期间撤销：按 revision 验证档位快照，在真正拨号前复核授权；测试控制这些异步边界，不能从旧快照放宽。
+- 握手提前回 200、额外字节丢失和取消后迟到拨号：真实本地协议 peer 延后应答、带尾字节，并核对无后续连接。JSONL 的半行和写失败分别验证，不把 I/O 失败变成网络拒绝。
+- 预计四个实现单元、约 90 分钟；若规模/时间翻倍按执行规则返回。AC-13 实机验收不计为本轮已证明。
+
+### 证明
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-08 | `network-egress.engine.cases.ts`「通放与混合档」：真引擎与真围栏运行命令，独占 allow 无卡、真实目标响应及日志/settings 计数；再加 ask 的真实活动后同目标出卡。隔离副本去掉全 allow 判断。 | 无档位旁路时独占 allow 等待卡片，响应和 policy-pass 均缺失；误用缓存全局授权时混合档没有卡。 |
+| AC-08 | 同文件「通放拒绝非公网」，真实工具连接短写/私网；grants 表覆盖 IANA 最长前缀、mapped/IPv6/fake-IP；upstream 真实 CONNECT peer 核对 DNS 混合返回被拒、零上游连接与固定目标地址，去掉过滤对照红。 | 目标准入或 lookup 被删，实际握手可达私网、出现政策放行；误拒 fake-IP 会使正例失败。 |
+| AC-08 | `network-egress-passes.test.ts`「逐次落盘与设置聚合」及 renderer 真实设置「通放记录展示」；唯一 ID、重启重读、半行、I/O 失败。 | 漏写一次、错误去重或无订阅投影时实际 JSONL 行数、first/last/count 或 DOM 不符。 |
+| AC-13 | `network-egress-upstream.test.ts` 的真实 HTTP(S)/SOCKS peer、显式 DIRECT/失败后备/取消；`network-egress.engine.cases.ts`「系统路由注入」用真引擎/真围栏及注入的本地测试上游代理，核对代理记录与目标响应，绕过路由对照红。 | 路由被丢弃、未完成握手就回 200、代理未收到 CONNECT、取消后仍拨号，均在实际入口红。 |
+| AC-13 | 编排器另安排：实机设测试系统代理 → 真引擎/真围栏连接仅经该代理可达的目标；保留代理记录，并对照无系统代理。 | 日常注入不能证明 Chromium 读取系统设置；缺实机命令和记录时该部分仍未验证。 |
+
+### 偏离记录
+
+暂无。基线相关三文件为 `bun test --max-concurrency 2 src/main/network-egress-grants.test.ts src/main/network-egress-approval.test.ts src/main/network-egress-proxy.test.ts`：36 pass / 0 fail（日志 `/tmp/egress-s2-baseline.log`）。
+
+
+切片二步骤 1（2026-11-26）：N7 已接到真实代理，测试夹具同步异步就绪合同；新增 `test-component/egress-upstream-fixture.ts` 是初始清单之外的同调用链测试文件，为九个已有 TCP peer 复用 connect-event → Promise 就绪适配，只供测试，不参与 allow-all 判据。N7 的协议测试使用真实生产请求，HTTP/HTTPS 由 Node server 解析；SOCKS peer 按 RFC 1928 与 SOCKS4 回复；HTTPS 证书由本次 openssl 生成、仅子进程加入 CA；Electron system Session 在隔离子进程验证 API 接线，没有启动 Electron。
+
+U `bun test --max-concurrency 2 src/main/network-egress-grants.test.ts src/main/network-egress-upstream.test.ts src/main/network-egress-proxy.test.ts`：38 pass / 0 fail（`/tmp/egress-s2-step1.log`）；其中原代理 24 条先单独通过，新增两条路由撤销/迟到/循环边界窄跑 2 pass。U `bun typecheck` 退出 0。旧名扫描最初误从根目录执行被根守卫拒绝，从 U 重跑为 10 pass；不计错误命令为通过。文档检查基线 69 errors / 253 warnings，沿用既有问题，不扩修。
+
+
+切片二步骤 2：完整非空活动快照的档位解析按 activity revision 核对，待批窗口恢复到全 allow 时继续；通放不写用户授权集合。N5 复用现有环境状态根追加逐次 JSONL，设置按唯一 ID 投影；实际 readonly 文件导致的 append 失败只影响记录状态，真实 CONNECT 仍成功。新增改动范围为 `egress-grant-truth.ts` 的 UTC 判据提取（N4/N5 共用同一时间合同，避免复制校验）；其余均在初始列表。三条旧代理夹具把 loopback 伪装成可批准目标，按设计 §4.2 改为公开形状的测试名映射到本地 TCP peer，原拒绝/批准/迟到断言保持；连接 ID 按 N5 改为运行 UUID + 序号，旧计数断言同步 string。
+
+U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts src/main/network-egress-passes.test.ts src/main/network-egress-proxy.test.ts`：37 pass / 0 fail（`/tmp/egress-s2-step2.log`）；`bun typecheck` 退出 0。初次新 passes 夹具遗漏父目录创建，2 fail，补齐夹具后窄跑 4 pass；这是夹具错误，不记作产品移除臂。新增 N7/passes 测试均为 integration：依赖通过静态 import 可追踪，普通受影响 PR 可选中；真引擎增量仍放已有 scenario 宿主，只由夜间运行，本轮验收按具名用例单次执行。返回前将执行 `affected-tests --list` 报告 scope。
+
+
+步骤 2 的后续窄复核在提交 `0c83296409` 后读到 HTTPS 失败（`/tmp/egress-s2-step2-upstream.log`，1 pass / 1 fail）：Bun https.request 会从新设的 CONNECT Host 头推导 SNI，把目标域名用于代理证书校验。显式将 HTTPS 的 servername 绑定路由代理 host（IP 不发域名 SNI），保持目标 authority 为 CONNECT Host。原测试不改，U `bun test --max-concurrency 2 src/main/network-egress-upstream.test.ts` 转为 6 pass / 0 fail（`/tmp/egress-s2-https-green.log`）。如实记录前一提交的验证缺口，未合并或推送。
+
+
+N7 循环边界补正：先以 `cbfedbb99b` 仅提交扩大 IPv6/IPv4-mapped 别名的回归输入，U `bun test --max-concurrency 2 src/main/network-egress-proxy.test.ts -t '系统代理指回'` 为 0 pass / 1 fail（展开式 IPv6 错归 ERR_INVALID_URL，`/tmp/egress-s2-loop-red.log`）。随后把 WHATWG/mapped 归一提到 grants 的内部导出 `canonicalEgressHost`，公网判断与代理循环共用；卡片准入未改。代理自身端口的名称还检查本次 lookup 的 loopback 地址，避免名称别名回指自身。原回归测试未改，grants/proxy 两文件 32 pass / 0 fail（`/tmp/egress-s2-loop-green.log`）；补齐名称解析后代理文件再核对为 26 pass / 0 fail（`/tmp/egress-s2-loop-proxy-final.log`），typecheck 与提交前旧名扫描通过。
+
+
+步骤 3 的设置部分：U `bun test --max-concurrency 2 src/renderer/codepuppy-ui/network-egress-card.test.ts` 为 5 pass / 0 fail（`/tmp/egress-s2-ui-step3.log`）；新增行只展示政策放行，不附撤销/保存动作。中英文各补六键，locale 单独进程 10 pass（`/tmp/egress-s2-locale.log`），typecheck 通过。已有 scenario 文件增加三条具名用例、宿主内部预期由 6 同步到 9；旧 45 秒臂不重跑。
+
+一次较宽轻量相关集：U activity、IPC、derived、registry、disclosure、truth、write-sites、gate-file-registry、shared wire、renderer feed、settings-tools 共 11 文件，93 pass / 0 fail（`/tmp/egress-s2-related-ui.log`）；E network-egress/context-injection 两文件，49 pass / 0 fail（`/tmp/egress-s2-related-ext.log`）。命令均为各包 `bun test --max-concurrency 2 <上述具名路径>`。全局档位/事件声明的消费者由 rg 枚举；尚需的 relay、endpoint-route、official-connectors 具名运行与真引擎移除对照一并等共享 slot。
+
+验证阻塞（未算通过）：`gate slot -- bun test --max-concurrency 2 src/main/network-egress.engine.cases.ts -t '通放与混合档|通放拒绝非公网|系统路由注入'` 尚未获得 slot，没有启动用例。`gate queue` 显示多项 ship 优先于本背景 slot，预计等待约三小时，已超过本片 90 分钟预计的两倍。当前只有轻量和协议入口证据，不能把三条真引擎/真围栏或三个移除臂记为已验证。已在对话请求本轮具名用例按并发 2 直接执行的规则例外，未获答复前不绕开队列。临时 detached 副本 `/tmp/egress-s2-controls-20261126` 已独立 frozen-lockfile 安装并准备相同输入，未运行对照。
+
+选测观察（交编排器）：`affected-tests --list` 退出 2，原样输出 `No such file or directory: '<本 worktree>/.gate-tests'`，因此没有 scope line。本基线没有声明文件；gate 属冻结范围，本轮没有添加或改造选择器。新增测试的层与静态 import 依赖见步骤 2，不能将本条失败表述为 affected 选择已通过。
+
+
+本轮返回前已取消自身尚未启动的 slot 等待（退出 130，未执行测试），并用 `git worktree remove /tmp/egress-s2-controls-20261126` 移除隔离副本；没有取消其它作业。具名真引擎、对照和 relay/endpoint/official 仍待执行，不能宣称 AC-08 的 scenario 证据或 AC-13 日常真引擎代理证据已完成。后续获准直接运行或取得 slot 后，从步骤 3 的上述三条开始，三个移除臂分别只跑对应一条。AC-13 实机系统代理证明仍由编排器另安排。
+
+最终文档检查仍为 69 errors / 253 warnings，findings 与本轮基线完全一致（`/tmp/egress-s2-docs-final.json`）；链接 6 条与 `git diff --check` 通过。未启动应用/Electron、未改系统代理、未跑全套/bin/check/gate，core.hooksPath 保持 `.githooks`。
+
+
+### r7：共享 slot 内补齐重型证明
+
+r7 明确不提供直接运行例外，等待可接受；本节补齐前述未验证项，不改变设计或生产代码。通过 `gate slot -- python3 /tmp/egress-s2-r7-verify-explicit.py` 与续接的 `gate slot -- python3 /tmp/egress-s2-r7-remaining.py` 执行，均实际取得共享 slot 后才启动测试。正常场景通过一次后，续接只执行剩余项，没有重跑正常场景、旧 45 秒臂或 r6 已过的轻量相关集。完整命令、cwd、退出码、实际计数和耗时在 `/tmp/egress-s2-r7-evidence/results.json`；两个 slot 的日志分别为 `/tmp/egress-s2-r7-slot-explicit.log`、`/tmp/egress-s2-r7-remaining-slot.log`。
+
+以下均从 U 执行，统一命令前缀 `bun test --max-concurrency 2 --timeout 120000`（超时沿用仓内测试宿主合同，不改变产品期限）：
+
+| AC / 项 | 文件与 `-t` | 实测结果 |
+| --- | --- | --- |
+| AC-08、AC-13 日常 | `./src/main/network-egress.engine.cases.ts -t '通放与混合档\|通放拒绝非公网\|系统路由注入'` | 退出 0，3 pass / 0 fail，4.53 s。真引擎 PID 73702 与 main PID 73700 不同；实际 apply 返回 libsandbox `/usr/lib/libsandbox.1.dylib`、profile 9007 B；实际逐次 policy-pass 为 2 条。独占 allow 无卡且设置计数 2，混入 ask 后出卡，短写/私网/保留地址拒绝；注入代理的请求记录包含 `via-proxy.egress.invalid:80`，模型工具结果收到靶站正文。 |
+| 去档位旁路对照 | 同文件 `-t '通放与混合档'`；仅临时使 approval 的 `pass()` 返回 undefined | 退出 1，0 pass / 1 fail，4.61 s；明确失败为 `allow-only must not create a card`，实际出现卡片、policy-pass 为 0。 |
+| 去公网判据对照 | 同文件 `-t '通放拒绝非公网'`；仅临时使 `isNonPublicEgressAddress` 返回 false | 退出 1，0 pass / 1 fail，2.85 s；`127.1` 实际收到 `HTTP/1.1 200 Connection Established`，而判据要求 403；错误通放产生 1 条 policy-pass。 |
+| 去路由注入对照 | 同文件 `-t '系统路由注入'`；仅临时令代理解析结果为 DIRECT | 退出 1，0 pass / 1 fail，3.48 s；靶站正文缺失，实际为 `curl: (52) Empty reply from server`，`egress-target-ok` 断言红。没有把 TCP 接通当目标请求成功。 |
+| relay 消费者 | `./src/main/relay-wiring.cases.ts -t 'W1 \|W2 \|W3 '` | 退出 0，3 pass / 0 fail。 |
+| endpoint 消费者 | `./src/main/endpoint-route.engine.cases.ts -t 'E1 refused engine CONNECT'` | 退出 0，1 pass / 0 fail。 |
+| official 消费者 | `./test-component/official-connectors.cases.ts -t 'GitHub recipe decrypts through actual engine file substitution'` | 退出 0，1 pass / 0 fail。 |
+
+三个有效对照各自都是正常启动、实际 apply 围栏后，在目标行为断言处失败；对应 main/engine PID 为 78275/78277、78302/78304、78342/78354。每臂只临时修改一个生产函数，finally 恢复源文件；在独立 frozen-lockfile 安装的 detached 副本中执行，没有借用主树 node_modules。原始输出为 evidence 目录下的 `control-{tier,public,route}.log`，实际引擎/代理/模型数据保存为对应 `.engine.json`；正常场景为 `scenario.log` 与 `scenario.engine.json`。消费者输出为 `relay.log`、`endpoint.log`、`official.log`。有效证据合计正常 8 pass / 0 fail、3 个预期红臂；remaining 续接批次返回 0，保留前一 slot 已通过的 3 条正常场景结果；未改任何断言、门或阈值。
+
+执行偏离如实保留：首次 slot 命令的 `.cases.ts` 未带 `./`，Bun 将它当过滤器，退出 1 且没有运行用例（`scenario-filter-miss.log`），改为显式路径后才得到上述 3 pass。第一个 `/tmp` 副本因集合外探针也落在 W11 `/private/tmp` 可写范围，启动自证失败、准备阶段 90 秒到期；没有 engine ready、policy-pass 为 0，不计作移除臂（`control-tier-setup-miss.log`、对应 `.engine.json`）。将同一独立副本用 git worktree move 移到 `/Users/pharaon/app/wt/egress-controls`，重新 frozen-lockfile 安装确认链接后，才得到上述三个有效红臂。主树测试与生产代码未因这些准备错误改动。有效场景/对照/消费者实际运行约 19.23 s，本轮含排队与准备约 79 分钟；r7 明确允许等待，未再次因队列估计中止。
+
+观察交编排器（非本轮修复）：`src/main/network-egress.engine.cases.ts:181` 的 fixture.start 错误没有请求 id，ready 等待未收到错误，因而上述启动失败表现为 90 秒准备超时；后续可单独改善夹具诊断，不改变本片产品行为。
+
+AC-08 的计划证明与 AC-13 日常注入证明现已补齐。AC-13 的真实机器系统代理读取/无代理对照仍由编排器安排，本轮不将其记为已验收。没有启动应用/Electron，没有改本机系统代理，没有执行全套、bin/check 或 gate run，也没有 push/PR/merge。
+
+
+r7 收尾：源代码仍为 `cc604a9bcb`，本轮只更新本节证据。三个对照的源文件已恢复，`git worktree remove /Users/pharaon/app/wt/egress-controls` 已完成，证据副本保留在上述 /tmp 目录。提交前旧名扫描 10 pass / 0 fail；链接 6 条与 diff 检查通过。文档 contract 仍为既有 69 errors / 253 warnings，findings 与 r6 基线完全一致；`affected-tests --list` 仍因本 worktree 缺 `.gate-tests` 退出 2，没有 scope line，继续交编排器，未改门。core.hooksPath 仍为 `.githooks`。
+
+### r8：接受的审计修复
+
+依据 r8 的 R1 处置，只修复六项接受项，不重开设计。新增回归均放原 integration 文件，依赖由静态 import 可追踪；不扩大 scenario 或 PR 选测层。每项缺陷先单独提交红测试，再提交产品修复，原红断言不改。
+
+R1-2：活动 revision 在档位查询中变化时重读至稳定，沿用拨号 signal 限定等待。必要同调用链文件 `network-egress-grants.ts` 仅把已有 signal 传入 main 的 pass 查询，未改 wire 合同。`83ba2c44b2` 的两条回归在旧实现为 0 pass / 2 fail（`/tmp/egress-r8-2-red.log`）；U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts` 修复后为 10 pass / 0 fail（`/tmp/egress-r8-2-green.log`）。
+
+R1-1：CONNECT 共用同一卡片路径和一次结束状态；路由重查丢失通放依据后重新询问，用户等待暂停拨号剩余预算，不重置预算。只有真实用户授权存在时才写 granted。`c8fa1937a1` 的回归为 0 pass / 2 fail（`/tmp/egress-r8-1-red.log`，缺卡片与 504 后第二条 403）；修复后 proxy 完整文件 28 pass / 0 fail（`/tmp/egress-r8-1-green.log`），登记数量同步为 28。
+
+R1-3：DIRECT 的 TCP lookup 只返回完整已检查集合，保留自动族回退；代理逐个尝试检查过的 IP，SOCKS4 只选 IPv4，不再次解析。`052f9c37d8` 两条回归旧代码 0 pass / 2 fail（`/tmp/egress-r8-3-red.log`）；修复后 upstream 完整文件 8 pass / 0 fail（`/tmp/egress-r8-3-green.log`）。双栈测试仅在隔离子进程的传输边界把公开 IP 映射到本地 IPv4-only TCP peer，真实 connect 执行 IPv6 失败到 IPv4 的回退，检查交给传输的完整固定集合；不关闭公网判据，不外拨公网。
+
+R1-4：启动时只读取一次完整性/完整字节偏移，追加按单写者内存状态推进；失败后下一次先截断到已知完整偏移，启动读到半行也可恢复，完整坏行仍按 unreadable 保留。设置继续按原投影重读。必要同调用链文件 `egress-grant-records.ts` 补真实 truncate 绑定，复用唯一 JSONL 编码函数；无新路径/配置。`8e9b974999` 两条回归为 0 pass / 2 fail（`/tmp/egress-r8-4-red.log`）；修复后 passes 完整文件 5 pass / 0 fail（`/tmp/egress-r8-4-green.log`）。
+
+R1-6：设置聚合复用 `canonicalEgressHost`，数字短写与点分 IPv4 合并，不改逐次原始记录。红测试单独提交，U `bun test --max-concurrency 2 src/main/network-egress-passes.test.ts -t 设置按规范` 为 0 pass / 1 fail（`/tmp/egress-r8-6-red.log`）；修复后 passes 完整文件 6 pass / 0 fail（`/tmp/egress-r8-6-green.log`），登记为 6。
+
+R1-5：在已有 HTTPS 子进程增加仅 DNS:localhost 证书对 IP 路由的拒绝；增加已完成 SOCKS greeting 后取消的 peer close；名称代理用 spied lookup 的真实 localhost 返回结构证明循环拒绝。测试先单独提交，在原实现 3 pass。取消清理按 TCP 连接、协议握手、就绪 socket 的实际生命周期交接：TCP connect 后解除连接阶段监听，SOCKS catch 销毁握手 socket，N7 就绪出口接管后续取消；不改 N7 公开合同。upstream/proxy 两文件完整运行 38 pass / 0 fail（9 + 29，`/tmp/egress-r8-5-green.log`）。三个接受的移除臂各执行一次后源文件已恢复，结果见下表。
+
+
+R1-5 的有效移除证据：`python3 /tmp/egress-r8-controls.py` 退出 0；包装器逐臂执行 U `bun test --max-concurrency 2 <原模块.test.ts> -t <下表名称>`，要求每臂恰好 0 pass / 1 fail，finally 用 scoped `git restore` 恢复本轮临时修改。每臂只执行一次，没有改断言、门或阈值；具体替换、命令和输出在 `/tmp/egress-r8-controls/results.json`。
+
+| 对照 | `-t` | 实际失败 |
+| --- | --- | --- |
+| HTTPS 请求临时设置 rejectUnauthorized:false | `HTTPS 上游` | 退出 1，0 pass / 1 fail；IP 路由被错误接通，缺失 EPROXYCONNECT，代理多收到一条 CONNECT（`tls.log`）。 |
+| 临时去掉 socksTunnel catch 的 socket.destroy | `SOCKS 已答` | 退出 1，0 pass / 1 fail；peer 未观察到 close，明确断言 true 收到 false（`socks.log`）。 |
+| 临时去掉 lookup 结果的代理循环判定 | `系统代理名称` | 退出 1，0 pass / 1 fail；进入 dial，正文 ECONNREFUSED 取代 EPROXYLOOP（`loop.log`）。 |
+
+受影响的真实入口仅按 r8 要求复跑一次：U `gate slot -- bun test --max-concurrency 2 --timeout 120000 ./src/main/network-egress.engine.cases.ts -t '通放与混合档|通放拒绝非公网|系统路由注入'` 退出 0，3 pass / 0 fail，4.54 s（`/tmp/egress-r8-scenario.log`）。main PID 96914、真实 engine PID 97223 不同；逐次政策放行 2 条。实际围栏与卡片/日志/靶站判据由原 scenario 入口守住，完整引擎证据保存在 `/tmp/egress-r8-scenario.engine.json`。未重跑旧 45 秒臂或 r7 的真实入口移除臂/重型消费者。
+
+本轮变动模块完整文件分别为 approval 10、proxy 29、upstream 9、passes 6，均 0 fail（对应上述 green 日志，合计 54 条，不累计重复迭代）。U `bun typecheck` 退出 0（`/tmp/egress-r8-typecheck.log`）。登记数量按实际 proxy/upstream/passes 29/9/6 同步，未降低任何地板。各次提交前 old-name-scan 均为 10 pass / 0 fail。
+
+`affected-tests --list` 退出 2：本基线缺 `.gate-tests`，没有 scope line（`/tmp/egress-r8-affected.log`）；沿用 r8 允许的缺声明说明，没有改 gate。文档 contract 69 errors / 253 warnings，逐项 findings 与本轮沿用的基线完全相同（`/tmp/egress-r8-docs.json`）；6 条链接和 diff 检查通过。
+
+
+一次较宽相关集：U `bun test --max-concurrency 2 src/main/egress-grant-truth.test.ts src/main/net-failure-real-stack.test.ts src/main/network-egress-fence.test.ts src/main/network-egress-grants.test.ts src/main/network-egress-ipc.test.ts src/main/network-egress-registry.test.ts src/main/process-fence-engine.test.ts src/main/process-fence-wiring.test.ts src/main/process-fence-write-sites.test.ts src/main/gate-file-registry.test.ts src/renderer/codepuppy-ui/network-egress-card.test.ts src/renderer/codepuppy-ui/settings-tools.test.ts src/shared/egress-denial.test.ts` 退出 0，13 文件 118 pass / 0 fail，187.60 s（`/tmp/egress-r8-related.log`）。由 rg 列出修改模块的导入消费者并补齐写点/计数登记判据；进程围栏接线使用 Electron mock，没有启动 Electron。测试准备下载依赖二进制与隔离 Office 缓存均由既有夹具执行，不改变产品或本机系统代理；没有重跑整层/整包。
+
+本轮偏离仅上文两个必要同调用链文件；公开 N3/N7、spec、design 与 §10 都未改。核对：Codex（GPT-6）按 r8 接受项与冻结输入完成，六项均有具名证据；原审计未接受的 OPTIONAL/ARCH 不扩修。下一步交编排器 ship；AC-13 实机系统代理证明与基线缺 `.gate-tests`/既有文档检查问题继续交编排器，无新增产品遗留。core.hooksPath 保持 `.githooks`，未 push/PR/merge/rebase，前台命令均已结束。

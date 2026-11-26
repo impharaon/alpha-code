@@ -1,3 +1,4 @@
+import { testEgressDial } from "../../test-component/egress-upstream-fixture"
 import { afterAll, beforeAll, expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import fs from "node:fs"
@@ -39,7 +40,7 @@ let closedPort = 0
 const target = net.createServer((socket) => socket.on("data", () => {}))
 mock.module("./network-egress-proxy", () => ({ startEgressPolicyProxy: async (deps: Parameters<typeof startEgressPolicyProxy>[0]) => {
   proxyLog = deps.log
-  proxy = await startEgressPolicyProxy({ ...deps, dial: (host) => net.connect({ host: "127.0.0.1", port: fault || host === "registry.npmjs.org" ? closedPort : targetPort }) })
+  proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }], ...deps, dial: testEgressDial((host) => net.connect({ host: "127.0.0.1", port: fault || host === "registry.npmjs.org" ? closedPort : targetPort })) })
   return proxy
 } }))
 const health = await Bun.file(new URL("./fixtures/relay-route/health-cloud.json", import.meta.url)).text()

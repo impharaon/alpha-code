@@ -1,4 +1,10 @@
 export const dict = {
+  "codepuppy.network.passesTitle": "「全部批准」放行记录",
+  "codepuppy.network.passesScope": "应用按「全部批准」档放行的连接。",
+  "codepuppy.network.noPasses": "暂无放行记录。",
+  "codepuppy.network.passCount": "放行 {{count}} 次",
+  "codepuppy.network.firstPass": "首次放行：",
+  "codepuppy.network.lastPass": "最近放行：",
   "codepuppy.network.title": "批准联网",
   "codepuppy.network.unknown": "无法确定发起方；此时正在运行工具的对话都可决定。",
   "codepuppy.network.scope": "记住范围：{{site}} 及其所有子域，端口不限。",
@@ -17,7 +23,7 @@ export const dict = {
   "codepuppy.network.settingsScope": "记住的站点在当前应用环境的所有项目中生效。",
   "codepuppy.network.revoke": "撤销",
   "codepuppy.network.revokeFailed": "撤销未能完整保存，请重试。",
-  "codepuppy.network.storageFailed": "批准记录未能读取或保存；若撤销写入失败，重启后可能恢复。",
+  "codepuppy.network.storageFailed": "联网记录未能读取或保存；若撤销写入失败，重启后可能恢复。",
   "codepuppy.network.noSites": "没有记住的站点。",
 
   "codepuppy.timeline.hub.installFailed": "未能安装",

@@ -203,7 +203,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
     installedHashes = hashes()
     __resetCodePuppyEnvironmentForTests()
     proxyLog.length = 0
-    proxy = await startEgressPolicyProxy({ log: (record) => void proxyLog.push(record) })
+    proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }], log: (record) => void proxyLog.push(record) })
     const child = new RecordingChild()
     creditDanglingSweepForSpawn()
     const result = await spawnLocalServer("127.0.0.1", 4319, "password", {

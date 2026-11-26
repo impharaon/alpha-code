@@ -30,6 +30,16 @@ export type EgressDecisionReceipt = {
   persistenceError?: "io"
 }
 export type EgressPassSummary = { destination: Destination; firstAt: string; lastAt: string; count: number }
+export type EgressPass = {
+  event: "egress.policy-pass"
+  id: string
+  at: string
+  destination: Destination
+  basis: "allow-all"
+  attribution: { kind: "unknown" }
+  sessions: { session: SessionRef; tier: "allow" }[]
+  tierRevision: number
+}
 export type EgressSettings =
   | { available: false }
   | { available: true; revision: number; sites: RememberedSite[]; passes: EgressPassSummary[]; persistence: "ok" | "unreadable" | "write-failed" }

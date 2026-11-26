@@ -529,7 +529,7 @@ export function createCodePuppySidecarHost(deps: {
       }
       if(inbound.type === "codepuppy.video.understand") {
         if(!deps.video){reply(post,{type:"codepuppy.video.understand.reply",id:inbound.id,ok:false,error:"unavailable"});return true}
-        deps.video(inbound).then(value=>reply(post,value),()=>reply(post,{type:"codepuppy.video.understand.reply",id:inbound.id,ok:false,error:"cloud_failed"}))
+        deps.video(inbound).then(value=>reply(post,value),error=>reply(post,{type:"codepuppy.video.understand.reply",id:inbound.id,ok:false,error:error instanceof Error && /^[a-z][a-z0-9_-]+$/.test(error.message) ? error.message : "cloud_failed"}))
         return true
       }
       if (inbound.type === "codepuppy.package.authorization.request") {

@@ -65,6 +65,20 @@ describe("planWritableLocations", () => {
     })
   })
 
+  test("version-manager locations are bound only where that manager is already installed", () => {
+    withLocationDisk((disk) => {
+      const input = { platform: "darwin" as const, home: disk.home, userDataPath: join(disk.root, "ud"), configHome: join(disk.home, ".config"), appData: join(disk.home, "Library/Application Support"), localAppData: join(disk.home, "Library/Caches"), goInstallBin: null, xdgCacheHome: null, bunInstall: null, truthPath: disk.truthPath, eligibility: disk.eligibility }
+      mkdirSync(join(disk.home, ".volta/bin"), { recursive: true })
+      const plan = planUserWritableLocations(input)
+      const cover = (target: string) => processFenceRulesCover({ allow: plan.rules, deny: [] }, target, "file")
+      for (const missing of [".nvm", ".config/nvm", "Library/Application Support/fnm", ".local/share/fnm", ".fnm", ".asdf", ".local/share/mise", ".volta/tools", ".volta/tmp", ".volta/log"]) expect(existsSync(join(disk.home, missing)), missing).toBe(false)
+      expect(cover(join(disk.home, ".volta/bin/tool"))).toBe(true)
+      expect(cover(join(disk.home, ".asdf/shims/node"))).toBe(false)
+      // Ordinary fixed install locations keep their existing binding.
+      expect(cover(join(disk.home, ".bun/bin/cli"))).toBe(true)
+      expect(cover(join(disk.home, ".local/lib/python3.12/site-packages/x"))).toBe(true)
+    })
+  })
   test("binds concrete directories and missing literal files without creating user files", () => {
     withLocationDisk((disk) => {
       const candidates = [{ sourcePath: join(disk.home, ".bun", "bin"), kind: "directory" as const }, { sourcePath: join(disk.home, ".config", "git", "config"), kind: "file" as const }]

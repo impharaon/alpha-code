@@ -221,7 +221,7 @@ describe("package manager locations", () => {
           expect(patterns.some((pattern) => pattern.test(`${root}${suffix}`)), `${manager}: ${root}${suffix}`).toBe(false)
       }
       for (const path of ["tools/image/packages", "tools/user/packages", "tools/user/bins", "tools/shared", "bin", "tmp", "log"])
-        expect(result.writable).toContainEqual({ manager, purpose: "global-install", rule: { kind: "subpath", value: `/Users/puppy/.volta/${path}` } })
+        expect(result.writable).toContainEqual({ manager, purpose: "global-install", rule: { kind: "subpath", value: `/Users/puppy/.volta/${path}` }, onlyIfExisting: true })
     }
   })
 

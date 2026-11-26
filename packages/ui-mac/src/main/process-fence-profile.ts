@@ -225,7 +225,8 @@ export type PackageManagerLocationInput = {
 }
 export type PackageManagerLocations = {
   env: Readonly<Record<string, string>>
-  writable: readonly { manager: PackageManager; rule: ProcessFenceWriteRule; purpose: "cache" | "global-install" }[]
+  /** `onlyIfExisting`: a version manager's own location; binding (creating) it when absent would change where that tool installs itself. */
+  writable: readonly { manager: PackageManager; rule: ProcessFenceWriteRule; purpose: "cache" | "global-install"; onlyIfExisting?: true }[]
 }
 
 /** Candidate locations only: the main planner binds their identities before any rule is applied. */
@@ -254,6 +255,9 @@ export function resolvePackageManagerLocations(input: PackageManagerLocationInpu
   const writable: PackageManagerLocations["writable"][number][] = []
   const add = (manager: PackageManager, purpose: "cache" | "global-install", kind: ProcessFenceWriteRule["kind"], ...values: string[]) => {
     values.forEach((value) => writable.push({ manager, purpose, rule: { kind, value } }))
+  }
+  const addVersionManager = (manager: PackageManager, kind: ProcessFenceWriteRule["kind"], ...values: string[]) => {
+    values.forEach((value) => writable.push({ manager, purpose: "global-install", rule: { kind, value }, onlyIfExisting: true }))
   }
   add("bun", "cache", "subpath", env.BUN_INSTALL_CACHE_DIR, env.BUN_RUNTIME_TRANSPILER_CACHE_PATH)
   add("pnpm", "cache", "subpath", ...["store", "cache", "state"].map((name) => path.join(cache, "pnpm", name)))
@@ -293,8 +297,8 @@ export function resolvePackageManagerLocations(input: PackageManagerLocationInpu
       [path.join(input.home, ".volta"), "/tools/image/node/[^/]+"],
       [path.join(input.home, ".asdf"), "/installs/nodejs/[^/]+"],
       [path.join(input.home, ".local", "share", "mise"), "/installs/node/[^/]+"],
-    ]) add(manager, "global-install", "regex", `^${regexLiteral(root!)}${suffix}/(lib/node_modules|bin)(/.*)?$`)
-    add(manager, "global-install", "subpath", ...["tools/image/packages", "tools/user/packages", "tools/user/bins", "tools/shared", "bin", "tmp", "log"].map((suffix) => path.join(input.home, ".volta", suffix)), path.join(input.home, ".asdf", "shims"), path.join(input.home, ".local", "share", "mise", "shims"))
+    ]) addVersionManager(manager, "regex", `^${regexLiteral(root!)}${suffix}/(lib/node_modules|bin)(/.*)?$`)
+    addVersionManager(manager, "subpath", ...["tools/image/packages", "tools/user/packages", "tools/user/bins", "tools/shared", "bin", "tmp", "log"].map((suffix) => path.join(input.home, ".volta", suffix)), path.join(input.home, ".asdf", "shims"), path.join(input.home, ".local", "share", "mise", "shims"))
   }
   if (input.platform === "darwin") add("pip", "global-install", "subpath", path.join(input.home, "Library", "Python"))
   add("pip", "global-install", "regex", `^${regexLiteral(path.join(input.home, ".local", "lib"))}/python[^/]+(/.*)?$`)

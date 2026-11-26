@@ -47,17 +47,21 @@ import { readWritableLocationTruth, writeWritableLocationTruth, type WritableLoc
 
 /** Static install/config candidates share R7 with caches; no user file is written here. */
 export function planUserWritableLocations(input: PackageManagerLocationInput & { truthPath: string; eligibility: WorkspaceDirectoryInput }) {
-  const rules: ProcessFenceWriteRule[] = [
-    ...resolvePackageManagerLocations(input).writable.filter((entry) => entry.purpose === "global-install").map((entry) => entry.rule),
-    ...userConfigurationLocations(input).flatMap((rule) => rule.kind === "dat-files" ? [] : [{ kind: rule.kind, value: rule.path }]),
-  ]
-  const patterns = rules.filter((rule) => rule.kind === "regex").map((rule) => {
+  const template = (rule: ProcessFenceWriteRule) => {
     // Only the fixed resolver's path templates enter here. Split before the first pattern segment.
     const match = /^\^((?:\\.|[^\\[(*+?{$])+)(.*)$/.exec(rule.value)!
     const prefix = match[1]!.replace(/\\(.)/g, "$1")
     const root = prefix.endsWith("/") ? prefix.slice(0, -1) : dirname(prefix)
     return { root, suffix: (prefix.endsWith("/") ? "" : basename(prefix)) + match[2]! }
-  })
+  }
+  const present = (path: string) => { try { lstatSync(path); return true } catch { return false } }
+  const rules: ProcessFenceWriteRule[] = [
+    // A version manager's location is bound only where it already exists; nothing is created for an absent manager.
+    ...resolvePackageManagerLocations(input).writable.filter((entry) => entry.purpose === "global-install" &&
+      (!entry.onlyIfExisting || present(entry.rule.kind === "regex" ? template(entry.rule).root : entry.rule.value))).map((entry) => entry.rule),
+    ...userConfigurationLocations(input).flatMap((rule) => rule.kind === "dat-files" ? [] : [{ kind: rule.kind, value: rule.path }]),
+  ]
+  const patterns = rules.filter((rule) => rule.kind === "regex").map(template)
   const base = planWritableLocations({ ...input, candidates: [
     ...rules.filter((rule) => rule.kind !== "regex").map((rule) => ({ sourcePath: rule.value, kind: rule.kind === "literal" ? "file" as const : "directory" as const })),
     ...patterns.map((pattern) => ({ sourcePath: pattern.root, kind: "directory" as const })),

@@ -1398,3 +1398,11 @@ Host aggregate 保持 **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc4
 本轮收据暂为 **PARTIAL**：已核 Codex（GPT-6），依据 spec v5/design v3.1 + r18，片 3/4 accepted 不重开；下一步只续片 5 的 S-01 ENV_FILE 接缝、错误 FileChanged 新测观察、Security 源 if/tip 事实边界和真实授权通知外部验收，未开始片 7。遗留去向：以上 fix now/编排器裁决；docs 基线 71 errors/250 warnings 和旧 command-subagent 三断言沿已接受处置；host checkpoint 交编排器，无新增 OPTIONAL。完整最终核对/提交见本节后续收口行。
 
 最终核对：ext/ui-mac 包内 `bun typecheck` 均 exit 0（`/tmp/plugin-standard-r18-{ext-commit-types,ui-final-types}.log`），11 个生产文件 scoped oxlint 0 warning/0 error，process 收口后单文件 oxlint 同样为 0。唯一 registry 文件在机制/证据同步后 **5 pass**；north-star exit 0，未扩大接管白名单。`check-docs-contract --profile /tmp/plugin-standard-r11-docs-profile.yml --changed-since 1db6a3bbf5 --format json` 保持既有 **71 errors / 250 warnings**，不修基线。`affected-tests --list` 原 scope line 为 **all tests: scripts/gate-files.tsv changed (gate or declared global input)**，678 个 PR test files，仅列举未运行。新增例均在原 fast/integration 文件；gate-files 仅 hub-view 21→22、host 107→110 数量同步，没有新的全局输入或测试 root。`git diff --check` exit 0、hooksPath=.githooks。02:40 至 03:40 UTC+08:00 约 60 分钟；未 push/PR/merge/rebase，未开应用/窗口。一次根目录误发的测试命令没有选中任何文件（未执行测试），随后仅从 ext 包目录执行具名例，所有实际结果均取正确包目录输出。
+
+### r19｜片 5 的最终裁决与收口
+
+核对：IMPLEMENT — r19，orchestrator / Claude Opus 5.5，2026-11-27；r18 14c18583c4..b2fc7741db accepted。本轮只收片 5，不开始片 7。沿 spec v5 / design v3.1 与既有 rulings；不改其他仓、pin/vendor 或 gate。
+
+偏离记录（orchestrator ruling 2026-11-27）：① S-01 允许 PreparedInstruction 增可选 environment，消费该 Invocation Session 的 ENV_FILE export，并使首次 inline shell 等待 SessionStart；仍由 core 单一 renderer 执行，按既有 S-xx 增量登记。② 本轮可单独纠正 r18 FileChanged 新测的追加/广播观察错误；产品的 handler-owned replacement 不变。③ Claude Security tip 所需 gitOperation 是 Claude-Code-specific 原生工具结果字段，标准事件无此事实，作为原包边界记录，不合成该字段。
+
+FileChanged 观察修正独立提交：保留两个真实 dash0 group 的声明结构，将第二 observer 也限定到其自己的字面 matcher；用 watched[1].txt 验证字面名，分别观察动态/静态 owner。验证第一个 handler 替换到 dynamic.txt、仅第二个保留静态集；动态输出 [] 撤回；实际静态 unlink/add；关闭包后不再投递。未提供 watchPaths 的第二 handler 保留原 matcher，未放宽产品过滤或改生产代码。具名例 **1 pass / 14 expects**（`/tmp/plugin-standard-r19-file-watch-green.log`）；移除 filePaths 的动态 replacement 后同例 **0 pass / 1 fail** 且 REMOVAL_ARM_APPLIED（`file-removal.log`，child-only loader，不改磁盘源码）。本步完整 host **110 pass / 0 fail**（`file-host-complete.log`），消除 r18 的唯一新测红；case 数量/PR 层级/selector 输入不变。

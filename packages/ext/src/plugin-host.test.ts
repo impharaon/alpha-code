@@ -3130,18 +3130,18 @@ packageIt.live("main forwards real permission and completion notifications to th
   }), { id: "actual-notification-producer", setup: async context => { producer = context } })
 }))
 
-packageIt.live("FileChanged watches literal files and dynamic paths once and withdraws them with the package", () => packageJourney(Effect.gen(function* () {
+packageIt.live("FileChanged replaces each handler watch set and withdraws literal watchers with the package", () => packageJourney(Effect.gen(function* () {
   const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
   const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
   const first = hooks.hooks.FileChanged[0]
-  first.matcher = "watched.txt"
+  first.matcher = "watched[1].txt"
   for (const hook of first.hooks) {
     hook.command = process.execPath
-    hook.args = ["-e", "const fs=require('node:fs');const path=require('node:path');const input=await Bun.stdin.json();fs.appendFileSync('file-events.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({continue:false,watchPaths:input.event==='unlink'||fs.readFileSync(input.file_path,'utf8').includes('withdraw')?[]:[path.join(input.cwd,'dynamic.txt')]}))"]
+    hook.args = ["-e", "const fs=require('node:fs');const path=require('node:path');const input=await Bun.stdin.json();fs.appendFileSync('file-events.jsonl',JSON.stringify({...input,owner:'dynamic'})+'\\n');console.log(JSON.stringify({continue:false,watchPaths:input.event==='unlink'||fs.readFileSync(input.file_path,'utf8').includes('withdraw')?[]:[path.join(input.cwd,'dynamic.txt')]}))"]
   }
   const observer = structuredClone(first)
-  delete observer.matcher
-  observer.hooks[0].args = ["-e", "const input=await Bun.stdin.json();require('node:fs').appendFileSync('file-events.jsonl',JSON.stringify(input)+'\\n')"]
+  observer.matcher = first.matcher
+  observer.hooks[0].args = ["-e", "const input=await Bun.stdin.json();require('node:fs').appendFileSync('file-events.jsonl',JSON.stringify({...input,owner:'static'})+'\\n')"]
   const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { FileChanged: [first, observer] } }) })
   const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
@@ -3149,7 +3149,7 @@ packageIt.live("FileChanged watches literal files and dynamic paths once and wit
   const ext = yield* activateExtUntilFinished
   const sessions = yield* Sessions.Service
   const location = yield* Location.Service
-  const watched = join(location.directory, "watched.txt")
+  const watched = join(location.directory, "watched[1].txt")
   const dynamic = join(location.directory, "dynamic.txt")
   const log = join(location.directory, "file-events.jsonl")
   writeFileSync(watched, "initial")
@@ -3164,14 +3164,22 @@ packageIt.live("FileChanged watches literal files and dynamic paths once and wit
   yield* Effect.sleep("150 millis")
   writeFileSync(dynamic, "dynamic change")
   yield* ext.finish(Effect.sync(() => rows().length === 3))
-  writeFileSync(watched, "withdraw dynamic")
+  expect(rows()[2]).toMatchObject({ owner: "dynamic", file_path: dynamic, event: "change" })
+  writeFileSync(watched, "static handler only")
+  yield* ext.finish(Effect.sync(() => rows().length === 4))
+  expect(rows()[3]).toMatchObject({ owner: "static", file_path: watched })
+  writeFileSync(dynamic, "withdraw dynamic")
   yield* ext.finish(Effect.sync(() => rows().length === 5))
   yield* Effect.sleep("150 millis")
   writeFileSync(dynamic, "withdrawn change")
   rmSync(watched)
+  yield* ext.finish(Effect.sync(() => rows().length === 6))
+  expect(rows()[5]).toMatchObject({ owner: "static", file_path: watched, event: "unlink" })
+  writeFileSync(watched, "added after unlink")
   yield* ext.finish(Effect.sync(() => rows().length === 7))
-  expect(rows().filter(row => row.file_path === dynamic)).toHaveLength(1)
-  expect(rows().filter(row => row.event === "unlink")).toHaveLength(2)
+  expect(rows()[6]).toMatchObject({ owner: "static", file_path: watched, event: "add" })
+  expect(rows().filter(row => row.file_path === dynamic)).toHaveLength(2)
+  expect(rows().filter(row => row.owner === "dynamic")).toHaveLength(3)
   expect(rows().every(row => row.hook_event_name === "FileChanged" && row.session_id === session.id && row.cwd === location.directory)).toBe(true)
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify(membership))
   writeFileSync(watched, "disabled change")

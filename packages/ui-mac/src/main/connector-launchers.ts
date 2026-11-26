@@ -1,11 +1,11 @@
 import { execFile, spawn } from "node:child_process"
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { createReadStream, readFileSync, realpathSync, writeFileSync } from "node:fs"
 import { access, cp, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises"
 import { constants } from "node:fs"
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { promisify } from "node:util"
-import { pathToFileURL } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import type { LauncherEnvironment, LauncherPlatform, ConnectorLaunchApi, ConnectorLaunchHost, ManagedFirstPartyBinding, ManagedPinnedFilesResult, PinnedEntryRecipe, PinnedPreparationProgress, DownloadFailureEvidence, PinnedFileDelivery } from "../../../util/src/codepuppy-connector-launch"
 import { canonicalJsonDigest } from "../../../util/src/codepuppy-hash"
 import { declaredFirstPartyTools } from "../../../core/src/mcp/codepuppy-first-party-mcp"
@@ -175,6 +175,7 @@ export function describeLauncherEnvironment(input: { resources: string; userData
 export function createLauncherAssetAuthority(input: Parameters<typeof describeLauncherEnvironment>[0]) {
   const environment = describeLauncherEnvironment(input)
   const entries = new Map<string, Promise<string>>()
+  let pythonMirror: Promise<void> | undefined
   let pending: Promise<LauncherEnvironment> | undefined
   const resolveAssets = async () => {
     const bundled = join(input.resources, "connector-launchers")
@@ -374,6 +375,30 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
       return (pending ??= resolveAssets().finally(() => {
         pending = undefined
       }))
+    },
+    async ensureFile(files: Pick<ConnectorLaunchHost, "ensureFile">, id: PinnedFileId, signal: AbortSignal, progress: (received: number, total: number) => void): Promise<PinnedFileDelivery> {
+      const delivery = await files.ensureFile(id, signal, progress)
+      if (!delivery.result.ok || id !== environment.pythonFileId || signal.aborted) return signal.aborted ? { result: { ok: false, error: "cancelled" } } : delivery
+      const archive = delivery.result.path
+      const pin = input.pins.files.find((file) => file.id === id)!
+      pythonMirror ??= (async () => {
+        const directory = join(fileURLToPath(environment.environment.UV_PYTHON_INSTALL_MIRROR!), environment.environment.UV_PYTHON_CPYTHON_BUILD!)
+        await ensurePinnedDirectory(realpathSync(input.userData), directory)
+        // The download authority already decoded the original filename exactly once.
+        const destination = join(directory, basename(archive))
+        const info = await lstat(destination).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error })
+        if (info?.isSymbolicLink() || (info && !info.isFile())) throw Error("Python mirror is not a regular file")
+        if (info?.size === pin.bytes && await launcherFileDigest(destination) === pin.sha256) return
+        const temporary = `${destination}.${randomUUID()}.part`
+        try {
+          await cp(archive, temporary, { preserveTimestamps: true })
+          if ((await stat(temporary)).size !== pin.bytes || await launcherFileDigest(temporary) !== pin.sha256) throw Error("Python mirror integrity mismatch")
+          await rename(temporary, destination)
+        } finally { await rm(temporary, { force: true }) }
+      })().finally(() => { pythonMirror = undefined })
+      try { await pythonMirror }
+      catch (error) { return { result: { ok: false, error: "disk" }, failure: { kind: "disk", detail: error instanceof Error ? error.message : String(error) } } }
+      return signal.aborted ? { result: { ok: false, error: "cancelled" } } : delivery
     },
     // Both domains share validation, download and unpack. The ID bridge retains original delivery provenance.
     async prepareFiles(...args: Parameters<typeof prepareFiles>): Promise<ManagedPinnedFilesResult> {

@@ -11,7 +11,7 @@ import { createPinnedFileAuthority } from "./pinned-files"
 import { createPinnedFileMainBridge } from "./connector-launch-host"
 import { createPinnedFileRequester } from "../../../util/src/codepuppy-connector-launch"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import pins from "../../resources/pinned-files.json"
 import type { LauncherPlatform, ManagedFirstPartyBinding, PinnedEntryRecipe, PinnedPreparationProgress } from "../../../util/src/codepuppy-connector-launch"
 import type { PinnedFiles } from "../../../util/src/codepuppy-pinned-files"
@@ -337,4 +337,27 @@ test("entryFor validates the protected recipe against the master pins before the
     expect(await requester.prepareFiles({ binding, ids: [f.recipe.id, unknown] }, new AbortController().signal, () => {})).toEqual({ ok: false, error: "unknown-file" })
     expect(f.downloads()).toBe(0)
   } finally { requester.close(); await main.dispose() }
+})
+
+test("Python mirror stages the authority's decoded filename and repairs corrupt cached bytes without downloading again", async () => {
+  const f = await fixture()
+  const bytes = await readFile(new URL("../../resources/pinned-files.json", import.meta.url))
+  const selected = f.input.pins.files.find((file) => file.id === "python/darwin-arm64/3.12.16-20261124")!
+  const manifest: PinnedFiles = { schemaVersion: 1, files: [{ ...selected, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }] }
+  let downloads = 0
+  const files = createPinnedFileAuthority({ userData: f.root, manifest, fetchImpl: async () => { downloads++; return new Response(bytes, { headers: { "content-length": String(bytes.length) } }) } })
+  const host = createLauncherAssetAuthority({ ...f.input, pins: manifest })
+  const run = () => host.ensureFile(files, selected.id, new AbortController().signal, () => {})
+  const first = await run()
+  if (!first.result.ok) throw Error(first.result.error)
+  const mirror = join(host.environment.runtimeRoot, "python-mirror", "20261124", first.result.path.split("/").at(-1)!)
+  expect(mirror).toContain("3.12.16+20261124")
+  expect(mirror).not.toContain("%2B")
+  expect(await readFile(mirror)).toEqual(bytes)
+  expect((await run()).result).toMatchObject({ ok: true, via: "cache" })
+  await writeFile(mirror, "corrupt own cache")
+  expect((await run()).result.ok).toBe(true)
+  expect(await readFile(mirror)).toEqual(bytes)
+  expect(downloads).toBe(1)
+  expect((await readdir(dirname(mirror)))).toEqual([basename(mirror)])
 })

@@ -165,9 +165,12 @@ test("video success cache is tenant and model revision scoped and returns the co
   expect(h.requests).toHaveLength(2)
   h.models.models[0]!.revision = "changed"
   const fourth = await restarted.start({ ...call, callID: "revision" }, request)
-  expect((await state(restarted, fourth.requestId, { ...call, callID: "revision" })).error).toBe(
-    "contract-incompatible",
-  )
+  expect((await state(restarted, fourth.requestId, { ...call, callID: "revision" })).result).toMatchObject({text:expect.stringContaining(h.answer.text),model_revision:h.answer.model_revision,cached:false})
+  const records=await readdir(path.join(root,"cloud"))
+  const changed=await Promise.all(records.map(async file=>JSON.parse(await readFile(path.join(root,"cloud",file),"utf8"))))
+  const paid=changed.find(record=>record.model.revision === "changed")
+  expect(paid.result).toBeUndefined()
+  expect(paid.attempts[0].state).toBe("completed")
   expect(h.requests).toHaveLength(3)
 })
 test("video resumes persisted unknown dispatch control bytes and reattaches a known job without another upload", async () => {

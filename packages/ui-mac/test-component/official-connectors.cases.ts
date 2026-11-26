@@ -1039,7 +1039,7 @@ export default {id:"test.official-runtime",setup:async(ctx)=>{
   const previous = process.cwd()
   process.chdir(slot.projectDirectory)
   let reloads = 0
-  const engine = await startEngine(buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password: "official-runtime-proof", engineVersion: "test", databasePath: slot.databasePath, configDirectory: slot.configDirectory, config: { content: JSON.stringify({ plugins: [observer] }) }, models: { fetch: false }, filewatcher: false, platform: process.platform }), { projectTrust: () => true, onDispatch: dispatch => async request => { if (new URL(request.url).pathname.endsWith("/location/reload")) reloads++; return dispatch(request) } })
+  const engine = await startEngine(buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password: "official-runtime-proof", engineVersion: "test", databasePath: slot.databasePath, configDirectory: slot.configDirectory, config: { content: JSON.stringify({ plugins: [observer] }) }, models: { fetch: false }, filewatcher: false, platform: process.platform }), { packageManagerEnvironment: {}, projectTrust: () => true, onDispatch: dispatch => async request => { if (new URL(request.url).pathname.endsWith("/location/reload")) reloads++; return dispatch(request) } })
   try {
     const connection = { url: engine.url, username: "opencode", password: "official-runtime-proof" }
     const client = engineClient(connection)

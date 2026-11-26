@@ -235,7 +235,7 @@ async function observe(inputs: ReturnType<typeof sidecarStep>, fence: unknown) {
   let fetch: ((request: Request) => Promise<Response>) | undefined
   const engine = await startEngine({ ...options, config: { ...options.config, content: JSON.stringify(runnable) } }, {
     onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-parity")),
-    projectTrust: engineProjectTrust,
+    packageManagerEnvironment: {}, projectTrust: engineProjectTrust,
   })
   engines.push(engine)
   const send = async (method: string, route: string, body?: unknown) => {

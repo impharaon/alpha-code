@@ -30,7 +30,7 @@ import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { loadFenceAddon } from "./process-fence-apply"
 import { trialCompileProfile } from "./process-fence-compile"
 import { planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
-import { processFenceRulesCover, processFenceWriteRules, WORKSPACE_WRITE_EXTENSION_CLASS } from "./process-fence-profile"
+import { processFenceRulesCover, processFenceWriteRules, resolvePackageManagerLocations, WORKSPACE_WRITE_EXTENSION_CLASS } from "./process-fence-profile"
 import { credentialStores } from "./codepuppy-secret-files"
 
 const run = process.env.CODEPUPPY_CONFIG_FENCE_TEST_ROOT!
@@ -43,6 +43,7 @@ const ws = join(run, "ws")
 const dataHome = join(home, ".local", "share")
 const cacheHome = join(home, ".cache")
 const configHome = join(home, ".config")
+const packageCache = resolvePackageManagerLocations({ platform: "darwin", home, userDataPath: userData, configHome, appData: appSupport, localAppData: join(home, "Library", "Caches") }).env
 const xdgConfig = join(configHome, "opencode")
 /** CF-11: the tool policy directory and one partition's document in it (the file name is a sha256, as policyFilePath writes it). */
 const policyDir = join(dataHome, "opencode", "codepuppy-tool-policy")
@@ -111,7 +112,7 @@ function build() {
   mkdirSync(join(ws, "dotfiles-plugin"), { recursive: true })
   symlinkSync(join(ws, "dotfiles-plugin"), join(xdgConfig, "plugin"))
   // E2: the places the engine and its children keep writing
-  for (const directory of [join(userData, "opencode"), join(userData, "uv-cache"), join(dataHome, "opencode"), join(cacheHome, "opencode"), join(home, ".npm")])
+  for (const directory of [join(userData, "opencode"), packageCache.UV_CACHE_DIR!, join(dataHome, "opencode"), join(cacheHome, "opencode"), packageCache.npm_config_cache!])
     mkdirSync(directory, { recursive: true })
 }
 
@@ -503,13 +504,13 @@ test("X1 (AC-02 at the fence): ~/.config — itself an ancestor node, so it goes
   expect(bad.results.get("x1-cfghome:rename-ancestor-away")).toBe("OK")
 })
 
-test("E2: under the same profile the engine and its children keep writing (state, database and -wal, logs, cache, ~/.npm, uv-cache, workspace, other userData files; mkdir -p on an existing protected directory); R8 control: a user's nested symlink inside a protected directory still writes to its target", () => {
+test("E2: under the same profile the engine and its children keep writing (state, database and -wal, logs, cache, R1 npm/uv caches, workspace, other userData files; mkdir -p on an existing protected directory); R8 control: a user's nested symlink inside a protected directory still writes to its target", () => {
   build()
   const writes = [
     `mkdir -p '${join(userData, "opencode", "locks")}' && echo x > '${join(userData, "opencode", "locks", "l")}'`,
     `echo x > '${join(dataHome, "opencode", "opencode.db")}' && echo x > '${join(dataHome, "opencode", "opencode.db-wal")}' && echo x > '${join(dataHome, "opencode", "opencode.db-shm")}'`,
     `mkdir -p '${join(dataHome, "opencode", "log")}' && echo x > '${join(dataHome, "opencode", "log", "a.log")}'`,
-    `echo x > '${join(cacheHome, "opencode", "pkg")}' && echo x > '${join(home, ".npm", "x")}' && echo x > '${join(userData, "uv-cache", "x")}'`,
+    `echo x > '${join(cacheHome, "opencode", "pkg")}' && echo x > '${join(packageCache.npm_config_cache!, "x")}' && echo x > '${join(packageCache.UV_CACHE_DIR!, "x")}'`,
     `echo x > '${join(ws, "x")}' && echo x > '${join(userData, "new.txt")}' && mv '${join(userData, "new.txt")}' '${join(userData, "moved.txt")}' && rm '${join(userData, "moved.txt")}' && echo y >> '${join(userData, "other.txt")}'`,
     `mkdir -p '${xdgConfig}' '${cfgDir}' '${join(userData, "codepuppy-engine-config")}' '${state}' '${policyDir}'`,
     `'${process.execPath}' -e 'for (const d of process.argv.slice(1)) require("fs").mkdirSync(d, { recursive: true })' '${xdgConfig}' '${cfgDir}' '${join(userData, "codepuppy-engine-config")}' '${policyDir}'`,
@@ -520,7 +521,7 @@ test("E2: under the same profile the engine and its children keep writing (state
   const { status, out } = fenced(plan.profile, ["/bin/sh", "-c", writes.map((line, i) => `(${line}) && echo E2-${i}-OK || echo E2-${i}-FAIL`).join("\n")])
   expect(status, out).toBe(0)
   for (let i = 0; i < writes.length; i++) expect(out, `${writes[i]}\n${out}`).toContain(`E2-${i}-OK`)
-  for (const file of [join(userData, "opencode", "locks", "l"), join(dataHome, "opencode", "opencode.db-wal"), join(cacheHome, "opencode", "pkg"), join(home, ".npm", "x"), join(userData, "uv-cache", "x"), join(ws, "x")])
+  for (const file of [join(userData, "opencode", "locks", "l"), join(dataHome, "opencode", "opencode.db-wal"), join(cacheHome, "opencode", "pkg"), join(packageCache.npm_config_cache!, "x"), join(packageCache.UV_CACHE_DIR!, "x"), join(ws, "x")])
     expect(existsSync(file), file).toBe(true)
   expect(readFileSync(join(userData, "other.txt"), "utf8")).toBe("other\ny\n")
   // R8 (outside the guarantee, design §1 (a) / §6): the write followed the user's link to its writable target

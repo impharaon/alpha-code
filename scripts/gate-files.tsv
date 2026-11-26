@@ -441,3 +441,4 @@
 2	packages/ui-mac	src/main/codepuppy-root-retirement.test.ts	-	退休全局根的负全称棘轮(第 ⑤ 层 KEPT:文本就是被守的产物):运营源码与写引导资源里不得重新出现退休 sentinel / alias 与迁移、回退入口。删掉它没有别的测试会红。
 2	packages/ui-mac	src/main/recovery-wiring.test.ts	-	Recovery 窗口的安全开关(独立 preload、contextIsolation / sandbox 开)与启动 DbSafety 分支无原生弹窗、Recovery 单挂载点(第 ⑤ 层 KEPT)。删掉它没有别的测试会红。
 1	packages/ui-mac	src/main/shell-env.test.ts	-	#1759 R8:生产 planner/profile + 真 sandbox-exec 下同步/异步 zsh 探针,交互失败后登录 fallback、界外零落盘、可信根不漂移、PATH 可用及坏 profile 零执行;删除它就失去真实 rc 写盘判据。精确条数=实测 1。[平台:darwin]
+3	packages/ui-mac	src/main/package-manager-environment.test.ts	-	#1759 R2:真实 Node spawner/PTY 与 NpmConfig 薄适配的最终缓存投影、继承/删除键/管道/退出和加载失败回落;不以直接跑上游源码代替最终 spawn。精确条数=实测 3。

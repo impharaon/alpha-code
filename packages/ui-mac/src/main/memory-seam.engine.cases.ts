@@ -84,7 +84,7 @@ async function engineWith(name: string, instructions: string[]) {
       filewatcher: true,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   const send = (method: string, route: string, body?: unknown) =>

@@ -61,7 +61,7 @@ beforeAll(async () => {
       filewatcher: false,
       platform: process.platform,
     }),
-    { projectTrust: engineProjectTrust },
+    { packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   engineUrl = engine.url.replace(/\/$/, "")

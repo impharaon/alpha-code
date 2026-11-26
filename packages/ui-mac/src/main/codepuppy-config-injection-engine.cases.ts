@@ -169,7 +169,7 @@ async function engineWith(
       filewatcher: opts.filewatcher ?? false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   const getAt = async (directory: string, route: string) => {

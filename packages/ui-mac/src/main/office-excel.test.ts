@@ -1,5 +1,6 @@
 // Integration: actual -I Office Python, app modules and OOXML. LO journeys are one-time acceptance.
 import { beforeAll, describe, expect, test } from "bun:test"
+import { join } from "node:path"
 import { spawnSync } from "node:child_process"
 import { installOfficeExcel, officeRuntimeDir } from "../../scripts/build-office-runtime"
 import { officePythonPath } from "../shared/document-resources"
@@ -58,6 +59,17 @@ with zipfile.ZipFile(path) as archive:
  assert any('slicer' in name.lower() for name in archive.namelist())
  assert b'sparkline' in archive.read('xl/worksheets/sheet1.xml')
 `))
+  test("a non-rebuildable pivot is retained with diagnostics while the source edit is saved", () => run(`
+OfficeExcel.objects(str(path),'create_pivot_table',json.dumps({'sheet':'Summary','at':'A1','source':'Data!A1:B3','row_fields':['Region'],'value_fields':[{'field':'Amount'}]}))
+# Controlled can_rebuild=false boundary on a real generated pivot, not an Excel-authored fixture claim.
+with OfficeExcel.edit(str(path)) as w:w['Summary']._pivots[0].cache.refreshedBy='Excel'
+result=OfficeExcel.apply_edit(json.dumps({'path':str(path),'action':'replace','query':'East','replacement':'North'}))
+assert result['diagnostics'][0]['kind']=='pivot-not-rebuilt'
+assert result['diagnostics'][0]['sheet']=='Summary' and result['diagnostics'][0]['pivot']=='PivotTable1'
+actual=load_workbook(path)
+assert actual['Data']['A2'].value=='North' and len(actual['Summary']._pivots)==1
+`))
+
   test("source changes are not overwritten and read cursors bind their workbook version", () => run(`
 try:
  with OfficeExcel.edit(str(path)) as w:
@@ -73,6 +85,47 @@ try:OfficeExcel.inspect(json.dumps({'action':'range','path':str(path),'sheet':'D
 except Exception as error:assert 'source-changed' in str(error)
 else:raise AssertionError('old cursor accepted')
 `))
+  test("Python consumes live projection changes, rejects regression and in-flight pin/configuration changes", () => run(`
+import os
+from codepuppy_office.recalculate import read_projection
+host=Path(directory)/'host.json'
+value={'schemaVersion':1,'sequence':0,'sidecarGeneration':8,'registrationId':'registration','location':{'directory':directory},'status':'active','pinId':'libreoffice/darwin-arm64/test','pinSha256':'a'*64,'runtime':{'phase':'preparing','stage':'download'},'jobs':{'root':directory,'profileSeed':directory,'fontconfigTemplate':None,'configurationSha256':'b'*64,'timeoutMs':180000}}
+host.write_text(json.dumps(value));os.environ['CODEPUPPY_DOCUMENT_HOST']=str(host)
+assert OfficeExcel.recalculate(str(path))['status']=='pending'
+value['runtime']={'phase':'ready','executable':__import__('sys').executable,'version':'test'};host.write_text(json.dumps(value))
+_,binding=read_projection()
+value['sequence']=1;value['pinSha256']='c'*64;host.write_text(json.dumps(value))
+try:read_projection(binding)
+except RuntimeError as error:assert 'pin/configuration' in str(error)
+else:raise AssertionError('in-flight pin change accepted')
+value['sequence']=0;host.write_text(json.dumps(value))
+assert OfficeExcel.recalculate(str(path))['code']=='runtime'
+value={key:value[key] for key in ['schemaVersion','sequence','sidecarGeneration','registrationId','location']}
+value.update(sequence=2,status='invalidated',reason='location-disposed');host.write_text(json.dumps(value))
+assert OfficeExcel.recalculate(str(path))['code']=='runtime'
+host.write_text('{')
+assert OfficeExcel.recalculate(str(path))['code']=='runtime'
+`))
+
+  test("real LibreOffice caches merge into the original package without changing formulas or extension parts", () => run(`
+import hashlib
+from codepuppy_office.cache import merge_caches
+original=Path(${JSON.stringify(join(import.meta.dir, "fixtures/office-excel/cache-original.xlsx"))})
+calculated=Path(${JSON.stringify(join(import.meta.dir, "fixtures/office-excel/cache-calculated.xlsx"))})
+content,count,errors=merge_caches(original,calculated)
+path.write_bytes(content)
+actual=load_workbook(path,data_only=True)
+assert count==4 and actual['Summary']['H2'].value==20100
+assert actual['Summary']['I2'].value=='中文' and actual['Summary']['J2'].value is True
+assert errors==[{'sheet':'Summary','cell':'K2','formula':'=#REF!','error':'#REF!'}]
+assert load_workbook(path)['Summary']['K2'].value=='=#REF!'
+with zipfile.ZipFile(original) as before,zipfile.ZipFile(path) as after:
+ for name in before.namelist():
+  if name.startswith('xl/worksheets/sheet') or name.startswith('xl/charts/chart'):continue
+  assert before.read(name)==after.read(name),name
+ assert b'20100' in after.read('xl/charts/chart1.xml')
+`))
+
   test("missing runtime projection fails recalculation without preventing normal edits", () => run(`
 import os
 os.environ.pop('CODEPUPPY_DOCUMENT_HOST',None)

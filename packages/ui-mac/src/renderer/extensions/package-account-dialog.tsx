@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal, on, For, Show } from "solid-js"
+import { createEffect, createResource, createSignal, on, onCleanup, For, Show } from "solid-js"
 import type { ElectronAPI, InstalledPackageV1 } from "../../preload/types"
 import { Button } from "../codepuppy-ui/Button"
 import { Dialog } from "../codepuppy-ui/Dialog"
@@ -28,7 +28,8 @@ export function PackageAccountDialog(props: {
   onClose(): void
   onSaved(): void | Promise<void>
 }) {
-  const [authorization] = createResource(() => [props.packageId, props.needId], () => extIpc.packageAuthorization(props.packageId))
+  const [authorization, { refetch }] = createResource(() => [props.packageId, props.needId], () => extIpc.packageAuthorization(props.packageId))
+  onCleanup(extIpc.onHubViewChanged(() => { void refetch() }))
   const items = () => {
     if (authorization.error) return []
     const value = authorization()

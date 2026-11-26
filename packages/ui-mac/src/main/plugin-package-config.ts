@@ -57,21 +57,29 @@ export function pluginOptionAuthorization(root: string, graph: PackageGraphV1): 
   })
 }
 
+const versionHints = new WeakMap<typeof suggestPluginVersion, Map<string, string | undefined>>()
+
 export async function pluginVersionAuthorization(root: string, graph: PackageGraphV1, suggestion = suggestPluginVersion): Promise<PackageAuthorizationItemV1[]> {
   const installed = installedPluginDescription(root, graph)
   const settings = graph.pluginTree && readInstalledPluginSettings(root, graph.pluginTree.storeKey)
   if (!installed || !settings) return []
-  return Promise.all(installed.description.entries.flatMap(entry => {
+  const hints = versionHints.get(suggestion) ?? new Map<string, string | undefined>()
+  versionHints.set(suggestion, hints)
+  return installed.description.entries.flatMap(entry => {
     const hostName = installed.hostNames[entry.id]
     const declaration = graph.declarations?.find(item => item.kind === "mcp" && item.hostName === hostName)
     if (entry.kind !== "mcp" || entry.transport !== "stdio" || !entry.floatingVersion || !declaration) return []
-    return [(async (): Promise<PackageAuthorizationItemV1> => {
-      const suggested = settings.mcpVersions[entry.id] === undefined ? await suggestion(entry) : undefined
-      return { kind: "mcp-version", componentId: declaration.componentId, prerequisiteId: graph.packageId + "#version:" + entry.id, serviceName: hostName, label: entry.sourceName, key: entry.id,
-        token: entry.floatingVersion!.token, value: settings.mcpVersions[entry.id] ?? suggested ?? "", ...(suggested ? { suggestion: suggested } : {}),
-      }
-    })()]
-  }))
+    const key = JSON.stringify([root, graph.packageId, graph.installedGraphDigest, entry.id])
+    if (settings.mcpVersions[entry.id] === undefined && !hints.has(key)) {
+      hints.set(key, undefined)
+      // Optional metadata never joins authorization's critical path; a later read sees the settled hint.
+      void suggestion(entry).then(value => { if (value === undefined) hints.delete(key); else hints.set(key, value) }, () => hints.delete(key))
+    }
+    const suggested = settings.mcpVersions[entry.id] === undefined ? hints.get(key) : undefined
+    return [{ kind: "mcp-version", componentId: declaration.componentId, prerequisiteId: graph.packageId + "#version:" + entry.id, serviceName: hostName, label: entry.sourceName, key: entry.id,
+      token: entry.floatingVersion.token, value: settings.mcpVersions[entry.id] ?? suggested ?? "", ...(suggested ? { suggestion: suggested } : {}),
+    }]
+  })
 }
 
 /** Uses the same D5 versioned resource/store as connector secrets, owned once by the bundle. */

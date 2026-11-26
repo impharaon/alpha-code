@@ -1611,10 +1611,11 @@ export function ExtensionHub(props: {
     const pack = () => cp.pack
     const presentation = () => installedPackagePresentation(pack())
     const view = () => catalog().packages?.find((entry) => entry.catalogId === pack().packageId)
-    const [authorization] = createResource(
+    const [authorization, { refetch: refetchAuthorization }] = createResource(
       () => `${pack().packageId}:${JSON.stringify(ext.store.mcp)}`,
       () => extIpc.packageAuthorization(pack().packageId),
     )
+    onCleanup(extIpc.onHubViewChanged(() => { void refetchAuthorization() }))
     const rootHub = () =>
       hubStateView(
         hubRowFor(

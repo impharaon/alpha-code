@@ -23,7 +23,7 @@ const HOSTS: Host[] = [
   { title: "定制中心三页结构:页签、页头、列表行、「添加 ▾」、已安装与系统分段、缺什么直接说、默认关闭与待生效(真 useExtensions + 真 ExtensionHub)", cases: "test-component/hub-three-pages.cases.ts", pass: 40, args: ["--max-concurrency", "2"], timeout: 120_000 },
   { title: "needs_auth 从引擎状态一路走到用户能点的按钮(真 useExtensions + 真 ExtensionHub)", cases: "test-component/mcp-needs-auth-wiring.cases.ts", pass: 23, timeout: 120_000 },
   { title: "REQ-126 CODE-D 新对话页工作区选择器与切目录内容保护的真组件用例", cases: "test-component/new-session-workspace.cases.ts", pass: 64, timeout: 60_000 },
-  { title: "BC4 shared package token dialog uses main declarations and one credential writer", cases: "test-component/package-account-dialog.cases.ts", pass: 7, args: ["--max-concurrency", "2"], timeout: 60_000 },
+  { title: "BC4 shared package token dialog uses main declarations and one credential writer", cases: "test-component/package-account-dialog.cases.ts", pass: 8, args: ["--max-concurrency", "2"], timeout: 60_000 },
   { title: "BC1 production source results render real records, isolate selection, and follow the current query", cases: "test-component/plugin-source-results.cases.ts", pass: 10, args: ["--max-concurrency", "2"], timeout: 60_000 },
   { title: "the production ExtensionDetail header states the recorded artifact digest, or says it is not recorded; a document tool's runtime section reads the bundled runtime (#1564)", cases: "test-component/receipt-artifact-display.cases.ts", pass: 6, timeout: 60_000 },
   { title: "#652 会话内连发三条:第 2、3 条真发出去并渲染出回复", cases: "test-component/session-second-send.cases.ts", pass: 11, timeout: 60_000 },

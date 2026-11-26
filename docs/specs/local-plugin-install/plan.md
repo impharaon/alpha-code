@@ -1004,3 +1004,9 @@ A4：d607a2c829 的原位真实 SDK 回归先红（`bun test --max-concurrency 2
 完整原 proxy lifecycle 文件 2 pass / 0 fail（`/tmp/plugin-standard-r11-A4-green.log`）。测试为有限本地 SDK integration，原文件 imports 可追踪，受影响 PR/nightly；该文件未登记精确条数，无新增全局集。后续补核心连接消费者及最终类型/相关集/移除验证，未把其余审计项或片 5 标完成。
 
 A4 证据加严：原用例改走实际 McpConnection.make（未预包装 fetch），保留原断言，完整原文件仍 2 pass / 0 fail（`/tmp/plugin-standard-r11-A4-connection-green.log`）；core、util、ui-mac 包内 `bun typecheck` 均 exit 0（`/tmp/plugin-standard-r11-A4-{core,util,ui}-types.log`）。该用例现在覆盖 transport 从 config 传入实例 fetch 的消费者；没有扩展产品合同。
+
+A4 移除反臂（`/tmp/plugin-standard-r11-A4-removal.py`）：删除 connection transport 传递 / 删除 main 登记，各 0 pass / 1 fail；恢复原字节，结果 `/tmp/plugin-standard-r11-A4-removal.json`。
+
+A5：479eed3f0c 先提交两条原位回归，held npm metadata 使授权读不返回（0 pass / 1 fail，`/tmp/plugin-standard-r11-A5-red.log`）；打开的版本表单不接收到达通知（0 pass / 1 fail，`/tmp/plugin-standard-r11-A5-dialog-red.log`）。fixture 后续把回包改为与 IPC 一致的新快照对象，断言未改；原对象原地变更不能代表真实 IPC。实现采用 r9 授权的非阻塞分支：设置权威缓存按 provider / 安装身份区分，inflight 去重且不加入授权关键路径；建议成功后复用 hub-view 通知，包行/打开的共享表单重读，不覆盖用户已填值。元数据 fetch 自身仍用现有 deadline，不把 10min REQUEST 常量误当缩短。新改动必要同链是 main provider composition 与两个 renderer 消费者，无新 DTO/IPC/公开配置。
+
+A5 原 installer 文件 46 pass / 0 fail（`/tmp/plugin-standard-r11-A5-green.log`），原 dialog component 文件 8 pass / 0 fail（`/tmp/plugin-standard-r11-A5-dialog-complete.log`）；宿主精确条数 7→8。回归分别是文件/事务 integration 与现有 DOM component integration，imports/宿主字面路径可由 PR 选择器追踪，不加 timing 测试。A5 及 A4 类型/相关集合将在收口统一补齐，不把其余 finding 标完成。

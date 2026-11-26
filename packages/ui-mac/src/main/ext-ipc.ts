@@ -87,7 +87,7 @@ import { getLogger } from "./logging"
 import { resolveVerifiedPackageV1, runCatalogInstallWithPackagePreflight } from "./package-installability"
 import { readPackageAuthorizationV1, savePackageSecretsV1, type PackageAdmissionDeps, createPackageAdmissionCoordinator } from "./package-admission"
 import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
-import { createPluginSources, installedPackageIdentity, type PreparePluginSourceResultV1 } from "./plugin-sources"
+import { createPluginSources, installedPackageIdentity, suggestPluginVersion, type PreparePluginSourceResultV1 } from "./plugin-sources"
 import { createSourceInstaller, installCatalogFromSource } from "./install-from-source"
 import { createPackageDeclarationResolver } from "./package-declarations"
 import { createManagedMcpConvergence, managedMcpNamesOf } from "./package-mcp-activation"
@@ -329,6 +329,11 @@ export function registerExtIpcHandlers(
   )
   let verifiedDeclarationCatalog: unknown
   const packageAdmissionDeps: PackageAdmissionDeps = {
+    versionSuggestion: async entry => {
+      const version = await suggestPluginVersion(entry)
+      if (version !== undefined) setImmediate(notifyHubViewChanged)
+      return version
+    },
     loadVerifiedCatalog: async () => {
       const loaded = await refreshRemoteCatalog(userDataPath, registryChannel)
       verifiedDeclarationCatalog = loaded.source === "none" ? undefined : loaded.catalog

@@ -30,6 +30,12 @@ export function videoInvocation(args: readonly string[], bundleDirectory: string
   return { directory: args[0]!, cacheRoot: args[2]!, bundleDirectory }
 }
 
+/** Tesseract OSD pseudo-scripts and Unicode scripts share the existing pinned model authority. */
+export function ocrScript(script: string | undefined){
+  const canonical=script === "Korean" ? "Hangul" : script === "Hiragana" || script === "Katakana" ? "Japanese" : script
+  return canonical && pins.files.some(pin=>pin.family === "ocr-model" && pin.id.endsWith(`/script-${canonical}`)) ? canonical : undefined
+}
+
 export async function createVideoRuntime(
   input: VideoInvocation,
   call: {
@@ -158,7 +164,8 @@ export async function createVideoRuntime(
     }
   }
 
-  async function ocrModels(script: string | undefined) {
+  async function ocrModels(detected: string | undefined) {
+    const script=ocrScript(detected)
     const ids = script
       ? pins.files
           .filter((pin) => pin.family === "ocr-model" && pin.id.endsWith(`/script-${script}`))

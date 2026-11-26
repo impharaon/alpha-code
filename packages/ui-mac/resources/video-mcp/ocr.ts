@@ -1,3 +1,4 @@
+import { ocrScript } from "./assets"
 import { runComponent } from "./process"
 import { fail, type VideoRuntime } from "./runtime"
 import type { Frame } from "./contracts"
@@ -72,7 +73,7 @@ export async function readFrameText(
       return { stdout: "", stderr: "" }
     throw error
   })
-  const script = /Script:\s*([^\r\n]+)/.exec(orientation.stdout)?.[1]?.trim()
+  const script = ocrScript(/Script:\s*([^\r\n]+)/.exec(orientation.stdout)?.[1]?.trim())
   const extra =
     script && !["Latin", "Han", "HanS", "HanT"].includes(script)
       ? await runtime.component({ kind: "ocr-model", script })

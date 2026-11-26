@@ -133,6 +133,7 @@ export const { ConfigCommandPlugin } = await load("src/config/plugin/command.ts"
 export const { Command } = await load("src/command.ts")
 export const { Config } = await load("src/config.ts")
 export const { ShellSelect } = await load("src/shell/select.ts")
+const { Shell } = await import("../../../core/src/shell")
 export const ConfigSchema = await resolve("@opencode/schema/config")
 export const { SessionPrompt } = await load("src/session/prompt.ts")
 export const { fromPromise } = await resolve("@opencode/plugin/promise/adapter")
@@ -258,6 +259,8 @@ export const HostLayer = AppNodeBuilder.build(
     nodes.InstructionDiscovery.node,
     nodes.Integration.node,
     nodes.Job.node,
+    Shell.node,
+    ShellSelect.node,
     nodes.KV.node,
     Mcp.node,
     Session.node,

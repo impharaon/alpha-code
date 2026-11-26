@@ -1,7 +1,11 @@
 import { restoreEnvMutation, type EnvMutation, type EnvSnapshot } from "./secret-mutations"
 import { projectEnvDiff } from "./secret-diff"
 import { constants } from "node:fs"
-import { access, readFile, stat } from "node:fs/promises"
+import { access, open, readFile, stat, unlink } from "node:fs/promises"
+import { randomUUID } from "node:crypto"
+import type { ShellCapture } from "@opencode/plugin/promise/shell"
+import { createSecretSpool, type SecretSpool } from "./secret-spool"
+import { createSecretStream } from "./secret-stream"
 import path from "node:path"
 import { Schema } from "effect"
 import type { ToolFacts } from "./policy/identity"
@@ -34,6 +38,8 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
   const files = createSecretFiles(roots)
   const calls = new Map<string, CallState>()
   const views = new WeakMap<object, () => Tool.Result>()
+  type Capture = { raw: SecretSpool; stream: ReturnType<typeof createSecretStream>; publish: ShellCapture["publish"] }
+  const captures = new Map<string, Capture>()
   const stateOf = (call: MaskCall, tool: string) => {
     const state = calls.get(toolCallKey(call))
     return state?.kind === "execute" && tool !== "execute" ? undefined : state
@@ -152,6 +158,59 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
   }
   const service = {
     roots,
+    capture: async (input: ShellCapture) => {
+      let staging: string | undefined
+      const release = async () => {
+        const state = captures.get(input.id)
+        captures.delete(input.id)
+        await state?.stream.dispose()
+        await state?.raw.dispose()
+      }
+      try {
+        if (input.withheld) throw new Error("Hidden shell capture")
+        await files.refresh()
+        if (input.phase === "start") {
+          const raw = await createSecretSpool(input.file, input.id)
+          const state: Capture = { raw, publish: input.publish, stream: createSecretStream(input.file, input.id, files.values, (bytes) => state.publish(bytes)) }
+          captures.set(input.id, state)
+          return
+        }
+        const state = captures.get(input.id)
+        if (!state) throw new Error("Shell capture released")
+        state.publish = input.publish
+        if (input.phase === "chunk") {
+          await state.raw.append(input.bytes)
+          await state.stream.push(input.bytes)
+          return
+        }
+        await state.stream.dispose()
+        staging = `${input.file}.safe.${randomUUID()}`
+        const handle = await open(staging, "wx", 0o600)
+        let size = 0
+        let newlines = 0
+        const stream = createSecretStream(input.file, input.id, files.values, async (bytes) => {
+          let offset = 0
+          while (offset < bytes.length) {
+            const written = await handle.write(bytes, offset, bytes.length - offset)
+            if (!written.bytesWritten) throw new Error("Safe capture write failed")
+            offset += written.bytesWritten
+          }
+          size += bytes.length
+          for (const byte of bytes) if (byte === 10) newlines++
+        })
+        try {
+          for await (const bytes of state.raw.read()) await stream.push(bytes)
+          await stream.finish()
+        } finally { await stream.dispose(); await handle.close() }
+        input.replacement = { file: staging, size, newlines }
+        input.disposition = "replace"
+        staging = undefined
+        await release()
+      } catch {
+        input.disposition = "withhold"
+        await release()
+      } finally { if (staging) await unlink(staging).catch(() => {}) }
+    },
     prepareMutation: async (input: EnvMutation): Promise<EnvMutation> => (await prepareMutation(input)).mutation,
     read: async (input: { call: MaskCall; file: ProtectedFiles.ProtectedFile; result: Tool.Result }): Promise<Tool.Result> => {
       const state = stateOf(input.call, "read")
@@ -322,6 +381,8 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     release: (call: MaskCall) => { calls.delete(toolCallKey(call)) },
     dispose: () => {
       calls.clear()
+      for (const state of captures.values()) { void state.stream.dispose(); void state.raw.dispose() }
+      captures.clear()
       files.dispose()
     },
   }

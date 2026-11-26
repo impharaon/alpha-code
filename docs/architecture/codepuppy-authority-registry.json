@@ -10,6 +10,45 @@
   },
   "entries": [
     {
+      "id": "secrets-output-capture",
+      "decision": "SC-01 / U-38、U-39：程序继续使用原文件；同一 shell.capture 内顺序发布安全段，终态按并集重遮盖，故障只保留说明。",
+      "adr": [
+        "ADR-050"
+      ],
+      "lane": "#1758 SC-01",
+      "takeovers": [
+        "packages/core/src/shell.ts",
+        "packages/plugin/src/effect/shell.ts",
+        "packages/plugin/src/promise/shell.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/secret-mask.ts",
+        "ladder": "L1 (owner-approved SC-01; capture publish/replace and orphan cleanup)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/tool-shell.test.ts",
+          "name": "capture publishes live bytes and replaces terminal output"
+        },
+        {
+          "file": "packages/core/test/tool-shell.test.ts",
+          "name": "capture failure hides terminal output without stopping the command"
+        },
+        {
+          "file": "packages/ext/src/secret-mask.test.ts",
+          "name": "capture reprojects the terminal file with newly discovered values"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "registered shell capture masks live files and preserves program use"
+        },
+        {
+          "file": "packages/core/test/shell-cleanup.test.ts",
+          "name": "removes only encrypted captures whose owner has exited"
+        }
+      ]
+    },
+    {
       "id": "secrets-tool-progress",
       "decision": "SC-02 / U-40：根工具含合成 Code Mode 的进度在 publisher 缓存与发布前由扩展遮盖；故障隐藏且命令继续。",
       "adr": [

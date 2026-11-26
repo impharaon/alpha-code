@@ -61,6 +61,8 @@ isolate()
 const { WriteTool } = await import("../../../core/src/tool/plugin/write")
 const { EditTool } = await import("../../../core/src/tool/plugin/edit")
 const { PatchTool } = await import("../../../core/src/tool/plugin/patch")
+const { ShellTool } = await import("../../../core/src/tool/plugin/shell")
+const { Shell } = await import("../../../core/src/shell")
 
 // Hand-written expectations (never derived from production helpers).
 const ID_BUILTIN_WRITE = "builtin::probe_write"
@@ -1839,6 +1841,32 @@ describe("env write-back", () => {
 })
 
 describe("secret result boundaries", () => {
+  it.live("registered shell capture masks live files and preserves program use", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID()
+    fs.writeFileSync(path.join(location.directory, ".env"), `KEY=${value}\nPORT=3000\n`)
+    const live: string[] = []
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, after: promisePlugin("observe-live-capture", async (ctx) => {
+      await ctx.shell.hook("capture", async (event) => {
+        if (event.phase === "chunk") live.push(await fs.promises.readFile(event.file, "utf8"))
+      })
+    }) })
+    const result = yield* callRaw(session.id, "shell", { command: "cat .env; cp .env program-copy.txt; exit 7" })
+    if (Exit.isFailure(result)) throw new Error(String(failure(result)?.message ?? Cause.pretty(result.cause)))
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect(JSON.stringify(result).includes(value)).toBe(false)
+    expect(JSON.stringify(result)).toContain("[REDACTED]")
+    expect(JSON.stringify(result)).toContain("PORT=3000")
+    expect((result as { value: { output: unknown } }).value.output).toMatchObject({ exit: 7 })
+    expect(fs.readFileSync(path.join(location.directory, "program-copy.txt"), "utf8").includes(value)).toBe(true)
+    expect(live.length).toBeGreaterThan(0)
+    expect(live.every((text) => !text.includes(value))).toBe(true)
+    expect(live.join("\n")).toContain("PORT=3000")
+    const shell = yield* Shell.Service
+    const info = yield* shell.list()
+    expect(info).toEqual([])
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+  }))
   it.live("synthetic execute progress must hide known protected values", () => Effect.gen(function* () {
     const location = yield* Location.Service
     fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=1234\n")

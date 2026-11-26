@@ -31,6 +31,8 @@ import { SessionStore } from "@opencode/core/session/store"
 import { Permission } from "@opencode/core/permission"
 import { PermissionSaved } from "@opencode/core/permission/saved"
 import { Plugin } from "@opencode/core/plugin"
+import { PluginHooks } from "@opencode/core/plugin/hooks"
+import { ProtectedFiles } from "@opencode/schema/codepuppy-protected-files"
 import { PluginSupervisor } from "@opencode/core/plugin/supervisor"
 import { Shell } from "@opencode/core/shell"
 import { ShellSelect } from "@opencode/core/shell/select"
@@ -795,6 +797,111 @@ describe("ShellTool ordinary shell syntax", () => {
 })
 
 describe("ShellTool", () => {
+  it.live("capture publishes live bytes and replaces terminal output", () => withTempDir((tmp) => withSession(tmp.path, () => Effect.gen(function* () {
+    const hooks = yield* PluginHooks.Service
+    const shell = yield* Shell.Service
+    const published = yield* Deferred.make()
+    const release = yield* Deferred.make()
+    const phases: string[] = []
+    let expired: ((chunk: Uint8Array) => Promise<void>) | undefined
+    yield* hooks.register("shell", "capture", (event) => Effect.gen(function* () {
+      phases.push(event.phase)
+      if (event.phase === "chunk") {
+        expired = event.publish
+        yield* Effect.promise(() => event.publish(Buffer.from("safe-one\n")))
+        yield* Effect.promise(() => event.publish(Buffer.from("safe-two")))
+        yield* Deferred.succeed(published, undefined)
+        yield* Deferred.await(release)
+      }
+      if (event.phase === "end") {
+        yield* Effect.promise(async () => {
+          await expect(expired!(Buffer.from("late"))).rejects.toThrow("publication failed")
+          const file = `${event.file}.safe-test`
+          await fs.writeFile(file, "terminal\n")
+          event.replacement = { file, size: 9, newlines: 1 }
+          event.disposition = "replace"
+        })
+      }
+    }))
+    const started = yield* shell.create({ command: bodyExitCommand })
+    yield* Deferred.await(published)
+    expect((yield* shell.get(started.id)).status).toBe("running")
+    expect(yield* shell.output(started.id)).toMatchObject({ output: "safe-one\nsafe-two", size: 17, cursor: 17 })
+    expect(yield* Effect.promise(() => fs.readFile(started.file, "utf8"))).toBe("safe-one\nsafe-two")
+    yield* Deferred.succeed(release, undefined)
+    const result = yield* shell.result(started)
+    expect(result).toMatchObject({ info: { exit: 7 }, capture: { output: "terminal\n", truncated: false } })
+    expect(yield* Effect.promise(() => fs.readFile(started.file, "utf8"))).toBe("terminal\n")
+    expect(phases[0]).toBe("start"); expect(phases.at(-1)).toBe("end")
+  }))))
+
+  it.live("capture failure hides terminal output without stopping the command", () => withTempDir((tmp) => withSession(tmp.path, () => Effect.gen(function* () {
+    const hooks = yield* PluginHooks.Service
+    const shell = yield* Shell.Service
+    yield* hooks.register("shell", "capture", (event) => Effect.gen(function* () {
+      if (event.phase !== "chunk") return
+      yield* Effect.promise(() => event.publish(Buffer.from("safe-prefix")))
+      yield* Effect.die(new Error("masker failed"))
+    }))
+    const started = yield* shell.create({ command: bodyExitCommand })
+    const result = yield* shell.result(started)
+    expect(result).toMatchObject({ info: { exit: 7 }, capture: { output: ProtectedFiles.MASKING_FAILED_TEXT, truncated: false } })
+    expect(yield* Effect.promise(() => fs.readFile(started.file, "utf8"))).toBe(ProtectedFiles.MASKING_FAILED_TEXT)
+  }))))
+
+  it.live("lost capture callback never falls back to raw output", () => withTempDir((tmp) => withSession(tmp.path, () => Effect.gen(function* () {
+    const hooks = yield* PluginHooks.Service
+    const shell = yield* Shell.Service
+    const registration = yield* hooks.register("shell", "capture", (event): Effect.Effect<void> => Effect.gen(function* () {
+      if (event.phase !== "chunk") return
+      yield* Effect.promise(() => event.publish(Buffer.from("safe-prefix")))
+      yield* registration.dispose
+    }))
+    const started = yield* shell.create({ command: bodyExitCommand })
+    expect((yield* shell.result(started)).capture?.output).toBe(ProtectedFiles.MASKING_FAILED_TEXT)
+    expect(yield* Effect.promise(() => fs.readFile(started.file, "utf8"))).toBe(ProtectedFiles.MASKING_FAILED_TEXT)
+  }))))
+
+  it.live("concurrent capture publication cannot clear the failure latch", () => withTempDir((tmp) => withSession(tmp.path, () => Effect.gen(function* () {
+    const hooks = yield* PluginHooks.Service
+    const shell = yield* Shell.Service
+    let rejected = false
+    yield* hooks.register("shell", "capture", (event) => Effect.promise(async () => {
+      if (event.phase === "chunk") {
+        const first = event.publish(Buffer.from("first"))
+        await event.publish(Buffer.from("concurrent")).catch(() => { rejected = true })
+        await first
+      }
+      if (event.phase === "end") {
+        const file = `${event.file}.safe-test`
+        await fs.writeFile(file, "forged")
+        event.disposition = "replace"
+        event.replacement = { file, size: 6, newlines: 0 }
+      }
+    }))
+    const started = yield* shell.create({ command: bodyExitCommand })
+    expect((yield* shell.result(started)).capture?.output).toBe(ProtectedFiles.MASKING_FAILED_TEXT)
+    expect(rejected).toBe(true)
+  }))))
+
+  it.live("capture disk failure returns only the notice and no old file reference", () => withTempDir((tmp) => withSession(tmp.path, () => Effect.gen(function* () {
+    const hooks = yield* PluginHooks.Service
+    const shell = yield* Shell.Service
+    let directory = ""
+    yield* hooks.register("shell", "capture", (event) => Effect.promise(async () => {
+      if (event.phase === "start") {
+        directory = path.dirname(event.file)
+        await fs.rmdir(directory)
+        await fs.writeFile(directory, "disk obstruction")
+      }
+      if (event.phase === "chunk") await event.publish(Buffer.from("safe")).catch(() => {})
+    }))
+    const started = yield* shell.create({ command: bodyExitCommand })
+    const result = yield* shell.result(started)
+    expect(result).toMatchObject({ info: { exit: 7, file: "" }, capture: { output: ProtectedFiles.MASKING_FAILED_TEXT, truncated: false } })
+    expect((yield* shell.output(started.id)).output).toBe(ProtectedFiles.MASKING_FAILED_TEXT)
+    yield* Effect.promise(async () => { await fs.unlink(directory); await fs.mkdir(directory) })
+  }))))
   it.live("returns both parallel CodeMode shell results", () =>
     withTempDir((tmp) => {
       reset()

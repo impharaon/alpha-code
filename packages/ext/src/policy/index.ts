@@ -268,6 +268,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       if (prepared !== "asked") await confirm(deps, prepared.decision, prepared.call, prepared.install)
     },
     seal: async () => {
+      await context.shell.hook("capture", (event) => secrets.capture(event))
       // Configured MCP servers as OpenCode will run them, after every earlier transform (the extension's cloud entry).
       await context.mcp.transform((editor) => {
         mcp.clear()

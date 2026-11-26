@@ -1,5 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
-import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, symlink, truncate, writeFile } from "node:fs/promises"
+import type { ShellCapture } from "@opencode/plugin/promise/shell"
+import { Shell } from "../../schema/src/shell"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -36,6 +38,46 @@ async function setup(values: string[] = [randomUUID()]) {
   }
   return { root, roots, mask: createSecretMask(roots), values }
 }
+
+test("capture reprojects the terminal file with newly discovered values", async () => {
+  const { root, roots, mask, values: [first] } = await setup()
+  const second = randomUUID()
+  const live: string[] = []
+  const event = (phase: ShellCapture["phase"], bytes = ""): ShellCapture => ({ id: Shell.ID.make("sh_fixture"), file: path.join(root, "sh_fixture.out"), phase, bytes: Buffer.from(bytes), withheld: false, disposition: "hold", publish: async (chunk) => { live.push(Buffer.from(chunk).toString()) } })
+  await mask.capture(event("start"))
+  await mask.capture(event("chunk", `first=${first}\nnew=${second}\nPORT=3000\n`))
+  expect(live.join("").includes(first)).toBe(false)
+  expect(live.join("").includes(second)).toBe(true) // Approved print-before-write live window.
+  await writeFile(path.join(roots.project, ".env"), `NEW=${second}\nPORT=3000\n`)
+  const end = event("end")
+  await mask.capture(end)
+  expect(end.disposition).toBe("replace")
+  const safe = await readFile(end.replacement!.file, "utf8")
+  expect(safe.includes(first) || safe.includes(second)).toBe(false)
+  expect(safe).toContain("PORT=3000")
+  expect(end.replacement).toMatchObject({ size: Buffer.byteLength(safe), newlines: 3 })
+  expect((await readdir(root)).some((name) => name.endsWith(".enc"))).toBe(false)
+})
+
+test("capture failures discard terminal prefixes", async () => {
+  const { root, mask } = await setup()
+  const live: string[] = []
+  const event = (phase: ShellCapture["phase"], bytes = ""): ShellCapture => ({ id: Shell.ID.make("sh_fixture"), file: path.join(root, "sh_fixture.out"), phase, bytes: Buffer.from(bytes), withheld: false, disposition: "hold", publish: async (chunk) => { live.push(Buffer.from(chunk).toString()) } })
+  await mask.capture(event("start"))
+  await mask.capture(event("chunk", "safe-prefix"))
+  expect(live.join("")).toBe("safe-prefix")
+  const spool = (await readdir(root)).find((name) => name.endsWith(".enc"))!
+  await truncate(path.join(root, spool), 0)
+  const end = event("end")
+  await mask.capture(end)
+  expect(end.disposition).toBe("withhold")
+  expect(end.replacement).toBeUndefined()
+  expect((await readdir(root)).some((name) => name.includes(".safe.") || name.endsWith(".enc"))).toBe(false)
+  mask.dispose()
+  const released = event("end")
+  await mask.capture(released)
+  expect(released.disposition).toBe("withhold")
+})
 
 test("terminal masking replaces every dynamic payload", async () => {
   const {

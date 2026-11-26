@@ -1,5 +1,6 @@
 import { describe, expect } from "bun:test"
 import path from "path"
+import { spawn } from "node:child_process"
 import { Effect } from "effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { Shell } from "@opencode/core/shell"
@@ -21,6 +22,21 @@ const withStore = <A, E, R>(body: (fs: FSUtil.Interface, root: string) => Effect
   })
 
 describe("Shell cleanup", () => {
+  it.live("removes only encrypted captures whose owner has exited", () => withStore((fs, root) => Effect.gen(function* () {
+    const pid = yield* Effect.promise(() => new Promise<number>((resolve, reject) => {
+      const child = spawn(process.execPath, ["--eval", ""], { stdio: "ignore" })
+      child.once("error", reject)
+      child.once("exit", () => resolve(child.pid!))
+    }))
+    const directory = path.join(root, Shell.DIRECTORY, "project")
+    yield* fs.ensureDir(directory)
+    const file = (owner: number) => path.join(directory, `sh_0123456789abABCDEFGHIJKLMN.out.pending.${owner}.${"a".repeat(32)}.enc`)
+    for (const owner of [pid, process.pid, Number.MAX_SAFE_INTEGER]) yield* fs.writeFileString(file(owner), "ciphertext fixture")
+    yield* Shell.cleanup()
+    expect(yield* fs.exists(file(pid))).toBe(false)
+    expect(yield* fs.exists(file(process.pid))).toBe(true)
+    expect(yield* fs.exists(file(Number.MAX_SAFE_INTEGER))).toBe(true)
+  })))
   it.live("removes expired output files across projects", () =>
     withStore((fs, root) =>
       Effect.gen(function* () {

@@ -1,7 +1,7 @@
 export * as Shell from "./shell.js"
 
 import path from "path"
-import { Context, Deferred, Duration, Effect, Fiber, Latch, Layer, Schema, Schedule, Stream } from "effect"
+import { Context, Deferred, Duration, Effect, Exit, Fiber, Latch, Layer, Schema, Schedule, Stream } from "effect"
 import { ChildProcess } from "effect/process"
 import { produce } from "immer"
 import { Shell } from "@opencode/schema/shell"
@@ -15,7 +15,8 @@ import { FileRetention } from "./file-retention.js"
 import { Location } from "./location.js"
 import { Global } from "@opencode/util/global"
 import { ShellSelect } from "./shell/select.js"
-import type { ShellCreateBefore } from "@opencode/plugin/effect/shell"
+import { ProtectedFiles } from "@opencode/schema/codepuppy-protected-files"
+import type { ShellCapture, ShellCreateBefore } from "@opencode/plugin/effect/shell"
 import { PluginHooks } from "./plugin/hooks.js"
 import { SessionEnvironment } from "./session/environment.js"
 import { SessionSchema } from "./session/schema.js"
@@ -47,6 +48,7 @@ type Active = {
   // Resolves with the terminal Info once the command exits, times out, or is killed. A wait
   // started after termination resolves immediately from the already-completed deferred.
   done: Deferred.Deferred<Info, NotFoundError>
+  hidden?: boolean
   timeoutFiber?: Fiber.Fiber<void>
   timeout?: (duration: number) => Effect.Effect<void>
 }
@@ -102,7 +104,7 @@ export const cleanup = Effect.fn("Shell.cleanup")(function* () {
       fs.readDirectoryEntries(path.join(directory, project.name)).pipe(
         Effect.map((entries) =>
           entries.flatMap((entry) =>
-            entry.type === "File" && /^sh_[0-9a-f]{12}.*\.out$/.test(entry.name)
+            entry.type === "File" && /^sh_[0-9a-f]{12}.*\.out(?:\.pending\.\d+\.[0-9a-f]{32}\.enc)?$/.test(entry.name)
               ? [path.join(directory, project.name, entry.name)]
               : [],
           ),
@@ -111,7 +113,16 @@ export const cleanup = Effect.fn("Shell.cleanup")(function* () {
       ),
     { concurrency: 8 },
   )
-  yield* FileRetention.cleanup(fs, files.flat(), RETENTION)
+  const all = files.flat()
+  yield* Effect.forEach(all.filter((file) => file.endsWith(".enc")), (file) => Effect.gen(function* () {
+    const pid = Number(file.match(/\.pending\.(\d+)\.[0-9a-f]{32}\.enc$/)?.[1])
+    if (!Number.isSafeInteger(pid) || pid <= 0) return
+    try { process.kill(pid, 0); return } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") return
+    }
+    yield* fs.remove(file).pipe(Effect.ignore)
+  }), { concurrency: 8, discard: true })
+  yield* FileRetention.cleanup(fs, all.filter((file) => file.endsWith(".out")), RETENTION)
 })
 
 const cleanupLayer = Layer.effectDiscard(
@@ -142,7 +153,7 @@ const layer = () =>
       const exitOrder: Shell.ID[] = []
 
       const outputDir = path.join(global.data, DIRECTORY, location.project.id)
-      const { mkdir, unlink } = yield* Effect.promise(() => import("fs/promises"))
+      const { mkdir, unlink, rename, stat, writeFile } = yield* Effect.promise(() => import("fs/promises"))
       const { createWriteStream, createReadStream } = yield* Effect.promise(() => import("fs"))
       yield* Effect.promise(() => mkdir(outputDir, { recursive: true }))
 
@@ -207,6 +218,12 @@ const layer = () =>
 
       const output = Effect.fnUntraced(function* (id: Shell.ID, input?: Shell.OutputInput) {
         const command = yield* require(id)
+        if (command.hidden) {
+          const bytes = Buffer.from(ProtectedFiles.MASKING_FAILED_TEXT)
+          const cursor = Math.min(input?.cursor ?? 0, bytes.length)
+          const end = Math.min(bytes.length, cursor + (input?.limit ?? 65536))
+          return { output: bytes.subarray(cursor, end).toString(), cursor: end, size: bytes.length, truncated: false }
+        }
         const cursor = input?.cursor ?? 0
         const limit = input?.limit ?? 65536
         if (cursor >= command.size) return { output: "", cursor: command.size, size: command.size, truncated: false }
@@ -242,6 +259,8 @@ const layer = () =>
           ),
         )
         const capture = yield* Effect.gen(function* () {
+          const command = yield* require(info.id)
+          if (command.hidden) return { output: ProtectedFiles.MASKING_FAILED_TEXT, truncated: false }
           const limits = Config.latest(yield* config.entries(), "tool_output")
           const maxLines = limits?.max_lines ?? ToolOutput.MAX_LINES
           const maxBytes = limits?.max_bytes ?? ToolOutput.MAX_BYTES
@@ -287,6 +306,41 @@ const layer = () =>
         const id = Shell.ID.ascending()
         const args = ShellSelect.args(invocation.shell, invocation.command)
         const file = path.join(outputDir, `${id}.out`)
+        const capturing = yield* hooks.has("shell", "capture")
+        let withheld = false
+        let announced = false
+        let write: ((bytes: Uint8Array) => Promise<void>) | undefined
+        const capture = Effect.fnUntraced(function* (phase: ShellCapture["phase"], bytes = new Uint8Array()) {
+          let active = true
+          let inflight: Promise<void> | undefined
+          const event: ShellCapture = {
+            id, phase, file, withheld, bytes, disposition: "hold",
+            publish: (chunk) => {
+              const fault = () => new Error("Shell capture publication failed")
+              if (!active) return Promise.reject(fault())
+              if (phase === "start" || withheld || inflight || !write) {
+                withheld = true
+                return Promise.reject(fault())
+              }
+              const operation = write(chunk).catch(() => { withheld = true; throw fault() })
+              inflight = operation
+              operation.then(() => { if (inflight === operation) inflight = undefined }, () => { if (inflight === operation) inflight = undefined })
+              return operation
+            },
+          }
+          const present = yield* hooks.has("shell", "capture")
+          if (!present) withheld = true
+          if (present) {
+            const exit = yield* hooks.trigger("shell", "capture", event).pipe(Effect.exit)
+            if (Exit.isFailure(exit)) withheld = true
+          }
+          active = false
+          const writing = inflight
+          if (writing) yield* Effect.promise(() => writing.catch(() => { withheld = true }))
+          if (event.disposition === "withhold" || phase !== "end" && event.disposition === "replace") withheld = true
+          return event
+        })
+        if (capturing) yield* capture("start")
 
         const info: Info = {
           id,
@@ -331,27 +385,100 @@ const layer = () =>
               commands.set(id, command)
 
               const stream = createWriteStream(file)
+              if (capturing) stream.on("error", () => { withheld = true })
+              write = (bytes) => new Promise<void>((resolve, reject) => {
+                if (!bytes.length) { resolve(); return }
+                let written = false
+                let drained = false
+                let settled = false
+                const failed = () => {
+                  if (settled) return
+                  settled = true
+                  stream.off("drain", drain)
+                  stream.off("error", failed)
+                  reject(new Error("Shell capture write failed"))
+                }
+                const complete = () => {
+                  if (settled || !written || !drained) return
+                  settled = true
+                  stream.off("drain", drain)
+                  stream.off("error", failed)
+                  command.size += bytes.length
+                  for (const byte of bytes) if (byte === 10) command.newlines++
+                  resolve()
+                }
+                const drain = () => { drained = true; complete() }
+                stream.once("drain", drain)
+                stream.once("error", failed)
+                try {
+                  const accepted = stream.write(bytes, (error) => {
+                    if (error) { failed(); return }
+                    written = true
+                    complete()
+                  })
+                  if (accepted) { drained = true; complete() }
+                } catch { failed() }
+              })
+              const announce = Effect.promise(async () => {
+                if (!withheld || announced) return
+                announced = true
+                await write!(Buffer.from(ProtectedFiles.MASKING_FAILED_TEXT)).catch(() => {})
+              })
               const outputDone = Latch.makeUnsafe()
               const pump = handle.all.pipe(
-                Stream.runForEach((chunk: Uint8Array) =>
-                  Effect.sync(() => {
-                    stream.write(chunk)
-                    command.size += chunk.length
-                    // Count while streaming so truncation notices never rescan the output file.
-                    for (let index = chunk.indexOf(10); index !== -1; index = chunk.indexOf(10, index + 1))
-                      command.newlines++
-                  }),
-                ),
+                Stream.runForEach((chunk: Uint8Array) => capturing
+                  ? Effect.gen(function* () {
+                      if (!withheld) yield* capture("chunk", chunk)
+                      yield* announce
+                    })
+                  : Effect.sync(() => {
+                      stream.write(chunk)
+                      command.size += chunk.length
+                      for (let index = chunk.indexOf(10); index !== -1; index = chunk.indexOf(10, index + 1)) command.newlines++
+                    })),
               )
               runFork(
                 Effect.gen(function* () {
-                  yield* pump.pipe(Effect.catch(() => Effect.void))
-                  yield* Effect.promise(
-                    () =>
-                      new Promise<void>((resolve) => {
-                        stream.end(() => resolve())
-                      }),
-                  )
+                  if (capturing) yield* announce
+                  yield* pump.pipe(Effect.catch(() => Effect.sync(() => { if (capturing) withheld = true })))
+                  const terminal = capturing ? yield* capture("end") : undefined
+                  yield* Effect.promise(() => new Promise<void>((resolve) => {
+                    if (stream.closed) { resolve(); return }
+                    stream.once("close", resolve)
+                    stream.end(resolve)
+                  }))
+                  if (capturing) {
+                    const replaced = yield* Effect.promise(async () => {
+                      if (withheld || terminal?.disposition !== "replace" || !terminal.replacement) return false
+                      const replacement = terminal.replacement
+                      if (path.dirname(path.resolve(replacement.file)) !== path.dirname(file) || path.resolve(replacement.file) === file) return false
+                      if ((await stat(replacement.file)).size !== replacement.size) return false
+                      await rename(replacement.file, file)
+                      command.size = replacement.size
+                      command.newlines = replacement.newlines
+                      return true
+                    }).pipe(Effect.exit, Effect.map((exit) => Exit.isSuccess(exit) && exit.value))
+                    if (!replaced) {
+                      withheld = true
+                      command.hidden = true
+                      const hidden = `${file}.hidden.${crypto.randomUUID()}`
+                      const saved = yield* Effect.promise(async () => {
+                        try {
+                          await writeFile(hidden, ProtectedFiles.MASKING_FAILED_TEXT, { mode: 0o600, flag: "wx" })
+                          await rename(hidden, file)
+                          return true
+                        } catch { await unlink(hidden).catch(() => {}); return false }
+                      })
+                      command.size = Buffer.byteLength(ProtectedFiles.MASKING_FAILED_TEXT)
+                      command.newlines = 0
+                      if (!saved) {
+                        command.info = produce(command.info, (draft) => { draft.file = "" })
+                        yield* Effect.promise(() => unlink(file).catch(() => {}))
+                      }
+                    }
+                    if (terminal?.replacement && path.dirname(path.resolve(terminal.replacement.file)) === path.dirname(file) && path.resolve(terminal.replacement.file) !== file)
+                      yield* Effect.promise(() => unlink(terminal.replacement!.file).catch(() => {}))
+                  }
                   yield* outputDone.open
                 }),
               )
@@ -445,7 +572,10 @@ const layer = () =>
               // release (kill) the process before its exit is observed.
               yield* Deferred.await(command.done).pipe(Effect.catch(() => Effect.void))
             }),
-          ).pipe(Effect.catchTag("AppProcessError", (error) => Deferred.fail(ready, error))),
+          ).pipe(Effect.catchTag("AppProcessError", (error) => Effect.gen(function* () {
+            if (capturing) { withheld = true; yield* capture("end") }
+            yield* Deferred.fail(ready, error)
+          }))),
         )
 
         const command = yield* Deferred.await(ready)

@@ -1,7 +1,7 @@
 ---
 id: PLAN-secrets-usable-not-visible
 title: 密钥文件程序可用、助手不可见 实施计划
-summary: 五段实施；①②③及 SC-02 已核，④捕获计划与单槽直播发布接缝待设计收口，完整真引擎证据留⑤。
+summary: 五段实施；①②③及 SC-02 已核，④按 v3.3 接同一回调内流式发布与终态收口，⑤规划真引擎全部 AC。
 kind: plan
 status: active
 spec: SPEC-secrets-usable-not-visible
@@ -292,7 +292,7 @@ Ext 补正完整检查：`packages/ext` 下 `bun test --max-concurrency 2 src/se
 ## ④ Shell.capture 直播与终态收口
 
 - 依据：规格 v4 AC-02/03/04/08/09/10；设计 v3.2 @ `cac06529fa` §4.5/4.7/§5/§10，SC-01/U-38；#1758。只消费冻结契约，不重新裁决。
-- 核对：r6 明确授权本轮追加④计划并接续实施（除非发现未决设计），编排器 Claude Opus 5.5；本节独立计划提交后直接实施，首次实施补该提交号。没有新增独立审查或 owner 决定。
+- 核对：计划 `0541bd7ec9`；r7 续派「Implement segment ④ (SC-01 live capture and terminal closure…)」明确授权按已定 v3.3 @ `f988de5eb1` 接续实施。继承编排器 Claude Opus 5.5 的前段收据；v3.3 已解决下述 r6 单槽接缝，不新增独立审查或 owner 决定。
 
 ### 改动
 
@@ -354,3 +354,18 @@ bun --eval 'import { stripAnsi } from "../session-ui/src/tools/ansi.ts"; for (co
 ```
 
 本轮依据版本与已定勿重开见③/④核对行；作者自查 Codex / GPT-6。r6 开始 08:43 UTC，最后检查约 09:33 UTC；本轮无新增独立审查。③实际 17 文件/737 insertions/23 deletions，④只有计划及接缝收据，未静默扩实施范围。
+
+
+### ④ r7 实施增量与接缝闭合
+
+- 依据：设计 v3.3 @ `f988de5eb1` §4.5/§10（`git show` 读取，未 merge/rebase）；规格 v4。r6 的单槽返回只作为历史证据保留，本次用同一个 callback 的 `publish(chunk)` 闭合，不再 pending。
+- 实际实施：Core 的 start/chunk/end、调用期发布函数、顺序/在途写入与 drain、失效/并发/写盘锁存、end 完成前安全替换与 IO 失败直接说明；Ext 复用同一 retained files，逐帧 AES-GCM 和长度/数量核对、增量 UTF8/escape 与真实 secret-prefix，以及 end 并集重遮盖。SC-01 与 ADR-050/唯一 registry/逐文件准入同提交登记；不新增 hook、Bus/UI 接管或配置。
+- 计划偏离：`secret-stream.test.ts` 实际有认证残段 IO，按 integration 而非原先 fast；无 ANSI 的匹配逻辑仍纯计算，未给生产新增可注入存储接口。`context-injection.ts/test.ts` 与其现有 inventory snapshot 必须同步新增 capture（并补既有 SC-02 progress）通路，保留精确集合断言，生成脚本只改变一行清单。`policy-host.cases.ts` 显式供真实 Shell 与 ShellSelect；原真实 ShellTool 初次因 fixture 缺服务而未注册，经 Plugin.list 明确定位，未替换身份或模拟工具。该 literal import 会扩大导入 fixture 的相关选择，不是全局 setup。
+- 分层：spool/stream 是当前帧+隔离磁盘 integration，Core Shell/cleanup 与 register-policy 是真实服务 integration；不会跑一分钟或新增容量常驻用例。数据格式沿用 Node dotenv 与 shared stripAnsi，本票密文 framing 为私有临时数据；没有新依赖。
+- 定向已核：Ext 的 spool/stream/mask/register-policy 四文件完整 **107 pass / 0 fail**；Core capture 五个新用例 **5 pass**、cleanup 完整 **2 pass**；context-injection/authority-registry 两文件机械同步后 **48 pass**。Core/Ext/Plugin `bun typecheck` 与 scoped oxlint 通过；Core 测试自引用推断错误以 callback 的明确 Effect 返回类型修正，未改测试断言。
+- `gate slot -- bun test --max-concurrency 2 test/tool-shell.test.ts` 完整文件仅跑一次，原 scanner/ordinary shell 用例有超时与 bash process-substitution wait 红例，正在按 delivery-ship §3 做一次具名基线确认；不重跑全文件、不放宽断言、不扩查 shell parser。相关具体结果与最终移除臂在下续收据，不把当前文件报为全绿。
+
+
+④检查补记：完整 Core Shell 文件 `gate slot -- bun test --max-concurrency 2 test/tool-shell.test.ts` exit **1**，**41 pass / 11 skip / 23 fail / 19 errors**。原 `conditional substitutions respect once` 的断言（实施前 `test/tool-shell.test.ts:555`）期待 exit 0，实为 `/bin/bash: wait: pid … is not a child of this shell` / exit 127。查本机 `/bin/bash --version` 为 3.2.57 arm64；以 `7908e11402` 的原 Core shell 和原测试作一次具名基线，`bun test --max-concurrency 2 test/tool-shell.test.ts -t 'conditional substitutions respect once'` 仍 exit 1 / 1 fail，同一句非 child 错误；日志 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r7-baseline-gd9_k9d0/conditional-once.log`。未把其它超时一概断言为同一根因，不继续排查/修复；原 scanner/ordinary 失败去向为编排器对应 shell 测试/机器协议事项。全文件不再重跑。基线复现最初误排入 slot，被另一 ship 占用预计 34 分钟，尚未执行测试即取消自己的等待；实际具名复现不含容量/时序负载，直接以两 worker 跑一次。两源文件已逐字节恢复。
+
+八个移除臂均 exit **1**：true-prefix、shared-ansi、end-union、frame-completeness、terminal-only-notice、owner-liveness、safe-counts、concurrent-latch。原始日志 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-r7-arms-y2udliw2/`；完整恢复 staged 字节。并发测试的拒绝观察放在 hook 外断言，以免 hook 内断言异常被正常 hide-on-failure 吞掉而形成假阳性。Core/Plugin surfaces、registry 及 guarded files 均有实际机制和上述真实用例。

@@ -122,6 +122,13 @@ done
 # 等),随之出清单(能力清点表 §9)。M0 把这 15 个文件也取成了上游原样;L4 逐条重判「退回 L0 / 重新接管」,
 # 定出最终清单并在 ADR-047「精确接管面」写理由。
 UPSTREAM_EXCLUDES=(
+  # ADR-050 / SC-01 (U-38/U-39): capture lifecycle, matching hook surfaces and their proofs.
+  ':(exclude)packages/core/src/shell.ts'
+  ':(exclude)packages/plugin/src/effect/shell.ts'
+  ':(exclude)packages/plugin/src/promise/shell.ts'
+  ':(exclude)packages/core/test/tool-shell.test.ts'
+  ':(exclude)packages/core/test/shell-cleanup.test.ts'
+
   # ADR-050 / SC-02 (U-40): root progress and the matching Effect/Promise hook surface.
   ':(exclude)packages/core/src/tool.ts'
   ':(exclude)packages/plugin/src/effect/tool.ts'

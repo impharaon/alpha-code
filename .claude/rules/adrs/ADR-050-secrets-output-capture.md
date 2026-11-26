@@ -1,7 +1,7 @@
 ---
 id: ADR-050
 title: 密钥输出在引擎发布前由扩展遮盖
-summary: SC-02 统一根工具进度的发布前事件；SC-01 的 shell 捕获另随实际实现登记，秘密规则始终归 Ext。
+summary: SC-01 在同一 shell 捕获回调内逐段发布、终态替换并清理孤立密文；SC-02 收口根工具进度，秘密规则归 Ext。
 kind: adr
 status: accepted
 date: 2026-11-27
@@ -12,7 +12,7 @@ related: [ADR-029, ADR-047, ADR-048]
 
 # 密钥输出在引擎发布前由扩展遮盖
 
-依据：[规格 v3](../../../docs/specs/secrets-usable-not-visible/spec.md) 与冻结设计 v3.1 @ `832ab5a4f4` 的 §4.8/§10。本文只登记已批准的接管，不另定范围。
+依据：[规格 v4](../../../docs/specs/secrets-usable-not-visible/spec.md) 与冻结设计 v3.3 @ `f988de5eb1` 的 §4.5/4.8/§10。本文只登记已批准的接管，不另定范围。
 
 ## SC-02：根工具进度
 
@@ -29,4 +29,10 @@ owner 2026-11-27，协调仓 INT-safety U-40（r5 派单转录）：「Cargo 选
 
 ## SC-01：独立捕获面
 
-U-38/U-39 已批准的 shell.capture、直播与终态收口继承冻结设计 §4.5/§10；本次未实施 SC-01，不登记不存在的 `secrets-output-capture` 机制或 proof。段④实施时在本 ADR 与同一权威册独立补齐，不能扩大 SC-02 的接管文件。
+owner 2026-11-26，U-38「好的。」批准同一 Core Shell 捕获/清理生命周期及 Effect/Promise 两面；U-39「这两个你的建议是什么，按你的建议吧。」批准直播与先打印后落盘的窄窗口。v3.3 在同一 SC-01 内补 `publish(chunk): Promise<void>`，不新增 hook 或授权。
+
+- `packages/core/src/shell.ts`：spawn 前锁存 capture 模式；按源流顺序触发 chunk/end，提供仅调用期有效的顺序 publish，write 回调与 drain 完成后计数；失去注册、回调或 IO 故障锁存隐藏且继续进程。end 在关闭 writer、替换最终文件/计数后才开放完成通知。失败由 Core 原子替换仅说明文件；说明文件 IO 也失败时直接提供说明正文，不返回旧文件引用。cleanup 只回收命名合规且 owner 确认退出的孤立密文，EPERM/未知 owner 留存，原 out 保留期不变。
+- `packages/plugin/src/effect/shell.ts`、`promise/shell.ts`：同形只读输入 bytes 与调用期 publish、可变 disposition/replacement。现有 Promise generic adapter 原样传递函数。
+- Ext 的 `secret-mask.ts` 持有同一 Location 采集与 shell 事务；`secret-stream.ts` 以 shared stripAnsi 适配增量边界/真前缀；`secret-spool.ts` 持 RAM key、AES-GCM 认证帧与总量核对。所有源文件、子进程环境与入参不因遮盖变化；Core 不持名单/匹配规则。
+
+权威册 ID `secrets-output-capture` 与 SC-02 独立。proof 指向真实 Core Shell live/replace、故障且退出码保持、失效/并发发布、磁盘失败无旧引用、Ext 前后并集、真实原 writer 可用及 cleanup 的命名测试。升级核对顺序、背压、函数失效、所有终态消费者的同一文件，以及错误不能清除锁存；不接管 Bus/UI/Code Mode runtime。完整会话与一分钟场景归⑤，登记不冒充这些验收已完成。

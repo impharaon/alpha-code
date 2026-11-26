@@ -425,6 +425,8 @@ type PackageManagerLocationInput = {
   appData: string       // 主进程取得的 roaming/config 基目录
   localAppData: string  // 主进程取得的 local/cache 基目录
   goInstallBin: string | null // v4.2：注入前 Go 原生有效安装目录；null 表示未取得
+  bunInstall: string | null   // v4.3 F-b：用户可信环境快照中的 BUN_INSTALL；未设为 null
+  xdgCacheHome: string | null // v4.3 F-b：用户可信环境快照中的 XDG_CACHE_HOME；未设为 null
 }
 type PackageManagerLocations = {
   env: Readonly<Record<string, string>> // 只能包含下表列出的固定键
@@ -437,21 +439,21 @@ type PackageManagerLocations = {
 function resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations
 ```
 
-所有输入必填、无任意位置覆盖选项；除 goInstallBin 按 v4.2 原生查询取得（可为 null）外，路径输入来自主进程已有系统路径权威，必须为绝对路径。`ProcessFenceWriteRule` 复用 `process-fence-profile.ts:313` 的现有形状；literal/subpath 的 value 是绝对路径，regex 的 value 是以已转义绝对根锚定的模式。Homebrew 未进入本冻结函数的 manager 值域，也不产出 env/writable；其余八种工具和 #1760 不等待该值域扩展。`C=<userDataPath>/package-managers`；cache/global 的路径先规划并 canonical 化，父目录由现有 planner 的 `mkdirp` 端口预建（不能靠围栏内 `mkdir` 去建立尚不可写的祖先）。CF/C1 与其真实目标、via/祖先冻结规则照旧优先；碰到保护位置不转成新可写根。main 的纯解析函数只产路径、不读用户配置或秘密、不执行工具。
+所有输入必填、无任意位置覆盖选项；除 goInstallBin 按 v4.2 原生查询取得（可为 null）、bunInstall/xdgCacheHome 取自用户可信环境快照（未设为 null，不读应用自身为子进程改写的值）外，路径输入来自主进程已有系统路径权威，必须为绝对路径。`ProcessFenceWriteRule` 复用 `process-fence-profile.ts:313` 的现有形状；literal/subpath 的 value 是绝对路径，regex 的 value 是以已转义绝对根锚定的模式。Homebrew 未进入本冻结函数的 manager 值域，也不产出 env/writable；其余八种工具和 #1760 不等待该值域扩展。`C=<userDataPath>/package-managers`；cache/global 的路径先规划并 canonical 化，父目录由现有 planner 的 `mkdirp` 端口预建（不能靠围栏内 `mkdir` 去建立尚不可写的祖先）。CF/C1 与其真实目标、via/祖先冻结规则照旧优先；碰到保护位置不转成新可写根。main 的纯解析函数只产路径、不读用户配置或秘密、不执行工具。
 
 | 工具 | 缓存/辅助数据：固定注入的键和值 | 全局安装决定 |
 | --- | --- | --- |
-| bun | `BUN_INSTALL_CACHE_DIR=C/bun/install-cache`；`BUN_RUNTIME_TRANSPILER_CACHE_PATH=C/bun/transpiler-cache` | 允许真实 `~/.bun/install/global` 和 `~/.bun/bin`；不以 `BUN_INSTALL` 重定向整个 Bun 安装 |
+| bun | `BUN_INSTALL_CACHE_DIR=C/bun/install-cache`；`BUN_RUNTIME_TRANSPILER_CACHE_PATH=C/bun/transpiler-cache` | **v4.3 F-b**：按 Bun 自身算法求用户真实根 `B` = bunInstall 已设取之，否则 `<xdgCacheHome>/.bun`，否则 `~/.bun`；只允许 `B/install/global` 和 `B/bin`，经 R7 绑定。不以 `BUN_INSTALL` 重定向整个 Bun 安装；用户未设 BUN_INSTALL 而应用自身为子进程设置了会移动 Bun 根的变量时，围栏子进程得到 `BUN_INSTALL=B`（还原真实位置，同 GOBIN 模式） |
 | pnpm | store/cache/state 三键各同时投影 `pnpm_config_<name>_dir` 与 `npm_config_<name>_dir`，值同为 `C/pnpm/<name>`；命名噪声见下文 | 用真实平台 PNPM_HOME（下表）；global packages 与 bin 在它之下。仅设置固定 `PNPM_HOME`，不把 store 顺带留在 PNPM_HOME |
 | yarn | `YARN_CACHE_FOLDER=C/yarn/cache`；现代版另设 `YARN_GLOBAL_FOLDER=C/yarn/berry`，默认 enableGlobalCache 下实际 cacheFolder 为 `C/yarn/berry/cache`，其 metadata/mirror 也留在 C（P10 实测） | Classic 的 global packages 在平台全局目录，bin 在固定 prefix/bin。现代 Yarn 没有 Classic `global add`；不虚构一个命令，BR-09 的该命令用 Classic 语义 |
 | npm / npx | `npm_config_cache=C/npm/cache`（包括 `_npx`、logs） | 真实 prefix 的 `lib/node_modules`、`bin`（Windows 为 prefix 下 `node_modules` 和 shim）；不重定向用户全局安装到 C |
 | pip | `PIP_CACHE_DIR=C/pip/cache` | 虚拟环境仍在项目；`--user` 写 Python 实际用户安装目录，缓存与其分开 |
 | uv | `UV_CACHE_DIR=C/uv/cache`；`UV_PYTHON_INSTALL_DIR=C/uv/python` | `uv tool` 的真实用户 tools/bin（下表）；连接器专用安装由 #1760 消费本端口派生的 C/uv，不另放一份 HOME 缓存 |
-| go | **v4.2 取代旧决定**：`GOPATH=C/go/gopath`、`GOMODCACHE=C/go/mod`、`GOCACHE=C/go/build`；sumdb 的 latest 因而也留在 C。GOPATH/GOBIN 成对注入，见文末 v4.2 | `GOBIN=goInstallBin`，保留重定向前的原生安装目录；默认仍为 `~/go/bin`。只用既有 bin/项目/批准规则判写，不放开原 GOPATH 或其 pkg/sumdb |
+| go | **v4.2 取代旧决定**：`GOPATH=C/go/gopath`、`GOMODCACHE=C/go/mod`、`GOCACHE=C/go/build`；sumdb 的 latest 因而也留在 C。GOPATH/GOBIN 成对注入，见文末 v4.2 | `GOBIN=goInstallBin`（v4.3 F-a：仅用户未显式设置 GOBIN 时注入），保留重定向前的原生安装目录；默认仍为 `~/go/bin`。只用既有 bin/项目/批准规则判写，不放开原 GOPATH 或其 pkg/sumdb |
 | cargo | **v4.1 / spec v6 取代旧决定**：R1/R2 不再注入 CARGO_HOME，Cargo 原生使用真实 `~/.cargo`；仅放行下文 v4.1 的缓存/锁精确表。project `target` 及配置中的路径不改 | `CARGO_INSTALL_ROOT=~/.cargo`，实际写入只含 `bin`、`.crates.toml`、`.crates2.json`；RUSTUP_HOME 不重定向、不把整棵 `~/.rustup` 加入写集合 |
 | Homebrew | **待 owner 定（B1）**；本次不确定其环境或执行方式 | **待 owner 定（B1）**；不产出 allow 清单，不影响其余行 |
 
-这些值是应用进程树的默认环境，不是命令黑名单；用户明确命令参数或项目配置仍按工具自身优先级解释，最终落盘受同一写集合约束。**已决定的新端口 R2**：shell、PTY、MCP、LSP 的 spawn 环境合成消费 R1 的相同 `env`，在该次 spawn 前只覆盖表内缓存键及 v4.2 为保留安装位置而配套的 GOBIN；不会清空用户 PATH、代理、registry 或凭据，不修改机器上的 rc/npmrc。**残留事实（R1-F6）**：PTY 在 spawn 后以 `-l` 运行用户 rc（`packages/core/src/pty.ts:169`），rc 后续 `export GOMODCACHE=...` 等仍能覆盖默认缓存键；Cargo 不再承诺迁入 C，见 v4.1；R2 不能在 exec 之前约束之后执行的 shell 代码，不宣称这种路径满足“缓存始终在 C”。不改 rc、不拦命令、不要求用户多做一步；真实入口证据分别报告默认路径与 rc 覆盖路径的结果。
+这些值是应用进程树的默认环境，不是命令黑名单；用户明确命令参数或项目配置仍按工具自身优先级解释，最终落盘受同一写集合约束。**已决定的新端口 R2**：shell、PTY、MCP、LSP 的 spawn 环境合成消费 R1 的相同 `env`，在该次 spawn 前只覆盖表内缓存键及为保留安装位置而配套的 GOBIN（v4.2）与 BUN_INSTALL（v4.3 F-b，仅上表条件成立时）；不会清空用户 PATH、代理、registry 或凭据，不修改机器上的 rc/npmrc。**残留事实（R1-F6）**：PTY 在 spawn 后以 `-l` 运行用户 rc（`packages/core/src/pty.ts:169`），rc 后续 `export GOMODCACHE=...` 等仍能覆盖默认缓存键；Cargo 不再承诺迁入 C，见 v4.1；R2 不能在 exec 之前约束之后执行的 shell 代码，不宣称这种路径满足“缓存始终在 C”。不改 rc、不拦命令、不要求用户多做一步；真实入口证据分别报告默认路径与 rc 覆盖路径的结果。
 
 **pnpm 通道（R1-F7）**：现行官方配置文档使用 `pnpm_config_*`；本机 pnpm 10.32.1 的实际同名查询忽略该前缀，而读取 `npm_config_*`（P12）。因此三对固定同值键由 R1 同时产生，无版本探测、切换或配置选项。npm 对 pnpm 专用前缀没有该噪声，但 npm 11.20.0 在实际读取配置时会对另三键逐项输出 `Unknown env config`，三条警告明确接受并保留，不称作无噪声；不把“--version 没有警告”当成安装路径的证据。真实入口必须核对缓存落点与这些警告，不通过压 stderr 隐藏。
 
@@ -465,7 +467,7 @@ function resolvePackageManagerLocations(input: PackageManagerLocationInput): Pac
 
 | 工具 | macOS / POSIX 固定路径模板（默认 subpath；点名文件为 literal；pnpm 根层使用下文固定 regex） | Windows 等价位置（仅环境/权限语义，不渲染 seatbelt） |
 | --- | --- | --- |
-| bun | `~/.bun/install/global`、`~/.bun/bin` | `%USERPROFILE%/.bun/install/global`、`.bun/bin` |
+| bun | `B/install/global`、`B/bin`；`B` = `BUN_INSTALL` ‖ `<XDG_CACHE_HOME>/.bun` ‖ `~/.bun`，取用户可信环境快照（§4.1，v4.3 F-b） | `%USERPROFILE%/.bun/install/global`、`.bun/bin` |
 | pnpm | macOS `~/Library/pnpm/global`、`~/Library/pnpm/bin`、`~/Library/pnpm/.tools` 与 PNPM_HOME 根层节点固定模式；Linux `~/.local/share/pnpm` 同形；`.tools` 供 switchCliVersion 安装项目钉住的 pnpm，缓存仍由显式键到 C（P11/P12） | `%LOCALAPPDATA%/pnpm/global`、`pnpm/.tools`、PNPM_HOME 的 shim/bin |
 | yarn Classic | `~/.config/yarn/global`（macOS/Linux）；`~/.yarn/bin`；prefix/bin 采用 npm 的固定 prefix 族及下文版本管理器模板 | `%LOCALAPPDATA%/Yarn/config/global`、`%LOCALAPPDATA%/Yarn/bin` |
 | npm | prefix 族 `/opt/homebrew`、`/usr/local`、`~/.npm-global`、`~/.local` 各自的 `lib/node_modules`、`bin`，以及下文版本管理器的固定模板；另含安装元数据，prefix 自身不整体放行 | `%APPDATA%/npm`（node_modules 和 `.cmd`/`.ps1`/无后缀 shim） |
@@ -1072,17 +1074,17 @@ G42-P04 原始 `result.json` 位于系统临时根 `go42-install-input-jdrv4ddf/
 | GOPATH | `C/go/gopath` | `manager: "go", purpose: "cache", rule: {kind: "subpath", value: ...}`，覆盖 pkg/sumdb/latest 及其锁/元数据 |
 | GOMODCACHE | `C/go/mod` | 保留原 cache subpath；module、工具链、lookup/tile 缓存 |
 | GOCACHE | `C/go/build` | 保留原 cache subpath |
-| GOBIN | `goInstallBin` | 配套环境投影，**不是 cache allow**；global-install 固定表及已打开/批准目录判写照旧 |
+| GOBIN | `goInstallBin`；用户显式设置 GOBIN 时不投影（v4.3 F-a） | 配套环境投影，**不是 cache allow**；global-install 固定表及已打开/批准目录判写照旧 |
 
 GOPATH/GOBIN 必须成对生成与消费；不能先改 GOPATH，再从它推导安装目录。没有新增原 HOME/go/pkg/sumdb、原 GOPATH 或用户任意安装目录的 allow；自定义 GOBIN 原本在项目/批准范围内则照常用，不因读取此值而扩大写集合。C 下目录继续由 main 预建、canonical 化并走 R7 初次目标绑定/重指检查与 CF/C1，不把整个 HOME 或整个原 GOPATH 放开。其它 manager 的缓存、Cargo 原生 Home 和 #1760 的 uv/npm 消费契约不变。
 
-**已决定的读取接缝 G42-R1a：** main 在最终缓存环境投影之前，从过滤后的原始命令环境 PATH 解析真实 Go 可执行文件；在 R8 的同一围栏 context 下执行该文件的 `env -json GOBIN GOPATH`，cwd 为 main 已预建的 C/go，不读取项目 go.mod。沿用原 HOME、GOENV 与非根环境；只对此查询设 `GOTOOLCHAIN=local`、`GOTELEMETRY=off`，避免查询触发工具链下载或遥测写入，不把这两键注入用户命令。由 Go 自己处理 go env -w、GOENV=off 及环境优先级，不维护第二份 Go 配置解析器。返回 JSON 的有效 GOBIN 为原安装目录；若工具返回空 GOBIN，按其原始 GOPATH 的第一个目录加 bin（平台路径列表分隔符），而不是用重定向后的 GOPATH。只消费这两个键，不读取/保存 registry token 或整份 Go 配置。
+**已决定的读取接缝 G42-R1a：** main 在最终缓存环境投影之前，从过滤后的原始命令环境 PATH 解析真实 Go 可执行文件；在 R8 的同一围栏 context 下执行该文件的 `env -json GOBIN GOPATH`，cwd 为 main 已预建的 C/go，不读取项目 go.mod。沿用原 HOME、GOENV 与非根环境；只对此查询设 `GOTOOLCHAIN=local`、`GOTELEMETRY=off`，避免查询触发工具链下载或遥测写入，不把这两键注入用户命令。由 Go 自己处理 go env -w、GOENV=off 及环境优先级，不维护第二份 Go 配置解析器。返回 JSON 的有效 GOBIN 为原安装目录；若工具返回空 GOBIN，按其原始 GOPATH 的第一个目录加 bin（平台路径列表分隔符），而不是用重定向后的 GOPATH。**v4.3 F-a 更正**：用户是否显式设置 GOBIN 以同一围栏内的 `go env -changed -json GOBIN` 判定（计算出的默认值非空，`go env GOBIN` 无法区分）；仅用户未设置时注入 GOBIN = 原 GOPATH 第一项/bin，用户已设置时不注入 GOBIN（GOPATH 照常重定向），由 Go 自己读取；结果为 null 时重新查询。只消费这些键，不读取/保存 registry token 或整份 Go 配置。
 
 该接缝是**明确 raise**，尚无现成安装目录查询函数；归 main 启动协调层，复用 R8 context/进程取消，不创建未围栏的工具探针。围栏先用 R1 的 `goInstallBin: null` 形成，查询只需原生读配置；取得结果后再生成最终成对环境，策略写根不依赖查询结果，避免循环依赖。Go 不存在或查询非 0/JSON 无法得到绝对目录时，结果为 null，沿用既有启动诊断记录原因，不猜 HOME/bin 以覆盖用户配置；null 时 R1 不产 GOPATH/GOBIN 这对键，GOMODCACHE/GOCACHE 仍产出，其它工具不受阻。后续 Go 命令仍按原入口执行和报告实际错误；不退回未围栏查询、不新增卡片/批准步骤，不声称该失败分支已满足 Go 缓存修复。
 
 ### 4.2 R2 必须投影 GOBIN
 
-R2 的环境不是单靠 `purpose: cache` 的路径值反查得出的键集合。Go 的缓存默认值必须包含配套 GOBIN；经 R7 规划后的 GOPATH/GOMODCACHE/GOCACHE 指向 canonical C 下根，GOBIN 保留原生目标路径而非改写为缓存路径。StartCommand.packageManagerEnvironment、sidecar 的同一安装/投影端口和 Shell/PTY/MCP/LSP 合成均消费这份结果，不另算 Go 目录。显式命令前缀 `GOBIN=... go install` 仍按 Go 优先级覆盖 spawn 默认，最终受现有写集合约束。配置快照之后的 rc/命令修改仍有 v4 R1-F6 的覆盖残留；不承诺 shell 执行之后还能强制缓存键或热更新原生安装目标。
+R2 的环境不是单靠 `purpose: cache` 的路径值反查得出的键集合。Go 的缓存默认值必须包含配套 GOBIN（用户显式设置 GOBIN 时除外，v4.3 F-a）；经 R7 规划后的 GOPATH/GOMODCACHE/GOCACHE 指向 canonical C 下根，GOBIN 保留原生目标路径而非改写为缓存路径。StartCommand.packageManagerEnvironment、sidecar 的同一安装/投影端口和 Shell/PTY/MCP/LSP 合成均消费这份结果，不另算 Go 目录。显式命令前缀 `GOBIN=... go install` 仍按 Go 优先级覆盖 spawn 默认，最终受现有写集合约束。配置快照之后的 rc/命令修改仍有 v4 R1-F6 的覆盖残留；不承诺 shell 执行之后还能强制缓存键或热更新原生安装目标。
 
 ## 5. 数据与失败
 
@@ -1122,5 +1124,13 @@ K1/K2 不变：档位/审批照旧，固定位置仍只在 R1，消费者不推�
 
 **交接收据：** Codex（GPT-6，designer）完成 G42-P02–P04；两个真实入口、bootstrap map 投影、安装目标与两个消融臂均有本机证据，签名负臂可失败。未声称新 planner/查询已实现、产品签名进程树或 Windows 已通过。旧名称扫描 10 pass/0 fail（2,347 断言），`git diff --check` 通过；文档契约检查与 HEAD 同为 70 error/252 warning，逐 finding 对比无新增。已运行 `affected-tests --list`，当前工作树缺 `.gate-tests`，工具返回缺文件错误、没有 scope 行，未将其记为范围检查通过。没有 owner 待决、规格变化或新增用户步骤；只修改本设计，未 merge、实现或发布。v4/v5 的审查与处置及 v4.1 Cargo 裁决保持原文。
 
-**v4.2 限定范围审查与编排器处置（2026-11-27）**：独立审查（Claude Opus 5.5，只读）结论 MERGE，2 Minor 均采纳，用户无感：① 只在查询返回空 GOBIN 时才注入「原 GOPATH 第一项/bin」；返回非空时不注入，由 Go 自己读环境或配置（用户 `go env -w GOBIN` 立即生效）。② 启动时查询结果为 null（尚未安装 Go）时，在下一次 Shell/PTY 环境合成前重新查询（会话中 `brew install go` 后无需重启）。观察留档：`GO111MODULE=off` 的 GOPATH 模式下，原 GOPATH/src 源码在重定向后不可见，不在本增量处理。
+**v4.2 限定范围审查与编排器处置（2026-11-27）**：独立审查（Claude Opus 5.5，只读）结论 MERGE，2 Minor 均采纳，用户无感：① 只在查询返回空 GOBIN 时才注入「原 GOPATH 第一项/bin」；返回非空时不注入，由 Go 自己读环境或配置（用户 `go env -w GOBIN` 立即生效）；判据已由下方 v4.3 F-a 更正。② 启动时查询结果为 null（尚未安装 Go）时，在下一次 Shell/PTY 环境合成前重新查询（会话中 `brew install go` 后无需重启）。观察留档：`GO111MODULE=off` 的 GOPATH 模式下，原 GOPATH/src 源码在重定向后不可见，不在本增量处理。
 
+**v4.3 编排器裁决（2026-11-27，编排器 Claude Opus 5.5；实现 impharaon/alpha-code#1759）**：以下是已作出的裁决，本节只记录，不是新一轮审查；frontmatter 的 v4.2 收据不变。均不新增用户步骤、确认或限制。
+
+| id / 日期 / 来源 | 裁决 | 依据与落点 |
+| --- | --- | --- |
+| F-a｜2026-11-27（更正 v4.2 审查处置①） | 用户显式设置的 GOBIN 以 `go env -changed -json GOBIN` 判定；计算出的默认值非空，`go env GOBIN` 无法区分。只有用户未设置 GOBIN 时才注入 GOBIN = 原 GOPATH[0]/bin；结果为 null 时重新查询。 | 处置①「查询返回空 GOBIN 才注入」的判据不成立。同步 v4 §4.1 Go 行、v4.2 §4.1 GOBIN 行与 G42-R1a、v4.2 §4.2。 |
+| F-b｜2026-11-27｜#1759 r8 | Bun 全局位置按 Bun 自身算法计算：`BUN_INSTALL` 已设取之，否则 `<XDG_CACHE_HOME>/.bun`，否则 `~/.bun`，取用户可信环境快照；只放行 `<root>/install/global` 与 `<root>/bin`，经 R7 绑定；`PackageManagerLocationInput` 从快照携带 `XDG_CACHE_HOME`/`BUN_INSTALL`（字段 `xdgCacheHome`/`bunInstall`）。应用自身为子进程设置会移动 Bun 根的变量时，用户未设 BUN_INSTALL 的围栏子进程得到 `BUN_INSTALL=<用户真实 Bun 根>`（同 GOBIN 模式；还原真实位置，不是重定向整个 Bun 安装）。 | 原 §4.2 只写 `~/.bun/...`，与用户设置 BUN_INSTALL 或 XDG_CACHE_HOME 的真实位置不符。同步 v4 §4.1 类型/bun 行/R2 句与 §4.2 bun 行；Windows 列未改。 |
+
+**传播核对**：`rg -n 'goInstallBin|GOBIN|\.bun/|BUN_INSTALL' docs/specs --glob design.md` 只命中本设计；#1760 无独立 Go/Bun 全局位置规则，共享位置权威仍为 R1。遗留：F-b 的字段名 `bunInstall`/`xdgCacheHome` 是本记录对「携带 XDG_CACHE_HOME/BUN_INSTALL」的具体化；用户已设 GOBIN 时的投影形态及 Bun 根还原的真实入口证据仍归 #1759 实施证明。

@@ -1144,3 +1144,30 @@ Expansion/scope（D4 / AC-11/13/15/25）：11066c70a0 的固定 Claude Security 
 具名 **1 pass / 0 fail**（`/tmp/plugin-standard-r13-failure-green.log`），真实 tool failure 与不可重试 provider rejection 各恰一次，失败会话无 Stop、无额外模型调用。完整 host 原文件 **83 pass / 0 fail**（`/tmp/plugin-standard-r13-failure-complete.log`），installer **50 pass**（`/tmp/plugin-standard-r13-failure-install.log`），ext typecheck exit 0（`/tmp/plugin-standard-r13-failure-types2.log`）。类型检查要求 subscription 初始化放在 runner 定义之后，已机械移动；行为不变，不重跑已绿整文件，后续相关集覆盖该消费。测试仍为原 integration 文件/固定 dash0 literal 来源路径，gate-files 83；command 失败事件的 readiness 与 L0 主权同提交同步，无新增 engine 接管。
 
 较宽相关集发现 setup-order 的原隔离 mock 仍只返回 seal，缺本轮真实 PolicyRegistration.onPackagePermissionRequest；`plugin-setup-order.cases.ts:17` 作必要同调用链形状同步，未改顺序断言（`/tmp/plugin-standard-r13-ext-related.log` 94 pass / 1 fail）。补充真实 scope 脚本前的 DATA 标记，前任务两次 Write 恰执行两次，普通下一轮不再执行，即使原脚本自身 guard 无输出也能检测 scope 泄漏。修后原 host/setup-order 两文件 **84 pass / 0 fail**（`/tmp/plugin-standard-r13-scope-observer-complete.log`），其余六个已绿相关文件继承，不重复运行；这是验证配套增量，不改变生产行为或计数。
+
+### r13 的 S-04 接缝返回与收口
+
+**SEAM-CHANGE-NEEDED: S-04 的 skills 生产点。** 冻结 design v3.1 §6 接缝表 `:582` 与 §10 `:763` 仅授权既有 `core/src/config.ts` 的 Config.load/reload 发布前窄调用。实际 `packages/core/src/config.ts:365–376` 只比较 Document/兼容目录；技能正文不变更该 Document 时在 `:373` 直接返回。技能有独立 watcher：`packages/core/src/config/plugin/skill.ts:38–47` 直接将 update.path 发布给自身 PubSub，`:154–180` 重读技能、在 `:163` 替换 loaded.skills 后 ctx.skill.reload，不经过 Config.reload 的配置视图发布屏障。`:187–193` 的 config.updated 重扫也会重新读技能。只在 config.ts 插 beforeConfigChange 不能观察或阻止这条真实 skills 变更，更不能保证 block 后其他配置重扫仍保留旧技能视图。
+
+该结论是对已命名两处生产调用链的只读核对（`nl -ba packages/core/src/config/plugin/skill.ts` / `config.ts` 与冻结表），未实现不充分的端口、未改 engine、未改冻结设计/§10，亦不在 ext/config.ts 再造一份技能解析或状态缓存。**建议的最小接缝增量**：签名/DTO 不变，将同一个 S-04 beforeConfigChange 的生产点明确扩至已接管的 ConfigSkillPlugin.refresh 发布边界，source="skills"、实际 filePath/occurrenceId；由该原生技能有效视图权威保留被拒文件的旧值，覆盖其 watcher 与 config.updated 重扫，避免同一修订重复事件/从旁路加载。项目同意/托管策略规则不变；engine 增量须在对应实现提交补 project-opencode-config-trust / plugin-hook-config-change 的 §10/registry 归属。仅“文件已是既有 L3”不足以替代本派发冻结的精确 S-04 调用位置，等待编排裁决后继续。
+
+本轮已绿相关集合去重 **330 pass / 0 fail**，12 个有限原测试文件：host 83、policy 78、identity 21、package-process 3、installer 50，共 235；一次较宽 ext 七文件最终 95（先 94 pass/1 fail 的唯一 setup mock 由配套同步闭合，最终完整 host/setup 两文件 84 中仅新增计算 setup 1，其余六文件 94 沿原绿结果）。日志分别为 `/tmp/plugin-standard-r13-{permission-complete,scope-complete,failure-complete,scope-observer-complete,ext-related}.log` 与三个阶段的 install 日志；具名红/绿、迭代和移除臂不累加。r12 的 530 是另一个相关集合，本轮没有为对齐总数复跑 source/converter/未改变 artifact 读者。继承 r11/r12 accepted 整树 15/15、engine 8 pass，不计为本轮新运行。
+
+**12 个移除臂全红**（临时 child-only preload，不改磁盘源字节）：request-stage、request-deny、request-allow（两条轴均红）、expansion-stage、scope-activate、scope-filter、scope-release、scope-Stop、source-absolute、scope-environment、tool-failure、execution-failure。命令 `python3 /tmp/plugin-standard-r13-removal.py`；每臂实际命中 production boundary 并经原具名行为断言变红，记录 `/tmp/plugin-standard-r13-removal-results.json` / `removal-summary.txt`。scope-filter/release 由真实 DATA 进程标记辨别，避免原脚本的自身 no-op guard 造成空观察。没有添加计时、容量或 sweep 运行。
+
+ext、ui-mac 包内 `bun typecheck` exit 0（`/tmp/plugin-standard-r13-failure-types2.log`、`/tmp/plugin-standard-r13-ui-types.log`）；conversion 与 artifact `--check` exit 0（20 files），`git diff --check` exit 0；docs-contract 单仓临时 Alpha profile，`--changed-since 1db6a3bbf5 --format json` exit 1，仍 **71 errors / 250 warnings**（`/tmp/plugin-standard-r13-docs.json`），按派发保留基线。`affected-tests --list` exit 0，scope **all tests: scripts/gate-files.tsv changed (gate or declared global input)**，678 个 PR 文件（`/tmp/plugin-standard-r13-affected{,-scope}.txt`）；只同步派发允许的现有精确计数行，没有运行全清单/全层/gate run/bin/check。hooksPath=`.githooks`。
+
+| 真样包 / 行 | r13 实际证据与仍未越过的边界 |
+| --- | --- |
+| Claude Security | 原 unanswered（只去 60 秒等待）在审批卡前 deny；原 turn/bound 脚本经命令展开、同一真实 prompt_id、技能作用域和普通下一轮退出通过；配置状态仅进临时 DATA。guard/banner/异步 metrics 的整包回放仍未做，不冒称 SDK/SaaS 已验。 |
+| dash0 | 原 24 声明仅改观察命令，真实 tool failure 与 execution failure 各一次、错误字段及无普通 Stop/恢复通过。其余有时机事件的完整回放待 S-03…S-07，五项正式 unavailable 原因继承。 |
+| ralph-loop | 原 Stop 继续/结束继承；新增实际继续轮内权限保留、真正结束后释放通过。 |
+| code-modernization | PostToolUseFailure / StopFailure 运行挂点已接通，原 telemetry.sh/py 只读核对为本地计数/std-lib；原六 handler 回放尚未运行，不能将它标作 SaaS/toolchain 阻塞。 |
+| Langfuse | 实际 option/default/secret/DATA/stdin 子进程证据继承并加 SKILL_DIR；原 Stop/SessionEnd hook 全运行仍未验，未声称已到 SDK/uv/SaaS 边界。 |
+| Convex | lint 继承 accepted；monitor 激活/通知/离场取消尚未接通。 |
+| Stripe | S-08 PostToolBatch 与原脚本必中采样运行尚未做。 |
+| PayPal / hookify | r12 accepted 原 prompt / Pre/Post 行为由本轮完整 host 继续覆盖；未扩大为其余未实施生命周期的通过。 |
+
+Host aggregate 保持 **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7**；相对 a9fe51d2ba **无 artifact 成员或清单变化**（`/tmp/plugin-standard-r13-host-artifact.json`）。未改 consumer pin/vendor，原 checkpoint 仍归编排器。
+
+已核 Codex（GPT-6），spec v5 / design v3.1 + 已接受 rulings。本轮返回 **SEAM-CHANGE-NEEDED（S-04 skills 生产点）**，片 3/4 accepted 继承，片 5 只按上文增量通过。后续仍有 S-03 完整 leave/notification/FileChanged/子助手、S-04…S-07、其他 prompt 事件、S-08、monitors 与剩余包运行验收；未开始片 7。23:19 至 23:50 UTC+08:00 约 31 分钟，16 文件、555 additions / 115 deletions（本收口文字前，含 tests/docs）；未达原片 5 规模/工时两倍，本次停止原因是上述冻结接缝而非扩大工时。无新依赖、迁移、公开 DTO 或 engine 接管；必要表外文件仅 setup-order.cases.ts 的原 mock 形状同步。遗留去向：S-04 交编排裁决；其余片 5 fix now 续本车道；host checkpoint 交编排器；docs 基线/三条旧 command-subagent 断言沿原归属。无新增 ARCH / OPTIONAL 或仓外写操作。

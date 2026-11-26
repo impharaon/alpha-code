@@ -49,3 +49,14 @@ test("Python installation preserves the planned PATH when developer tools are pr
   expect(existsSync(f.marker)).toBe(true)
   expect(f.input.environment.PATH).toContain("system-bin")
 })
+
+for (const tools of ["absent", "missing-directory"] as const) test(`Python installation excludes system tools when the developer probe is ${tools}`, async () => {
+  const f = pythonInstallation(tools)
+  const planned = f.input.environment.PATH
+  const result = await Effect.runPromise(Effect.scoped(installConnectorPython(f.input)).pipe(Effect.provide(f.layer)))
+  expect(result).toMatchObject({ exitCode: 0, stdout: "ready" })
+  expect(existsSync(f.marker)).toBe(false)
+  expect(f.input.environment.PATH).toBe(planned)
+  const probe = f.commands.find((command) => command._tag === "StandardCommand" && command.command === "/usr/bin/xcode-select")
+  expect(probe?._tag === "StandardCommand" ? probe.args : []).toEqual(["-p"])
+})

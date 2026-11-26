@@ -1,3 +1,4 @@
+import { engineClient } from "./engine-client"
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
@@ -903,7 +904,19 @@ export async function spawnLocalServer(
     throw error
   })
   // REQ-234 `#1529`:ready 之后接上重载请求的发送口(重发 main 记录里仍在途的 generation)。
-  if (!exited) detachCodePuppy = options.codepuppySidecar?.attach(postCodePuppy)
+  if (!exited) {
+    const client = engineClient({ url: `http://${hostname}:${port}`, password })
+    detachCodePuppy = options.codepuppySidecar?.attach(postCodePuppy, options.generation, {
+      session: async (ref) => {
+        const info = await client.session.get({ sessionID: ref.sessionID })
+        return info.location.directory === ref.directory ? { parentID: info.parentID } : undefined
+      },
+      shell: async (ref, id) => {
+        const info = await client.shell.get({ id, location: { directory: ref.directory } })
+        return info.data.status === "running" && info.data.metadata.sessionID === ref.sessionID
+      },
+    })
+  }
 
   const wait = (async () => {
     const url = `http://${hostname}:${port}`

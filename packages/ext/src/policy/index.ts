@@ -72,7 +72,7 @@ export function policyWorkspace(location: Plugin.Context["location"]): string {
  * `toolPolicy`: who writes the tool policy document (SPEC-engine-config-fence BR-03, DESIGN §4.5). The extension passes the hub bridge's
  * writer — main, over the parent port — whenever the process has one; absent (CLI, test hosts) the store writes directly.
  */
-export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"], toolPolicy?: ToolPolicyWriter): Promise<PolicyRegistration> {
+export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"], toolPolicy?: ToolPolicyWriter, network?: HubBridge["network"]): Promise<PolicyRegistration> {
   const env = process.env
   // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
   const bootstrap = codepuppyBootstrap()
@@ -268,7 +268,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       })
 
       await context.tool.transform((editor) =>
-        wrapForDisplay(editor as never, (callID) => displays.get(callID)),
+        wrapForDisplay(editor as never, (callID) => displays.get(callID), network ? (tool, call, execute) => network.run(context.location.directory, tool, call, execute) : undefined),
       )
       await context.tool.hook("execute.after", (event) => {
         if (event.tool === CODE_MODE_TOOL) {

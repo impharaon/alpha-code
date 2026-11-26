@@ -1,7 +1,7 @@
 ---
 id: PLAN-secrets-usable-not-visible
 title: 密钥文件程序可用、助手不可见 实施计划
-summary: 列明五个交付段，保留共享规则与通用遮盖证据，细化安全读取、env 保值写回、权限例外与风险标注段。
+summary: 五段实施；①②③及 SC-02 已核，④捕获计划与单槽直播发布接缝待设计收口，完整真引擎证据留⑤。
 kind: plan
 status: active
 spec: SPEC-secrets-usable-not-visible
@@ -12,7 +12,7 @@ last_reviewed: 2026-11-26
 
 # PLAN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 实施计划
 
-本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；当前已展开①②③。①②实际检查见各段实施收据；②的 Code Mode 外层进度已在 r5 通过 SC-02 补齐，完整真引擎行为验收仍在⑤。
+本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；当前已展开①②③④。①②实际检查见各段实施收据；②的 Code Mode 外层进度已在 r5 通过 SC-02 补齐，完整真引擎行为验收仍在⑤。
 
 ## 交付段落
 
@@ -332,3 +332,25 @@ Ext 补正完整检查：`packages/ext` 下 `bun test --max-concurrency 2 src/se
 ### 偏离记录
 
 暂无。新测试的静态 imports/literal 路径保持依赖可追踪；当前 `.gate-tests` 缺失不伪装成 selector 已通过。
+
+
+### ④ r6 接缝收据：SC-01 单槽发布与长 escape
+
+- `SEAM-CHANGE-NEEDED: SC-01 shell.capture`。冻结 v3.2 @ `cac06529fa` §4.5 的 `bytes: Uint8Array` / `disposition` 单槽（固定提交行 323–338）不足以同时满足行 342/354 的密文长 escape 残段、仅当前帧/真实 secret 前缀内存，以及行 344/348 的已确定文本当次 flush 发布。不是 SC-03/分页重开，也不改变已批秘密匹配范围。
+- 生产函数探针：`bun /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-sc01-seam-i28_2rog/ansi-capture.ts`，exit 0。仅输入合成控制字符，不含用户数据。调用现有 `packages/session-ui/src/tools/ansi.ts:6`，两组长度：pending 1026 / 1048578 bytes；补 BEL 后输出均 0；补 `ESC X` 后应发布 1028 / 1048580 bytes，且程序断言与原串相同。probe 不复制 strip 正则，也不是容量/时序常驻测试。
+- 具体调用：首 chunk 为 `ESC ]` + 任意长的 `x`，之后命令暂不退出；它若随后闭合，现有 stripAnsi 会移除整段，因此首 chunk 不能先发布。若下一小 chunk 改为无效 `ESC X`，整段已确定为普通文本且不是秘密前缀，必须当前 flush 释放。它可以从密文逐帧解密，但当前 event 只有一个完整 Uint8Array 可供 Core 追加；要么整份回填内存，要么等后续 chunk/结束，要么扩展直写 Core 文件/计数，分别违反内存、直播或职责边界。返回 replace 也被限定为 end。
+- 所需最小修订：保留同一 SC-01 生命周期，由 Core 提供可在一个 capture 回调内顺序发布多个安全块的出口（或等价的流式安全块契约），由 Core 逐块写盘/计数/故障收口，Ext 仍持解析/秘密/密文。需设计方固定签名与失效语义后续派；本轮不私加接口、不直接写 Core capture，也不通过上限或失败隐藏规避普通大输出。
+- 状态：计划 `0541bd7ec9` 已提交；核对来源为 r6 的同轮授权。没有实施④、没有登记不存在的 SC-01 mechanism/proof、没有更改已批设计/运行规则。③完成与相关测试继续保存；下一步交编排器/设计方仅处理上述接缝。
+
+
+③最终相关集收据：从 exports、实际调用与 `policy-host.cases` literal import 筛选后，Ext 的 identity/risk/unattended/unattended-policy/plugin-host/engine-transforms/plugin-setup-order 七文件 **135 pass**；fixture 的 tool-policy-rpc/session-grant/session-row-rules/inventory/permission-reply-premises 五文件 **32 pass**；UI unattended/config-injection-throat 两文件 **18 pass**。命令均为包目录下 `bun test --max-concurrency 2 <具名文件>`、exit 0。ask-deadline 的定时专用用例未获本轮运行授权，未额外跑。加上上列改变行为文件，最终代码 **332 个不同用例 PASS，0 fail**；没有重复计入迭代或移除臂。Ext/UI `bun typecheck` exit 0，实际改动 TS scoped oxlint exit 0。Core/Plugin 本轮未改，无新包检查。
+
+`affected-tests --list` exit **2**：缺根 `.gate-tests`，**无 scope line**，不声明自动选择器通过。Alpha profile 的 `check_repo(..., changed_since="4dd42773c8")` 输出 `/tmp/secrets-r6-docs-contract.json`：本 plan 0 findings；modules 的既有 13 缺链、README 的既有 index.stale/跨仓 ID 仍在（仓级共 322 findings），去向继承前段的文档治理；实际新增 authority 链接存在，生成器只提取本 plan 索引行，未全仓重写。`git diff --check` exit 0。遗留仅④接缝交设计方、⑤完整验收与 Windows 发布真机，不做无关修复。
+
+上述 SC-01 反例也可从 `packages/ext` 重现（一次性命令，不加永久容量测试）：
+
+```sh
+bun --eval 'import { stripAnsi } from "../session-ui/src/tools/ansi.ts"; for (const n of [1024,1048576]) { const p="\x1b]"+"x".repeat(n); if (stripAnsi(p+"\x07")!=="" || stripAnsi(p+"\x1bX")!==p+"\x1bX") throw Error("premise changed"); console.log(n,Buffer.byteLength(stripAnsi(p+"\x07")),Buffer.byteLength(stripAnsi(p+"\x1bX"))); }'
+```
+
+本轮依据版本与已定勿重开见③/④核对行；作者自查 Codex / GPT-6。r6 开始 08:43 UTC，最后检查约 09:33 UTC；本轮无新增独立审查。③实际 17 文件/737 insertions/23 deletions，④只有计划及接缝收据，未静默扩实施范围。

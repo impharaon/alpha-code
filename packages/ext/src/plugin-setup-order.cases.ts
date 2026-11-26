@@ -15,6 +15,7 @@ mock.module("./policy/index", () => ({
   registerPolicy: async () => {
     order.push("registerPolicy")
     return {
+      onPackagePermissionRequest: () => () => {},
       seal: async () => {
         order.push("seal")
       },

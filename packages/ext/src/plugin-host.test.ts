@@ -2392,7 +2392,7 @@ packageIt.live("the real security expansion activates its skill hook only for th
     if (handler.command.includes(" turn")) handler.command = 'CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" ' + handler.command
   const skill = decoder.decode(yield* Effect.promise(() => capture.readFile("skills/threat-model/SKILL.md")))
   // Route source-owned Claude config state into the test package DATA; scripts remain original.
-  const sample = yield* invocationSample("claude:claude-security", { "hooks/hooks.json": JSON.stringify(hooks), "skills/threat-model/SKILL.md": skill.replace('command: sh ', 'command: CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" sh ') })
+  const sample = yield* invocationSample("claude:claude-security", { "hooks/hooks.json": JSON.stringify(hooks), "skills/threat-model/SKILL.md": skill.replace('command: sh ', 'command: printf s >>"${CLAUDE_PLUGIN_DATA}/scope-calls"; CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" sh ') })
   const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
   yield* invocationNativeServices
@@ -2409,11 +2409,16 @@ packageIt.live("the real security expansion activates its skill hook only for th
   yield* sessions.wait(parent.id)
   expect(yield* Effect.promise(() => Bun.file(join(location.directory, "unrelated.ts")).exists())).toBe(false)
   expect(readFileSync(join(location.directory, ".claude-security/threat-model.md"), "utf8")).toBe("fixture threat model")
+  const { pluginDataDirectory } = yield* Effect.promise(() => import("../../ui-mac/src/shared/installed-plugin-settings"))
+  const settings = JSON.parse(readFileSync(join(sample.root, "ext-store", sample.key, "package-settings.json"), "utf8"))
+  const calls = join(pluginDataDirectory(settings.dataHome, settings.packageId), "scope-calls")
+  expect(readFileSync(calls, "utf8")).toBe("ss")
   expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("Claude Security")
   yield* llm.push(TestLLM.toolCall("call_security_after", "write", { path: "unrelated.ts", content: "ordinary next turn" }), TestLLM.text("Ordinary done", "security-ordinary"))
   yield* sessions.prompt({ sessionID: parent.id, text: "Write an ordinary file" })
   yield* sessions.wait(parent.id)
   expect(readFileSync(join(location.directory, "unrelated.ts"), "utf8")).toBe("ordinary next turn")
+  expect(readFileSync(calls, "utf8")).toBe("ss")
 })))
 
 

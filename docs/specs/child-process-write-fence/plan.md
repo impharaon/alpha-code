@@ -548,3 +548,46 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 - **orchestrator ruling correction 2026-11-27（r6）。** 续接 brief 修正 v4.2 Minor①：围栏内原生查询分为 `go env -json GOPATH` 与 `go env -changed -json GOBIN`；后者有 GOBIN 时保留用户配置，不注入；缺席才固定原 GOPATH 第一项/bin。R1/R7 的缓存位置不变。启动 null 的结果在下一次 Shell/PTY 合成前经同代只读 parentPort 拉取重查；成功后保留投影。实现复用 shared/package-manager-environment 与现有 spawner，PTY 的异步等待在 `engine/package-manager-pty-service.ts` 的原 create 服务外层，保留同步原生 binding；构建 resolver、`env.d.ts`、sidecar/server 为同调用链必要文件，无上游改动或新用户步骤。真实 CLI 样本落在既有 process-fence fixture 目录，只有 GOPATH/GOBIN 两个非秘密字段。Go 读取/sidecar-env/server 三文件 **83 pass**；投影与适配两文件 **6 pass**；最终场景与其它结果续记，不把局部通过算 AC-09 关闭。
 - r6 查询与重试移除臂：分别撤显式配置识别、撤 null 后 refresh，两条命名用例合跑 **2 fail**，还原 **2 pass**；类型检查 exit 0。main/sidecar 的 `env.d.ts` 同步新的宿主读取回调；新 PTY adapter 仅包装已决定的 create 合成时机，不改 core/native ABI。构建与真实 Go 场景排在机器 gate slot 后，尚未据此声明通过。
+
+## 交付切片三｜本人批准项目外目录
+
+- 依据：#1759；spec v6 AC-10 / BR-08；冻结 design v4 §4.4 R4/R5/R6、§5/§6 与 §10 v4 R1 处置（`d4a849e524`；后续 v4.1/v4.2 不改变本片）。切片一、二提供位置/身份与实际围栏；切片四继续负责 AC-11/12，切片五负责 v5 brew。
+- 核对：r6 续接明确允许本轮追加计划后直接实施；本节由 Codex（GPT-6）核对冻结输入与真实调用链，不替编排者声称独立审查通过。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/engine/file-access-transform.ts` 及同模块测试、`scripts/build-engine.ts` | 在既有精确构建变换入口接 R5 的真实 FileAccess 目标与读写轴；沿原函数执行，不复制服务实现或改 gate/上游文件。输入是磁盘上的真实 core 源码，锚漂移必须构建失败。 |
+| `packages/ui-mac/src/main/codepuppy-sidecar-messages.ts`、`hub-view.ts`、`ext-ipc.ts`；`packages/ext/src/hub-bridge.ts`、`plugin.ts`、`policy/index.ts` 及现有测试 | 接 R6 两端 parser/build/只读 request，evaluate 消费实际目标状态；不在 ext 维护路径/档位表。 |
+| `packages/ui-mac/src/shared/directory-write-approval.ts`（新增：R4 的纯 wire 类型/输入校验）；`src/main/directory-write-approval.ts` 及同模块测试（新增：主进程描述快照、本人批准协调） | 绑定请求事实、renderer、引擎代、显示时 dev/ino 与 decisionID；只读描述与批准写动作分离。复用原 tracker/register/grant 与既有身份规则。 |
+| `packages/ui-mac/src/main/process-fence-plan.ts`、`process-fence-workspaces.ts`、`server.ts`、`ipc.ts`、`index.ts` 及既有测试；`src/preload/index.ts`、`types.ts` | 复用已有 plannedWritableTarget/checkWritableTarget 预览缺失目标，避免另一套资格判定；主进程核实 pending 请求，暴露 R4、投影实际 profile/grants 的 R6 revision，组合至当前代。 |
+| `packages/ui-mac/src/engine-adapter/contract/receipts.ts`、`engine-adapter/index.ts`、`permission-reply.test.ts`；renderer 的 `PermissionDialog.tsx`、`permission-watcher.tsx`、`app.tsx` 及既有审批测试 | 在既有卡片显示真实目标，具体按钮登记 pre-reply 动作；账本先完成 current/fingerprint 校验，再 await 本人批准的 R4，成功后才沿原审批回复。拒绝、自动回复不登记动作。复用现有冲突/失败呈现。 |
+| `scripts/gate-files.tsv`、本计划 | 仅同步实际测试条数与一次性证据；不改 gate 的选择或规则。 |
+
+### 顺序
+
+1. R5 的目标元数据与 R6 的只读投影/两端接线；先跑变更 case，再完整跑消息、hub bridge、policy 相关现有文件。新增构建变换测试在模块既有/同模块测试中消费真实源码和实际执行结果；一次生产构建验变换接线。
+2. R4 主进程快照/批准协调与 IPC/tracker 接线；目录存在/缺失、合法软链/重指、HOME/状态/保护、过期/冲突、代际、拒绝与重试覆盖实际磁盘及真实 tracker。完成后跑所改模块文件全文件一次。
+3. 现有卡片与 receipt pre-reply await；在当前 DOM harness 验真实路径、按钮来源、拒绝零登记、grant 失败零 allow、指纹冲突先于授权与同 decisionID 重试。跑现有 PermissionDialog/permission-reply 与真正受影响的调用宿主；不新画 UI。
+4. 最终通过 `gate slot` 跑一次无窗口真实引擎/Seatbelt 场景：原写请求批准后成功，已有/后生子进程与第二次写无需重审、PID 不变；拒绝与移除 R4 均零落盘。真实 UI 点击由 DOM harness 证明、签发/消费与写盘由真实场景证明，分别标边界。再跑一次较宽相关集合、类型、old-name、north-star、docs 与 affected-tests 清单。
+
+### 风险
+
+- 当前 FileAccess 只有目标与可选 metadata，读写事实必须从实际调用轴进入；Shell 的工作目录批准属于可执行命令的目录能力，不能从命令文本猜文件。读工具不因此取得 OS 写权。构建变换只补冻结元数据与参数，不接管原引擎行为。
+- 显示与点击间的目录替换、原请求变化、引擎换代是不同冲突；任何 mkdir/register/issue 均排在事实核验之后。缺失目录只准备准确目标；沿现有 planner 的前瞻资格规则，不放行祖先。
+- OS grant 与 HTTP reply 没有事务。保留已本人批准的运行内授权，按同一 decisionID 重试；不伪造撤回。多目标中一项失败不发送 allow。
+- 同一 receipt 账本也服务自动允许与普通 HTTP 调用；它们没有点击登记的 pre-reply 动作，不能签发目录授权。远端请求不签本机令牌。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-10 / R5、R6 | FileAccess 真实源码执行的元数据 case；既有 messages/hub-bridge/policy 测试的 `external write scope` case，含 read、已可写、表外、protected、错误/坏形状 | fast/integration；affected PR 与 nightly；直接 import 与 literal 源路径可选择 | 缺 absolute/读写轴将错误授予读请求或不能定位目标；移除只读查询会使已授权目录仍 ask、表外写绕过 ask；假消息不得变成授权。 |
+| AC-10 / R4 | `directory-write-approval` 真盘 + 真实 tracker，覆盖显示后 symlink re-point/同路径换 inode、缺失目标、HOME/保护、pending/fingerprint、重试及 generation | integration；affected PR 与 nightly | 撤身份核对会给显示外目标写权；撤精确目录准备无法写缺失目标；提前登记使 conflict/expired 的目录进入 registry。 |
+| AC-10 / 本人动作 | 既有 PermissionDialog 与 permission-reply DOM/账本用例：显示实际目录、点击绑定、await grant、reject/自回复/冲突/失败、幂等 | integration；affected PR 与 nightly | 撤 pre-reply await 会先发 allow；把描述或普通 reply 当批准会让无人点击/拒绝臂登记目录；grant 失败不能得到成功回执。 |
+| AC-10 / 实际落盘 | 临时场景经生产 spawnLocalServer、planner、sidecar/apply、真实 tracker/R4 与引擎原请求；普通/软链/缺失目录、已有及后生 Shell/PTY 子进程、第二次写、拒绝与移除 R4 | scenario，一次性留 command/output；不加入每 PR 常跑矩阵 | 无 R4 的同次写 EPERM 且零落盘；批准后原请求成功且 PID 不变，拒绝/伪造/重放零新增授权；目录显示后换身份须 conflict。 |
+
+### 偏离记录
+
+暂无。真实签名 utilityProcess/Electron 窗口禁止启动，沿前片证据边界报告；不以 Node transport 和 DOM harness 冒充产品签名/UI 全链实跑。

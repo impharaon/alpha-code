@@ -1529,7 +1529,7 @@
           "name": "a subtask command: the child session runs on the parent's picked model"
         }
       ],
-      "note": "The pick is the session's `model`. L6 contract: Code Puppy's adapter switches the session model to the composer's pick before every send, so the field always carries the user's choice (orchestrator, plan 6bc34b3ce5). Upstream-native and kept: a session with no model takes a command's model, which then stays the session's model."
+      "note": "The pick is the session's `model`. L6 contract: Code Puppy's adapter switches the session model to the composer's pick before every send, so the field always carries the user's choice (orchestrator, plan 6bc34b3ce5). Upstream-native and kept: a session with no model takes a command's model, which then stays the session's model. #1776 S-01: package instructions share the source-before-values renderer; explicit session model priority and the existing project interpolation gate remain owned here. See plugin-invocation-semantics."
     },
     {
       "id": "mcp-independent-startup",
@@ -2093,7 +2093,8 @@
           "file": "packages/ui-mac/src/renderer/subprocess-cases.test.ts",
           "name": "项目信任组件:不完整下次再查"
         }
-      ]
+      ],
+      "note": " #1776 S-01: package instructions share the source-before-values renderer; explicit session model priority and the existing project interpolation gate remain owned here. See plugin-invocation-semantics."
     },
     {
       "id": "package-disable-pending-mcp-requests",
@@ -2186,6 +2187,36 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "absent and explicit HTTP retain the same streamable HTTP request"
+        }
+      ]
+    },
+    {
+      "id": "plugin-invocation-semantics",
+      "decision": "DESIGN-local-plugin-install v3 S-01: one Location-owned command renderer compiles original source nodes before binding arguments and Text values; package calls use the same renderer as native commands. PreparedInstruction.arguments is the verbatim Invocation name order ([] if undeclared), per orchestrator ruling 2026-11-27.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 3, explicit implement dispatch r5",
+      "takeovers": [
+        "packages/core/src/config/plugin/command.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/config/plugin/command.ts",
+        "ladder": "Existing L3 increment only: private renderer exposed through self-owned @opencode/plugin/codepuppy-package-runtime, scoped disposal; ext does not import core or run a second shell renderer."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "package instruction renders source nodes before bound values and arguments"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "declared argument names select their ordered values"
+        },
+        {
+          "file": "packages/plugin/test/codepuppy-package-runtime.test.ts",
+          "name": "instruction renderer follows the Location lifetime across module consumers"
         }
       ]
     }

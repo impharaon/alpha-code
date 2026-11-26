@@ -297,3 +297,6 @@ OpenCode 共用服务、库与凭证。
 新接管只有 `packages/schema/src/mcp.ts` 的 `RemoteConfig.transport?: "http" | "sse"`；既有 `packages/core/src/mcp/client.ts` 只扩 SDK 选择、union 类型与 HTTP 专用收尾判别。不接管整个 schema 目录，不新增依赖/client/协议 fallback。维护归属为 MCP/runtime 车道，登记 id=`plugin-mcp-transport`；north-star 的 schema 单文件清单与现有打印/同步 parity 共用同一权威。
 
 缺席/显式 http 维持原 HTTP 行为，显式 sse 原 URL 经同一 authProvider/headers/受控 Fetch 打开 SSE，SSE 不做 HTTP codemode 探测或 sessionId/DELETE 收尾。判据在 schema mcp、ext engine-transforms、ui-mac install/truth 与 core codepuppy-mcp-runtime 既有测试；真实 SDK 流及代理证据随本片 plan 收据，不以配置复制代替。同步上游必须对该单文件与既有 client 做 takeover upgrade review。
+### #1776 S-01 调用 renderer 窄增量
+
+依据 DESIGN-local-plugin-install v3 §6/§10、r5 的 IMPLEMENT 派发及 orchestrator ruling 2026-11-27（Claude Opus 5.5）：只在已接管 `core/src/config/plugin/command.ts` 增加来源语法与 source/value 边界，原生和整包指令复用同一 shell/process 原语。自有 `@opencode/plugin/codepuppy-package-runtime` 是 Location 生命周期内的反向调用端口；PreparedInstruction.arguments 原样携带参数名顺序，未声明为 []，仍由 core 解析。源码识别在绑定值之前，绑定值/调用参数不成为新 shell 节点。唯一主权登记为 `plugin-invocation-semantics`，原 command-model-priority/项目信任决定保持；没有增加其他上游文件接管。

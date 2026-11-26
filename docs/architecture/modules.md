@@ -81,3 +81,5 @@ review_after: 2027-05-09
 `plugin-package-config.ts` 的同一设置/DATA preparation 同时服务直接来源和签名 profile 的现有 admission。可选 MCP 版本沿声明的 floating token 位置绑定；清空恢复源 argv，建议由现有来源模块读取 metadata。模型别名映射同时交回 ext 的唯一 policy facts 查询，原 canonical identity 的停用/询问规则继续生效。
 
 `packages/schema/src/mcp.ts` 单独持有 remote MCP 的可选传输轴（缺席/HTTP 与显式 SSE）；main 包投影和真源、ext 的唯一投影将其交给既有 `core/src/mcp/client.ts` 的 SDK 选择，不建立第二连接器客户端。S-12 的精确接管见 registry `plugin-mcp-transport`。内容入口 `createSourceInstaller` 在提交结果返回后的事件轮次调用原 state writer，再收敛 MCP/重载；同一入口取消被显式包状态动作取代的待激活任务，state writer 的校验、写盘和锁顺序不变。
+
+S-01 的 `@opencode/plugin/codepuppy-package-runtime` 只持有同进程、按 Location 分区的反向 renderer 槽。`core/src/config/plugin/command.ts` 随 Location 注册/释放，原生和包指令共用源码先编译、后绑定值的 shell/process 原语；参数名顺序由 Invocation 传入，语法轴由 converter 合同生成，ext 不导入 core 执行器。

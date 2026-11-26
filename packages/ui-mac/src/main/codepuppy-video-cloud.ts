@@ -32,6 +32,7 @@ type Attempt = {
   envelopeJson: string
   manifestJson: string
   clip: VideoClip
+  bodyFullySent: boolean
   jobId: string | null
   state: "dispatching" | "running" | "completed" | "failed" | "cancelled"
   result?: VideoUnderstandingResultV1
@@ -245,6 +246,11 @@ export function createMainVideoService(deps: {
         let latestConsent: string | undefined
         const stopAttempts = async () => {
           for (const attempt of record.attempts.filter((a) => a.state === "running" || a.state === "dispatching")) {
+            if(!attempt.jobId && !attempt.bodyFullySent){
+              attempt.state="cancelled"
+              await persist()
+              continue
+            }
             while (!attempt.jobId) {
               const access = deps.identity()
               if (!access || access.tenantId !== record.tenant) throw new Error("not-authenticated")
@@ -379,6 +385,7 @@ export function createMainVideoService(deps: {
                 envelopeJson: JSON.stringify(guarded.envelope),
                 manifestJson: snapshot.manifestJson,
                 clip,
+                bodyFullySent: false,
                 jobId: null,
                 state: "dispatching",
               }
@@ -408,7 +415,10 @@ export function createMainVideoService(deps: {
                   model: record.model,
                   signal,
                   uploadConsent: consent,
-                  progress: (bytes) => progress("uploading", bytes, active.clip.bytes),
+                  progress: async (bytes) => {
+                    if(bytes === active.clip.bytes && !active.bodyFullySent){active.bodyFullySent=true;await persist()}
+                    progress("uploading",bytes,active.clip.bytes)
+                  },
                 })
               })
               if (uploaded.status === "consent-required") uploaded = await deps.upload.wait(uploaded.requestId, signal)

@@ -48,7 +48,7 @@ export async function dispatchVideoUpload(input: {
   model: VideoModelsV1["models"][number]
   signal: AbortSignal
   uploadConsent?: string
-  progress: (bytes: number) => void
+  progress: (bytes: number) => void | Promise<void>
   fetch?: typeof fetch
 }): Promise<CloudDispatchResult | { error: string }> {
   if (!videoFits(input.clip, input.model)) return { error: "video_input_exceeds_upstream" }
@@ -70,7 +70,7 @@ export async function dispatchVideoUpload(input: {
         input.signal.throwIfAborted()
         bytes += block.length
         digest.update(block)
-        input.progress(bytes)
+        await input.progress(bytes)
         if (bytes > input.clip.bytes) throw new Error("snapshot-changed")
         yield block
       }

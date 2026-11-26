@@ -82,19 +82,20 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
           if (disposed) return
           const candidate = path.join(directory, entry.name)
           const relative = path.relative(source.root, candidate).split(path.sep).join("/")
-          if (source.exclude.some((pattern) => pathGlob(relative, pattern, roots.platform))) continue
           if (entry.isDirectory() || entry.isSymbolicLink()) {
+            // Published literal subtree exclusions prune IO; only Schema matches protected file paths.
+            if (relative.split("/").some((segment) => source.exclude.includes(`**/${segment}`))) continue
             if (source.include.some((pattern) => canDescend(relative, pattern, roots.platform))) await walk(candidate)
           }
-          if (!source.include.some((pattern) => pathGlob(relative, pattern, roots.platform))) continue
           const target = await available(() => realpath(candidate))
           if (!target) continue
-          const info = await available(() => stat(candidate, { bigint: true }))
-          if (!info?.isFile()) continue
           const matches = [
             ProtectedFiles.match({ path: candidate, roots }),
             ProtectedFiles.match({ path: target, roots }),
           ]
+          if (!matches.some((file) => file !== undefined)) continue
+          const info = await available(() => stat(candidate, { bigint: true }))
+          if (!info?.isFile()) continue
           for (const file of matches)
             if (file) {
               // Missing/unreadable sources are retried; other failures propagate to this call's hidden result.
@@ -158,20 +159,13 @@ async function available<T>(run: () => Promise<T>): Promise<T | undefined> {
   }
 }
 
-function pathGlob(value: string, pattern: string, platform: ProtectedFiles.PathPlatform) {
-  return path.posix.matchesGlob(
-    platform === "win32" ? value.toLowerCase() : value,
-    platform === "win32" ? pattern.toLowerCase() : pattern,
-  )
-}
-
 function canDescend(relative: string, pattern: string, platform: ProtectedFiles.PathPlatform) {
-  const segments = relative.split("/")
-  const parts = pattern.split("/")
+  const segments = (platform === "win32" ? relative.toLowerCase() : relative).split("/")
+  const parts = (platform === "win32" ? pattern.toLowerCase() : pattern).split("/")
   const recursive = parts.indexOf("**")
   const prefix = recursive === -1 ? parts.slice(0, -1) : parts.slice(0, recursive)
   if (recursive === -1 && segments.length >= parts.length) return false
-  return segments.every((segment, index) => index >= prefix.length || pathGlob(segment, prefix[index], platform))
+  return segments.every((segment, index) => index >= prefix.length || /[*?]/.test(prefix[index]) || segment === prefix[index])
 }
 
 async function sqliteValues(file: ProtectedFiles.ProtectedFile) {

@@ -748,3 +748,5 @@ r14 security（a+c）：document-chromium 的离屏 BrowserWindow 显式 webview
 r14 OOXML（a）：red-9.log 两条闸均点名 shared/workspace-file.ts。将原 documentContainerKind 实现原样迁入现有 shared/ooxml.ts 解压权威，并从原 workspace-file 路径转出；没有第二套 ZIP owner、增加 preview 大小限制或改声明/返回值，保持 §4.4/R4 的独立容器身份语义。
 
 r14 写盘登记（c）：red-7.log 仅两处新签名。先运行原 --write 生成器，再保留原登记簿全部理由注释，将 document-render 的 mkdir(job)/writeFile(render.json) 归 W1+X1：job 在经宿主与 realpath 核验的所属 Location/.document-output 下。无新增可写根、无 TODO；不改变权限守卫。
+
+r14 HTML 预览消费者（b）：red-10.log 的旧 details.url 字面锚已由 §4.4/R4 复用 hardenPreviewSession 的 blocked(url) 回调替代。仍要求 safeOrigin 仅返回 origin，仍要求 recordBlocked 接收 safeOrigin(url)，额外明确拒绝直接记录 url；不改 UI 状态面或泄漏 path/query。

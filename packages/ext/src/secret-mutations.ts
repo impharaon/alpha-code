@@ -130,17 +130,26 @@ function restoreFields(text: string, current: ReturnType<typeof envAssignments>,
   return envAssignments(text).toReversed().reduce((result, item) => {
     if (item.value !== ProtectedFiles.REDACTED) return result
     const prior = current.find((entry) => entry.name === item.name && entry.occurrence === (base.get(item.name) ?? 0) + item.occurrence)
-    return prior ? result.slice(0, item.valueStart) + prior.rhs + result.slice(item.valueEnd) : result
+    if (!prior) return result
+    let end = item.valueEnd
+    for (let line = 0; line < prior.rhs.split(/\r?\n/).length - 1; line++) {
+      const continuation = result.slice(end).match(/^\r?\n\[REDACTED\](?=\r?\n|$)/)
+      if (!continuation) break
+      end += continuation[0].length
+    }
+    return result.slice(0, item.valueStart) + prior.rhs + result.slice(end)
   }, text)
 }
 function maskTemplate(text: string, names: ReadonlySet<string>) {
-  const records = envAssignments(text).filter((item) => names.has(item.name))
+  const records = envAssignments(text).filter((item) => names.has(item.name)).map((item) => ({
+    ...item, replacement: item.rhs.split(/\r?\n/).map(() => ProtectedFiles.REDACTED).join("\n"),
+  }))
   const spans = records.map((item, index) => {
-    const delta = records.slice(0, index).reduce((sum, entry) => sum + ProtectedFiles.REDACTED.length - entry.valueEnd + entry.valueStart, 0)
-    return { ...item, from: item.valueStart + delta, to: item.valueStart + delta + ProtectedFiles.REDACTED.length }
+    const delta = records.slice(0, index).reduce((sum, entry) => sum + entry.replacement.length - entry.valueEnd + entry.valueStart, 0)
+    return { ...item, from: item.valueStart + delta, to: item.valueStart + delta + item.replacement.length }
   })
   return {
-    text: records.toReversed().reduce((result, item) => result.slice(0, item.valueStart) + ProtectedFiles.REDACTED + result.slice(item.valueEnd), text),
+    text: records.toReversed().reduce((result, item) => result.slice(0, item.valueStart) + item.replacement + result.slice(item.valueEnd), text),
     position: (position: number) => {
       let delta = 0
       for (const span of spans) {

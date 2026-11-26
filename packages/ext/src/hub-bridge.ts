@@ -1,3 +1,5 @@
+import { createNetworkEgress } from "./network-egress"
+import { parseNetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../../ui-mac/src/shared/package-admission"
 import type { PluginSourceIdV1, SourceSearchResultV1 } from "../../ui-mac/src/main/plugin-sources"
 import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/plugin-source-timing"
@@ -54,6 +56,7 @@ export type BridgeFailure = { ok: false; reason: "unavailable" | "timeout" | "er
 export type HubInstallSubject = { readonly name: string; readonly source: PluginSourceIdV1 | "created" }
 
 export type HubBridge = {
+  readonly network: ReturnType<typeof createNetworkEgress>
   readonly unattended: ReturnType<typeof createUnattendedState>
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
@@ -104,6 +107,11 @@ export function createHubBridge(
     const message = event?.data
     if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
+    if (type.startsWith("codepuppy.network.")) {
+      const parsed = parseNetworkOutbound(message)
+      if (!parsed) return log("network egress: malformed runtime message")
+      if (network.receive(parsed)) return
+    }
     if (type === "codepuppy.unattended.live") {
       const parsed = parseUnattendedLive(message)
       if (!parsed) return log(`[@codepuppy/ext] dropped a malformed unattended snapshot`)
@@ -155,6 +163,17 @@ export function createHubBridge(
     })
   }
 
+  const network = createNetworkEgress({
+    log,
+    send: async (build) => {
+      const reply = await ask(build, (message) => {
+        const parsed = parseNetworkOutbound(message)
+        return parsed?.type === "codepuppy.network.activity.reply" ? parsed : undefined
+      })
+      return "type" in reply ? reply : undefined
+    },
+  })
+
   const writeToolPolicy = async (build: (id: number) => unknown): Promise<{ backup?: string }> => {
     const result = await ask(build, (message) => {
       const reply = parseToolPolicyWriteReply(message)
@@ -171,6 +190,7 @@ export function createHubBridge(
   }
 
   return {
+    network,
     unattended,
     available: !!port,
     ...(port

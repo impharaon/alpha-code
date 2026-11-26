@@ -43,7 +43,7 @@
 import * as http from "node:http"
 import * as net from "node:net"
 import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode/schema/codepuppy-net-failure"
-import { egressDenialLine } from "../shared/egress-denial"
+import { egressDenialLine, egressDenialDescription, type EgressDenialDetail } from "../shared/egress-denial"
 import { isEgressAuthorizedForSidecar } from "./network-egress-derived"
 import { requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"
 
@@ -124,7 +124,7 @@ export type EgressProxyDeps = {
    * 而它在**没有接上询问通道时恒答 `not-asked`** ⇒ 不接线的行为与本票之前逐字相同(403 unregistered,零额外记录)。
    * 本代理自己不判任何一格,也不持第二份清单:它只是在拒绝之前多问一句,然后照答复办。
    */
-  requestGrant?: (host: string, port: number) => Promise<EgressGrantOutcome>
+  requestGrant?: (host: string, port: number, signal?: AbortSignal) => Promise<EgressGrantOutcome>
   /** 拨号超时(默认 10 s):登记了但黑洞的目的地要快速、可读地失败,不能挂到客户端超时。 */
   dialTimeoutMs?: number
   /** `#1572` 静默兜底期限(默认 15 s):TLS 隧道上游零字节多久就关。0 = 不设期限。 */
@@ -182,7 +182,7 @@ function denialBody(reason: EgressDenyReason, authority: string, detail?: string
       ? // `#1379`:拒绝理由要说得出**为什么**,否则用户只看到一个泛化的网络错误。两个半场各说一句。
         // 措辞刻意窄:动态半场只认**目录里自带、且这台机器握着密钥**的那些供应商 —— 写在配置文件里的
         // 自建节点不算(`#1380` R1 Blocker:那些文件在围栏的可写集里)。说宽了就是把披露做成假话。
-        `blocked by this app's local egress policy — the destination is neither a registered app endpoint (${REGISTRY_PATH}) nor one of the built-in model providers this machine holds a key for`
+        (detail ? egressDenialDescription(detail as EgressDenialDetail) : `blocked by this app's local egress policy — the destination is neither a registered app endpoint (${REGISTRY_PATH}) nor one of the built-in model providers this machine holds a key for`)
       : reason === "bad-authority"
         ? "CONNECT authority must be host:port"
         : reason === "method-not-connect"
@@ -273,19 +273,21 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
     // `resume()`,而那会吞掉客户端在 200 之前抢跑的字节(TLS ClientHello),比它治的病更坏。
     // 所以这个判断只在优雅关闭时命中;没命中的代价是对着一个死 socket 建一次隧道,它下一拍就自己收掉。
     let clientGone = false
-    clientSocket.once("close", () => (clientGone = true))
-    void requestGrant(parsed.host, parsed.port).then(
+    const approval = new AbortController()
+    clientSocket.once("close", () => { clientGone = true; approval.abort() })
+    void requestGrant(parsed.host, parsed.port, approval.signal).then(
       (outcome) => {
-        // `not-asked`(没接通道 / 准入不过 / 超并发 / 记忆期内)不写记录:那一行会假装有人裁决过。
-        if (outcome !== "not-asked") log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: outcome })
-        if (outcome !== "granted") return deny(403, "unregistered", parsed)
+        // `not-asked`(没接通道 / 准入不过)不写记录:那一行会假装有人裁决过。
+        if (outcome !== "not-asked") log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: outcome === "granted" ? "granted" : "refused" })
+        if (outcome !== "granted") return deny(403, "unregistered", parsed, outcome === "not-asked" ? undefined : outcome)
         // 人答得比客户端的超时慢是常态(`webfetch` 30 s)。批准已经落账,这条连接却已经走了 ——
         // 不要对着一个死 socket 拨号,让调用方重试即可(方案基线 I7)。
         if (clientGone || clientSocket.destroyed) return
+        if (!authorize(parsed.host, parsed.port)) return deny(403, "unregistered", parsed, "approval-unavailable")
         openTunnel(parsed)
       },
       // 询问通道自己坏了也只能是拒:降级方向永远朝 fail-closed。
-      () => deny(403, "unregistered", parsed),
+      () => deny(403, "unregistered", parsed, "approval-unavailable"),
     )
     return
 

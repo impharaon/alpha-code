@@ -2152,6 +2152,12 @@ for (const mode of ["home", "session", "command"] as const) test(`first ${mode} 
     asked.push(input)
     return new Promise((resolve) => { release = () => resolve({ outcome: "writable", grant: "granted" }) })
   })
+  Object.assign(window.api, { networkEgress: {
+    setTier: async () => ({ ok: true, value: { revision: 1 } }),
+    listApprovals: async () => ({ ok: true, value: [] }), subscribe: () => () => {},
+    settings: async () => ({ ok: true, value: { available: false } }),
+    decide: async () => ({ ok: false, code: "not-found" }), revoke: async () => ({ ok: false, code: "unavailable" }),
+  } })
   setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
   commandListEntries = [{ name: "helios-brief", description: "周报", source: "skill" }]
   const projects = projectsApi([project("alpha-code", "/ws/a")])

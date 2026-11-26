@@ -1,3 +1,4 @@
+import { networkEgressActivity, type NetworkInspection } from "./network-egress-activity"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import type { InstallOutcomeV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1 } from "./plugin-sources"
@@ -495,7 +496,7 @@ export function createHubRequestStages(deps: { log: (line: string) => void; onCh
 export type CodePuppySidecarHost = {
   receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void): boolean
   /** sidecar ready:返回该次连接的断开函数(只断开自己那一次,晚到的旧 exit 不会断开新连接)。 */
-  attach(post: (message: CodePuppySidecarOutbound) => void): (reason: string) => void
+  attach(post: (message: CodePuppySidecarOutbound) => void, generation?: number, inspect?: NetworkInspection): (reason: string) => void
 }
 
 export function createCodePuppySidecarHost(deps: {
@@ -517,6 +518,7 @@ export function createCodePuppySidecarHost(deps: {
   }
   return {
     receive(message, post) {
+      if (networkEgressActivity.receive(message, post)) return true
       if (!isCodePuppySidecarMessage(message)) return false
       const inbound = parseCodePuppySidecarInbound(message)
       if (!inbound) {
@@ -557,10 +559,12 @@ export function createCodePuppySidecarHost(deps: {
       deps.reloads.receiveReport(inbound)
       return true
     },
-    attach(post) {
+    attach(post, generation, inspect) {
+      const detachNetwork = process.platform === "darwin" && generation !== undefined && inspect ? networkEgressActivity.attach(generation, post, inspect) : undefined
       const detachUnattended = unattendedRuns.attach(post)
       const detachReloads = deps.reloads.attach(post)
       return (reason) => {
+        detachNetwork?.()
         detachUnattended(reason)
         detachReloads(reason)
       }

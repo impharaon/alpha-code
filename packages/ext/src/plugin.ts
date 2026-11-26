@@ -111,12 +111,12 @@ export const CodePuppyExt: Plugin.Plugin = {
     // 版本或形状不符 ⇒ 抛 ⇒ 本插件 failed ⇒ sidecar 拒报 ready。只读一份冻结的文档,不挂任何钩子,不改 I3 的挂钩次序。
     const bootstrap = codepuppyBootstrap()
     // SPEC-engine-config-fence BR-03:工具策略文档由 main 写 —— 有 parentPort 时桥给出 main 的写者(DESIGN-engine-config-fence §4.5)
-    const policy = await registerPolicy(context, processState().hubBridge.unattended, processState().hubBridge.installSubject, processState().hubBridge.toolPolicy)
+    const policy = await registerPolicy(context, processState().hubBridge.unattended, processState().hubBridge.installSubject, processState().hubBridge.toolPolicy, processState().hubBridge.network)
     const directory = context.location.directory
     const { hubBridge, reloads } = processState()
     const registration = {}
     reloads.register(directory, registration)
-    const cleanups: Array<() => Promise<void> | void> = [() => reloads.unregister(directory, registration)]
+    const cleanups: Array<() => Promise<void> | void> = [() => reloads.unregister(directory, registration), ...(bootstrap.network.egressProxy ? [hubBridge.network.watch(context)] : [])]
     const cleanup = async () => {
       for (const run of cleanups.splice(0).reverse()) {
         try {
@@ -288,6 +288,9 @@ export const CodePuppyExt: Plugin.Plugin = {
           error(`[@codepuppy/ext] output cap skipped: ${describe(cause)}`)
         }
       }
+      await context.session.hook("context", (event) => {
+        if (bootstrap.network.egressProxy) processState().hubBridge.network.context(context.location.directory, event)
+      })
       for (const name of ["context", "compaction", "generate", "title"] as const) await context.session.hook(name, assembleRequest)
       // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
       // 写在 http.request:2.x 的路由层在 model.request 之后才按 apiKey 写 Authorization(packages/ai/src/route/auth.ts),

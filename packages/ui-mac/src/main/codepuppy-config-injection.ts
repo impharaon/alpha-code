@@ -13,6 +13,7 @@
 // 真实爆炸半径 + 失败必须出声)。
 
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { ASK_AGENT, READONLY_AGENT } from "../shared/permission-tier"
 import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -354,12 +355,12 @@ export function injectCodePuppyConfig(
     if (!switches.readonlyDisabled) {
       config.agents = {
         ...config.agents,
-        "codepuppy-readonly": {
-          description: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].description,
+        [READONLY_AGENT]: {
+          description: CODEPUPPY_AGENT_TEXT[READONLY_AGENT].description,
           // REQ-055:对选择器隐藏;CodePuppyComposer 只读档改为提交时 agent 参数,不再依赖可见列表轮转
           hidden: true,
           mode: "primary",
-          system: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt,
+          system: CODEPUPPY_AGENT_TEXT[READONLY_AGENT].prompt,
           permissions: rules([
             ["read", { "*": "allow", "*.env*": "deny" }],
             ["glob", "allow"],
@@ -371,7 +372,7 @@ export function injectCodePuppyConfig(
             ["edit", "deny"],
             ["shell", "deny"],
             ["external_directory", "deny"],
-            ["subagent", { "*": "deny", "codepuppy-readonly": "allow" }],
+            ["subagent", { "*": "deny", [READONLY_AGENT]: "allow" }],
             ["mcp:*", "ask"],
             ["plugin:*", "ask"],
             // BR-01 / BR-10(SPEC-plugin-helper-and-hub v5):助手的只读查找与状态工具不问;安装仍每档都问(hubInstallAsk)。
@@ -403,8 +404,8 @@ export function injectCodePuppyConfig(
     //       常驻闸:packages/opencode/test/permission/codepuppy-composer-tiers.test.ts(真 Agent + 真 Permission.ask)。
     config.agents = {
       ...config.agents,
-      "codepuppy-ask": {
-        description: CODEPUPPY_AGENT_TEXT["codepuppy-ask"].description,
+      [ASK_AGENT]: {
+        description: CODEPUPPY_AGENT_TEXT[ASK_AGENT].description,
         hidden: true,
         mode: "primary",
         permissions: rules([
@@ -417,7 +418,7 @@ export function injectCodePuppyConfig(
           ["websearch", "allow"],
           ["edit", "ask"],
           ["shell", "ask"],
-          ["subagent", { "*": "ask", "codepuppy-ask": "allow" }],
+          ["subagent", { "*": "ask", [ASK_AGENT]: "allow" }],
           ["doom_loop", "ask"],
           ["read", { "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" }],
         ]),

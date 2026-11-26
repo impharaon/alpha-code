@@ -1,7 +1,7 @@
 ---
 id: PLAN-secrets-usable-not-visible
 title: 密钥文件程序可用、助手不可见 实施计划
-summary: 列明五个交付段，保留共享规则段的实施证据，细化 Location 采集与通用工具收口段的文件、顺序和证明。
+summary: 列明五个交付段，保留共享规则与通用遮盖证据，细化安全读取、env 保值写回、权限例外与风险标注段。
 kind: plan
 status: active
 spec: SPEC-secrets-usable-not-visible
@@ -12,7 +12,7 @@ last_reviewed: 2026-11-26
 
 # PLAN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 实施计划
 
-本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；当前已展开①②。第一段实际检查见下方实施收据，完整真引擎行为验收仍在⑤。
+本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；当前已展开①②③。①②实际检查见各段实施收据；②的 Code Mode 外层进度保留待决 SC-02，完整真引擎行为验收仍在⑤。
 
 ## 交付段落
 
@@ -179,3 +179,61 @@ AC-01/05/07 的完整 read/权限/Windows 证明不在②宣告完成。去掉�
 - r4 pending SC-02：保留原 privacy.test.ts；只替换其 import 为当前出货 secret-mask.ts 的同目录 privacy-current.test.ts，从 `packages/ext` 执行 `bun test <该文件绝对路径>`，exit 1，0 pass / 1 fail / 0 import errors。原断言仍要求 liveContainsKnownValue=false，实际 true；未削弱为允许泄漏。段②其余义务已完成，外层实时进度交设计候选 v3.1 的 owner 决策；不得据此宣告 BR-03、AC-09 或⑤完成。
 
 2026-11-26 r4 · 追加必要范围：`packages/ext/src/plugin-host.test.ts` 的两例因本票明确移除错误 cause 而更新旧行为断言（见收据），属于原范围外唯一新增测试文件修改；不修无关问题。三个提交单元分别为 `d14b17a2ea`、`9cd3861ca4` 和本次接线提交；中间 `9a08725438` 只保留接缝反例。模块地图已在结果投影提交补权威链接。冻结决定和源文件使用权限未改；SC-02 单列待决，不把续派授权说成 owner 已批准其契约。
+
+## ③ 安全读取、env 保值写回与权限例外
+
+- 依据：[规格 v3](spec.md) @ `aa2476b378da663115e6735b991f6cbf2e04b5c6`，BR-01/02/04/05/06/07，AC-01、04（直接读）、05、06（三消费者）、07（路径接线）；[冻结设计](design.md) @ `66313542d35b182ef8fdbd2d4c4597d715149c35` §4.1、§4.2、§4.3/4.3.1、§4.4、§4.6、§4.7、§5、§6、§10；#1758。代码基线为②接线提交 `82e96edcca`；继承①已接受结论与②收据，不重审原决定。r4 仅授权规划③，设计候选 v3.1 / SC-02 仍待 owner 决策，不是本段依据。
+- 核对：待编排器核对本段计划；首次实施提交从续派单 `Phase:` 行填写。
+
+只实现上述读取、写回与权限/风险接线，不接 SC-01/SC-02，不宣告 shell、真实 SSH、模型记录和卡片交叉验收已完成。段②已经提供的 roots、envAssignments、resolveProtectedFile、remember、result/error/preview 继续是唯一材料与投影实现；本段不再持有名单、秘密词、档位表或值集合。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ext/src/secret-mask.ts`、`secret-mask.test.ts` | 补冻结的 read 与 prepareMutation 能力；read 只返回安全 TextPage，复用 env 词法记录和公开值规则，安全文本生成后分页；恢复读取的值经现有 files.remember 留存。接线依赖由 policy 提供，不让模型输入覆盖 roots。现有失败投影和非 read 进度包装保持唯一出口。 |
+| `packages/ext/src/secret-mutations.ts`、`secret-mutations.test.ts`（新增） | 封装确有复杂边界的 env write/edit/patch 局部输入恢复；只读当前目标，消费 envAssignments 的跨度/序号、resolveProtectedFile 与现成 Patch.parse/Hunk/derive。此文件只生成恢复副本，原执行器继续负责写盘、锁、formatter 和审批；不新增 parser、writer 或接口框架。 |
+| `packages/ext/src/secret-values.ts`、`secret-values.test.ts` | 仅在安全变量视图/恢复确需时补同一 env 词法边界的未解析区判定、RHS 占位符识别；沿用 Node parseEnv 和逐次记录，不另解析 dotenv。复用②的官方 Node 样本及临时生成值，补重复键、引号、多行、注释、export、BOM/CRLF 的消费者断言。 |
+| `packages/ext/src/policy/index.ts`、`policy/register-policy.test.ts` | 同一 seal transform 中接安全 read 和 writer 包装，身份来自 factsFor/toolFacts；原工具输入已 pin，传原 execute 的是局部副本。使用既有 unattendedProfile；执行前建立根 read 关联，成功/失败及 Location 释放清理。permission evaluate 消费现有目录权威并把 secrets.roots 同时传给能力轴与 gate。真实宿主测试读取结果、原工具/权限调用计数和实际磁盘，不伪造 builtin 身份。 |
+| `packages/ext/src/external-directory-rule.ts`、`external-directory-rule.test.ts`（新增邻接测试） | 在原权威中增加设计 §4.6 的操作判定及完整调用关联；既有规则生成/底座插入仍归此处。测试根 read 关联的建立/结束/释放、事件来源、ask/deny、自动化与已有两种交互载体差异；不在 UI/gate 加第二份 agent 名单。该模块此前没有自己的测试文件。 |
+| `packages/ext/src/policy/risk.ts`、`policy/risk.test.ts`、`policy/gate.ts` | ClassifyInput 按冻结契约增加必填 protectedRoots；gate 的依赖由同一 SecretMask 供数。受保护路径改消费 ProtectedFiles.probe，保留不属于本名单的系统文件风险、已有类别和其它探针；不从 metadata 反推根、不把风险升成审批。更新所有现有调用及具名风险样本。 |
+| `packages/ui-mac/src/main/codepuppy-config-injection.ts`、`codepuppy-config-injection.test.ts` | 仅去掉交互只读/询问载体的 env 专用冲突条目及相应旧注释；原只读其它 deny、tool-policy-default、自动化两载体的 env deny 保持原义。测试同时解码所有输出规则，检查交互读与自动化矩阵，不把保护名单生成回配置。 |
+| `docs/architecture/modules.md`、`docs/README.md`、本 `plan.md` | 实施时补 env 恢复权威、风险输入来源及必要生成索引行，填写核对、偏离和检查收据。本次 PLAN 只写/提交 plan.md，摘要对应索引行留首次实施同步。 |
+
+不改 Core/Plugin API、Schema 已发布规则、其它 specs、包依赖、公用 HTTP/Protocol、生成客户端或 gate。测试如因新增必填 roots 需要机械同步，限定实际调用方并在同提交偏离记录逐文件列名；不顺手迁移其它用例。
+
+### 顺序
+
+1. **安全视图提交**：先在 `secret-mask.test.ts` 增加 `protected read builds the safe page before pagination`、`protected read preserves missing-file and hidden-failure outcomes`，实现 read。调用前由身份已核实的内置 read 包装消费 unattendedProfile 和词法/realpath 分类；名单外仍走原 execute。env 的源序、重复键名、公开端口、秘密遮盖与固定说明由现有 envAssignments/isPublicValue 产生；未解析 shell/注释不透传，非 env 只说明。分页用原 offset/limit 语义与 TextPage 形状，测试空/默认/零值/分页、越界及安全说明，不能先分页原文。原目标不存在保留具名读失败；构造失败同形固定说明，不退回原 read。实际 read 接线在本提交完成，并在 `register-policy.test.ts` 加 `interactive protected reads bypass raw authorization in all tiers` 和 `automation and foreign read tools retain their original path`：三交互档与项目外私钥皆零 Asked，端口原样；自动化在册/载体、整工具停用、第三方同名 read、普通文件均按原权威运行。用真实 Core read 注册与隔离来源；不调用 UI 或窗口。
+2. **env 恢复提交**：先以 `secret-mutations.test.ts` 的 `write restores the current RHS by key occurrence`、`edit restores every matched occurrence in its file`、`patch restores source occurrences across update and move`、`mutation failures keep existing IO and format outcomes` 约束局部副本，再实现恢复和 writer 包装。write 验同键不同值、顺序、精确占位符、显式新值、新键/新文件、非 env；edit 验片段从全文第二次键开始、replaceAll 每次不同 RHS、原工具的定位/歧义及未匹配语义；patch 用现成 parse 区分操作，以 derive 对实际目标的结果验证唯一序列化，不手写 parser。保留移动源、上下文/删除/新增行、普通行/BOM/行尾；恢复值留进 Location，来源之外不猜值。`register-policy.test.ts` 加 `pinned env mutations preserve values through the original writers`，实际内置 write/edit/patch 后核磁盘真实值、原审批、结果/diff/preview 全部遮盖及原 event.input 未变。读取/解析失败不写占位符，按原具名错误退出；不新增确认、不改原写入事务。
+3. **目录例外与风险提交**：在 external-directory-rule 原权威完成根 read 关联与 evaluate 判定，使用尾部 confirm/pin 后的事实，终态 finally 和 dispose 清理；Code Mode child 不建/覆盖根 read。`external-directory-rule.test.ts` 加 `external read exception uses the complete verified root call`，覆盖缺 source、source 非 tool、同 id 不同 session/message、伪造 metadata、其它工具/agent、deny、无来源断言、结束后旧键和自动化。`register-policy.test.ts` 加 `only fully approved ordinary external reads skip the directory ask`：真实普通项目外文件在 build 零 Asked、codepuppy-ask 先等待批准、只读仍原 deny；写/edit/patch/shell 仍保留目录 ask，显式 deny 胜出。接 risk 必填 roots 同提交迁移两个生产调用点与测试供数；`risk.test.ts` 加 `protected path risk consumes the location roots`，同时验 Windows 形态/显式路径、示例/依赖排除及 /etc 系统风险没有丢失。所有风险只做说明。
+4. **三消费者联合证据**随上一步落入现有 `register-policy.test.ts`：`one protected file rule reaches read masking and risk` 用② fixture 假值验证同一发布家族的 read、普通工具回显和审批风险。另在临时模块图中只加一个新文件名到 Schema 发布数据，运行同一输入与断言；不向生产增加改名单选项。移除臂分别旁路三消费者的安全 read、通用结果遮盖、共享 ProtectedFiles.probe；另分别移除 RHS 按序恢复、根 read 来源关联，具名断言必须变红。自动化误豁免、公开值全遮、终态/预览遗漏也各用对应命名用例反证。完整 AC-06 真引擎联合与跨记录证明仍在⑤。
+5. 每步从 `packages/ext` 用 `bun test <上述测试文件> -t '<本步命名用例>'` 迭代，步骤结束完整跑改变行为的文件一次；配置注入对应从 `packages/ui-mac` 跑 `bun test src/main/codepuppy-config-injection.test.ts -t 'interactive env read rules preserve automation denies'`，步骤结束完整跑该文件一次。新行为的用例在实现前先观察失败，不添加票号文件/常驻 mutation 检查；每个临时移除臂记录命令、exit 和原始日志。测试样本沿用② provenance，Patch 输入由真实 Patch.parse/derive 校验，内部工具调用形状直接使用当前 Input；不手写外系统格式。
+6. 返回前只一次扩大相关集：`rg -n 'classifyPermissionRequest|GateDeps|externalDirectoryRules|EXTERNAL_DIRECTORY_AGENTS|createSecretMask|mock\.module' packages/ext/src packages/ui-mac/src/main` 筛出口/mock/枚举消费者。现有应核 `src/policy/identity.test.ts`、`src/policy/unattended.test.ts`、`src/policy/unattended-policy.test.ts`、`src/plugin-host.test.ts`、`src/engine-transforms.test.ts`、`src/plugin-setup-order.test.ts`，以及 UI `src/main/codepuppy-unattended.test.ts`、`src/main/config-injection-throat.test.ts`；已在本步完整运行过的文件不重复。配置注入 engine.scenario 不跑，完整会话/一分钟直播/Windows 真机仍留⑤或平台发布。Ext、ui-mac 分别 `bun typecheck`，只对实际改动 TS 执行 `bunx --no-install oxlint <文件列表>`；不运行包/项目整套或 gate。
+7. 补本段核对/偏离/实际检查收据，更新必要模块链接与生成器索引行；按 Alpha profile 检查本次改动文档、实际链接、`git diff --check`，分上述三个提交单元保存并停于③。已知仓级文档基线和 pending SC-02 按原去向报告，不借此开展治理或引擎接管。
+
+### 风险
+
+- read 把原始读取放在审批之后会违反零 Asked；提前跳过身份或自动化判定又会扩权。三档真实 read、原授权计数、假同名工具与在册自动化用例放在第一提交，不用返回文本看似正确代替接线证据。原 read 的分页与 model content 有私有 helper，局部安全页须以真实输入/结果形状对照，不能复制服务或忽略越界/截断语义。
+- 重复键、片段、多次 replaceAll 和 patch 移动会把恢复值对应错；先验证当前文件逐次跨度及局部输入能由原 writer 正确消费。特别用两个秘密值不同的重复赋值验证 replaceAll；若现有单一 oldString/newString 形状不能保留原定位/替换语义，按冻结接口不足返回具体 SEAM-CHANGE-NEEDED，不拆成多次无锁写、不放宽匹配、不跨文件取值。本段不预先扩 Core edit 接口。
+- 恢复读取在原执行器准备时发生，仍受现有外部并发写语义约束；不能顺手新增跨进程锁、重试或限制。引用同一次当前读取，不用全局 retained 集合恢复磁盘；真实 writer 用例核原锁/审批调用继续生效。
+- 目录规则的整条删除、metadata 自称 read 或仅 id 关联会放宽其它动作。由原权威持有判定和完整调用键，正反权限矩阵与结束清理同时落地；SC-02 仍不影响这条权限路径。
+- risk 迁移若保留可选 roots/旧名单兜底或错误删除系统路径探针，会出现两份权威或风险退化。类型要求生产/测试全部供数，临时移除共享 probe 的对照要失败；保留未知输入总函数与现有非保护文件风险用例。
+
+### 证明
+
+| AC / 本段义务 | 命名测试/证据 | 缺少行为为什么会失败 / 完整证明去向 |
+| --- | --- | --- |
+| AC-01、BR-02/06 | `protected read builds the safe page before pagination`；`interactive protected reads bypass raw authorization in all tiers` | 旁路包装会触发原 ask/deny 或暴露值；整文遮盖使端口、变量名或分页断言失败。记录/模型/卡片的真引擎三档及去规则臂留⑤。 |
+| AC-04 的直接读 | 上述三档接线含②真实格式的测试 SSH 私钥，词法与 realpath 别名；`protected read preserves missing-file and hidden-failure outcomes` | 调原 read、透出附件/派生信息或失败回退会使内容/原执行计数变红；真实 SSH 使用由④⑤证明。 |
+| BR-04、env 写回 | 三个 mutation 具名用例；`pinned env mutations preserve values through the original writers` | 去掉恢复或改成末值 map，使写后 RHS 丢失、重复键互换或原 oldString 不匹配；不执行原 writer/改 pin 输入使锁/审批/冻结断言失败；普通文本、显式新值仍必须原样生效。 |
+| AC-05 | `external read exception uses the complete verified root call`；`only fully approved ordinary external reads skip the directory ask` | 去掉例外使 build 仍 ask；删整条规则或相信自报来源使写/假来源/询问档变 allow；全键/结束清理缺失会让旧调用越权。完整真引擎权限矩阵留⑤。 |
+| AC-06 | `one protected file rule reaches read masking and risk`；临时发布数据新增文件名及逐消费者移除臂 | 只接一两处会使新文件的安全 read、输出遮盖或风险至少一断言失败；临时证据记录实际三处结果，⑤再核真引擎联合。 |
+| AC-07 的路径接线 | read/风险用例使用① Windows 形态盘符、反斜杠和大小写样本；本机真实 symlink 与相对路径 | 省略规范化/真实目标判定使一致性断言失败；本机字符串/IO 不冒充 Windows 运行，win32-x64 的 AC-01/02/04 仍随 Windows 包发布。 |
+| BR-07、自动化不扩权 | `protected read preserves missing-file and hidden-failure outcomes`；`automation and foreign read tools retain their original path`；配置注入 `interactive env read rules preserve automation denies` | 故障退回原文、调用原 read 或把自动化纳入交互豁免分别使失败说明、零读取/零 Asked 的原拒绝及配置矩阵断言失败。AC-08 的 shell 真引擎故障证明留④⑤。 |
+
+### 偏离记录
+
+暂无。本段为 PLAN，只追加本节并同步计划摘要/导读；未改生产代码、冻结设计、spec 或 SC-02 断言。具体 private helper 的签名与局部实现不在计划重新冻结；若实际改动文件或顺序变化，在对应实施提交同处记录。
+
+本次 PLAN 作者检查：Codex / GPT-6，已对照上述冻结节与当前 read/write/edit/patch、身份、自动化、目录及风险调用点；只读探查，未实施③。Alpha profile 文档检查中本 plan findings 为 0，实际 spec/design 相对链接存在，`git diff --check` exit 0；仓级既有 index.stale 等不宣称通过，按前述去向交编排器。下一步为编排器核对本节后续派实施。

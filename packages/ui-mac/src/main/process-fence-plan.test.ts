@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { planConfigFence, planPackageManagerCaches, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
+import { planConfigFence, planPackageManagerCaches, planUserWritableLocations, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
 import { writableLocationTruthPath } from "./process-fence-workspaces"
 import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
 import { renderProcessFenceProfile, processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
@@ -41,6 +41,30 @@ function withLocationDisk(run: (disk: { root: string; home: string; state: strin
 }
 
 describe("planWritableLocations", () => {
+  test("fixed installs and user files use identity truth and concrete version roots", () => {
+    withLocationDisk((disk) => {
+      // Existing real filesystem fixtures; system prefixes are excluded to keep this Mac untouched.
+      const version = join(disk.home, ".nvm/versions/node/v24.0.0")
+      mkdirSync(version, { recursive: true })
+      const input = { platform: "darwin" as const, home: disk.home, userDataPath: join(disk.root, "ud"), configHome: join(disk.home, ".config"), appData: join(disk.home, "Library/Application Support"), localAppData: join(disk.home, "Library/Caches"), goInstallBin: null, truthPath: disk.truthPath, eligibility: { ...disk.eligibility, configFenceRoots: () => [disk.protected, "/opt/homebrew", "/usr/local"] } }
+      const first = planUserWritableLocations(input)
+      const cover = (target: string) => processFenceRulesCover({ allow: first.rules, deny: [] }, target, "file")
+      for (const target of [join(disk.home, ".bun/bin/cli"), join(version, "lib/node_modules/cli/package.json"), join(disk.home, ".gitconfig.lock"), join(disk.home, ".zshrc")]) expect(cover(target), target).toBe(true)
+      for (const target of [disk.home, join(disk.home, ".nvm/arbitrary"), join(disk.home, ".config/git/other"), join(disk.home, "private")]) expect(cover(target), target).toBe(false)
+      expect(existsSync(join(disk.home, ".zshrc"))).toBe(false)
+      expect(existsSync(join(version, "bin"))).toBe(true)
+      const other = join(disk.root, "other")
+      mkdirSync(other)
+      rmSync(join(disk.home, ".bun/bin"), { recursive: true })
+      symlinkSync(other, join(disk.home, ".bun/bin"))
+      symlinkSync(join(disk.protected, "settings"), join(disk.home, ".zshrc"))
+      const next = planUserWritableLocations(input)
+      expect(next.excluded).toContain(join(disk.home, ".bun/bin"))
+      expect(next.excluded).toContain(join(disk.home, ".zshrc"))
+      expect(processFenceRulesCover({ allow: next.rules, deny: [] }, join(other, "cli"), "file")).toBe(false)
+    })
+  })
+
   test("binds concrete directories and missing literal files without creating user files", () => {
     withLocationDisk((disk) => {
       const candidates = [{ sourcePath: join(disk.home, ".bun", "bin"), kind: "directory" as const }, { sourcePath: join(disk.home, ".config", "git", "config"), kind: "file" as const }]
@@ -222,7 +246,7 @@ describe("package manager cache planning", () => {
       const profile = renderProcessFenceProfile({ workspaces: [project], packageManagerCaches: caches.rules,
         roots: { home: disk.home, configHome: input.configHome, dataHome: join(disk.home, ".local/share"), cacheHome: join(disk.home, ".cache") },
         userDataPath: input.userDataPath, stateHome: input.userDataPath, codepuppyGlobalRoot: disk.state, egressProxyPort: 4443,
-        configFence: [{ kind: "literal", path: protectedFile }], credentialStores: [{ kind: "literal", path: credentialFile }],
+        configFence: [{ kind: "literal", path: protectedFile }], homebrewFence: [], credentialStores: [{ kind: "literal", path: credentialFile }],
       })
       const attempt = (file: string) => spawnSync(SANDBOX_EXEC, ["-p", profile, "/bin/sh", "-c", 'printf changed > "$1"', "probe", file], { encoding: "utf8" })
       for (const file of [join(caches.env.GOCACHE!, "positive"), join(disk.home, ".cargo/registry/positive"), join(disk.home, ".cargo/.package-cache"), join(project, "positive")]) expect(attempt(file).status).toBe(0)
@@ -280,7 +304,7 @@ test.skipIf(process.platform !== "darwin")("writable location truth stays fenced
     const plan = planProcessFence({
       userDataPath: userData, sidecarEnv: { HOME: disk.home },
       addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../../out/main"), exists: existsSync },
-      egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: disk.protected, credentialStores: [],
+      egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: disk.protected, homebrewFence: [], credentialStores: [],
     }, {
       homeDir: () => disk.home, codepuppyGlobalRoot: () => join(disk.state, "env", "dev"), appStateRoot: () => disk.state,
       realpath: realpathSync.native, defaultWorkspace: () => project, readWorkspaces: () => [],
@@ -346,7 +370,7 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     // SPEC-engine-config-fence:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory)
     engineConfigDirectory: `${HOME}/.config/opencode`,
     // SPEC-stored-credentials-fence §4.5:受保护集这几条只判自己那一轴,存放点清单空(空 ⇒ C1 两块不渲染);C1 的测试自己给 server.ts 交的那份
-    credentialStores: [],
+    homebrewFence: [], credentialStores: [],
   }
   return { deps, input, made, logs }
 }

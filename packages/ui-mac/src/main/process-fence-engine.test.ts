@@ -108,7 +108,7 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
         egressProxyPort: egressProxy.port,
         carriedWorkspaces: [],
         engineConfigDirectory: join(home, ".config", "opencode"),
-        credentialStores: credentialStores({ userDataPath: userData }),
+        homebrewFence: [], credentialStores: credentialStores({ userDataPath: userData }),
       },
       {
         homeDir: () => home,

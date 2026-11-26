@@ -65,6 +65,7 @@ export const WRITABLE_ROOT_IDS = {
   W13: "/dev/null /dev/stdout /dev/stderr",
   W14: "/dev/tty ^/dev/fd/",
   W15: "/dev/ptmx ^/dev/ttys:PTY 靠它(§6.4)",
+  W21: "R1/R3/R7 绑定的固定全局安装与用户配置位置",
   W20: "R1/R7 绑定的包管理器缓存;Cargo 原生 Home 的精确缓存/锁/数据库",
   X1: "用户本次应用运行亲手打开的项目(主进程绑定当前引擎签发的私有类扩展)",
 } as const
@@ -155,6 +156,8 @@ export function configFenceLocations(input: {
 }
 
 export type ProcessFenceProfileInput = {
+  homebrewFence: readonly Exclude<ConfigFenceRule, { kind: "dat-files" }>[]
+  userWritableLocations?: readonly ProcessFenceWriteRule[]
   /** W1:启动时并集,顺序即优先级(裁剪从尾部丢)。 */
   workspaces: readonly string[]
   packageManagerCaches?: readonly ProcessFenceWriteRule[]
@@ -351,6 +354,12 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     "(allow file-write*",
     ...ws.map((w) => `  (subpath "${w}")                                  ; W1`),
     ...(input.packageManagerCaches ?? []).map((rule) => `  (${rule.kind} ${rule.kind === "regex" ? "#" : ""}"${assertSeatbeltSafePath(rule.value, "package manager cache")}") ; W20`),
+    ...(input.userWritableLocations ?? []).map((rule) => {
+      if (rule.kind !== "regex") return `  (${rule.kind} "${assertSeatbeltSafePath(rule.value, "user writable location")}") ; W21`
+      new RegExp(rule.value)
+      if (/["\u0000-\u001f\u007f]/.test(rule.value)) throw new Error("process fence: invalid user writable pattern")
+      return `  (regex #"${rule.value}") ; W21`
+    }),
     `  (subpath "${userDataPath}")                             ; W3`,
     ...(stateHome === userDataPath ? [] : [`  (subpath "${join(stateHome, "opencode")}")               ; W3 (XDG_STATE_HOME)`]),
     `  (subpath "${join(dataHome, "opencode")}")               ; W4`,
@@ -369,6 +378,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     '(allow network-bind (local ip "localhost:*"))             ; N2 sidecar 自己的 HTTP 服务器要 bind',
     '(allow network-inbound (local ip "localhost:*"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)',
     `(allow network-outbound (remote ip "localhost:${egressProxyPort}"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)`,
+    ...renderConfigFence(input.homebrewFence),
     ...renderConfigFence(configFence),
     ...renderCredentialFence(credentialStores),
   ]

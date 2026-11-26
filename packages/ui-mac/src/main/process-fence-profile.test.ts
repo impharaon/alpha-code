@@ -8,10 +8,12 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { readHomebrewInstallations, homebrewFenceLocations } from "./homebrew-installation"
+import { planProtectedLocations } from "./process-fence-plan"
 import {
   COMPILE_BYTE_WALL,
   LOCAL_SIDECAR_SERVER_KEY,
@@ -68,7 +70,7 @@ const base: ProcessFenceProfileInput = {
   roots,
   egressProxyPort: 4443,
   configFence: CF,
-  credentialStores: C1,
+  homebrewFence: [], credentialStores: C1,
 }
 
 const locationInput = {
@@ -82,6 +84,36 @@ const locationInput = {
 }
 
 describe("package manager locations", () => {
+  test("homebrew installation nodes stay protected while ordinary global bins remain writable", () => {
+    const root = realpathSync(mkdtempSync(join(import.meta.dir, "../../node_modules/.cache/homebrew-identity-")))
+    try {
+      // Filesystem-only markers at the launcher/Library paths from frozen H1's real Homebrew layout.
+      // Content is not parsed or executed; these are our probe files, not a replacement brew implementation.
+      const prefix = join(root, "prefix")
+      const repository = join(root, "repository")
+      mkdirSync(join(prefix, "bin"), { recursive: true })
+      mkdirSync(join(repository, "bin"), { recursive: true })
+      mkdirSync(join(repository, "Library/Homebrew"), { recursive: true })
+      writeFileSync(join(repository, "bin/brew"), "launcher marker")
+      writeFileSync(join(repository, "Library/Homebrew/brew.sh"), "library marker")
+      symlinkSync(join(repository, "bin/brew"), join(prefix, "bin/brew"))
+      const installs = readHomebrewInstallations([prefix], [])
+      expect(installs).toHaveLength(1)
+      expect(installs[0]!.launcher.realPath).toBe(join(repository, "bin/brew"))
+      expect(readHomebrewInstallations([prefix], [{ kind: "subpath", value: root }])).toEqual([])
+      const deny = planProtectedLocations(homebrewFenceLocations(installs), undefined, { realpath: realpathSync.native }).configFence
+      const profile = renderProcessFenceProfile({ ...base, workspaces: [], homebrewFence: deny.filter((rule) => rule.kind !== "dat-files"), userWritableLocations: [{ kind: "subpath", value: join(prefix, "bin") }, { kind: "subpath", value: join(repository, "Library") }] })
+      const rules = processFenceWriteRules(profile)
+      expect(processFenceRulesCover(rules, join(prefix, "bin/npm-probe"), "file")).toBe(true)
+      if (process.platform === "darwin") {
+        const result = spawnSync("/usr/bin/sandbox-exec", ["-p", profile, "/usr/bin/python3", "-c", `import json, pathlib\nresult=[]\nfor p in ${JSON.stringify([join(repository, "bin/brew"), join(repository, "Library/Homebrew/brew.sh"), join(prefix, "bin/npm-probe")])}:\n try: pathlib.Path(p).write_text('probe'); result.append(True)\n except PermissionError: result.append(False)\nprint(json.dumps(result))`], { encoding: "utf8" })
+        expect(result.status, result.stderr).toBe(0)
+        expect(JSON.parse(result.stdout)).toEqual([false, false, true])
+      }
+      for (const path of [join(repository, "bin/brew"), join(repository, "Library/Homebrew/brew.sh"), repository]) expect(processFenceRulesCover(rules, path, "file"), path).toBe(false)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
   test("fixed cache environment is separate from the real global install roots", () => {
     const cache = `${locationInput.userDataPath}/package-managers`
     const result = resolvePackageManagerLocations(locationInput)
@@ -299,10 +331,10 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     expect(cf).toBe(n4 + 1)
     expect(lines.slice(cf)).toEqual([...CF_LINES, ...C1_LINES]) // C1 是全文最后的文件规则(stored-credentials-fence §4.5)
     expect(lines.slice(cf).some((l) => l.startsWith("(allow"))).toBe(false)
-    expect(tokens(renderProcessFenceProfile({ ...base, configFence: [], credentialStores: [] })).at(-1)).toBe(NETWORK_LINES(4443).at(-1))
+    expect(tokens(renderProcessFenceProfile({ ...base, configFence: [], homebrewFence: [], credentialStores: [] })).at(-1)).toBe(NETWORK_LINES(4443).at(-1))
     // C1 单独在场(受保护集为空)时也紧接在网络行之后;C1 为空 ⇒ 两块都不渲染
     expect(tokens(renderProcessFenceProfile({ ...base, configFence: [] })).slice(-C1_LINES.length)).toEqual(C1_LINES)
-    expect(tokens(renderProcessFenceProfile({ ...base, credentialStores: [] })).slice(-CF_LINES.length)).toEqual(CF_LINES)
+    expect(tokens(renderProcessFenceProfile({ ...base, homebrewFence: [], credentialStores: [] })).slice(-CF_LINES.length)).toEqual(CF_LINES)
     expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "literal", path: '/Users/alpha/"x' }] })).toThrow(/configFence\[0\]/)
     expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "dat-files", dir: "relative" }] })).toThrow(/configFence\[0\]/)
   })
@@ -312,7 +344,7 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       { kind: "subpath" as const, path: "/r/cfg/opencode", via: ["/w/proj/link", "/w/proj"] },
       { kind: "literal" as const, path: "/w/other/x", via: ["/w/proj"] },
     ]
-    const profile = renderProcessFenceProfile({ ...base, configFence, credentialStores: [] })
+    const profile = renderProcessFenceProfile({ ...base, configFence, homebrewFence: [], credentialStores: [] })
     const ancestors = profile.split("\n").find((line) => line.includes("; CF 上级目录节点"))!
     expect(ancestors).toBe('(deny file-write* (literal "/r/cfg") (literal "/r") (literal "/w/proj/link") (literal "/w/proj") (literal "/w/other") (literal "/w"))      ; CF 上级目录节点')
     expect(processFenceWriteRules(profile).deny).toEqual([
@@ -346,7 +378,7 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
   test("`#1337` 网络行:Q1.2 四行逐字、顺序不变、deny 在前 allow 在后、N4 的端口就是传入的代理端口;只写加法(没有第二条 deny)", () => {
     // 受保护集两块渲染在 N4 之后(SPEC-engine-config-fence);网络行本身的形状在没有受保护集的形状上判,有受保护集时它们紧贴在两块之前
     expect(tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234 })).slice(-(CF_LINES.length + C1_LINES.length + 4), -(CF_LINES.length + C1_LINES.length))).toEqual(NETWORK_LINES(61234))
-    const out = tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234, configFence: [], credentialStores: [] }))
+    const out = tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234, configFence: [], homebrewFence: [], credentialStores: [] }))
     expect(out.slice(-4)).toEqual(NETWORK_LINES(61234))
     expect(out.filter((l) => l.startsWith("(deny "))).toEqual([
       "(deny file-write*)",
@@ -369,14 +401,14 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
 
   test("每一行都带 §8.2 的 id 注释,且 id 集合 = WRITABLE_ROOT_IDS 的键(登记簿只能点名存在的行)", () => {
     const ids = new Set(
-      renderProcessFenceProfile({ ...base, packageManagerCaches: [{ kind: "literal", value: `${HOME}/.cargo/.package-cache` }] })
+      renderProcessFenceProfile({ ...base, userWritableLocations: [{ kind: "literal", value: `${HOME}/.gitconfig` }], packageManagerCaches: [{ kind: "literal", value: `${HOME}/.cargo/.package-cache` }] })
         .split("\n")
         // X2 is a deny rule, not a writable root.
         .map((l) => /;\s*(W\d+|X1)\b/.exec(l)?.[1])
         .filter((x): x is string => !!x),
     )
     expect([...ids].sort()).toEqual(Object.keys(WRITABLE_ROOT_IDS).sort())
-    expect(Object.keys(WRITABLE_ROOT_IDS).sort()).toEqual(["W1", "W11", "W12", "W13", "W14", "W15", "W20", "W3", "W4", "W5", "W8", "X1"])
+    expect(Object.keys(WRITABLE_ROOT_IDS).sort()).toEqual(["W1", "W11", "W12", "W13", "W14", "W15", "W20", "W21", "W3", "W4", "W5", "W8", "X1"])
   })
 
   test("XDG 根跟着 env 走:用户导出 XDG_DATA_HOME 时 W4 指向它,不再是 ~/.local/share", () => {
@@ -430,8 +462,8 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
 
   test("E9 往返:生产渲染(含受保护集)→ 解析 ⇒ allow 逐条还原写块(W13 一行三条、W14/W15 literal + regex),deny 与渲染输入(规则 + 上级目录)逐条相等;X1 扩展行不算规则", () => {
     expect(processFenceWriteRules(renderProcessFenceProfile(base))).toEqual({ allow: ALLOW, deny: [...CF_DENY, ...C1_RULES] })
-    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, credentialStores: [] }))).toEqual({ allow: ALLOW, deny: CF_DENY })
-    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, configFence: [], credentialStores: [] }))).toEqual({ allow: ALLOW, deny: [] })
+    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, homebrewFence: [], credentialStores: [] }))).toEqual({ allow: ALLOW, deny: CF_DENY })
+    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, configFence: [], homebrewFence: [], credentialStores: [] }))).toEqual({ allow: ALLOW, deny: [] })
     expect(processFenceWriteRules("(version 1)(allow default)(deny file-write*)")).toEqual({ allow: [], deny: [] })
   })
 
@@ -439,7 +471,7 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
   // 运行期放行的解析器认得这两种形状,deny 逐条等于两份输入(受保护集,再 C1)按出现顺序拼起来 —— C1 在场时新打开的项目照样签得出放行。
   test("E9 / D11 往返(受保护集 + C1,真渲染):deny 逐条等于两份输入按出现顺序拼起来;C1 的路径带引号即拒渲染", () => {
     expect(processFenceWriteRules(renderProcessFenceProfile(base))).toEqual({ allow: ALLOW, deny: [...CF_DENY, ...C1_RULES] })
-    expect(() => renderProcessFenceProfile({ ...base, credentialStores: [{ kind: "literal", path: '/x/"y' }] })).toThrow(/credentialStores\[0\]/)
+    expect(() => renderProcessFenceProfile({ ...base, homebrewFence: [], credentialStores: [{ kind: "literal", path: '/x/"y' }] })).toThrow(/credentialStores\[0\]/)
   })
 
   test("文法只认渲染点写出的形状:其余任何含 file-write 的表头、条目或行都抛(调用方按「本代不签发」处理)", () => {
@@ -854,7 +886,7 @@ describe("控制组:判据能测出已知的坏", () => {
     expect(rendered).not.toEqual(tokens(renderProcessFenceProfile(base)))
   })
   test("`#1337` 少 N3(inbound)或多一条减法 deny ⇒ 网络行判据红(老勘破 §5 那两行 / 减法组合正是 `#1334` 实测的两种坏)", () => {
-    const good = tokens(renderProcessFenceProfile({ ...base, configFence: [], credentialStores: [] })) // 网络行的形状在没有受保护集的形状上判(见上)
+    const good = tokens(renderProcessFenceProfile({ ...base, configFence: [], homebrewFence: [], credentialStores: [] })) // 网络行的形状在没有受保护集的形状上判(见上)
     expect(good.slice(-4)).toEqual(NETWORK_LINES(4443))
     const sec5 = good.filter((l) => !l.includes("network-inbound"))
     expect(sec5.slice(-4)).not.toEqual(NETWORK_LINES(4443))

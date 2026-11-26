@@ -78,7 +78,7 @@ const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<Proces
     roots: { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` },
     egressProxyPort: 4443,
     configFence: [],
-    credentialStores: [],
+    homebrewFence: [], credentialStores: [],
     ...over,
   })
 

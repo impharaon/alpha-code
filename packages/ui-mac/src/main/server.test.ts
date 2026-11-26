@@ -1333,7 +1333,7 @@ describe("§4.8 随包 ripgrep 进引擎 PATH", () => {
 
 test("external write scope uses the actual rendered rules for files and keeps protected denies", async () => {
   const { renderProcessFenceProfile } = await import("./process-fence-profile")
-  const profile = renderProcessFenceProfile({ roots: { home: "/fence-home", configHome: "/fence-home/.config", dataHome: "/fence-home/.local/share", cacheHome: "/fence-home/.cache" }, workspaces: ["/opened"], userDataPath: "/fence-data", stateHome: "/fence-state", codepuppyGlobalRoot: "/fence-global", egressProxyPort: 4443, configFence: [{ kind: "literal", path: "/opened/protected" }], credentialStores: [{ kind: "subpath", path: "/vault/credentials" }] })
+  const profile = renderProcessFenceProfile({ roots: { home: "/fence-home", configHome: "/fence-home/.config", dataHome: "/fence-home/.local/share", cacheHome: "/fence-home/.cache" }, workspaces: ["/opened"], userDataPath: "/fence-data", stateHome: "/fence-state", codepuppyGlobalRoot: "/fence-global", egressProxyPort: 4443, configFence: [{ kind: "literal", path: "/opened/protected" }], homebrewFence: [], credentialStores: [{ kind: "subpath", path: "/vault/credentials" }] })
   creditDanglingSweepForSpawn()
   const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: () => ({ ...fakePlanFence(), profile }), fork: fakeFork })
   try {

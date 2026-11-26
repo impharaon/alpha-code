@@ -608,13 +608,14 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 ## 交付切片四｜固定全局安装位置与用户配置
 
 - 依据：#1759；spec v6 AC-11（非 brew）、AC-12；design v4 §4.1–4.3.1、R6/R7、§10 @ `6a292250bc`；Go discriminator 沿 r6 明确修正。切片五继续负责 v5 brew。
-- 核对：待首个实施提交填入本计划提交；r7 授权同轮计划并直接实施，自核不冒充独立审查。
+- 核对：`1232705ba8` · Codex（GPT-6）· r7 授权同轮计划并直接实施，自核通过，不冒充独立审查。
 
 ### 改动
 
 | 文件 | 改什么 |
 | --- | --- |
 | `packages/ui-mac/src/main/process-fence-profile.ts`、`process-fence-plan.ts` 及既有测试 | R1/R3 同一位置权威的全局/用户规则经 R7 后进入实际 profile；固定模板按真实根绑定；精确文件不变成父目录写权。 |
+| `packages/ui-mac/src/main/homebrew-installation.ts`（新增：main 的安装身份快照）；profile/planner 的现有测试 | H1 安装识别与 HB 拒写先于全局 bin 启用；复用现有 CF 规范化/alias 节点逻辑，不执行候选 brew。 |
 | `packages/ui-mac/src/main/server.ts` 及既有测试 | 生产启动/探针消费已核规则与安装环境；R6 沿实际 profile 读出同一集合，不另抄位置表。 |
 | `packages/ext/src/policy/identity.test.ts`（必要时 `policy/index.ts`） | 复用切片三的文件目标 R6，核三档、固定文件无 external_directory 附加卡、保护拒绝与表外目录审批。 |
 | `scripts/gate-files.tsv`、本计划 | 机械计数与证据同步；不改 gate。 |
@@ -642,4 +643,5 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 ### 偏离记录
 
-暂无。
+- r7 步骤 1：新增 H1 身份读取模块，在 `process-fence-plan` 抽出原有 canonical/alias 节点实现 `planProtectedLocations`，CF 与 HB 共用；不是第二套路径判定。profile 的冻结必填 `homebrewFence` 传播到直接 profile/planner 调用者（native/test 的 packaged-main、packaged-window-main；main 下 credential-table、custom-provider-truth[-fence]、egress-grant-truth、engine-config-fence.engine、engine-db-records.engine、fence-write-denied.engine、mcp-server-truth、network-egress-fence、process-fence-apply/compile/config-fence/engine/extension/wiring/zsh-startup、project-trust-truth-fence、project-writable.engine、server、shell-env、stored-credentials-fence.engine、workspace-identity-firmlink.fixture、workspace-write-probe-fence）。这些超初始清单的文件仅补空安装测试上下文，不启动窗口或增加其重场景；server 下一步才接真实快照。
+- `bun test src/main/process-fence-profile.test.ts src/main/process-fence-plan.test.ts` **90 pass**；新增固定安装/用户文件真盘用例 **1 pass**。HB 缺失拒写臂最初由纯规则断言先红，调整观察顺序后同一条真 sandbox-exec Library 写入断言 **1 fail**，恢复 **1 pass**；两份日志都保留，不把最初纯断言冒充真围栏对照。类型传播曾发现 fixture 重复补了字段，已去重；没有更改断言。

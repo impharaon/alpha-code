@@ -20,7 +20,7 @@
 // **刻意不建** `~/.opencode`:它整个是受保护配置位置 CF-9,任何进程都不建它(BR-07;W16 已删,计划目录在引擎数据目录下,
 // 这里本来就预建数据目录,`plan` 由写文件工具懒建)。
 
-import { lstatSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
 import {
@@ -44,6 +44,45 @@ import {
   type WorkspaceDirectoryInput,
 } from "./process-fence-profile"
 import { readWritableLocationTruth, writeWritableLocationTruth, type WritableLocationTruth } from "./process-fence-workspaces"
+
+/** Static install/config candidates share R7 with caches; no user file is written here. */
+export function planUserWritableLocations(input: PackageManagerLocationInput & { truthPath: string; eligibility: WorkspaceDirectoryInput }) {
+  const rules: ProcessFenceWriteRule[] = [
+    ...resolvePackageManagerLocations(input).writable.filter((entry) => entry.purpose === "global-install").map((entry) => entry.rule),
+    ...userConfigurationLocations(input).flatMap((rule) => rule.kind === "dat-files" ? [] : [{ kind: rule.kind, value: rule.path }]),
+  ]
+  const patterns = rules.filter((rule) => rule.kind === "regex").map((rule) => {
+    // Only the fixed resolver's path templates enter here. Split before the first pattern segment.
+    const match = /^\^((?:\\.|[^\\[(*+?{$])+)(.*)$/.exec(rule.value)!
+    const prefix = match[1]!.replace(/\\(.)/g, "$1")
+    const root = prefix.endsWith("/") ? prefix.slice(0, -1) : dirname(prefix)
+    return { root, suffix: (prefix.endsWith("/") ? "" : basename(prefix)) + match[2]! }
+  })
+  const base = planWritableLocations({ ...input, candidates: [
+    ...rules.filter((rule) => rule.kind !== "regex").map((rule) => ({ sourcePath: rule.value, kind: rule.kind === "literal" ? "file" as const : "directory" as const })),
+    ...patterns.map((pattern) => ({ sourcePath: pattern.root, kind: "directory" as const })),
+  ] })
+  const targets = new Map(base.locations.map((entry) => [entry.sourcePath, entry.targetPath]))
+  const writable: ProcessFenceWriteRule[] = rules.flatMap((rule) => rule.kind !== "regex" && targets.has(rule.value) ? [{ ...rule, value: targets.get(rule.value)! }] : [])
+  const excluded = [...base.excluded]
+  for (const pattern of patterns) {
+    const root = targets.get(pattern.root)
+    if (!root) continue
+    // Version-manager templates enumerate concrete versions before binding bin/package roots.
+    const version = /^\[\^\/\]\+\/\((.*)\)\(\/\.\*\)\?\$$/.exec(pattern.suffix)
+    if (version) {
+      const versions = readdirSync(root).map((name) => join(pattern.root, name))
+      const bound = planWritableLocations({ ...input, candidates: versions.map((sourcePath) => ({ sourcePath, kind: "directory" })) })
+      const installs = planWritableLocations({ ...input, candidates: bound.locations.flatMap((entry) => version[1]!.split("|").map((suffix) => ({ sourcePath: join(entry.sourcePath, suffix), kind: "directory" as const }))) })
+      writable.push(...installs.locations.map((entry) => ({ kind: "subpath" as const, value: entry.targetPath })))
+      excluded.push(...bound.excluded, ...installs.excluded)
+      continue
+    }
+    const escaped = root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    writable.push({ kind: "regex", value: `^${escaped}/${pattern.suffix}` })
+  }
+  return { rules: [...new Map(writable.map((rule) => [JSON.stringify(rule), rule])).values()], excluded: [...new Set(excluded)] }
+}
 
 export function planPackageManagerCaches(input: PackageManagerLocationInput & { truthPath: string; eligibility: WorkspaceDirectoryInput }) {
   const anchor = checkWorkspaceDirectory(input.eligibility, input.userDataPath)
@@ -176,6 +215,8 @@ export type ProcessFencePlan = {
 }
 
 export type PlanProcessFenceInput = {
+  homebrewFence: readonly Exclude<ConfigFenceRule, { kind: "dat-files" }>[]
+  userWritableLocations?: readonly ProcessFenceWriteRule[]
   packageManagerCaches?: readonly ProcessFenceWriteRule[]
   userDataPath: string
   /** createSidecarEnv() 的输出 —— XDG_* / HOME 从**这一份**取,它才是引擎将看到的 env。 */
@@ -211,12 +252,21 @@ export function planConfigFence(
   deps: Pick<PlanProcessFenceDeps, "realpath" | "mkdirp" | "lstat">,
 ): { configFence: ConfigFenceRule[]; configFenceRoots: string[]; unexpressed: string[] } {
   /** 残留 R11:写不进 profile(引号、反斜杠、控制字符)因而不被冻结 / 保护的路径,计划器记一行点名。 */
-  const unexpressed: string[] = []
   const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home, dataHome: input.roots.dataHome })
   const envFile = input.envFile ? resolve(input.envFile) : undefined
   // CF-9 那一条不预建(BR-07:应用从不建 `~/.opencode`;不存在时 subpath 规则照样挡住任何形式的新建)。按这一条跳过,不按路径串:
   // 用户把同一个目录指定为引擎全局配置目录(CF-8)时照常预建(审查 R1)
   for (const location of locations) if (location.kind === "subpath" && !location.neverCreate) deps.mkdirp(location.path)
+  return planProtectedLocations(locations, envFile, deps)
+}
+
+/** The same canonical/alias-node protection for CF and Homebrew installation identities. */
+export function planProtectedLocations(
+  locations: readonly ConfigFenceRule[],
+  envFile: string | undefined,
+  deps: Pick<PlanProcessFenceDeps, "realpath" | "lstat">,
+): { configFence: ConfigFenceRule[]; configFenceRoots: string[]; unexpressed: string[] } {
+  const unexpressed: string[] = []
   const target = (path: string) => {
     try {
       return deps.realpath(path)
@@ -404,7 +454,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   // DESIGN-stored-credentials-fence §4.5:存放点落到真实路径(userData 的真实路径求不出 ⇒ 抛 ⇒ 拒 fork)
   const credentialRules = planCredentialStores(input.credentialStores, deps)
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
+    { workspaces: union.selected, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)

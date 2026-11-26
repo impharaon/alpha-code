@@ -20,7 +20,7 @@ test.skipIf(process.platform !== "darwin")("fenced shell probes: interactive and
     const plan = planProcessFence({
       userDataPath: userData, sidecarEnv: { HOME: home },
       addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../../out/main"), exists: existsSync },
-      egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: join(home, ".config", "opencode"), credentialStores: [],
+      egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: join(home, ".config", "opencode"), homebrewFence: [], credentialStores: [],
     }, { homeDir: () => home, codepuppyGlobalRoot: () => join(state, "env", "dev"), appStateRoot: () => state, realpath: realpathSync.native, defaultWorkspace: () => project, readWorkspaces: () => [], isDirectory: (path) => statSync(path).isDirectory(), mkdirp: (path) => void mkdirSync(path, { recursive: true }), compile: trialCompileProfile, log: () => {} })
     const context: ShellProbeFenceContext = { profile: plan.profile, roots: { ...plan.roots, engineConfigDirectory: join(home, ".config", "opencode") }, env: {
       HOME: home, PATH: "/usr/bin:/bin:/usr/sbin:/sbin", XDG_CONFIG_HOME: plan.roots.configHome, XDG_DATA_HOME: plan.roots.dataHome, XDG_CACHE_HOME: plan.roots.cacheHome, XDG_STATE_HOME: plan.roots.stateHome, OPENCODE_CONFIG_DIR: join(home, ".config", "opencode"),
@@ -60,7 +60,7 @@ test.skipIf(process.platform !== "darwin")("fenced Go install directory query pr
   for (const dir of [home, project, state, userData]) mkdirSync(dir)
   try {
     const plan = planProcessFence({ userDataPath: userData, sidecarEnv: { HOME: home },
-      addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../../out/main"), exists: existsSync }, egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: join(home, ".config/opencode"), credentialStores: [],
+      addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../../out/main"), exists: existsSync }, egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: join(home, ".config/opencode"), homebrewFence: [], credentialStores: [],
     }, { homeDir: () => home, codepuppyGlobalRoot: () => join(state, "env/dev"), appStateRoot: () => state, realpath: realpathSync.native, defaultWorkspace: () => project, readWorkspaces: () => [], isDirectory: (p) => statSync(p).isDirectory(), mkdirp: (p) => void mkdirSync(p, { recursive: true }), compile: trialCompileProfile, log: () => {} })
     const context: ShellProbeFenceContext = { profile: plan.profile, roots: { ...plan.roots, engineConfigDirectory: join(home, ".config/opencode") }, env: { HOME: home, PATH: project, GOENV: join(home, "native-go-env") } }
     const sample = await Bun.file(new URL("../../test-fixtures/process-fence/go-env.json", import.meta.url)).json()

@@ -389,7 +389,7 @@ async function run() {
         roots,
         egressProxyPort: modelPort,
         configFence: fenceSet.configFence,
-        credentialStores: planCredentialStores(credentialStores({ userDataPath: engineData }), { realpath: (p) => realpathSync.native(p) }),
+        homebrewFence: [], credentialStores: planCredentialStores(credentialStores({ userDataPath: engineData }), { realpath: (p) => realpathSync.native(p) }),
       }),
       }
     },

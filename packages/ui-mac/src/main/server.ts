@@ -382,7 +382,7 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
       engineConfigDirectory: input.engineConfigDirectory,
       ...(input.envFile ? { envFile: input.envFile } : {}),
       // DESIGN-stored-credentials-fence §4.5:C1 的存放点与 T1 / P / T2 的表同一份清单
-      credentialStores: mainCredentialStores(input.userDataPath),
+      homebrewFence: [], credentialStores: mainCredentialStores(input.userDataPath),
     },
     {
       homeDir: () => roots.home,

@@ -192,7 +192,7 @@ async function machine() {
       egressProxyPort: gateway.port!,
       carriedWorkspaces: [],
       engineConfigDirectory: host.slot.configDirectory,
-      credentialStores: credentialStores({ userDataPath: userData, officialRuntimeParent: runtimeParent }),
+      homebrewFence: [], credentialStores: credentialStores({ userDataPath: userData, officialRuntimeParent: runtimeParent }),
     },
     {
       homeDir: () => home,

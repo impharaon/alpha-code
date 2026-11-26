@@ -251,7 +251,7 @@ function planFor(t: ReturnType<typeof tree>, options: { userData?: string; envFi
       egressProxyPort: 59999,
       carriedWorkspaces: [],
       engineConfigDirectory: join(config, "opencode"),
-      credentialStores: credentialStores({ userDataPath }),
+      homebrewFence: [], credentialStores: credentialStores({ userDataPath }),
       ...(options.envFile ? { envFile: options.envFile } : {}),
     },
     {
@@ -362,7 +362,7 @@ beforeAll(() => {
       egressProxyPort: 59999,
       carriedWorkspaces: [],
       engineConfigDirectory: cfgDir,
-      credentialStores: credentialStores({ userDataPath: userData }),
+      homebrewFence: [], credentialStores: credentialStores({ userDataPath: userData }),
     },
     {
       homeDir: () => home, codepuppyGlobalRoot: () => env, appStateRoot: () => state, realpath: (path) => realpathSync.native(path),

@@ -127,7 +127,7 @@ describe("InstructionDiscovery", () => {
         })
         const discovery = yield* start()
         const files = yield* discovery.list()
-        expect(Array.isArray(files) ? files.filter(file => file.source).map(file => file.source) : []).toEqual(paths.slice(0, 4).map((file, index) => ({ sourcePath: file, scope: ["Project", "Local", "Project", "User"][index] })))
+        expect(Array.isArray(files) ? files.filter(file => file.source).map(file => file.source) : []).toEqual(paths.slice(0, 4).map((file, index) => ({ sourcePath: file, scope: (["Project", "Local", "Project", "User"] as const)[index]! })))
         expect(Array.isArray(files) ? files.find(file => file.path === paths[4])?.source : undefined).toBeUndefined()
       }).pipe(Effect.provide(instructionLayer({ home, config, instructions: paths, locationServiceLayer: Layer.succeed(Location.Service, location(Location.Ref.make({ directory: AbsolutePath.make(project) }))) })))
     })),

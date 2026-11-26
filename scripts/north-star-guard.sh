@@ -193,6 +193,11 @@ UPSTREAM_EXCLUDES=(
   # S-05 r16: optional provenance in the native value/codec, with its existing module proof.
   ':(exclude)packages/core/src/instruction-discovery.ts'
   ':(exclude)packages/core/test/instruction-discovery.test.ts'
+  ':(exclude)packages/core/src/config/plugin/instruction.ts'
+  ':(exclude)packages/core/src/session/instruction-state.ts'
+  ':(exclude)packages/core/src/session/instructions.ts'
+  ':(exclude)packages/core/test/instruction-state.test.ts'
+  ':(exclude)packages/core/test/session-instructions.test.ts'
   ':(exclude)packages/core/src/config/plugin/agent.ts'
   # INT-safety I-13 L2 / DESIGN-engine-config-fence D16(owner 2026-11-20 经编排器转达:「两件都同意」):会话行上的规则只有 deny 参与。
   # 会话上下文在 select 内部把会话行并进决定本次请求有哪些工具、技能与连接器说明的规则,插件钩子在那之后才拿到工具表,改不了这次合并;

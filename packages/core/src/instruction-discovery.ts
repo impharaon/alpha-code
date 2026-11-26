@@ -20,7 +20,7 @@ export class File extends Schema.Class<File>("InstructionDiscovery.File")({
 }) {}
 
 const Files = Schema.Array(File)
-const key = Instructions.Key.make("core/instructions")
+export const key = Instructions.Key.make("core/instructions")
 
 export const Event = {
   Updated: Bus.ephemeral({ type: "instruction-discovery.updated", schema: {} }),

@@ -590,7 +590,18 @@ export async function registerPackageHooks(
       const blocked = results.find(result => result.block && result.valid())
       return { apply: change.source === "policy_settings" || !blocked, ...(blocked?.text ? { reason: blocked.text } : {}) }
     },
-    instructionsLoaded: async () => {},
+    instructionsLoaded: async event => {
+      await run("InstructionsLoaded", event.sessionID, {
+        file_path: event.filePath,
+        memory_type: event.memoryType,
+        load_reason: event.loadReason,
+        ...(event.globs ? { globs: event.globs } : {}),
+        ...(event.triggerFilePath ? { trigger_file_path: event.triggerFilePath } : {}),
+        ...(event.parentFilePath ? { parent_file_path: event.parentFilePath } : {}),
+        ...(event.agentId ? { agent_id: event.agentId } : {}),
+        ...(event.parentSessionId ? { parent_session_id: event.parentSessionId } : {}),
+      })
+    },
     async beforeCompaction(input) {
       const results = await run("PreCompact", input.sessionID, { trigger: input.trigger, custom_instructions: input.customInstructions })
       const blocked = results.find(result => result.block && result.valid())

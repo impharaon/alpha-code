@@ -1,7 +1,7 @@
 ---
 id: PLAN-secrets-usable-not-visible
 title: 密钥文件程序可用、助手不可见 实施计划
-summary: 列明五个交付段，细化共享保护规则段的文件、顺序和证明，并记录该段快测及移除对照证据。
+summary: 列明五个交付段，保留共享规则段的实施证据，细化 Location 采集与通用工具收口段的文件、顺序和证明。
 kind: plan
 status: active
 spec: SPEC-secrets-usable-not-visible
@@ -12,7 +12,7 @@ last_reviewed: 2026-11-26
 
 # PLAN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 实施计划
 
-本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；当前只展开第一段。第一段实际检查见下方实施收据，完整真引擎行为验收仍在⑤。
+本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；当前已展开①②。第一段实际检查见下方实施收据，完整真引擎行为验收仍在⑤。
 
 ## 交付段落
 
@@ -97,3 +97,64 @@ AC-02、03、05、08、09 本段不触及执行路径，其证据责任已列在
 ### 偏离记录
 
 2026-11-26 · 无文件范围、交付顺序或冻结决定偏离。落实细节为导出共享 `isCredentialName`，让后续 credential-document 字段采集与公开值判定不重复秘密词逻辑；未更改冻结四个入口。索引按原计划在本次①补入，PLAN 提交仍只有 plan.md。
+
+## ② Location 采集与通用工具收口
+
+- 依据：[规格 v3](spec.md) @ `aa2476b378da663115e6735b991f6cbf2e04b5c6`，BR-01/03/04/06/07、AC-02/04/06/08/10 的采集与通用结果处理部分；[冻结设计](design.md) @ `66313542d35b182ef8fdbd2d4c4597d715149c35` §4.1、§4.3、§4.3.1 的预览出口、§4.5 的非 shell 出口、§4.7、§5、§6、§10。① @ `1b35e096a5004cfb41c830bc559c76109d6777c0` 已由 Claude Opus 5.5（orchestrator）在 r2 续派单接受，继承规则/路径/公开值与八个移除对照结论；不重新审查。#1758；本段读码基线同①提交。
+- 核对：待编排器核对；首个②实施提交从续派单 `Phase:` 行填写计划提交、核对者/模型及结论。
+
+本段不实现 read 分流、env 写回、目录审批例外、风险器迁移或 Shell.capture；分别留③④。SecretMask 只落本段需要的能力，不为后续方法加空实现、透传或关闭开关。根事实先可供③消费；不在②放宽权限。以下均为实施安排，尚未执行本段测试。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ext/src/secret-values.ts`（新增） | profile 对应的静态文本/结构化字段提取和 env 词法记录。消费 Schema 的 `CredentialFields`、`isCredentialName`、`isPublicValue`，保留 env 键出现序号与原 RHS 跨度，供③直接复用；不在解析器内发现文件或另持名单。 |
+| `packages/ext/src/secret-files.ts`（新增） | Location 来源发现、词法/realpath 归类、真实身份去重、文件/目录五元组缓存、主库及 WAL/SHM 变化检测、只读 SQLite 单元格投影；保留缺失根的现存父目录观察点。文件材料留在本进程，不改来源文件。 |
+| `packages/ext/src/secret-mask.ts`（新增） | 创建 Location 私有 SecretMask，拥有 retained values、根调用状态、结果/错误/进度/预览的共同投影，以及通用文本/字节替换的唯一实现。③接安全 read/写回、④增量流处理时扩展本实现，不另写第二个 matcher。包含本段 tool.transform 的进度包装。 |
+| `packages/ext/src/secret-values.test.ts`、`secret-files.test.ts`、`secret-mask.test.ts`（新增） | 各新模块自己的 fast / 文件系统及 SQLite integration 用例；不添加票号文件、场景副本或规模/时序测量。 |
+| `packages/ext/src/fixtures/secret-files/`（新增小样本） | 实际工具 writer、现成官方样本或设计 §2 已固定官方源码生成的最小格式样本。每份附工具版本、来源链接/源码位置、哈希及仅替换假值的说明，存在测试数据注释或测试的 provenance 表中；不新增说明 Markdown，不采用户 HOME。 |
+| `packages/ext/src/policy/index.ts` | 在现有 registerPolicy / seal 中创建并消费 SecretMask：尾部 before 的 confirm/pin 后 begin，尾部 after 的所有归因/display 之后收口；同次 tool.transform 先沿用 display，再包安全进度；seal 尾部处理权限预览。既有 PolicyRegistration 增加私有清理函数，供 plugin 的现有 cleanup 使用。 |
+| `packages/ext/src/plugin.ts` | 把上述清理接入现有 Location cleanup，保持 registerPolicy 首个 await、seal 最后一个 await；既有云输出校验及错误改写仍在安全终态收口之前。 |
+| `packages/ext/src/policy/register-policy.test.ts` | 在现成真实插件宿主/注册表中补接线用例，包括共享 ID 的根 execute 与多个/并发 child、拒绝发生在 begin 前、后续 hook 改写、进度和终态顺序、权限预览。只验组件接线，不在本文件增加完整模型会话场景。 |
+| `packages/ext/src/plugin-setup-order.cases.ts`、`plugin-setup-order.test.ts` | 更新现有 policy mock 的清理返回值及原 setup/cleanup 断言；仍由现有子进程宿主执行，避免模块 mock 污染。 |
+| `docs/architecture/modules.md`、`docs/README.md`、本 `plan.md` | 实施时仅补 Ext 的材料/投影权威文件、生成器对应索引行和本段核对/偏离/检查收据；不修前段已记录的仓级文档问题。本次 PLAN 只提交 plan.md。 |
+
+不改 Schema 第①段已接受的规则、Core/Plugin/Protocol/Server、公用 schema、包依赖或 gate。文件内普通私有 helper 由实施决定，不另建单实现 interface 或解析框架。
+
+### 顺序
+
+1. **采集基础提交**：先做 `secret-values`、`secret-files` 及各自测试/真实小样本。根事实从 `Location.Info` 的目录/项目信息、Node 宿主目录与已冻结路径变量取得；global project 用打开目录，项目 ID 不作路径，不 import Electron main 私有实现。sources/match/profile/字段选择只消费①。静态格式解析不执行 shell、标签、插值或外部引用；解析失败按设计失败出口处理，不退回全文秘密。env 使用 Node parseEnv 并保存逐次词法记录；JSON/INI/assignments/netrc/凭据 URL、私钥与不透明字节按各自 profile 提取。SQLite 用 Node 内建只读主库连接、固定发布表/列，完成即关闭。
+2. 同一提交验证变化发现：先按 sources 发现，在其范围内按真实身份结束链接环；每个已知目录/文件独立 stat，变化目录逐层 readdir，新子目录/新来源首次发现，缺失根观察点随父目录变化前进。纯缓存键表验证五元组每一轴；真实临时目录验证原地改写、替换、新建/消失、嵌套目录变化、显式路径例外及 WAL 提交。缓存调用次数仅作一次临时探针证据，不增加生产统计接口，不用 watcher/TTL/数量上限。缺失/不可读来源不抹去 retained values，后续调用仍能重新发现。
+3. **结果投影提交**：实现 `secret-mask` 的 Location 与根调用状态，以及成功 content/output/metadata、Tool.Error、progress 和预览共用的安全投影。按冻结 §4.5 处理重叠值、数字/动态键、键碰撞、内联文本/二进制附件、受保护文件引用；保留协议结构。ANSI 只窄引用现成 `stripAnsi`；不复制正则。完整结果的替换归本模块，④的流式前缀适配继续复用它。故障用 Schema 固定说明，不重调故障 masker，不把异常原文或 cause 带回。
+4. **接线提交**：SecretMask 在 registerPolicy 每 Location 创建；seal 的尾部 before 在确认/pin 后才 begin。after 放在现有归因和显示附加之后，并在根结束时清理该根；child 只重读/遮盖自己，不建立、结束或污染 outer。进度包装覆盖无 display 的工具，保存根的最后进度及原发布回调；结束集合重新投影后，使现有 publisher 合并到的也是安全终态（必要的最后一次安全进度仍走原 context.progress），避免旧动态正文/键经 failureSnapshot 复活。Code Mode 故障终态的 toolCalls 按设计清空。权限预览在发布前共用正文投影，保留原 effect；无工具来源的预览不伪造调用键，也不创建根事务。plugin 释放时清掉 Location 私有材料，保持原注册次序。
+5. 每提交单元迭代时只跑本步命名用例，例如在 `packages/ext` 执行 `bun test src/secret-values.test.ts -t 'published profiles collect credential values'`、`bun test src/secret-files.test.ts -t 'changed sources retain old values and discover new files'`、`bun test src/secret-mask.test.ts -t 'terminal masking replaces every dynamic payload'`、`bun test src/policy/register-policy.test.ts -t 'masking begins after pin and children keep the outer call'`。每步结束完整跑本步改变行为的上述文件一次；接线步另跑 `src/plugin-setup-order.test.ts`。移除臂只在临时副本，分别去掉字段选择/变化发现、结果投影、故障替换、根/child 区分及预览遮盖，断言对应命名用例变红，不加生产注入开关。
+6. 返回前仅一次扩大相关集。用 `rg -n 'registerPolicy|wrapForDisplay|mock\.module' packages/ext/src` 核对出口变化的调用/mock/枚举消费者；当前应检查 `src/policy/display.test.ts`、`src/policy/unattended-policy.test.ts`、`src/policy/inventory.test.ts`、`src/policy/risk.test.ts`、`src/policy/session-row-rules.test.ts`、`src/policy/tool-policy-rpc.test.ts`、`src/plugin-host.test.ts` 和 `src/plugin-setup-order.test.ts`（已完整跑过的不重复）。只运行与实际改动相连的文件，报告筛选结果；若现成 mock 因新增清理返回值需要同步，限定于该关联文件并在偏离行列名。`bun typecheck` 与对改动 TS 的 `bunx --no-install oxlint <实际文件列表>` 从 `packages/ext` 执行；新增 Node SQLite 的测试须执行真实 Node 路径，不能让 Bun 的替代实现冒充。无需启动 app/Electron。
+7. 补必要文档及核对/偏离，按已解析 Alpha profile 检查改动文档、当前新增链接、`git diff --check`，提交并停止于②。不运行包级测试、bin/check、gate run、一分钟命令或全消费者真引擎场景。
+
+样本落实：优先复用冻结设计 §2 的 gcloud 594.0.1 官方源码及实测 DDL（源码包 SHA-256 `f3d680f1d2bcf89b575bbba309305f2d897236d19b82e7d78462cf632ee2252d`）；现有临时目录 `secrets-gcloud-source-nnq2qb0l` 仍有 `creds.py`/源码包，可核哈希后从官方列定义生成库。AWS/npm/kubectl/SSH 的格式样本用各自工具在隔离 HOME/显式输出文件中产生；其它 profile 用设计 §4.1/4.2 的一手 writer/固定样本，实施时记录版本与哈希。只替换进程生成的假值，保留真实语法/字段/DDL，不手写另一系统的格式。不执行云登录、联网获取凭据或读取用户库。Node SQLite 子进程可以临时 bundle 本段生产模块后调用；报告实际 Node 版本，不把它当作出货 Electron 或 Windows 证明。
+
+### 风险
+
+- 格式数量多，错误字段提取可能漏值或把 `json`、账户、到期时间等普通值污染成秘密。先固定小样本来源和字段投影，再接 IO；每个发布 profile 有正例及普通字段保留例，未知/损坏结构不能退回整文匹配。
+- 缓存与符号链接若漏看目录、新根或 WAL，会使结果使用旧集合。用文件/目录变化和只读主库集成用例约束；保留旧值与重新发现分开验证。只验证本机 darwin IO，Windows 身份/junction 仍按原⑤/发布安排。
+- 相同调用键的 child、并发根及 Location reload 可能互相清状态或串值。以真实 hook/registry 接线证明根 begin/end 次数和 child 结果，而不是给 child 造新 ID；清理只销毁本 Location，根故障不传染其它根。
+- 删除 error.metadata 并不足以隐藏故障正文；已有 publisher 会合并最后 progress。接线用例必须检验实际终态合并输入，结束重投影与安全覆盖发生在终态发布前。保留真实工具错误类型与宿主可信状态，不信工具自报的“成功/退出码”。
+- hooks 的错误不能导致原工具/程序被中断，预览遮盖也不能改审批结局。测试包含 begin 采集失败后执行计数仍增长、单 child 故障后兄弟继续、preview 的 allow/ask/deny 原值不变；不以新增拒绝、确认、限额或停执行解决失败。
+
+### 证明
+
+| AC / 本段义务 | 命名测试/证据 | 缺少行为为什么会失败 / 完整证明去向 |
+| --- | --- | --- |
+| AC-02、04 的通用结果面 | `secret-mask.test.ts`：`terminal masking replaces every dynamic payload`；`attachments are checked as decoded bytes` | 移除投影时，text/output/metadata/动态键/附件或错误因果中的生成值仍可见；真正 shell、SSH、模型/记录/卡片的交叉证明留④⑤。 |
+| AC-04、06 的来源基础 | `secret-files.test.ts`：`changed sources retain old values and discover new files`、`source aliases share protected identity` | 去掉变化发现、来源匹配或真实身份去重，会漏新文件/原地写或不能结束链接环；read/结果/风险三消费者联合留③⑤。 |
+| AC-10、BR-06 | `secret-values.test.ts`：`published profiles collect credential values`、`env records preserve every assignment occurrence`；`secret-files.test.ts`：`sqlite captures selected cells through a read-only main database` | 删除凭据字段/列或误采整文，会漏假值或遮掉普通值；替换为末值 map 会丢重复键的较早值。真实格式/DDL 来源一并记录；混合命令真引擎对照留④⑤。 |
+| AC-08 的通用隐藏义务 | `secret-mask.test.ts`：`masking failure hides payload without stopping execution`；`register-policy.test.ts`：`terminal failure cannot revive the last progress` | 移除隐藏分支会返回原文/旧进度；把故障向 gate 抛出会使原工具未执行。真实 shell exit/signal/timeout 及各消费者故障注入留④⑤。 |
+| BR-03 的根/child 与进度接线 | `register-policy.test.ts`：`masking begins after pin and children keep the outer call`、`progress and preview are masked before publication` | 提前 begin、child end 外层、只在 after 遮盖或遗漏预览，分别使拒绝调用有状态、第二个 child/最终结果漏遮或运行/审批数据含值；预览效果改变也判失败。AC-09 的 shell 直播留④⑤，不在②跑一分钟时序。 |
+| BR-04、Location 释放 | `secret-files.test.ts`：`capture leaves source files unchanged`；`secret-mask.test.ts`：`locations and root failures stay independent`；既有 setup-order 宿主 | 写来源文件、跨 Location 保留/清理错误或泄漏根状态会改变原文件/另一调用结果。清理后再建 Location 不继承旧材料；程序发送真值的 AC-03 和 env 写回仍留③④⑤。 |
+
+AC-01/05/07 的完整 read/权限/Windows 证明不在②宣告完成。去掉保护的可失败对照为本段局部证据，不能代替⑤的真引擎对照。
+
+### 偏离记录
+
+暂无。PLAN 只追加本段及同步本文件摘要/导语，不修改①的实施收据，不变更冻结决定；索引等文档写入留②实施。

@@ -1,5 +1,5 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
-import { afterAll, afterEach, expect, test } from "bun:test"
+import { afterAll, afterEach, expect, spyOn, test } from "bun:test"
 import appPlugin from "@opencode-ai/app/vite"
 import { build } from "vite"
 import { mkdtempSync, rmSync } from "node:fs"
@@ -56,8 +56,8 @@ test("真实 main 批准在两个对话渲染同一未知来源卡片，拒绝�
   a.querySelector<HTMLElement>('[data-network-egress-decision="deny"]')!.click()
   expect(await request).toBe("user-denied")
   await flush()
-  expect(a.textContent).toContain("这次连接已被拒绝")
-  expect(b.textContent).toContain("这次连接已被拒绝")
+  expect(a.querySelectorAll("[data-network-egress-request]")).toHaveLength(0)
+  expect(b.querySelectorAll("[data-network-egress-request]")).toHaveLength(0)
 })
 
 test("记住范围直接显示主域与端口语义，保存失败仍在已允许卡片明确显示", async () => {
@@ -89,4 +89,21 @@ test("提交档位绑定真实 main，远端和没有围栏的界面不发送联
   disposers.push(runtime.render(() => runtime.createComponent(runtime.SessionNetworkEgressCards, { identity: () => ({ serverKey: "http://127.0.0.1:1234", directory: "/project", sessionID: "ses_a" }) }), host))
   await flush()
   expect(host.querySelector("[data-network-egress-cards]")).toBeNull()
+})
+
+
+test("档位上报失败只记录日志，提交可以继续且 main 保持 unknown", async () => {
+  const f = await fixture()
+  const report = spyOn(f.service.api, "setTier")
+  const warning = spyOn(console, "warn").mockImplementation(() => {})
+  Object.defineProperty(window, "api", { configurable: true, value: { awaitInitialization: async () => ({ url: "http://127.0.0.1:1234" }), networkEgress: f.service.api } })
+  runtime.setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+  try {
+    report.mockResolvedValueOnce({ ok: false, code: "unavailable" })
+    await expect(runtime.setSessionNetworkTier({ directory: "/project", sessionID: "ses_a" }, "allow")).resolves.toBeUndefined()
+    report.mockRejectedValueOnce(new Error("IPC unavailable"))
+    await expect(runtime.setSessionNetworkTier({ directory: "/project", sessionID: "ses_a" }, "allow")).resolves.toBeUndefined()
+    expect(await f.activity.tier({ generation: 1, directory: "/project", sessionID: "ses_a" })).toBe("unknown")
+    expect(warning).toHaveBeenCalledTimes(2)
+  } finally { report.mockRestore(); warning.mockRestore() }
 })

@@ -19,3 +19,13 @@ test("站点范围与托管租户隔离：PRIVATE、通配、例外与 IDNA", ()
   }
   expect(siteContains(siteForHost("食狮.com.cn"), "a.xn--85x722f.com.cn")).toBe(true)
 })
+
+
+test("记住平台根站点不覆盖 PSL PRIVATE 租户", () => {
+  const platform = siteForHost("sts.amazonaws.com")
+  expect(platform).toEqual({ kind: "domain", value: "amazonaws.com" })
+  expect(siteContains(platform, "sts.amazonaws.com")).toBe(true)
+  expect(siteContains(platform, "amazonaws.com")).toBe(true)
+  expect(siteForHost("victim.s3.amazonaws.com")).toEqual({ kind: "domain", value: "victim.s3.amazonaws.com" })
+  expect(siteContains(platform, "victim.s3.amazonaws.com")).toBe(false)
+})

@@ -3,7 +3,7 @@ import { createNetworkEgressActivity } from "./network-egress-activity"
 import { createNetworkEgressApproval } from "./network-egress-approval"
 import type { EgressApproval, NetworkActivity, NetworkOutbound, RememberedSite, SessionRef } from "../shared/network-egress-wire"
 
-export async function approvalFixture(options: { timeoutMs?: number; unreadable?: boolean } = {}) {
+async function approvalFixture(options: { timeoutMs?: number; unreadable?: boolean } = {}) {
   const activity = createNetworkEgressActivity()
   const messages: NetworkOutbound[] = []
   const replies = new Map<number, () => void>()
@@ -137,4 +137,32 @@ test("保存失败只给精确临时授权，撤销失败保持内存撤销且�
     expect(await request).toBe("granted")
     expect(bad.store.read()).toEqual({ ok: false, reason: "bad file" })
   } finally { bad.service.close() }
+})
+
+
+test("已决结果读取一次后退休，重复点击仍取原回执，后续卡片不积累历史", async () => {
+  const f = await approvalFixture()
+  try {
+    const first = f.service.request("a.example.com", 443)
+    const card = (await f.cards())[0]!
+    const receipt = await f.service.api.decide({ requestID: card.requestID, decision: "deny" })
+    expect(await first).toBe("user-denied")
+    expect(await f.service.api.decide({ requestID: card.requestID, decision: "allow-session" })).toEqual(receipt)
+    expect((await f.cards()).map((item) => item.state)).toEqual(["resolved"])
+    expect(await f.cards()).toEqual([])
+    expect(await f.service.api.decide({ requestID: card.requestID, decision: "allow-session" })).toEqual({ ok: false, code: "not-found" })
+    const next = f.service.request("b.example.com", 443)
+    expect((await f.cards()).map((item) => item.destination.host)).toEqual(["b.example.com"])
+    f.service.close()
+    await next
+  } finally { f.service.close() }
+})
+
+test("准入失败的回环与私网只保留原拒绝通路，不向活动会话发等待说明", async () => {
+  const f = await approvalFixture()
+  try {
+    for (const host of ["127.0.0.1", "10.0.0.1"]) expect(await f.service.request(host, 443)).toBe("not-asked")
+    expect(await f.cards()).toEqual([])
+    expect(f.messages.filter((message) => message.type === "codepuppy.network.notice")).toEqual([])
+  } finally { f.service.close() }
 })

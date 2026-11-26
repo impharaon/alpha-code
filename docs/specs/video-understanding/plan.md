@@ -131,7 +131,7 @@ last_reviewed: 2026-11-26
 ## D2 完整本机处理与持久结果
 
 - 依据：impharaon/alpha-work:SPEC-video-understanding v1 @ `25afeda6285b66b3de9d83531fa2e5a6cafa468f`；视频设计 §4.1/§4.2（库与已准备组件的消费边界）/§4.3/§5/§6 D2/§10 @ `870002ed698f1a83efa9d6ecb359ea5a0d0d41af`；alpha-code#1775 r2 续派。覆盖 AC-01/03/04/05/06/08/09/10/11/12/14/16 的本机段，AC-07 的 OCR producer、AC-13 的本机片段准备、AC-17 的跨平台处理段；AC-15/18 的组件分发与许可仍归 D3。
-- 核对：待编排器核对本节计划提交；D2 首笔 IMPLEMENT 提交从续派 `Phase:` 填入计划 commit、核对方/模型及结论，本阶段不自填通过。
+- 核对：Phase: IMPLEMENT — `129df72433` · Claude Opus 5.5（orchestrator）· D2 plan accepted：文件、顺序、风险、样本来源和逐 AC 证明通过；实际组件仅消费 pin 准备结果，缺少的样本/测量不宣称通过。
 
 本节读码基线为 `31d4cacaf0`。r2 已接受 D1 三个提交所覆盖的附件/metadata/读取指令；上述 D1 记录保留为历史证据。`FIRST-PARTY-NODE-v2.1` 仍在审查，本节不把它写成已冻结或已实现，也不改 D1 的待集成断言。D2 可先实现/验证独立的本机处理模块，不等待 L1 handler 或平台云实现；真实组件取得与 MCP 宿主集成证据分别在 D3、D1 接线后完成。
 
@@ -223,3 +223,11 @@ last_reviewed: 2026-11-26
 ## D5 平台视频理解桌面接线
 
 待本片 PLAN 展开；范围、AC 和依赖见总览，实施依据为视频设计 §4.4/§4.5/§5/§6 D5。平台契约只消费 producer 固定产物，不在桌面定义副本。
+
+### r3 D1 接缝续接记录
+
+2026-11-26 · 消费 FIRST-PARTY-NODE-v2.1 @ origin/alpha `a586b16fca`，已 fetch/read，未 merge/rebase。新增同一 manifest 的 video 条目、Node 服务源码/构建资源和自动注入消费点；首项仅 `{codepuppyNode}`，不实现展开、matcher、resolveAssets 或重锚。当前 producer 尚未提供 launchers/expandFirstPartyCommand，消费点保持未就绪、不回退解释器；#1760 集成后才核实际自动注入、冷 Node 身份/准备和已持久条目重锚，断言 pending。
+
+构建复用仓内已锁定的 MCP SDK 2.3.1 与 zod，ui-mac 仅增加直接构建依赖声明，bun.lock 仅三条 workspace 声明变化；未引入新版本。新增 `.gitignore` 的 dist-video 规则与 `scripts/prebuild.ts` 构建接线为必要同一调用链文件。清单保留未改的现有 Office producer，#1760 的 v2 producer schema 转换仍归其拥有者，不在本票添加旧版本解析分支。
+
+`bun test src/main/codepuppy-config-injection.test.ts` 在组合运行中通过；服务/快照初测暴露 SDK 高层类无 setRequestHandler，改用其真实 Server 后，`bun test src/main/video-service.test.ts src/main/office-mcp-tools-snapshot.test.ts` 为 4 pass / 0 fail。实际 SDK InMemoryTransport 往返列出同一 schema，未准备工具不冒充执行成功。`bun typecheck` exit 0；服务源码将随 D2 纳入显式类型检查。

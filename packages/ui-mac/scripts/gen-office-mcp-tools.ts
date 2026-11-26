@@ -14,6 +14,8 @@ import { createHash } from "node:crypto"
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { videoToolDefinitions } from "../resources/video-mcp/contracts"
+import { VIDEO_SERVICE_COMMAND } from "../src/shared/video-service"
 import { CODEPUPPY_OFFICE_CONNECTORS, codepuppyOfficeInstallCommand } from "../src/shared/office-advisories"
 
 const OFFICE_MCP_DIR = join(import.meta.dir, "..", "resources", "office-mcp")
@@ -43,7 +45,8 @@ export function renderOfficeMcpTools(server: string = OFFICE_MCP_SERVER): string
   const manifest = {
     serverSha256: createHash("sha256").update(readFileSync(server)).digest("hex"),
     formats: Object.fromEntries(
-      formats.map((format) => [format, { command: codepuppyOfficeInstallCommand(format), tools: tools[format] }]),
+      [...formats.map((format) => [format, { command: codepuppyOfficeInstallCommand(format), tools: tools[format] }]),
+        ["video", { command: VIDEO_SERVICE_COMMAND, environment: {}, cwd: null, codeSha256: { "video-mcp/server.js": createHash("sha256").update(readFileSync(join(OFFICE_MCP_DIR, "../../dist-video/server.js"))).digest("hex") }, tools: videoToolDefinitions() }]],
     ),
   }
   return `${JSON.stringify(manifest, null, 2)}\n`

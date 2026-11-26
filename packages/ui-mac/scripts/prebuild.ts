@@ -4,6 +4,8 @@ import { $ } from "bun"
 import { resolveChannel } from "./utils"
 
 const channel = resolveChannel()
+await $`bun ./scripts/build-video-mcp.ts`
+await $`bun ./scripts/gen-office-mcp-tools.ts`
 await $`bun ./scripts/copy-icons.ts ${channel}`
 await $`bun ./scripts/copy-metainfo.ts ${channel}`
 

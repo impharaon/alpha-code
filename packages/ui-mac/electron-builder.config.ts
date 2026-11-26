@@ -130,6 +130,10 @@ const getBase = (appId: string): Configuration => ({
     {
       // REQ-133:四格式 Code Puppy stdio MCP 共用的一份 Python server。catalog 命令中的
       // {codepuppyResources} 由 main 替换为 process.resourcesPath,不让 renderer 猜 app 路径。
+      from: "dist-video/",
+      to: "video-mcp/",
+    },
+    {
       from: "resources/office-mcp/",
       to: "office-mcp/",
     },

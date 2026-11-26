@@ -26,7 +26,8 @@
     "package:win": "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ electron-builder --win --x64 --publish never --config electron-builder.config.ts",
     "install:local": "bun ./scripts/install-local.ts",
     "ship:mac": "bun run build && bun run package:mac && bun run install:local",
-    "ship:windows": "bun run build && bun run package:win"
+    "ship:windows": "bun run build && bun run package:win",
+    "build:video": "bun ./scripts/build-video-mcp.ts"
   },
   "dependencies": {
     "@codepuppy/contracts-consumer": "workspace:*",
@@ -50,6 +51,8 @@
     "@effect/platform-node": "catalog:",
     "@happy-dom/global-registrator": "20.0.11",
     "@lydell/node-pty": "catalog:",
+    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/server": "2.3.1",
     "@opencode-ai/app": "workspace:*",
     "@opencode-ai/client": "file:../codepuppy-app/vendor/opencode-ai-client-1.17.13-v2.tgz",
     "@opencode-ai/sdk": "workspace:*",
@@ -83,6 +86,7 @@
     "typescript": "~5.6.2",
     "vite": "catalog:",
     "vite-plugin-solid": "catalog:",
+    "zod": "catalog:",
     "zod-openapi": "5.4.6"
   },
   "optionalDependencies": {

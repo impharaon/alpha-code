@@ -47,3 +47,6 @@ tsconfig.tsbuildinfo
 
 # Legal drafts pending review are kept outside the repository; never copy them in.
 legal-drafts-private/
+
+# Bundled video service build output
+/packages/ui-mac/dist-video/

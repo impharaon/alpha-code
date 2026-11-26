@@ -167,6 +167,7 @@ function run(packageDir: string, files: string[], names: readonly string[]): Cas
 
 export function upstreamReds(
   file: keyof typeof KNOWN_RED,
+  title: string,
   group?: "command-forms" | "bash-approvals" | "zsh-approvals",
 ) {
   // The shell approval cases each wait for their expected timeout; distribute those waits across hosts.
@@ -174,21 +175,25 @@ export function upstreamReds(
     (name) =>
       !group ||
       (group === "command-forms"
-        ? !name.endsWith("reuses existing approvals")
+        ? !(name.endsWith("reuses existing approvals") && (name.startsWith("bash:") || name.startsWith("zsh:")))
         : name.endsWith("reuses existing approvals") && name.startsWith(group === "bash-approvals" ? "bash:" : "zsh:")),
   )
   describe("[packages/core/src/permission.ts codepuppy(I-05, I-13 L1)] upstream tests that assert a project-level always write or a saved approval's effect are red by design", () => {
-    test("the pinned upstream cases in those three files are present and red", () => {
-      const packageDir = path.dirname(path.dirname(file))
-      const cases = run(packageDir, [path.relative(packageDir, file)], names)
-      const missing: string[] = []
-      const passing: string[] = []
-      for (const name of names) {
-        const found = cases.find((item) => item.file === file && item.name === name)
-        if (!found) missing.push(`${file} › ${name}`)
-        else if (!found.failed) passing.push(`${file} › ${name}`)
-      }
-      expect({ missing, passing }).toEqual({ missing: [], passing: [] })
-    }, 240_000)
+    test(
+      title,
+      () => {
+        const packageDir = path.dirname(path.dirname(file))
+        const cases = run(packageDir, [path.relative(packageDir, file)], names)
+        const missing: string[] = []
+        const passing: string[] = []
+        for (const name of names) {
+          const found = cases.find((item) => item.file === file && item.name === name)
+          if (!found) missing.push(`${file} › ${name}`)
+          else if (!found.failed) passing.push(`${file} › ${name}`)
+        }
+        expect({ missing, passing }).toEqual({ missing: [], passing: [] })
+      },
+      240_000,
+    )
   })
 }

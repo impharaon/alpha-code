@@ -305,3 +305,111 @@ M1–M3 本次整包的具名记录（去向：编排器的机器条件处置，
 - 实际运行注册另验：`packages/ext` 下 `bun test /tmp/plugin-package-plan.4YRctl/verify-runtime.test.ts`，1 pass / 0 fail、92 assertions；最终代码实际注册 S1 7、S4 12、S3 15、S2 1，共 35 个 Skill.Info，path 均在各自 installed tree，S1/S4 的实际兄弟链接可读，S2 两变量实际指到本包/本技能。来源移走/脚本用途与全包回放集中作一次性证据，常驻套件保留最小文件树、跨技能资源及运行注册回归，避免把该整段场景常驻到 PR 层；这是验证落点相对原表的调整。日志和可复核副本留在上述临时目录，未作为仓库运行依赖。
 - 返回前较宽集只运行一次：在 `packages/ui-mac` 用 `bun test` 执行 `package-child-kind.fast.test.ts`、`package-update.test.ts`、`package-admission.parity.test.ts`、`engine-explicit-config.test.ts`、`ext-cas-gc.test.ts`、`ext-transaction-config.test.ts`、`ext-transaction-file.test.ts`、`ext-transaction-prepared.test.ts`、`ext-receipt-v2.test.ts`、`ext-skill-generations.test.ts`、`ext-package-lifecycle.test.ts`、`ext-package-lifecycle-permutations.test.ts`、`hub-view.test.ts`（均在 `src/main`），282 pass / 2 fail。两项失败都把本次新增的 bundle 当未知 kind；同提交同步这两项旧事实断言（未知 kind 的拒绝仍保留），只重跑这两个改动文件，28 pass / 0 fail，未重跑全宽集。它们属于 seam amendment 的机械枚举同步，非兼容旧拒绝行为。
 - 收尾检查：两个包 typecheck、两个 generator `--check`、scoped oxlint 与 `git diff --check` 均通过，旧名扫描 10 pass / 0 fail。`check-docs-contract --profile /tmp/plugin-package-plan.4YRctl/docs-profile.yml --changed-since 9f08c506d9 --format json` 仍报告原有 71 errors / 250 warnings，未扩大修复面，交编排器处置。实施两轮约 70 分钟（不含计划/等待派工）；约 28 个生产 TS 文件、约 1,160 行新增（生成物/语料另计），未达到双倍边界。步骤 2–3 合并为内容/接缝提交，步骤 4 与收尾证据随后提交；未推送、未启动 App/Electron、未跑 gate/bin/check/全套。
+
+
+## 片 4 · #1776：文件夹/Git/市场直装、配置与标准 MCP
+
+- 依据：[Story #1776](https://github.com/impharaon/alpha-code/issues/1776) 当前正文；[local-plugin-install 规格 v5 @ 7278c10](https://github.com/impharaon/alpha-work/blob/7278c10/docs/specs/local-plugin-install/spec.md)；[local-plugin-install 设计 v3 @ 5ee9f55](https://github.com/impharaon/alpha-work/blob/5ee9f55a7e1fb09a915883a382cbcf1c94741a62/docs/specs/local-plugin-install/design.md) §4.8、§4.10、§4.13、§5、§6、§8、§10，沿其引用消费 D1/D2/D5。覆盖下表片 4 的 AC 分项；不重述或修改冻结决定。
+- 核对：待编排器核对本计划及下列 S4-A/S4-B 冻结接缝变更；第一笔实施提交逐字填写续派 `Phase:` 行。此计划未获实施核对，不将下面的拟议落点当成改动片 2 的授权。
+- 基线：派发 worktree/分支保持原样，`HEAD=c4f213f461e6c93142155a22f028e783fb0f44ec`，叠在 #1762 片 2 上；集成使用 #1762 真正合入后的版本。alpha-work 的 `origin/main=5ee9f55`，其工作副本文档仍为旧版，本片读取 Git 对象。兼容性证据继承 `2026-11-26/plugin-compat/REPORT.md` §5.2/6/8 及 `plugins.csv`、`sources.json` 的固定样本，不把分析 worktree 的数字当当前代码的运行通过数。
+- 计划起于 2026-11-26 13:50（UTC+08:00），预计 30–45 分钟；实施预计 6–10 小时、约 30–40 个手写生产/合同文件、2,000–3,000 行手写改动，生成物与真实压缩夹具另计。每完成一组 AC 核对用时/规模；达到上界两倍返回具体阻塞，不自行扩票。
+- 本轮文档影响为执行计划，仅追加本节；片 1/2、frontmatter、索引与其他文件不改。实施阶段的合同说明、模块地图与 S-09 主权登记随对应实现提交；不改 gate。界面复用 spec v5 的体验约定及其引用的 helper 令牌/授权输入、包管理服务设置、市场逐条指定入口，不绘稿、不新增安装前确认。
+
+### 余片及 AC 归属
+
+集成顺序为 **4→3→5→7→8→9→6**；此表只索引归属，余片不在本节展开文件或步骤。
+
+| 片 | AC 所有权与交接边界 |
+| --- | --- |
+| 4（本节） | 完整 AC-01/04/05/07/12/19/26/27；AC-03 出网部分、AC-13/14 直接安装入口部分；AC-20 的声明/值、AC-25 的目录/技能绑定。配置向进程送值及 hook DATA 的完整运行证据交片 5。 |
+| 3 | AC-06/10；与片 2 合闭 AC-02 的命令、助手、整包预览；AC-13/14 命令/助手部分。Invocation、YAML、源工具规则的转换及运行属本片，不在片 4 顺手实现。 |
+| 5 | AC-11/15、AC-03 hook 当次 allow；汇合并闭合原 AC-13/14 全部组件/入口；AC-20 hook OPTION、AC-22/23/24、AC-25 hook DATA/更新/移除、AC-30。无真实时机事件按设计逐项说明。 |
+| 7 | 完整 AC-21，包括匹配文件懒启动、真实诊断、缺程序和关闭停止。 |
+| 8 | 完整 AC-28/29，输出样式与默认主助手。 |
+| 9 | 完整 AC-31，command 来源与真实 link；片 4 不执行 locator、不提前实现 link。 |
+| 6 | BR-13 原生文件引用管理；关联 AC-13 停止/移除管理、AC-15 项目信任，不删除原文件，不认领已移交 helper 的 AC-18。 |
+
+片 1 的 AC-08、AC-03 默认/连续询问和技能/MCP 生命周期，片 2 的 AC-09、AC-02 技能/资源与 AC-13/14 技能脚本证据均继承原收据；新增能力仍验自己的关闭/移除。alpha-web 是外部集成依赖：按设计 §8 一次收拢分叉 adapters、消费本仓同份 converter artifact、更新 host pin/compiler/公开载荷；本车道不改该仓、不签名/发布，也不为本机 MCP 建公开条目。交接须列本仓 commit、artifact aggregate/文件摘要与实际消费版本，未消费前不宣称 BR-12 跨仓等价已完成。
+
+### 当前代码与冻结接缝
+
+本片读取 [模块图](../../architecture/modules.md) 与 [K1/K2](../../architecture/constraints.md)，沿唯一 converter、账本/事务、专用密钥与出网权威接线。以下两个缺口是片 2 的冻结实现必须开放的最小接缝；没有另写安装器或命名算法绕过它们。
+
+| 接缝/位置（上述 HEAD） | 已核事实、最小所需变更 |
+| --- | --- |
+| **S4-A · SEAM-CHANGE-NEEDED**：`packages/ui-mac/src/main/install-from-source.ts:92,159,282`，同链 `ext-ipc.ts:1412` | `wholePackage` 只认 marketplace；folder/Git 沿平铺技能路径且仍受 `needsPluginFiles` 筛除。需允许来源分派把选中的 folder/Git Claude/Codex/纯技能 capture 交同一 `buildPluginPackageTxItems`，继续使用片 2 原树物化/事务，不修改 mode/link/CAS/恢复算法。直接入口的预览、内容提交与提交后登记接线一并按 §5/BR-10 验证；`install-from-source.ts:393` 与 `ext-ipc.ts` 的 MCP 激活动作不得在内容安装阶段启动连接器。 |
+| **S4-B · SEAM-CHANGE-NEEDED**：`packages/ui-mac/src/main/plugin-package-install.ts:141,160,165`；调用方 `install-from-source.ts:167,181,183`、`package-admission.ts:1035,1043,1223` | `pluginHostName` 保留大小写、只碰撞时加路径 hash；`pluginComponentId` 依赖 entry.id，direct receipt 另做 lowercase。MCP leaf 的 Text 渲染只支持旧绑定。需允许这些现有 helper/调用点统一消费 v3 §4.8 的逻辑身份及 §4.10/4.13 的绑定/投影，连同描述 validator 与 ext 技能 Text 消费点补已批准字段。catalog 仍沿已验证 envelope 身份。保留单一 owner，不新增第二映射表，不迁移已装记录。 |
+| 已批准新增字段的落点 | `plugin-package.ts:26,315` 的 Text/renderer、description validator 与 profile schema 尚无 option/environment/DATA；按 v3 共享形状同步 generator/decoder/真实语料。这里只列落点，不另定字段或重开设计。该增量与 S4-B 的片 2 消费面一起交编排器核对。 |
+| S-09 集成依赖 | `core/src/mcp/client.ts:372–392` 已有 loggedFetch/authProvider 组合点；main `network-egress-proxy.ts` 当前普通 HTTP 为 405，不能只改 URL validator。按设计 §6/§10 的既有 L3 增量登记 `plugin-local-mcp` 后接入；registry 与对应 guard 随实现同一提交，不把设计中的候选文字当已登记事实。 |
+
+S4-A/S4-B 只申请落实已冻结 v3 的接缝范围，不申请新产品决定。编排器未开放前不修改片 2 代码；可独立核对/规划的部分保留如下。若实施遇到上述范围之外的冻结接口缺口，返回精确 `SEAM-CHANGE-NEEDED`，不改冻结树基础或增加旁路。
+
+### 改动
+
+下表为实施候选范围；路径省略 `packages/ui-mac/`，其他包写全。标注 S4-A/B 的行以接缝续派为前提。现有模块的回归加在其既有测试文件；新文件只在它拥有下述新增职责且没有合适现有 owner 时创建。
+
+| 文件/入口 | 改什么 |
+| --- | --- |
+| `src/shared/host-extension-package-contract/plugin-package.ts`、`plugin-conversion.ts`、`generate-plugin-conversion.ts` 及生成 `.mjs/.d.mts` | 在唯一库落本片的 provider/portable 合并、市场组件声明、MCP 发现/传输、变量/default/forwarding/timeout、typed options/SecretNeed 与 DATA 语义；Text 求值复用同一 owner。Invocation 运行、hook/LSP/style/monitor runner 留对应片。 |
+| 同目录 `profiles/plugin-package.v1.schema.json`、`decoder.ts`、`CONTRACT.md`、`generate-artifact.ts`、artifact manifest、相关 `testvectors/` | 同步本片共享形状与发布清单，首次把自包含 converter 及声明随 host artifact 提供给 W；真实样本派生解码语料。按仓库既有发布版本规则处理被改变的已发布定义，不伪造 aggregate，不增加另一套 schema。 |
+| `src/main/plugin-sources.ts`；`src/main/install-from-source.ts`、`plugin-package-install.ts`（S4-A/B） | 复用 captureFolder/captureGit/prepareCapture 的完整快照；源生态、manifest 与市场声明只交 converter 判定。各直接来源进入同一 bundle builder，身份/receipt/声明同源；返回逐包真实结果及具体失败路径，保留其他可用 entry。 |
+| `src/shared/plugin-install.ts`、`installed-plugin-package.ts`；`src/main/package-admission.ts`、`ext-package-tx-builders.ts`（S4-B 的描述/绑定消费） | 将规范化声明、名字映射、普通值/密钥引用接到现有 graph/claims/prepare 资源；同一 source 安装与 profile admission 不再各做子集投影。未改的选项/秘密及 OAuth 绑定保留，失败不发布半份新配置。账本写器和片 2 事务算法保持；如必须改变其冻结写入合同另返 seam。 |
+| 新 `src/main/plugin-package-config.ts`、`plugin-package-data.ts`；`src/main/package-admission.ts`、`ext-package-uninstall.ts`、`ext-install-planner.ts` 必要同链调用 | 前者只持本包 typed 值/状态及既有版本化秘密资源的准备/保存；后者只按同一 fence roots 快照与 packageId 管理 DATA 创建/清理。值变更后走既有 MCP convergence；本包开关、更新、移除与失败清理不误动其他包或旧有效资源。复用现有密钥写器/归属，不另建 secret store/包 registry。 |
+| `src/main/ext-config.ts`、`ext-mcp-policy.ts`、`package-mcp-activation.ts`、`engine-explicit-config.ts`；`packages/ext/src/engine-transforms.ts`、`cloud-websearch-kill.ts` 的 managed MCP 投影调用 | 在已管理包路径落实 v3 的 argv/依赖/URL 绑定与单一 `projectServerConfig`；移除设计已否决的程序头/参数形状拒收，保留真实 dependency/runtime 诊断。保留显式 SSE、cwd、分阶段 timeout/OAuth/环境转发，不通过全局出网放宽实现 loopback。 |
+| `packages/ext/src/plugin.ts` 与 `plugin-package-skills.ts` 的声明读取/技能绑定；共享 `renderPluginText`（S4-B） | 消费 main 的同一有效配置/数据投影，实际 SkillEditor 内容展开本包非敏感值与 DATA；不重新读 manifest、不把敏感值注入模型，不提前实现片 3 Invocation。长 MCP 工具别名在既有 awaited context 消费同一映射及原对象，权限/执行仍用原身份。 |
+| `src/main/network-egress-proxy.ts`、`server.ts`、`sidecar.ts`、`codepuppy-sidecar-messages.ts` 的既有内存引导/更新链；`packages/ext/src/hub-bridge.ts` 的现有 parentPort 桥 | 在同一代理及主进程已提交定义权威落实 §4.13；私有 McpProxyBinding 随有效代建立/撤销，经既有受控内存链到 MCP 实例。不得落进普通配置、env、日志或子进程；HTTP/SSE/CONNECT 流按同一绑定取消。sidecar 与 core 共用的内存绑定落在 `packages/util/src/` 自有具名模块，不落普通启动配置或凭据文件，不新造 RPC。 |
+| `packages/core/src/mcp/client.ts` 的 fetch 组合点；现有 Code Puppy bootstrap 内存类型/接线；`docs/architecture/codepuppy-authority-registry.json`、`scripts/north-star-guard.sh` 的登记（S-09） | 只落实设计 §6/§10 的私有 MCP fetch 绑定，OAuth/原 transport 沿既有实例；同提交具名登记、行为 guard。不存在合法登记或需其他 engine 接管即返回，不改 oauth.ts、通用 fetch、NO_PROXY 或引擎代际。 |
+| `src/shared/package-admission.ts`、`src/main/ext-ipc.ts`、`src/preload/index.ts` / `types.ts`、`src/renderer/extensions/ext-ipc.ts` / `ext-hub-state.ts`、`package-account-dialog.tsx` / `extension-hub.tsx` 及既有 i18n | 在既有账户/服务设置中贯通普通 typed 值、安全状态、敏感输入及选填版本；字段文案用源声明。版本只改 floatingVersion 指定 token，清空恢复原命令；关闭输入仍保留已安装包。市场继续逐条指定，只安装指定集合，无预选全市场或第二次确认。只增加必要 DTO/现有动作参数，不向 renderer 下发路径、配置原件或秘密读回值。 |
+| `test-fixtures/plugin-helper/` 的已有 fixture/provenance/source-fetch、必要压缩成员；上述模块既有测试；`docs/architecture/modules.md` | 用下表实际固定来源保留最小回归及 provenance，旧拒收/平铺断言随替代行为同步；完整多包回放留一次性证据。模块图仅更新本片新增职责/owner，不治理无关旧偏离。 |
+
+### 顺序
+
+1. **先取得接缝续派，再落回归红测**：S4-A/B 及 S-09 具体登记范围由编排器接收；继承 #1762 已验树基础。provider、身份、变量/argv、portable 丢服务分别在原模块测试中以实样重现并单独提交失败证据；正确红测的断言在后续修复提交不改。旧行为断言在替代行为提交更新。
+2. **转换与宿主合同**：落本片共享形状、converter、真实语料与 generator 产物；运行 `plugin-conversion.test.ts`、`package-envelope-v1.test.ts`、`host-extension-package-artifact.test.ts` 中改动项，再各受影响文件一次。生成检查与相同 capture 的 ESM/源码结果比较；W 只拿到明确 commit/aggregate 的交接，不在本车道修改。
+3. **直接内容安装与配置/data**：按开放后的 S4-A/B 接现有 builder，贯通 typed 值/版本/秘密、DATA 生命周期与实际 skill 绑定；同提交带管理页/IPC的必要消费。依次验证 AC-01/04/05/07/12/19、AC-20/25 本片分项及内容零执行，相关测试文件各完成一次。无需真实凭据的自动证据先做，不等片 3/5 runner。
+4. **标准 MCP 投影与本机传输**：落单一投影、绑定期校验/依赖诊断及显式 SSE；S-09 的 main 代理、私有 fetch、登记与 guard 同提交。用真实 SDK transport 经代理验证 POST/GET/DELETE、SSE/CONNECT、认证头不外泄、关闭/换代取消，以及普通工具出网反臂；闭合 AC-26/27 自动部分、AC-03 出网部分。
+5. **一次整体验收及交接**：在临时 HOME/XDG/数据库/配置/secret 根中，回放本节固定样本的实际取源→安装→技能/MCP 运行读取。真实 Supabase/Cloudinary/Zoho 登录、Rill 服务、Docker/XcodeBuildMCP 等外部条件交编排器安排，分别记运行结果或未验证，绝不以 stub 充作真实服务通过。片 5 后补 OPTION/hook DATA 进程端证据。只提交本仓工作，不推送/开 PR/合并。
+
+### 风险
+
+- 冻结片 2 的接缝是本轮具体前置，不通过复制安装器/身份算法绕开；新 shape 的 decoder、schema、生成 ESM、main/ext 消费与发布字节必须同一版本，避免库能读而真实安装拒收。长工具名证据需执行原 executor，不能只断言长度。
+- 原始明文可能在多个文件/字段重复出现。AC-05 从未经上架脱敏的真实副本起步，用同一无效 canary 扫安装树、CAS、配置、视图、错误与捕获日志；故意恢复一个目标原值的临时反臂应被检出。测试只输出存在与否，不输出 canary/真实凭据。
+- 配置缺值/坏定义、程序缺失、loopback 无服务必须保留包及其他 entry；更新不能丢用户设置/秘密或 data，prepare 失败不能删旧目录。身份定义搬文件的反臂同时检查 component/secret/OAuth 归属。
+- 本机能力必须真实经过现有代理。无绑定、错 entry/代/目标和撤销后的请求不得拨号；普通工具/脚本沿原网络权威。SDK 流、取消、OAuth 与 proxy-auth 去向一起验，不能用一次健康探测或仅 validator 变绿替代。
+- 安装后默认开启与内容阶段零执行分别观测，现有测试若只 stub activateMcp 不算 AC-14。副本内可观察标记有直接触发的正对照；真实插件代码只在临时目录执行，应用/Electron/窗口不启动。
+
+### 证明
+
+以下是**待实施证据**，不是本轮已通过结果。具名 case 加在所列模块已有测试中；路径未加前缀时相对 `packages/ui-mac/src/`。新模块的首个测试文件分别为 `src/main/plugin-package-config.test.ts`、`src/main/plugin-package-data.test.ts`；既有 DOM case 使用 `test-component/package-account-dialog.cases.ts`、`plugin-source-results.cases.ts` 和 `hub-three-pages.cases.ts`，不重新创建已移除的 renderer 宿主测试。`U` 表示从 `packages/ui-mac` 执行 `bun test --max-concurrency 2`，`E` 从 `packages/ext` 执行同命令；迭代在命令后附 `-t '<具名 case>'`。实际 MCP 传输使用仓库 `packages/core/test/fixture/mcp-echo.ts`/现有 MCP SDK server 夹具，不手写协议或把断言副本当实现。
+
+| 样本 | 固定来源/受控变化 |
+| --- | --- |
+| S1 | `openai/plugins@981b02c0c44058b595f3b4180002c3ae3c806d40`：完整 `plugins/supabase`、`plugins/build-ios-apps` 和 `.agents/plugins/marketplace.json`；直接取原 env/header 定义的副本注入无效测试密钥并记录改动。 |
+| S2 | `anthropics/claude-plugins-official@0fbfda5a91f4adc311daca25acc99132f40f0b6e`：`plugins/plugin-dev`、`plugins/project-artifact` 与市场清单；无 manifest、自定义目录、mode/link 的反臂只对真实副本改目标字段/文件位置并记 provenance。不覆盖片 2 原夹具/收据。 |
+| S3 | `grafana/ai-marketplace@6c28ba1961d502d82301cbd64d2322e6e960477c/plugins/grafana-mcp`；`langfuse/claude-observability-plugin@b5211009698fdfe79c6bbe90d6901ad255ea65d3`，保留原 userConfig 及缺省值。 |
+| S4 | `cloudinary-devs/cloudinary-plugin@86be53409e3fb1c465cd5ff4d1dc937a2860f45c`、`catalystbyzoho/claude-plugin@9670b79d72fe4923cc845ca0414d009ef3684ccb`；根 mcp.json 的五项及 streamable-http 一项。 |
+| S5 | `rilldata/agent-skills@adfce5762be435c026f4731f72e388520cb133cc`、`cockroachdb/claude-plugin@6c96c6394a61f366e8ec1b7cec2281e97507cbff`；本机服务地址与其他连接器一并保留。 |
+| S6 | 缺陷矩阵按 REPORT/CSV 取 `CodSpeedHQ/codspeed@59cfc90540bb3717d8acf4ad03f7b5531c8e1a3d`、`mintlify/mintlify-claude-plugin@c1c1700d405dc375c2d90a1d4f8b283e6422b7ec`、`SAP-samples/hana-cli-claude-plugin@abadd0aba32792b6378ed784e9f6d3e5b25dfc2a`、`pydantic/skills@238d97102650c1caa51f35027aee13c469c59542/plugins/logfire`；provider 双 manifest 取 `supabase-community/supabase-plugin@2c6d02d4565babe784103ee4d446a93ae9b24151`。最小成员及原 mode/逐文件摘要/原 archive 摘要写 provenance，不重新跑全 381 包。 |
+
+| AC / 本片缺陷合同 | 具名证据与相关命令 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-01 | `folder Supabase installs skills and standard connector together`：`U src/main/plugin-sources.test.ts src/main/install-from-source.test.ts`，S1 实际 folder candidate→安装→回读图/整树及 SkillEditor；一次性由编排器补真实登录/工具清单命令及输出。 | 跨 kind 的 supabase 不得使图拒绝；走平铺入口或把 app 当 MCP 会缺标准服务/技能/已安装包。安装成功不等于真实登录通过。 |
+| AC-04 | `connector version selection preserves the source argv`：`U src/main/package-admission.test.ts` 与 `U ./test-component/package-account-dialog.cases.ts`，S1 build-ios-apps 分别清空/精确版本保存，读回实际 MCP config，预填建议只用实际可取得结果。 | 不消费 floatingVersion 会无字段/改错 argv；强制版本会使清空分支失败；新增安装前确认由 DOM 反臂检出。 |
+| AC-05 | `source secrets are absent from public artifacts and resolve at transport`：`U src/main/install-from-source.test.ts src/main/codepuppy-mcp-secrets.test.ts src/main/package-mcp-activation.test.ts`；S1/S3 原副本 env/header 同值及重复 targets，实际秘密 store 读回、受控 connector 边界比较值、全出口布尔扫描；另有保存失败不发布半份配置。 | 只收上架脱敏样本检不出原值泄漏；只脱敏不解引用时实际 transport 得不到相同值；漏任一目标会被扫描检出。 |
+| AC-07 | `Git and folder install the same captured plugin tree`：`U src/main/plugin-sources.test.ts src/main/install-from-source.test.ts`；S2 同 commit 归档与其解包目录分别走 captureGit/captureFolder，比较去除来源/本机绑定后的 entries、字节/mode/link、实际技能路径；移走 folder 源后读取安装副本。 | 只取根 SKILL、逐技能平铺、丢 mode/link 或遗留来源路径均在真实读回处失败；不是只比 converter 返回值。 |
+| AC-12 | `content discovery and selected marketplace packages keep their resources`：同上两文件及 `U ./test-component/plugin-source-results.cases.ts ./test-component/hub-three-pages.cases.ts`；S2 删除清单/按真实声明改目录的副本，真实市场中指定 plugin-dev 与另一条目，未指定条目不安装；一个实际坏定义不抹成功包事实。 | manifest 必需或默认目录硬编码会缺 entry；安装全市场、丢指定项引用或一个失败撤掉其他成功包都会使实际库存不符。 |
+| AC-19 | `package options bind only their consuming connectors`：`U src/shared/host-extension-package-contract/plugin-conversion.test.ts src/main/package-admission.test.ts` 与 `U src/main/plugin-package-config.test.ts ./test-component/package-account-dialog.cases.ts`；S3 的标题/说明/两个必填项，测试 URL/无效 token 到真实运行投影，空填关闭仍装包且仅消费项待填。 | 把 URL 当 secret、把未填模板先送 validateServer 或只改 UI 都会在 config/逐项状态/秘密扫描处失败。缺 Docker 单记依赖，不因此拒包，不代装工具链。 |
+| AC-20（声明/值） | `typed option defaults preserve false zero and empty values`：`U src/shared/host-extension-package-contract/plugin-conversion.test.ts`、`U src/main/plugin-package-config.test.ts ./test-component/package-account-dialog.cases.ts`；S3 Langfuse 11 项，经真实保存/读回检查 defaults、显式值、敏感状态与清空行为。 | truthy 丢值、数字/布尔转字符串、敏感默认漏脱敏或丢选填项都会失败；本片不把这些断言冒充 hook OPTION 进程证据，后者片 5 补。 |
+| AC-25（目录/技能） | `package data is writable outside the content generation`：`U src/main/plugin-package-data.test.ts` 及 `E src/plugin-host.test.ts`；S2 project-artifact 的实际已注册 skill 正文指到存在可写目录，以第二真实包验证目录不同；同来源更新/关闭开启保持 sentinel，卸载不随 data 内链接删外部目标或他包 data。 | 绑定未展开、目录在 immutable generation 或错误 fence root 会使写入失败；更新换目录/跨包共用/误删均使 sentinel 或他包对照失败。hook 进程及联合 AC-25 闭合归片 5。 |
+| AC-26 | `portable MCP discovery preserves all streamable HTTP servers`：`U src/shared/host-extension-package-contract/plugin-conversion.test.ts src/main/install-from-source.test.ts src/main/package-mcp-activation.test.ts`，S4 逐项六个 connector，显式 SSE 另走现有 SDK SSE 夹具；编排器补两个真实服务的登录/列工具结果。 | 不默认读 mcp.json 或丢 transport 时不满六项；只 HTTP fallback 无法通过显式 SSE 路径观测，不能以复制配置代替连通。 |
+| AC-27、AC-03 出网 | `local MCP proxy is bound to one live definition`：`U src/main/network-egress-proxy.test.ts src/main/package-mcp-activation.test.ts`、`E src/engine-transforms.test.ts` 与 `packages/core` 中 `bun test --max-concurrency 2 test/mcp.test.ts` 的相关 case。S5 声明经过真实 transport/代理，服务先停再启无需重装；无/错/已撤销绑定不拨号，普通工具出网仍拦，MCP server 收不到 Proxy-Authorization。 | 只改校验会仍撞 HTTP 405/围栏；全局 host 放行使反臂拨号；凭据进 server header/普通 config 会被泄漏断言检出；只单次 probe 不能完成真实协议流和取消。真实 Rill Developer 工具另由编排器实测。 |
+| AC-13/14（直接入口） | `source preview and content commit do not execute plugin content`：`U src/main/install-from-source.test.ts src/main/plugin-sources.test.ts`，S1/S2 完整真实副本添加受控可观察标记，folder/Git/指定市场分别观测包进程/文件副作用/连接器启动/可执行文件头；临时目录直接触发同一样本的正对照必须看到动作。已安装技能/MCP 另验关闭/移除及秘密/data 清理。 | 只有空 spy 而正对照也不动作不能通过；提前激活或求值真实包内容会出现标记。命令/助手/hooks runtime 全闭合仍留片 3/5。 |
+| §4.8 provider/身份/变量/argv 与 §4.13 | 在 `plugin-conversion.test.ts`、`install-from-source.test.ts`、`package-admission.test.ts` 加同表缺陷回归：`provider selection keeps the chosen ecosystem`、`component identity survives definition relocation`、`environment defaults and argv retain source meaning`；运行各具名 `-t`。S1/S6 验跨 kind、大小写、MCP 搬定义仍同 secret/OAuth、portable/Claude 单边能力不被吞、括号规则测试留片 3；forward env 从运行端取，显式 env 覆盖，原 command[0]/带空格 argv/`-p` 不拆改。`E src/plugin-host.test.ts -t 'long MCP aliases execute the original tool'` 验长名仍调用原对象。 | 任一旧映射/简化 renderer/子集投影恢复会在实际图提交、运行参数或工具执行处失败；catalog 伪造源身份仍须失败。Docker/PHP/JBang 等只验合法定义接收及具名 dependency 状态，不把缺工具链当转换失败或扩大 #1760 范围。 |
+
+验证按三层执行：纯转换/状态在 fast，真盘/代理/SDK 接线在 integration；完整真实包/引擎旅程只作一次性命令证据或既有 nightly scenario，不给 PR 加整包回放。每步先相关 `-t`，完成该步各改动行为文件完整运行一次；返回前只跑一次较宽相关集。用 `rg -l 'plugin-conversion|plugin-package-install|projectServerConfig|savePackageSecrets|startEgressPolicyProxy'` 搜受影响包测试中的 import/mock/枚举消费者，列实际文件后执行，初选为 `package-admission.parity.test.ts`、`package-update.test.ts`、`ext-package-lifecycle.test.ts`、`ext-package-ledger-uninstall.test.ts`、`engine-explicit-config.test.ts`、`ext-config.test.ts`、`ext-mcp-policy.test.ts`、`package-mcp-oauth.wiring.test.ts` 及 ext 的 `package-scope.test.ts`。只因实际新增 export/枚举改变补必要消费者，不跑全包/全仓或 gate/bin/check。相关包各 `bun typecheck`、改动 TS 的 scoped lint、两个 generator `--check`、文档合同/本文件链接与 `git diff --check`；机器 gate 在跑时保持两 worker。
+
+### 偏离记录
+
+暂无实施偏离。计划阶段具体返回 S4-A/S4-B 的冻结接缝缺口；本轮未改代码、未重新设计、未执行真实市场插件或真实账号授权。
+
+计划自核（Codex / GPT-6）：已将片 4 每个 AC/缺陷合同映射到真实来源、实际入口及缺行为必失败的检查，并列清余片归属；编排器的实施核对仍待续派。计划阶段 `bin/setup` exit 0，`git config --get core.hooksPath` 为 `.githooks`；包目录 `bun test --max-concurrency 2 src/main/plugin-sources.test.ts src/main/install-from-source.test.ts src/shared/host-extension-package-contract/plugin-conversion.test.ts` exit 0，111 pass / 0 fail，属于当前基线而非本片完成证据。文档合同检查使用 Alpha profile 原值，仅把仓库集合限定为本 worktree（临时 profile：`/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/plugin-standard-plan-y2un84rb/docs-profile.yml`），`check-docs-contract --profile <该文件> --changed-since c4f213f461 --format json` exit 1：71 errors / 251 warnings；变更前为 69 errors / 253 warnings，finding 的 code/path/message 集合无新增，只因本文件被触及，片 1 第 19/45 行的两处既有跨仓 ID 引用由 warning 升为 error。原前缀及其他章节保持不动，遗留交编排器（既有文档治理），不认领合同检查通过。`python3 scripts/check-doc-links.py docs/specs/local-plugin-install/plan.md` exit 0（8 条相对链接），`git diff --check` exit 0。只追加本节；不运行应用/Electron/窗口或全量门。

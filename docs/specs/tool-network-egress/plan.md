@@ -321,3 +321,5 @@ R1-2：活动 revision 在档位查询中变化时重读至稳定，沿用拨号
 R1-1：CONNECT 共用同一卡片路径和一次结束状态；路由重查丢失通放依据后重新询问，用户等待暂停拨号剩余预算，不重置预算。只有真实用户授权存在时才写 granted。`c8fa1937a1` 的回归为 0 pass / 2 fail（`/tmp/egress-r8-1-red.log`，缺卡片与 504 后第二条 403）；修复后 proxy 完整文件 28 pass / 0 fail（`/tmp/egress-r8-1-green.log`），登记数量同步为 28。
 
 R1-3：DIRECT 的 TCP lookup 只返回完整已检查集合，保留自动族回退；代理逐个尝试检查过的 IP，SOCKS4 只选 IPv4，不再次解析。`052f9c37d8` 两条回归旧代码 0 pass / 2 fail（`/tmp/egress-r8-3-red.log`）；修复后 upstream 完整文件 8 pass / 0 fail（`/tmp/egress-r8-3-green.log`）。双栈测试仅在隔离子进程的传输边界把公开 IP 映射到本地 IPv4-only TCP peer，真实 connect 执行 IPv6 失败到 IPv4 的回退，检查交给传输的完整固定集合；不关闭公网判据，不外拨公网。
+
+R1-4：启动时只读取一次完整性/完整字节偏移，追加按单写者内存状态推进；失败后下一次先截断到已知完整偏移，启动读到半行也可恢复，完整坏行仍按 unreadable 保留。设置继续按原投影重读。必要同调用链文件 `egress-grant-records.ts` 补真实 truncate 绑定，复用唯一 JSONL 编码函数；无新路径/配置。`8e9b974999` 两条回归为 0 pass / 2 fail（`/tmp/egress-r8-4-red.log`）；修复后 passes 完整文件 5 pass / 0 fail（`/tmp/egress-r8-4-green.log`）。

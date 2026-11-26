@@ -17,8 +17,11 @@ function parsePass(value: unknown): EgressPass | undefined {
   return value as EgressPass
 }
 
-export function readEgressPasses(path: string, deps: { readFileSync(path: string, encoding: "utf8"): string; log(line: string): void }) {
+export const egressPassLine = (pass: EgressPass) => JSON.stringify(pass) + "\n"
+
+export function readEgressPasses(path: string, deps: { readFileSync(path: string, encoding: "utf8"): string; log(line: string): void }): { passes: EgressPass[]; persistence: "ok" | "unreadable"; completeBytes?: number; partialTail?: boolean } {
   const passes: EgressPass[] = []
+  let completeBytes = 0
   try {
     const text = deps.readFileSync(path, "utf8")
     const lines = text.split("\n")
@@ -26,27 +29,42 @@ export function readEgressPasses(path: string, deps: { readFileSync(path: string
       const pass = parsePass(JSON.parse(line))
       if (!pass) throw new Error("invalid policy-pass record")
       passes.push(pass)
+      completeBytes += Buffer.byteLength(line + "\n")
     }
-    if (lines.at(-1) !== "") throw new Error("incomplete final policy-pass record")
-    return { passes, persistence: "ok" as const }
+    if (lines.at(-1) !== "") {
+      deps.log("egress passes: incomplete final policy-pass record")
+      return { passes, persistence: "unreadable", completeBytes, partialTail: true }
+    }
+    return { passes, persistence: "ok", completeBytes }
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return { passes, persistence: "ok" as const }
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return { passes, persistence: "ok", completeBytes }
     deps.log("egress passes: unreadable or incomplete policy-pass log")
     return { passes, persistence: "unreadable" as const }
   }
 }
 
-export function createEgressPassLog(store: { read(): ReturnType<typeof readEgressPasses>; append(pass: EgressPass): void }, log: (line: string) => void) {
+export function createEgressPassLog(store: { read(): ReturnType<typeof readEgressPasses>; append(pass: EgressPass, repairBytes?: number): void }, log: (line: string) => void) {
   const memory = new Map<string, EgressPass>()
+  const initial = store.read()
+  const writable = initial.persistence === "ok" || initial.partialTail === true
+  let completeBytes = initial.completeBytes ?? 0
+  let repairBytes = initial.partialTail ? completeBytes : undefined
   return {
     record(pass: EgressPass) {
       if (memory.has(pass.id)) return
       if (!parsePass(pass)) { log("egress passes: invalid policy-pass record"); return }
       memory.set(pass.id, structuredClone(pass))
       try {
-        if (store.read().persistence !== "ok") throw new Error("incomplete log")
-        store.append(pass)
-      } catch { log("egress passes: append failed; policy pass retained for this run") }
+        if (!writable) throw new Error("invalid log")
+        store.append(pass, repairBytes)
+        completeBytes += Buffer.byteLength(egressPassLine(pass))
+        repairBytes = undefined
+      } catch {
+        // A failed append may have written a partial line. The single writer knows
+        // the last complete byte offset; the next append repairs only that tail.
+        repairBytes = completeBytes
+        log("egress passes: append failed; policy pass retained for this run")
+      }
     },
     snapshot() {
       const disk = store.read()

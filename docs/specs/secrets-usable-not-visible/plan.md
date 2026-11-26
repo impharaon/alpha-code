@@ -714,3 +714,47 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 - 证据：`/tmp/secrets-r12-{fixture-identity,write-sites,permission-dialog,permission-risk}-red.log`；最终 `/tmp/secrets-r12-{fixture-identity,write-sites,permission-dialog,permission-risk}-final.log`；`sample-final.log`、`fixture-consumers-final.log`、`probe-{red,green}.log`、`risk-classifier.log`、`ledger-{generate,check}.log`、`nul-final.log`、`affected.log` 均带同一 secrets-r12 前缀。聚合事实 `/tmp/secrets-r12-receipt.json`；本次 plan.md 文档合同与 git diff --check 通过。
 
 偏离：必要的同调用链改动是 Schema probe 与其原测试；另外 17 个文件均为原生成器产生的夹具，不能只改 hash 欺骗身份 guard。UI 没有删/弱化测试或修改呈现规则；测试条数不变，无需改 gate-files 计数。本轮未改 known-fails.tsv、.gate-tests、检测规则/阈值/地板、冻结设计、依赖或其它仓库，无 push/PR/merge/rebase。遗留去向：八个指定失败全部消除；原有两处 Reflect lint 交编排器独立处理。ARCH/OPTIONAL：无新增项。
+
+## r13 视频 alpha 合并与重新采样收据
+
+依据：r13 IMPLEMENT(integration) 授权 fetch + merge；spec v4、design v3.3、SC-01/SC-02 不变。已核 Codex / GPT-6。开始 2026-11-26 13:20:02 UTC，验证于 13:31 UTC 完成，约 11 分钟，包含本机 slot 排队；未扩大到视频功能验收或整门。文档影响为模块地图事实合并与本计划执行证据。
+
+`git fetch origin` exit 0，取得视频已合入的 `2142240b16b1a5516ba841d75e751fdf93f54607`。`git merge --no-edit origin/alpha` 产生题述冲突；合并提交 **`10abacd95b84171ca91d0b76a6c1cd66f43fc219`**，两父为 `d23e8b0c7c73d12964dda2b2bb10666cc120f16a` 与该 alpha。没有 rebase 或再次改写冻结接口。
+
+| 冲突 | 具体取舍与验证 |
+| --- | --- |
+| `docs/architecture/modules.md` | 保留 alpha 对 docs/effect-drizzle-sqlite/effect-sqlite-node/enterprise 的历史入口更正；Ext 行保留本票十个秘密模块链接；Schema 行同时保留视频 progress/frame authority 说明和保护名单链接。没有删任一模块的已知职责 |
+| `packages/ext/src/plugin-setup-order.cases.ts` | mock 同时返回 dispose 与 videoToolFacts；原两条用例、registerPolicy 最先/seal 最后、项目 fan-out 位置与最终 disposePolicy 断言全部保留 |
+| `packages/ext/src/policy/index.ts` | PolicyRegistration 与实际返回值同时保留 dispose、videoToolFacts、factsFor。视频消费同一工具事实权威；秘密事务、shell.capture、progress/preview/result/error/read 遮盖与终态清理仍按原路径运行。没有改两者的判定规则 |
+| 17 份 `engine-adapter/fixtures/*.json` | 只对实际冲突的 17 路径用 scoped git restore 选择 HEAD 作为中间输入，未覆盖 alpha 新增的其它文件；合并后再由原采样器全部重采，未手工改 JSON |
+
+这些冲突均为相邻的新增字段/说明，不是同一行为的相反决定；未发现需设计裁定的语义冲突。自动合入的 plugin.ts 视频接线继续调用 policy 的两个事实入口，cleanup 继续保留本票 dispose。
+
+### 依赖、生成物与计数
+
+- bun.lock 改变后在根执行 `bun install --frozen-lockfile`，exit 0 / 5 packages installed。输出报告 1 个 postinstall 被现有 Bun trust 策略阻止；只读查看 untrusted 列表，没有运行 trust 或改变策略。所需采样、编译和测试均实际完成。安装后恢复并读回 hooksPath `.githooks`；没有手工改依赖/锁文件。
+- 原生成器 `bun packages/ext/scripts/context-injection-inventory.ts --write` exit 0：**106 fragments / 31040 injected bytes / 169472 declared limits**。生成结果与自动合入快照一致；Ext `bun run build` 同时生成 bundle/工具 manifest，exit 0。其余合并触及的模块地图和 gate-files 为原有人工源登记，没有另造生成器。
+- 对 merge-base `e3a15f2432`、本分支 `d23e8b0c7c`、alpha `2142240b16` 的 gate-files 按 package/file 键比对，**两侧同时改过的行交集为空**（`/tmp/secrets-r13-count-intersection.json`）；没有新增测试或手改计数。实际测量仍保留：setup-order 外层 1 / 内层 2、register-policy 97、plugin-host 53、context-injection 44。JUnit 顶层九文件共 258，未把嵌套 suite 重复求和。
+- 重采命令：根 `gate slot -- bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts`，exit 0。独立 HOME/XDG、临时项目与 mock 服务，由采样器原 finally 清理；没有 app/Electron/窗口。逐份检查 17 个 JSON：`_source` 均为合并提交 **10abacd95b**，每个 `_engine.packages` tree 等于合并后的 HEAD。生成物提交 **`beb7052f42`**；不以覆盖身份或选择某一侧旧样本代替实际重采。
+
+### 一次相关验证
+
+所有下表测试均通过 `gate slot -- bun test --max-concurrency 2 --timeout 90000` 执行；r12 四文件各自独立运行一次，没有同一代码的盲目重跑。
+
+| package / 点名文件 | exit / 结果 |
+| --- | --- |
+| ext：plugin-host、policy/register-policy、plugin-setup-order、video-understanding、cloud-vision、context-injection、policy/authority-registry、policy/risk、policy/display.test.ts（显式九文件列表） | **0 / 258 PASS**；逐文件 53/97/1/2/25/44/5/23/8；视频 frame projection、MCP verification、事务清理和既有权限链均在原文件内验证 |
+| ui-mac：`src/engine-adapter/fixture-identity.test.ts` | **0 / 5 PASS**，最终合并树身份 |
+| ui-mac：`src/main/process-fence-write-sites.test.ts` | **0 / 16 PASS**，r12 W4 登记与新闭包一致 |
+| ui-mac：`src/renderer/codepuppy-ui/PermissionDialog.test.ts` | **0 / 81 PASS**，657 expect，风险标签/外发说明/ARIA 原断言不变 |
+| ui-mac：`src/renderer/codepuppy-ui/permission-risk.test.ts` | **0 / 5 PASS**，40 expect，四档与外发保持 |
+| schema：`src/codepuppy-protected-files.test.ts` | **0 / 7 PASS**，604 expect，含 HOME 与 Windows 形态 |
+| ui-mac：r12 点名的 14 个夹具直接读取文件（同 command-reply 至 turn-diffs 显式列表） | **0 / 163 PASS**；对新样本做一次 wider-related，实际数以本轮 JUnit 为准 |
+
+本轮共 **535 个不同用例 PASS**。Ext 与 fixture 消费者同时保存 JUnit（`/tmp/secrets-r13-ext.xml`、`/tmp/secrets-r13-fixture-consumers.xml`），setup-order 的 2 条子用例由原宿主精确计数，不另重复运行。`bun typecheck`：ext、ui-mac 均 exit 0；schema exit 0 / 145 files。scoped oxlint 仅本轮解决的 setup-order.cases.ts / policy/index.ts，exit 0 / 0 warnings / 0 errors。
+
+合并/样本提交后 `affected-tests --list` exit 0：**`affected tests: 157 of 736 test files`**，只列出，没有 gate run/bin/check/整套或整层。以新 alpha 为基准的 git diff --check exit 0；本次 modules.md、plan.md 文档合同检查通过。
+
+观察与去向：对旧 first-parent 的 staged diff --check 会报 alpha 自带的 `resources/video-runtime/licenses/leptonica.txt:26`、`src/shared/project-artifact-path.ts:104` 两处 EOF 空行；一次与 origin/alpha 的逐文件 diff 为空，未改这些源资产，供编排器按 alpha 既有事项处置。安装的 trust 提示保留原日志，不擅改策略。本轮无新 ARCH/OPTIONAL，未解冲突为零。
+
+证据统一前缀 `/tmp/secrets-r13-`：sample、ext-tests、fixture-identity、fixture-consumers、write-sites、permission-dialog、permission-risk、protected-files、ext-typecheck、ui-typecheck、schema-typecheck、install、inventory、build、lint、affected.log；聚合标识与计数 `receipt.json`。偏离仅为本次明确授权的合并解决、原生成器重采与事实/登记校验；没有新设计、依赖选择、检测规则/阈值或产品行为改动。未 push/开 PR/merge PR，发布仍由编排器负责。

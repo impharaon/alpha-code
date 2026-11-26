@@ -64,6 +64,7 @@ export function createDocumentRuntime(input: {
     attempt.settled = (async () => {
       let cancelTimer: ReturnType<typeof setTimeout> | undefined
       let deadline: ReturnType<typeof setTimeout> | undefined
+      let refreshPublished = false
       try {
         await mkdir(task.jobRoot, { recursive: true })
         const manifest = readDocumentAssets(input.assets)
@@ -102,12 +103,19 @@ export function createDocumentRuntime(input: {
         if (attempt.cancelled || disposed || !registrations.has(key(registration.location))) return
         publish({ phase: "ready", version: receipt.version, executable: executable(destination, input.platform) })
       } catch (error) {
-        await discardCandidate()
-        if (!attempt.cancelled && !disposed) fail(error)
+        if (!attempt.cancelled && !disposed && task.runtimeRoot === destination) {
+          await rm(destination, { recursive: true, force: true })
+          candidate = undefined
+          refreshPublished = true
+        } else {
+          await discardCandidate()
+          if (!attempt.cancelled && !disposed) fail(error)
+        }
       } finally {
         clearTimeout(cancelTimer); clearTimeout(deadline)
         if (disposed || (attempt.cancelled && requests.size === 0)) { await discardCandidate(); preparation = undefined }
         if (active === attempt) active = undefined
+        if (refreshPublished && !disposed) preparation = prepare()
         if (attempt.cancelled && !disposed) dispatch()
       }
     })()

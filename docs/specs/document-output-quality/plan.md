@@ -598,3 +598,5 @@ A8：新增原 runtime 文件的 ready→dispose→同 userData 新 runtime 实�
 A9 runtime red：未发布 manifest 当前在构造器 throw；复用已发布目录验证失败当前直接 failed，target 0 PASS/2 FAIL（A9-runtime-red.log）。分两个生产提交修正，均不添加无限自动重试。A9 的共享 cache 要求与仍冻结的 §4.10/R13 明文“{{JOB_FONT_CACHE}} 替换为本 job 内缓存”相冲突；该部分需设计拥有者同步裁定，不能悄悄改 Python 投影契约。Windows 字体只在准备时写入则与 §4.2 已一致，将独立修。
 
 A9 missing-pin green：构造不抛、query 返回真实 unknown failed，未访问下载器；target 1 PASS（A9-pin-green.log）。无 pin 时不虚构活跃 Python 投影，实际环境查询仍明确拒绝缺少的绑定。
+
+A9 published-repair green：原两项 runtime 断言不变，文件 19 PASS（A9-runtime-green.log）。仅已发布目录验证失败时丢弃并从同 pin 重提取一次；新 candidate 再失败即 failed，不循环。

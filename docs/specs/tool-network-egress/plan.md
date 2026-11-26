@@ -311,3 +311,9 @@ AC-08 的计划证明与 AC-13 日常注入证明现已补齐。AC-13 的真实�
 
 
 r7 收尾：源代码仍为 `cc604a9bcb`，本轮只更新本节证据。三个对照的源文件已恢复，`git worktree remove /Users/pharaon/app/wt/egress-controls` 已完成，证据副本保留在上述 /tmp 目录。提交前旧名扫描 10 pass / 0 fail；链接 6 条与 diff 检查通过。文档 contract 仍为既有 69 errors / 253 warnings，findings 与 r6 基线完全一致；`affected-tests --list` 仍因本 worktree 缺 `.gate-tests` 退出 2，没有 scope line，继续交编排器，未改门。core.hooksPath 仍为 `.githooks`。
+
+### r8：接受的审计修复
+
+依据 r8 的 R1 处置，只修复六项接受项，不重开设计。新增回归均放原 integration 文件，依赖由静态 import 可追踪；不扩大 scenario 或 PR 选测层。每项缺陷先单独提交红测试，再提交产品修复，原红断言不改。
+
+R1-2：活动 revision 在档位查询中变化时重读至稳定，沿用拨号 signal 限定等待。必要同调用链文件 `network-egress-grants.ts` 仅把已有 signal 传入 main 的 pass 查询，未改 wire 合同。`83ba2c44b2` 的两条回归在旧实现为 0 pass / 2 fail（`/tmp/egress-r8-2-red.log`）；U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts` 修复后为 10 pass / 0 fail（`/tmp/egress-r8-2-green.log`）。

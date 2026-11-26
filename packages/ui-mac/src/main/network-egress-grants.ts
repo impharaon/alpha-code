@@ -73,13 +73,13 @@ export function admitUserEgressGrant(host: unknown, port: unknown): UserEgressGr
 let authority: {
   authorized(host: string, port: number): boolean
   request(host: string, port: number, signal?: AbortSignal): Promise<EgressGrantOutcome>
-  pass(): Promise<EgressPassBasis | undefined>
+  pass(signal?: AbortSignal): Promise<EgressPassBasis | undefined>
   recordPass(pass: EgressPass): void
   denyPass(id: string, destination: Destination, basis: EgressPassBasis): void
 } | undefined
 
 export type EgressPassBasis = Pick<EgressPass, "sessions" | "tierRevision">
-export const currentEgressPass = () => authority?.pass() ?? Promise.resolve(undefined)
+export const currentEgressPass = (signal?: AbortSignal) => authority?.pass(signal) ?? Promise.resolve(undefined)
 export const recordEgressPass = (pass: EgressPass) => authority?.recordPass(pass)
 export const denyEgressPass = (id: string, destination: Destination, basis: EgressPassBasis) => authority?.denyPass(id, destination, basis)
 

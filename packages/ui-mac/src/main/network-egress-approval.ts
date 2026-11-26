@@ -91,14 +91,23 @@ export function createNetworkEgressApproval(deps: {
       }
     })
   })
-  async function pass(): Promise<EgressPassBasis | undefined> {
+  async function pass(signal?: AbortSignal): Promise<EgressPassBasis | undefined> {
     if (!deps.available) return
-    const snapshot = deps.activity.snapshot()
-    if (!snapshot.complete || !snapshot.activities.length) return
-    const sessions = [...new Map(snapshot.activities.map((activity) => { const session = activitySession(activity); return [sessionRefKey(session), session] })).values()]
-    const tiers = await Promise.all(sessions.map((session) => deps.activity.tier(session)))
-    if (deps.activity.snapshot().revision !== snapshot.revision || tiers.some((tier) => tier !== "allow")) return
-    return { sessions: sessions.map((session) => ({ session, tier: "allow" })), tierRevision: snapshot.revision }
+    for (;;) {
+      signal?.throwIfAborted()
+      const snapshot = deps.activity.snapshot()
+      if (!snapshot.complete || !snapshot.activities.length) return
+      const sessions = [...new Map(snapshot.activities.map((activity) => { const session = activitySession(activity); return [sessionRefKey(session), session] })).values()]
+      const tiers = await new Promise<Awaited<ReturnType<typeof deps.activity.tier>>[]>((resolve, reject) => {
+        const abort = () => reject(signal?.reason)
+        signal?.addEventListener("abort", abort, { once: true })
+        Promise.all(sessions.map((session) => deps.activity.tier(session))).then(resolve, reject).finally(() => signal?.removeEventListener("abort", abort))
+      })
+      signal?.throwIfAborted()
+      if (deps.activity.snapshot().revision !== snapshot.revision) continue
+      if (tiers.some((tier) => tier !== "allow")) return
+      return { sessions: sessions.map((session) => ({ session, tier: "allow" })), tierRevision: snapshot.revision }
+    }
   }
   function linearize<T>(operation: () => T): Promise<T> {
     const next = serial.then(operation)

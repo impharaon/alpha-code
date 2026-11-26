@@ -79,6 +79,18 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       seen.delete(value)
     }
   }
+  const permissionCause = (cause: unknown, mode: "mask" | "hide", seen = new Set<object>()): unknown => {
+    if (!cause || typeof cause !== "object" || seen.has(cause)) return undefined
+    seen.add(cause)
+    const source = cause as { _tag?: string; error?: unknown; message?: string; reason?: string; feedback?: string; rules?: unknown; permission?: string; resources?: unknown }
+    if (source._tag !== "Permission.BlockedError" && source._tag !== "Permission.CorrectedError")
+      return permissionCause(source.error, mode, seen)
+    const fields = mode === "hide"
+      ? { rules: [], permission: source.permission, resources: [], reason: ProtectedFiles.MASKING_FAILED_TEXT, feedback: ProtectedFiles.MASKING_FAILED_TEXT, message: ProtectedFiles.MASKING_FAILED_TEXT }
+      : project(Object.fromEntries(Object.entries(source).filter(([key]) => ["rules", "permission", "resources", "reason", "feedback"].includes(key)))) as Record<string, unknown>
+    // Preserve the engine's actual class prototype across the separately bundled extension boundary.
+    return Object.create(Object.getPrototypeOf(cause), Object.fromEntries(Object.entries({ ...fields, _tag: source._tag }).map(([key, value]) => [key, { value, enumerable: true, configurable: true, writable: true }])))
+  }
   const metadata = (value?: Tool.Metadata): Tool.Metadata => {
     const { [DISPLAY_KEY]: display, ...dynamic } = value ?? {}
     const masked = project(dynamic)
@@ -284,6 +296,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         }))))) throw new Error("Restored env excerpt in error")
         const error = new Tool.Error({
           message: text(input.error.message),
+          error: permissionCause(input.error, "mask"),
           metadata: metadata(await mutationProjection({ ...state?.last, ...input.error.metadata }, state) as Tool.Metadata),
         })
         await finishProgress(state, false)
@@ -295,7 +308,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         } catch {
           /* Never recover the previous dynamic progress. */
         }
-        return new Tool.Error({ message: ProtectedFiles.MASKING_FAILED_TEXT, metadata: hiddenMetadata(state) })
+        return new Tool.Error({ message: ProtectedFiles.MASKING_FAILED_TEXT, error: permissionCause(input.error, "hide"), metadata: hiddenMetadata(state) })
       } finally {
         if (state) calls.delete(toolCallKey(input.call))
       }

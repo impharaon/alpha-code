@@ -782,7 +782,7 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 
 远端requirements以实际 pinned GlobalSettings 的 connectivity 读取offline事实，不再由本地适配猜CLI。在线读取沿 bundled npm make-fetch-happen 的正常HTTP缓存/更新语义；offline在同一descriptor XDG缓存内，通过原key owner去掉URL凭据/签名后的逻辑源名读取cacache快照。网络不可达可复用上次成功内容；403/404等HTTP失败不被快照掩盖，响应内容读取/写缓存失败也不进入传输fallback。没有自己的TTL/registry更新器、第二个固定文件下载器或用户缓存选项；fetch自身retry=0，准备事务只恢复一次。缓存body是私有来源内容，key/ready不写认证。红例原断言保留，补正测试的typed failure解码和Bun自有transpiler缓存位置（确认非绑定目录里只有bun子目录），组件13 assertions通过；实际原厂uv/Node/Python探针 `gate slot -- bun /tmp/connector-r5-npm-proof/remote-native-r9.ts` exit0，3次HTTP覆盖首次认证、内容变化、403，签名轮换offline和服务器关闭后offline均无请求（`/tmp/connector-r9-remote-native-real.log`）。探针先因Bun server.stop后port变0误造URL，固定持有原port后通过；产品代码未因此改变。
 
-总入口新增既有文件7个组件/集成例（含前述Python/remote共本轮8例）：同key并发仅安装一次，真实installer stderr活动转发给两个订阅者；等待者取消不杀持有者；持有者中断后原子关闭子进程再释放锁，另一个等待者/后续attempt能恢复；晚到Host/下载进度不重新spawn；瞬时下载和安装各恢复一次、确定404不重试、持续失败不写ready、联网后新attempt成功；缺失入口/坏ready重建，随后有效ready不再下载/安装；egress按attempt/directory/server/host/port全字段匹配，逐字段负对照不误报拒绝。测试隔离全局Host而不新增产品注入接口，真实Location files/spawner和npm Config/内容/捕获/执行绑定均运行。只在自有CLI dispatch边界控制故障/暂停并复制既有真实npm产物样本，不模拟外部输出。同步点是Deferred/实际stderr/文件事件，没有时钟性能断言或计时扫描。产品仅给新加入准备的订阅者发一次当前packages活动，便于一直呈现准备态；仍同一producer，不另建状态权威。
+总入口新增既有文件7个组件/集成例，另有远端组件1例，共本轮8例：同key并发仅安装一次，真实installer stderr活动转发给两个订阅者；等待者取消不杀持有者；持有者中断后原子关闭子进程再释放锁，另一个等待者/后续attempt能恢复；晚到Host/下载进度不重新spawn；瞬时下载和安装各恢复一次、确定404不重试、持续失败不写ready、联网后新attempt成功；缺失入口/坏ready重建，随后有效ready不再下载/安装；egress按attempt/directory/server/host/port全字段匹配，逐字段负对照不误报拒绝。测试隔离全局Host而不新增产品注入接口，真实Location files/spawner和npm Config/内容/捕获/执行绑定均运行。只在自有CLI dispatch边界控制故障/暂停并复制既有真实npm产物样本，不模拟外部输出。同步点是Deferred/实际stderr/文件事件，没有时钟性能断言或计时扫描。产品仅给新加入准备的订阅者发一次当前packages活动，便于一直呈现准备态；仍同一producer，不另建状态权威。
 
 **实际原件链**：
 - `gate slot -- bun /tmp/connector-r5-npm-proof/prepare-uv-product-r9.ts` exit0：完整public UV入口，真实随包uv/Node、Python pin，editable源+解释器目标，首次ensure1/install1，两处Location同key、当前输入正确（`/tmp/connector-r9-prepare-uv.log`）。
@@ -791,3 +791,27 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 - `gate slot -- bun /tmp/connector-r5-npm-proof/prepare-npm-cold-r9.ts` exit0：空runtime冷准备，第一次注入connect失败、第二次同一authority复用已验原件，installer1；真实SDK MCP stdio两次连接，当前argv/cwd/env正确，begin/end各2（`/tmp/connector-r9-npm-cold-real.log`）。r8冷MCP探针缺口已补齐。大原件没有再次从公网下载；全部探针只在/tmp只读导入#1759准确R1/R2，非生产围栏装配。
 
 阶段整行为文件 `bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2` →59 PASS/351 assertions（`/tmp/connector-r9-final-file.log`）；core `bun typecheck` →exit0、2071 files/2projects（`/tmp/connector-r9-final-types.log`）。fixture初版4个TS错误（via字段、Word/Stream/PlatformError类型）已按现有契约修正；并发进度断言移至第二订阅者已加入的确定同步点，没有修改断言。初次写编辑脚本有语法错误未执行产品变更，已更正；测试一次性记录没有当作性能/容量检查。最终移除臂/相关调用方/scope与#1759准确余项在最终收据补记。
+
+### r9 最终收据：DONE-INDEPENDENT
+
+依据版本：SPEC v1 / DESIGN v2.2，r4/r6裁定及r9 IMPLEMENT；已核：Codex / GPT-6，**DONE-INDEPENDENT**。本轮计划164888de79；Python红6060a566a9→修复2e6e92d97a；remote红6e51c9c5a2→cache/transaction实现33d4315e90。没有新的设计分叉；r8列明的独立余项已完成，下面生产接线与正式包验收不冒充完成。
+
+**补充实物 / AC-04/05/10子链**：`gate slot -- bun /tmp/connector-r5-npm-proof/prepare-uv-package-r9.ts` exit0（`/tmp/connector-r9-uv-package-real.log`），完整public入口实际安装pinned Python内pip26.3 wheel并执行真实pip CLI；两处Location分别用uvx与uv tool run，同一key、installer1、ensure0（复用健康Python）、当前输入正确。与前述解释器/editable、带空格源/递归文件/stdin EOF、Python可执行文件/标准库修复、远端原厂缓存和冷NPM真实MCP探针合起来，覆盖本轮指定的独立入口，不声称完成干净机器/写入围栏/正式包时钟验收。
+
+**总事务 / AC-06/07/08子链**：本文件命名例验证真实子进程活动与字节进度、并发合并、订阅者/持有者取消、等待者及后来retry恢复、失败不发布ready、有效ready跳过下载/安装、egress全字段正负对照。AC-08既有原文诊断生产链由相关6例回归承接；生产controller/新对话root闭环仍列下表。没有测试用例只断言文档文字或从helper的存在推断生产已接线。
+
+**移除对照13项**：去掉Python reinstall、健康检查、offline快照、来源秘密清理、HTTP更新语义、同key锁、瞬时恢复、晚到进度guard、egress attempt比对、实际stderr活动、egress释放、ready快路径、ready发布；各自命名例均exit1 /0 PASS /1 FAIL（`python3 /tmp/connector-r9-removals.py`、`/tmp/connector-r9-removals-summary.log`、`/tmp/connector-r9-removal-*.log`）。每次只改一处并git restore自己的文件。恢复后仅新增8例 `bun test test/codepuppy-connector-launch.test.ts -t 'connector preparation repairs missing|uv remote requirements keep|connector preparation merges simultaneous|connector preparation releases cancelled|connector preparation aborts downloads|connector preparation retries transient|connector preparation names egress|connector preparation replaces incomplete' --max-concurrency=2` →8 PASS/57 assertions（`/tmp/connector-r9-restored-final.log`）。未重复整文件或原件下载；不存在遗留的故意损坏代码。
+
+**最终相关检查**：阶段整文件59 PASS/351 assertions；core `bun typecheck` exit0/2071files/2projects。grep新增/改变export的import/mock/枚举者只有准备测试文件；另对真实连接/状态/诊断调用方 `bun test test/codepuppy-mcp-runtime.test.ts -t 'Office declarations bind|bundled slots bind|bundled declarations reject|the failed status the desktop reads|a local server that writes a secret to stderr and exits|launcher download classification uses' --max-concurrency=2` →6 PASS/72 assertions（`/tmp/connector-r9-runtime-related.log`）。没有改ui-mac/util代码，不重复其未改检查；core无独立lint脚本，git diff --check exit0。未运行gate run/bin/check/全层/计时/容量/窗口。
+
+`affected-tests --list` exit0：**affected tests: 395 of 742 test files**（`/tmp/connector-r9-affected-final.scope` / `.list`），与r8相同，无global/fallback扩跑。新增回归在既有integration文件，fixture的静态imports/字面URL路径可追踪，不改selector或每PR必跑层。官方docs check_repo本plan0 findings，既有仓级56 errors/251warnings（`/tmp/connector-r9-docs.json`）；相对链接检查exit0。hooksPath=.githooks；所有前台命令已结束，未推送/PR/merge、未改其它仓或fence文件、未读/输出真实密钥。
+
+**#1759合入后的准确剩余清单（仍由本票生产集成完成）**：
+1. main用同次 `planPackageManagerCaches` 的绑定env/cacheEnv/rules/locations/excluded装配mandatory bootstrap.launchers、校验和资产描述；`resolvePackageManagerLocations`只作候选，不复制位置表。R1/R2准确签名沿r8表，本轮最后复核分支HEAD仍ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f，没有变化。
+2. 通过其 `installPackageManagerEnvironment` / `packageManagerEnvironment` / `refreshPackageManagerEnvironment` / `projectPackageManagerEnvironment` / `createPackageManagerEnvironmentRequester` 和最终Location spawner接R2；把现成main资产/唯一下载authority、managed prepareFiles/entryFor、依赖/授权/egress事实接入完整Host；sidecar在engine启动前publishConnectorLaunchHost。不得由main运行任意安装命令。
+3. 将本轮完整prepare接index/Slot/localLaunch的packagePreparation；生产attempt controller绑定当前identity/sidecar代的preparing/status/diagnostic/retry与窄桥，接renderer root的单一行/问题投影和真实新对话诊断入口。
+4. 生产开机调用现成Node re-anchor和精确首方槽位/matcher、受管handler；摘要继续对声明槽位，不对扩展后路径。辅助函数/独立证据已完成，boot调用位置尚待最终bootstrap绑定。
+5. 将 `createConnectorLaunchState` 的document runtime绑定返回值接生产 `bindDocumentRuntime`，让文档retry动作真正调用 `runtime.retry()`；独立动作/投影不替代此root接线。
+6. 完成真实Mac签名/打包启动链、空缓存/旧PATH/干净账户/真围栏/国内节点与入口不可达/限速/错误呈现/助手上下文/断网重启的正式AC；Windows依owner平台节奏在Windows包上实测（包括trampoline），不能把Mac组件证据写成AC-09已通过。#1759合入并不自动完成这些项。
+
+偏离/规模：本轮6文件、约358增5删（最终收据另计）；新增fixture只有同模块Host隔离/受控故障与真实进程装配，不加产品接口、依赖或配置。实际约27分钟（2026-11-26T23:47Z，起始23:20:16Z；原预期90分钟），原件/构建依赖复用已有已验缓存，未扩大任务。遗留去向：上述生产集成/正式验收→#1759合入后#1760；docs/README.md:1 index.stale等原有仓级文档结果→文档治理（本plan无新增）；Office compileall→documents已路由，原失败命令/exit1/stderr空沿r4记录，本轮未碰。没有新增ARCH观察或OPTIONAL项。

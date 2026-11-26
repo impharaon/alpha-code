@@ -2856,3 +2856,70 @@ packageIt.live("InstructionsLoaded runs actual package handlers after admission 
   yield* sessions.wait(session.id)
   expect(readFileSync(log, "utf8").trim().split("\n")).toHaveLength(1)
 })))
+
+const subagentHookSample = (matcher?: string) => Effect.gen(function* () {
+  const agent = yield* invocationSample("claude:feature-dev")
+  const agentMembership = JSON.parse(readFileSync(join(agent.root, "skills-enabled.json"), "utf8"))
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const event of ["SubagentStart", "SubagentStop"]) for (const group of hooks.hooks[event]) {
+    if (matcher) group.matcher = matcher
+    else delete group.matcher
+    for (const handler of group.hooks) {
+      handler.command = process.execPath
+      handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();const log='subagent-hook-events.jsonl';fs.appendFileSync(log,JSON.stringify({...input,parent_projection:fs.readFileSync(input.transcript_path,'utf8'),child_projection:input.agent_transcript_path?fs.readFileSync(input.agent_transcript_path,'utf8'):''})+'\\n');if(input.hook_event_name==='SubagentStart')console.log('CHILD_START_BEFORE_MODEL');if(input.hook_event_name==='SubagentStop'&&fs.readFileSync(log,'utf8').trim().split('\\n').map(x=>JSON.parse(x)).filter(x=>x.hook_event_name==='SubagentStop').length===1)console.log(JSON.stringify({decision:'block',reason:'finish this child only'}))"]
+    }
+  }
+  const observer = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { SubagentStart: hooks.hooks.SubagentStart, SubagentStop: hooks.hooks.SubagentStop } }) })
+  const membership = JSON.parse(readFileSync(join(observer.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(observer.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...new Set([...membership.keys, ...agentMembership.keys, observer.key])] }))
+  return agent
+})
+
+packageIt.live("subagent hooks bind real child identity before its first model and continue only that child", () => packageJourney(Effect.gen(function* () {
+  const agent = yield* subagentHookSample("^code-reviewer$")
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const target = agent.hostNames["agent:agents/code-reviewer.md"]!
+  yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Real parent", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Parent recorded", "subagent-parent"), TestLLM.text("Child first result", "subagent-first"), TestLLM.text("Child finished", "subagent-finished"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Prepare the real parent" })
+  yield* sessions.wait(parent.id)
+  yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_source_subagent" as never, call: { type: "tool-call", name: "subagent", id: "source_subagent", input: { agent: target, description: "Review", prompt: "Review this project", background: false } } })))
+  const children = (yield* sessions.list({ parentID: parent.id })).data
+  expect(children).toHaveLength(1)
+  const log = join(location.directory, "subagent-hook-events.jsonl")
+  expect(yield* Effect.promise(() => Bun.file(log).exists())).toBe(true)
+  const rows = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(rows.map(row => row.hook_event_name)).toEqual(["SubagentStart", "SubagentStop", "SubagentStop"])
+  for (const row of rows) {
+    expect(row).toMatchObject({ session_id: parent.id, agent_id: children[0]!.id, agent_type: "code-reviewer" })
+    expect(row.transcript_path).not.toBe(row.agent_transcript_path)
+    expect(row.parent_projection).toContain("Parent recorded")
+  }
+  expect(rows[1]).toMatchObject({ last_assistant_message: "Child first result", stop_hook_active: false })
+  expect(rows[2]).toMatchObject({ last_assistant_message: "Child finished", stop_hook_active: true })
+  expect(rows[1]!.child_projection).toContain("Child first result")
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(3)
+  expect(JSON.stringify(requests[1]!.system)).toContain("CHILD_START_BEFORE_MODEL")
+  expect(JSON.stringify(requests[2])).toContain("finish this child only")
+})))
+
+packageIt.live("a normal session with a parent does not fabricate subagent lifecycle events", () => packageJourney(Effect.gen(function* () {
+  yield* subagentHookSample()
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Ordinary parent", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const child = yield* sessions.create({ location: { directory: location.directory }, parentID: parent.id, title: "Ordinary child", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* TestLLM.Test).push(TestLLM.text("Ordinary response", "ordinary-child"))
+  yield* sessions.prompt({ sessionID: child.id, text: "This was not a subagent invocation" })
+  yield* sessions.wait(child.id)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "subagent-hook-events.jsonl")).exists())).toBe(false)
+})))

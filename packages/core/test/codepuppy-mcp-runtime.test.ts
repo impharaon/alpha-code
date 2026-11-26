@@ -71,7 +71,7 @@ const toolsFile = (tools: unknown[]) => {
 const unused = () => Effect.die("unused integration service")
 
 /** The production MCP service over the given configured servers (the upstream mcp.test.ts wiring). */
-const mcpLayer = (servers: Record<string, unknown>) =>
+const mcpLayer = (servers: Record<string, unknown>, busLayer = Layer.mock(Bus.Service, { subscribe: () => Stream.never, publish: (definition: any, data: any) => Effect.succeed({ id: "evt", type: definition.type, data } as never) })) =>
   Layer.effectDiscard(
     Effect.gen(function* () {
       const bus = yield* Bus.Service
@@ -93,7 +93,7 @@ const mcpLayer = (servers: Record<string, unknown>) =>
           new Document({ type: "document", info: new Info({ policies: [], mcp: new ConfigMCP.Info({ servers: servers as never }) }) }),
         ]),
         Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make(ROOT) } as never))),
-        Layer.mock(Bus.Service, { subscribe: () => Stream.never, publish: (definition: any, data: any) => Effect.succeed({ id: "evt", type: definition.type, data } as never) }),
+        busLayer,
         Layer.mock(Integration.Service, {
           revision: () => 0,
           transform: () => Effect.succeed({ dispose: Effect.void }),
@@ -788,4 +788,52 @@ testEffect(Layer.empty).live("stdio cross-session elicitation only diagnoses amb
     expect(seen).toHaveLength(0)
     expect(fs.readFileSync(starts, "utf8").split("+").length - 1).toBe(1)
   }).pipe(Effect.provide(mcpLayer({ local: local({ CODEPUPPY_MCP_STARTUP_LOG: starts }, { protocol: "legacy" }) })), Effect.provide(Logger.layer([Logger.make(entry => { logs.push(JSON.stringify(entry.message)) })], { mergeWithExisting: true })))
+}))
+
+const { PluginTestLayer } = await import("./plugin/fixture")
+const { Session: NativeSession } = await import("@opencode/core/session")
+
+testEffect(PluginTestLayer).live("a real session owns matching remote MCP transports until SessionEnd and removal while stdio stays open", () => Effect.gen(function* () {
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const sessions = yield* NativeSession.Service
+  const session = yield* sessions.create({ location: Location.Ref.make({ directory: AbsolutePath.make(ROOT) }) })
+  const bus = yield* Bus.Service
+  const transports = new Map<string, InstanceType<typeof WebStandardStreamableHTTPServerTransport>>()
+  const counts = { opened: 0, closed: 0 }
+  const http = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: async request => {
+    const id = request.headers.get("mcp-session-id")
+    if (id) return transports.get(id)?.handleRequest(request) ?? new Response(null, { status: 404 })
+    const server = new McpServer({ name: "session-owner-fixture", version: "1" }, { capabilities: { tools: {} } })
+    server.setRequestHandler("tools/list", async () => ({ tools: [{ name: "probe", inputSchema: { type: "object", properties: {} } }] }))
+    server.setRequestHandler("tools/call", async () => ({ content: [{ type: "text", text: "owned call" }] }))
+    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: () => crypto.randomUUID(), enableJsonResponse: true, onsessioninitialized: id => { transports.set(id, transport); counts.opened++ }, onsessionclosed: id => { transports.delete(id); counts.closed++ } })
+    await server.connect(transport)
+    return transport.handleRequest(request)
+  } })
+  yield* Effect.addFinalizer(() => Effect.sync(() => { http.stop(true) }))
+  const registration = runtime.registerPackageRuntime({ directory: ROOT }, packageElicitationHandlers({ beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer }))
+  yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+  const starts = file("session-remote-stdio-starts")
+  yield* Effect.gen(function* () {
+    const mcp = yield* Mcp.Service
+    yield* connected("remote")
+    yield* connected("local")
+    expect(counts.opened).toBe(1)
+    yield* mcp.callTool({ server: "remote", name: "probe", sessionID: session.id })
+    expect(counts.opened).toBe(2)
+    expect(counts.closed).toBe(0)
+    yield* mcp.callTool({ server: "local", name: "echo", sessionID: session.id })
+    yield* Effect.promise(() => runtime.releasePackageSessionMcp({ directory: ROOT }, session.id))
+    expect(counts.closed).toBe(1)
+    expect(transports.size).toBe(1)
+    yield* mcp.callTool({ server: "local", name: "echo", sessionID: session.id })
+    expect(fs.readFileSync(starts, "utf8").split("+").length - 1).toBe(1)
+    yield* mcp.callTool({ server: "remote", name: "probe", sessionID: session.id })
+    expect(counts.opened).toBe(3)
+    yield* sessions.remove(session.id)
+    yield* until(Effect.sync(() => counts.closed === 2 ? true : undefined), "session removal closes owned remote transport")
+    expect(transports.size).toBe(1)
+    yield* mcp.disconnect("remote")
+    expect(transports.size).toBe(0)
+  }).pipe(Effect.provide(mcpLayer({ remote: new ConfigMCP.Remote({ type: "remote", url: `http://127.0.0.1:${http.port}/mcp`, oauth: false }), local: local({ CODEPUPPY_MCP_STARTUP_LOG: starts }, { protocol: "legacy" }) }, Layer.succeed(Bus.Service, bus))))
 }))

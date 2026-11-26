@@ -565,3 +565,83 @@ r3 最终删除反臂：在干净 `9577dc76c3` 后运行 `python3 /tmp/plugin-st
 r3 最终静态检查：schema `bun typecheck` 142 files、core 2,053 files / 2 projects、client 178 files、ext 与 ui-mac 均 exit 0；client generator 已在 S-12 同提交同步两处类型。11 个本轮改动手写生产/合同文件 scoped oxlint 0 warnings / 0 errors；host 两 generator `--check` PASS，aggregate 仍为 `9094c2712f8ec5901bf5976ee914ab5a4a6874fa4932317a7881b2c553eb188f`。plan/ADR-047 相对链接共 13 条 PASS，`git diff --check` PASS。docs contract 仍 71 errors / 251 warnings，两条旧 plan unknown-id 与其余基线不动；`affected-tests --list` 在当前提交再次 exit 2，缺 `.gate-tests`，没有 scope line。hooksPath 保持 `.githooks`。r3 约 42 分钟，11 个手写生产/合同文件 +52/-38 行（测试/生成物另计），没有超过原实施上界。
 
 最终交接（r3）：依据 spec v5、design v3.1 `3a0352e4e3` 与 r3 顺序续派；已核为 Codex / GPT-6。S-12 字段/SDK 选择与 AC-14 直接内容返回顺序已完成，state writer 合同未改；整片结论仍 **SEAM-CHANGE-NEEDED: S-09 可信 SSE 实际 POST 端点登记**，以本节真实 SDK 经代理的失败和直接成功对照为证，不报告 DONE。下一步仅给该绑定/代内真实端点的受控登记及撤销端口，继续沿既有 proxy/client；已定的 HTTP 缺省、显式 SSE、原权限/密钥/出网权威不重开。遗留去向：S-09 补口交编排器/设计；两个未改本地检查宿主超时、缺 selector manifest 与 docs 基线交编排器；真实 SaaS/工具链与后续片保持原归属。没有新增 OPTIONAL、依赖、公开配置选择、state-writer 变更、迁移或 gate 算法改动。所有前台命令已收完，仅本分支 commit，未 push/PR/merge/启动应用。
+
+
+## 片 3 · #1776：命令、子助手与调用语义
+
+- 依据：[Story #1776](https://github.com/impharaon/alpha-code/issues/1776)；[spec v5 @ 7278c10](https://github.com/impharaon/alpha-work/blob/7278c10/docs/specs/local-plugin-install/spec.md) 的完整 AC-06/10、与片 2 合闭的 AC-02 命令/助手/预览、AC-13/14 命令/助手分项；[design v3.1 @ 3a0352e4e3](https://github.com/impharaon/alpha-work/blob/3a0352e4e3306c0410e2bb680a07f6312d8bcf57/docs/specs/local-plugin-install/design.md) §4.1/4.3/4.8/4.9/§5/§6 S-01/§8/§10（其中片 3 合同沿冻结 v3）。
+- 核对：r4 派发允许同轮 PLAN→IMPLEMENT；本节处于 PLAN，S-01-Q1 需要设计裁决，未记录实施通过。片 4 的 15 实样、SSE 选择/真实连接、AC-14 延后与关闭取消、删除反臂按 r4 的 Claude Opus 5.5 验收收据继承，不重开其历史问题。
+- 起于 2026-11-26 16:36（UTC+08:00），基线 `88d40cb6df`、工作区干净、hooksPath=`.githooks`。实施预计 6–10 小时、20–28 个手写生产/合同文件、约 2,000–3,500 行（测试/生成物/真实夹具另计）；每组 AC 后核对实际规模/用时，达到上界两倍返回，不静默扩大。
+- 集成顺序保持 4→3→5→7→8→9→6；片 5/7/8/9/6 的 AC 归属继承前节表。本片的调用身份/规则、实际 agent/command 与 Invocation 值成为片 5 的输入；alpha-web 的 converter 消费/重 pin 仍由外仓集成，不在此实现。
+
+### 当前代码与来源核对
+
+- `plugin-package.ts` 当前 Invocation 只有原控制字段，缺 §4.1 的 arguments/argumentSyntax/effort/paths/preloadSkills/memory/maxTurns/background；`plugin-conversion.ts:382–400` 的 invocation/toolRules 尚未补齐，strings 会在括号内部拆工具模式；实际 skill 目录的 openai.yaml 尚未进入转换器。
+- `install-from-source.ts` 与 signed profile admission 仍只把 skill/MCP 作为可运行项；其他 entry 保存在同一 bundle 中。片 3 接既有 command/agent 记录和有效投影，不改变片 2 的树/CAS/事务/账本算法或另建包状态。
+- `plugin-package-skills.ts` 已有唯一 installed metadata/live-generation 枚举；ext 已用 SkillEditor 注册真实树内技能，可复用该读端扩展命令/助手消费。现有 ToolEditor.update、AgentEditor.update、command.transform/reload 与 session prompt/context/idle 是 S-01 的 L0 接入点。
+- `core/src/config/plugin/command.ts:196–260` 的原 evaluateTemplate 在参数替换后扫描 shellRegex，parseArguments 是 native parser；直接重用现状会改变 Claude 参数语义并重新识别插入数据。S-01 指定在同一既有 L3 原语内修正，不在 ext 复制 shell 执行。原 `codepuppy-command-model-priority.test.ts` 可覆盖该执行器/模型优先级，不为本票另建 core 测试文件。
+- 真实兼容性报告 §5.2/6/8 的 command/agent、模型/工具及 YAML 失败作为缺陷来源；不是把分析基线的静态候选数字当本片 PASS。下表只列本轮实际检查的源文件数，尚未运行命令/委派。
+
+| 实样 | 固定来源 | 源 command / agent / SKILL.md 数 | 本片证据落点 |
+| --- | --- | --- | --- |
+| feature-dev | anthropics/claude-plugins-official@0fbfda5a91f4，plugins/feature-dev | 1 / 3 / 0 | 用户命令、原助手指令/工具/模型与真实委派 |
+| Codex Vercel | openai/plugins@981b02c0c440，plugins/vercel | 6 / 3 / 54 | commands/status.md、agents/*.md、各 skill 的 YAML |
+| plugin-dev | anthropics/claude-plugins-official@0fbfda5a91f4，plugins/plugin-dev | 1 / 3 / 7 | 完整内容/预览、命令/助手注册及兄弟技能引用 |
+| Temporal | openai/plugins@981b02c0c440，plugins/temporal | 0 / 0 / 4 | 三份 skill sidecar policy 与显式调用对照 |
+| build-chatgpt-app | openai/plugins@981b02c0c440，plugins/openai-developers/skills/build-chatgpt-app | 0 / 0 / 1（整包 5 skills） | dependencies.tools 的 MCP 身份/定义与实际工具可达 |
+| claude-security | anthropics/claude-plugins-official@0fbfda5a91f4，plugins/claude-security | 0 / 17 / 6 | ROOT/SKILL_DIR、agent 控制/作用域、显式调用与零提前执行 |
+
+来源清单为兼容报告的 sample.json/plugins.csv；fixture 用现有 `test-fixtures/plugin-helper/{standard,whole}/provenance.json` 和 selection.tar.gz 补最小原件，记录文件摘要/commit；参数、坏规则和可观察 launcher 只对这些真实副本改目标字段。ralph-loop 的 AC-06 参数/脚本对照沿报告同仓固定 commit 取相应原件，不拿手写插件格式替代。
+
+### 改动
+
+| 文件/入口（未注前缀时位于 packages/ui-mac） | 改什么 |
+| --- | --- |
+| `src/shared/host-extension-package-contract/plugin-package.ts`、`plugin-conversion.ts`、`profiles/plugin-package.v1.schema.json` | 补冻结 Invocation/SkillDisplay/McpToolDependency 及对应严格验证；读取实际 skill sidecar YAML、源模型/工具规则与参数语法，使用同份转换器。只按设计补已有能力，不另写 provider reader。 |
+| 同目录两个 generator、mjs/d.mts/artifact、testvectors/corpus；`test-fixtures/plugin-helper/fixture.ts` 与真实 provenance/archive | 类型/schema/ESM/fixture 同版本，syntax 轴生成到消费侧；发布校验指出已发布定义变更时沿仓库版本规则 bump，不另加旧记录迁移或兼容分支。只扩本片实际读取的原件。 |
+| `src/main/install-from-source.ts`、`package-admission.ts`、`ext-package-tx-builders.ts`；`src/shared/plugin-install.ts`/`installed-plugin-package.ts` 的必要 typed consumers | 接 command/agent 记录、同树指令引用、有效声明/预览，沿包根启停和既有投影/卸载；保留 namespace、hostName/componentId 与本包依赖映射，使用片 4 已验的内容返回→自动开启顺序。树物化/事务算法不改。 |
+| `packages/ext/src/plugin-package-skills.ts`、`plugin.ts`，新增 `plugin-package-invocation.ts` | 复用唯一 installed/live-generation 读端；同一 invoke 路径供用户命令、模型 skill、原 subagent executor 包装；绑定源指令/参数、依赖/路径激活、preload/memory/effort/background/maxTurns，实际任务仍交原 Session/SubagentJob/工具服务。新增模块只拥有这些包调用语义。 |
+| `packages/ext/src/policy/{identity,index,gate,catalog}.ts`；`model-facts.ts` 既有模型事实消费者 | source ToolRule/本包 MCP/助手名进入现有身份与唯一 evaluator；可见集合与调用期 allow/deny 分别消费对应源字段；调用期规则清理、硬 deny、用户明确模型/effort 优先均沿原权威，不写永久权限。 |
+| 新增 `packages/plugin/src/codepuppy-package-runtime.ts` 与同模块测试；`packages/core/src/config/plugin/command.ts` | 只落 S-01 实际需要的反向 renderer/Location 生命周期端口与同一原生执行原语；PreparedInstruction 依 Q1 定点补口后的冻结定义消费。后续 hook callbacks 不在本片预置空实现；同进程两 bundle 必须共享同 Location 槽。 |
+| `docs/architecture/codepuppy-authority-registry.json`、ADR-047 的 S-01 窄增量、`docs/architecture/modules.md`、本节 | 同 engine 实现提交登记 plugin-invocation-semantics，并同步原 command-model-priority/project-opencode-config-trust 的实际能力说明与具名证明。command.ts 已在精确接管清单；只在确有新路径时做机械登记，不改 gate 算法/阈值。 |
+
+### 顺序
+
+1. **合同问题先定点返回（本次 PLAN）**：写入 Q1 与文件/证据计划，只有 plan.md 提交。设计补齐 S-01 后在首个实现提交填核对行，不先写一个自选 port shape。
+2. **转换与合同红→绿**：具名实样重现规则误拆、命令/助手字段遗漏、YAML false/依赖遗漏；先独立提交正确红测，再补统一 converter/验证/schema 与生成物。只运行改动 case，随后转换/宿主合同各相关文件完整一次。
+3. **S-01 renderer 红→绿**：同一 ConfigCommand 原语识别 source 语法后才绑定值；用户命令和包调用消费同一 renderer。端口/Location dispose/工作区隔离及原生参数/项目 gate 回归随同一提交；registry/ADR 与实际 engine 改动同提交。先跑新 -t，再跑对应原模块文件一次。
+4. **安装与 L0 运行入口**：接命令/助手内容记录、启停/预览、统一 invocation 和原执行器包装；真实工具清单、Agent.Info/子会话指令与模型建议读回。preload/路径/记忆目录只在对应运行时创建/注入；完整树、ROOT/SKILL_DIR/DATA 消费片 2/4 的现有权威。
+5. **同一权限/身份与运行收口**：真实调用绑定规则、可用工具集合和模型/effort，显式用户与 deny 反臂；关闭/移除、下一用户消息/完成清理。一次临时 HOME/XDG/数据根下回放六实样，实际源脚本只在临时目录中用受控标记运行，真实 SaaS/模型供应凭据和工具链留集成验收。最后只跑一次按实际改动 import/mock/枚举搜出的较宽相关集及适用包 typecheck/lint/generator/文档检查，commit only。
+
+### 风险
+
+- **S-01-Q1 冻结端口缺字段（当前停点）**：§4.1 Invocation.arguments 与 §4.9 的命名参数是本片必需输入，但 §6 `PreparedInstruction` 只有 parts/syntax/rawArguments/cwd。源字符串仍须保留 source；core 被指定先识别原模板参数/shell 节点再绑定值。当前形状中，body=`$target`、rawArguments=`first second`，arguments 分别为 `["target"]` 与 `["unused","target"]` 的两个合法声明会得到相同 renderer 输入，却应得到 first 与 second。renderer 无法从输入恢复参数名位置。ext 先展开或改写命名参数还涉及缺位 named 为空、indexed 保留的差别，并移走已冻结给 core 的解析责任。
+- **Q1 建议最小补口**：在 `PreparedInstruction` 携带 Invocation 的有序参数名（建议 `arguments: readonly string[]`，原样传递），仍由 core 这一份 parser/renderer 解释；不新加解析器、上下文 registry 或旁路消息。需设计确认该字段/缺省和共享生成位置；本节不把建议写成已批准合同。
+- **工具可见与授权混用**：agent.tools/availableTools 与 allowed-tools 的测试必须分别删行为变红，不能把后者变白名单或永久 allow；真实 deny/项目信任/出网继续有反臂。Task/Skill/MCP 源名映射跟同一 entry/hostName/generation，不能为长模型别名另造权限身份。
+- **数据成为代码或参数缺位丢意图**：同一实际 renderer 验源静态 shell、含引号/反斜杠的参数、bound ROOT/值和用户注入的反引号/美元。原生 opencode 语法继续走其声明轴；不靠先 join/split 或 ext 自己跑 shell。
+- **子会话并发/结束清理**：规则、effort、preload/memory 与 child/turn/task 的实际身份关联；前后台与 maxTurns 必须取原任务机制的真实结果。用下一用户消息、同包另一入口、另一 session 和换代/关闭反臂检出串用，不能只检查转换 JSON。
+- **静态展示冒充运行与依赖**：根 YAML 不是子助手；skill YAML 的 false、MCP 工具依赖和资源相对位置需要走实际入口。缺依赖只报告消费项具体名字。默认提示只在用户从入口发起时预填，安装没有模型提交/脚本执行。
+
+### 证明
+
+命令 `U/E/C/P` 分别从 packages/ui-mac、ext、core、plugin 运行 `bun test --max-concurrency 2 <file> -t '<name>'`。新永久测试在既有模块文件；只有新端口模块新建同名测试。下面名称为待新增/调整的具名证据，不是 PASS 收据。
+
+| AC/合同分项 | 具名证据与命令/宿主 | 层与运行时机 | 删除行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-02 命令/助手/预览 | U `src/main/install-from-source.test.ts`、`package-admission.test.ts`：`plugin-dev installs commands and agents from the same live bundle`；真实 7 skills/1 command/3 agents、资源/图/预览来源及 active 清单读回 | integration；受影响 PR＋nightly | 仍只接 skill/MCP、伪装为 skill、漏组件或引用错代时实际库存/指令不同 |
+| AC-06 参数与 shell；Q1 | C `test/codepuppy-command-model-priority.test.ts`：`package instruction renders source nodes before bound values and arguments`、`declared argument names select their ordered values`；feature-dev/ralph-loop 副本只改目标参数字段，正向源脚本标记、含 !`/美元/引号数据的负向臂 | integration；受影响 PR＋nightly；完整样本执行为一次性命令证据 | 恢复旧 parse/参数后扫描会串位、吞尾参或执行数据；删名字字段传递会使 first/second 的同模板两臂混同 |
+| AC-06 工具规则词法 | U `src/shared/host-extension-package-contract/plugin-conversion.test.ts`：`source tool rules retain quoted nested patterns and recover the next rule`；按真实声明字段做有界副本变体 | fast；受影响 PR＋nightly | 括号内空格/逗号被拆、坏规则吞其他合法项会在归一化规则及诊断定位处失败 |
+| AC-10 助手/模型/实际工具集合 | E `src/plugin-host.test.ts`、`src/policy/register-policy.test.ts`；C 原 command-model-priority 的相关 case：`package agent delegates with its instructions and tool set`、`explicit user model wins over a package suggestion`；feature-dev/Vercel 的原执行器/真实 child 指令/离线模型请求读回 | integration；受影响 PR＋nightly；完整旅程一次性回放 | 少注册、只给 description、工具名错译、建议覆盖用户或另起执行循环会在真实 child/模型请求/工具执行处失败 |
+| AC-10 YAML policy/依赖/显示 | U 原 converter 文件与 E `src/plugin-host.test.ts`：`skill sidecars preserve manual policy and resolve declared MCP dependencies`；Temporal 的 false 仍可用户显式调用，build-chatgpt-app 的工具依赖可达，根 interface 不造 agent，资源按 skill 目录解析 | fast＋integration；受影响 PR＋nightly | YAML 未读、false 被覆盖、只存依赖说明或把界面配置当 agent 会在入口/实际 MCP 身份处失败 |
+| Invocation 运行字段 | E `src/plugin-host.test.ts`：`package invocation applies source effort paths preload memory and task controls`（按字段表驱动）；实际 read/edit/write 激活与显式调用对照、真临时目录内容、source maxTurns 的 partial/可继续、原前后台任务结果 | fast 的字段投影＋integration 的真实挂点；完整子任务旅程/时机测量只作一次性或既有 nightly | 去掉字段消费后不仅 JSON 不同，模型上下文/文件触发/目录与任务结果也必须改变；跨 session/下一用户消息的作用域反臂失败 |
+| D3 调用期 allow/deny 与身份 | E `src/policy/register-policy.test.ts`、`identity.test.ts`、`src/plugin-host.test.ts`：`package invocation permissions expire without changing persistent rules`；命中普通 ask、硬 deny、availableTools、下一消息/结束/关闭、MCP 与助手源名同映射 | fast＋integration；受影响 PR＋nightly | 永久放宽、allow 充当可见白名单、holdAsk 抹掉合法来源 allow、错包名或残留状态均有实际拒绝/执行/可见性对照 |
+| AC-13/14 命令/助手分项 | U 原 install/admission、E 原 plugin-host；一次性临时完整六样本的安装→调用→关闭→移除，安装阶段 marker/process/tool-call 为零，明确触发的同样本正向臂能观察；卸载本包运行入口/包内 memory 清理，项目共享记忆依原归属保留 | integration 的入口开关；整包旅程一次性命令＋输出（不加日常 suite） | 提前模板执行、只写 desiredState 却仍可委派/调用、移除漏注册或误删共享资料都会在可观察副作用/实际清单处失败 |
+| S-01 单槽/同一原语 | P 新 `test/codepuppy-package-runtime.test.ts`：`instruction renderer follows the Location lifetime across module consumers`；C/E 上述真实调用链 | fast 的槽生命周期＋integration 的真实 renderer；受影响 PR＋nightly | 两 bundle 各存一份、漏 dispose/工作区串用或 ext 另写执行器不能满足真实绑定/释放及单一 renderer 反臂 |
+
+实现时按导出与字段实际变化用 rg 找 import/mock/枚举/读文件消费者，初选 U 的 host artifact/envelope/install/admission/account/write-channel 文件，E 的 plugin-host/engine-transforms/policy register/identity，C 的 codepuppy-command-model-priority 与 tool-skill/tool-subagent 中相关具名 case。每步只改动 case 迭代、完成时对应行为文件一次；heavy/timing/容量的既有 case 留 nightly，不能因同文件而全跑。最后一次较宽相关集只补实际可达消费者，不跑全包/项目、bin/check 或 gate。永久用例 imports/字面路径可被 selector 追踪；按新 AGENTS 返回前执行 affected-tests --list，缺 manifest 如实报告，不在冻结 gate 外加配置。文档跑本文件链接/合同及 diff 检查；适用包各 bun typecheck、scoped lint、两个 generator --check。
+
+### 偏离记录
+
+2026-11-26 · 本轮按 r4 的“发现未裁决设计问题则停在 PLAN-READY”执行：只追加本节，没有实现代码、测试或 engine 登记改动。S-01-Q1 是冻结跨模块输入缺失，不能由本车道增字段/改责任来绕过；建议最小输入字段已列于风险，待编排器/设计裁决后进入第 2 步。片 4 accepted 及其他已定合同继续继承。
+
+本轮 PLAN 收口（2026-11-26 16:47，Codex / GPT-6）：只读核对固定设计/真实样本/既有入口，约 11 分钟。`python3 scripts/check-doc-links.py docs/specs/local-plugin-install/plan.md` exit 0，8 条相对链接；`git diff --check` exit 0。单仓 docs profile 的 `check-docs-contract --changed-since 88d40cb6df --format json` exit 1，71 errors / 251 warnings，与已接受基线一致（`/tmp/plugin-standard-r4-plan-docs.json`）；按派发不修两条旧 unknown-id。`affected-tests --list` exit 2，缺 `.gate-tests`，无 scope line（`/tmp/plugin-standard-r4-plan-affected.log`）。未运行测试/应用/全量门，hooksPath=`.githooks`。已核依据 spec v5/design v3.1 与 r4；结论 PLAN-READY / Q1 待裁决。下一步由编排器/设计定点补 renderer 参数名输入；其余遗留维持原去向，无额外 OPTIONAL。

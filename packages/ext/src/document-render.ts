@@ -28,7 +28,7 @@ import {
   documentPngInfo,
 } from "../../ui-mac/src/shared/workspace-file"
 import { readDocumentAssets } from "../../ui-mac/src/shared/document-resources"
-import { prepareDocumentFonts } from "../../ui-mac/src/shared/document-runtime-fonts"
+import { prepareDocumentProfile } from "../../ui-mac/src/shared/document-runtime-fonts"
 import { runDocumentPython } from "./document-process"
 
 export function createDocumentRenderer(input: {
@@ -255,12 +255,8 @@ export function createDocumentRenderer(input: {
         await mkdir(job, { recursive: true })
         const profileRoot = join(input.documentRuntimeRoot, "jobs", renderId)
         if (request.kind !== "pdf")
-          prepareDocumentFonts({
+          prepareDocumentProfile({
             assets: input.assets,
-            runtimeRoot: join(
-              environment.renderState.phase === "ready" ? environment.renderState.executable : "",
-              process.platform === "darwin" ? "../../../.." : "../..",
-            ),
             jobRoot: profileRoot,
             platform: process.platform === "darwin" ? "darwin" : "win32",
             home: homedir(),

@@ -614,3 +614,5 @@ A10 red：资源配置目标轴的现有 resources 文件新增 Windows/Mac File
 A10 green：target FileSets 与 afterPack/copier 在 resources 文件 14 PASS（A10-green.log），不再根据 mac host 把 arm64 Python 拷入 Windows 包；uv 仅增加固定 action 安装步骤。没有运行/发布 Windows workflow，Win 实机包仍按既有计划待验。
 
 A9 Windows font rewrite red：既有 ext renderer 文件用实际模板/页图和原 profile 生成器，正常 Office render 调用了会修改 runtime 字体的 installer，target 1 FAIL（A9-fonts-red.log，实际 1 次）。下一提交渲染仅建私有 profile；Windows 四字体仍由 main 准备/验证负责，不在并发 render 中重写。
+
+A9 font render green：原 installer 调用反例不改，renderer 文件 6 PASS（A9-fonts-green.log）；字体复制仅留准备器，render 私有 profile 不再修改共享 Windows runtime。

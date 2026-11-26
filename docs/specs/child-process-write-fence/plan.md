@@ -603,3 +603,43 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 步骤 3 收口：`bun test src/renderer/codepuppy-ui/PermissionDialog.test.ts src/engine-adapter/permission-reply.test.ts` **102 pass / 0 fail / 754 expect**。卡片显示真实目录；描述失败可沿原错误呈现重试；只有具体点击安装 pre-reply 动作，账本先核当前请求/指纹再 await R4，失败不发 allow，拒绝不登记。原 v1 reply 通过 requestID/decision 找到当前点击闭包，decisionID 仍由该闭包交 main 核实；不改公共审批协议。该两文件是已有 affected PR 测试，新增 5 条；不把临时原生场景加入每 PR 矩阵。
 - **BLOCKED: verification — AC-10 的一次性 RPC 探针返回编码。** `gate slot` 下生产 main/engine 构建成功，真实 R5 pending、只读描述、main R4/tracker 原生签发均完成，`outside/first.txt` 已为 `approved write`。临时 RPC observer 返回原 Tool.Result、完成对象、完成字符串时均 HTTP 500：`Server failed to encode its response`，引擎报 output 不是 JSON 值。后两次只修临时探针的返回值，仍未解决；按“同一修正失败两次即返回”停止，不删断言、不再定位生产 RPC 或改其协议。已有子进程、同代第二次写/PID、缺失/软链目录、原生拒绝及撤 R4 的完整对照尚未跑完，**AC-10 不记通过**。三次根目录、初始及最新结果、runner 与日志都保留于同一场景根的 `r6/`，最新 `approval-results.json`；与先前 R4 真盘/receipt 移除臂的红绿证据分开。
 - 独立收口：`gate slot -- bun test src/main/project-writable-ipc.test.ts src/main/process-fence-config-fence.test.ts src/main/process-fence-zsh-startup.test.ts` **3 pass / 0 fail**（真实 sandbox-exec 宿主）。返回前一次较宽相关集合为既定七文件加 IPC census 与 receipt 的六个直接消费者，共 **121 pass / 0 fail / 14 files**；精确清单及输出在 `r6/summary.json`、`r6/logs/`。ui-mac/ext 类型检查、north-star、`git diff --check` exit 0；旧名扫描 **10 pass**。文档契约 exit 1，**70 error / 252 warning**，去行号后的 finding 与已接受基线完全相同；不改既有 INT-safety 引用。`affected-tests --list` exit 2：此基线缺 `.gate-tests`，没有 scope 行，未报选择器通过。r6 本轮约 85 分钟（含约 30 分钟 slot 等待），切片三按已完成内容提交，完整原生证明交编排者处置；无窗口/真 HOME 安装、无全量 gate、无 push/PR。
+- **r7 observation ruling（编排者 Claude Opus 5.5，2026-11-27）。** 临时 RPC 只触发真实 write；工具完成/失败写入项目内 `results/*.json`，宿主读取结果及外部目标文件，沿既有签名围栏场景的观察方式。返回使用 `package-mcp-oauth.engine.cases.ts` 已有的普通数组形状，不再读取该 RPC 的编码返回，不修改生产协议。`gate slot -- bun test ./node_modules/.cache/package-manager-scenario-vf8vnnjs/r7/approval.test.ts` **1 pass / 37 expect**：普通、软链、缺失目录批准后原请求成功；批准前已有 PTY 子进程先拒写、批准后写入；同一引擎第二次写无 external_directory 请求，工具 PID/宿主 PID 均不变；缺失目录的上级仍拒写。native reject 与撤 R4 两臂工具失败、零落盘/零登记。三臂与实际文件在原场景根 `r7/approval-results.json`。r6 的 RPC 编码阻塞已按本裁决闭合，不重跑 Go/其它成功安装。
+
+## 交付切片四｜固定全局安装位置与用户配置
+
+- 依据：#1759；spec v6 AC-11（非 brew）、AC-12；design v4 §4.1–4.3.1、R6/R7、§10 @ `6a292250bc`；Go discriminator 沿 r6 明确修正。切片五继续负责 v5 brew。
+- 核对：待首个实施提交填入本计划提交；r7 授权同轮计划并直接实施，自核不冒充独立审查。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/main/process-fence-profile.ts`、`process-fence-plan.ts` 及既有测试 | R1/R3 同一位置权威的全局/用户规则经 R7 后进入实际 profile；固定模板按真实根绑定；精确文件不变成父目录写权。 |
+| `packages/ui-mac/src/main/server.ts` 及既有测试 | 生产启动/探针消费已核规则与安装环境；R6 沿实际 profile 读出同一集合，不另抄位置表。 |
+| `packages/ext/src/policy/identity.test.ts`（必要时 `policy/index.ts`） | 复用切片三的文件目标 R6，核三档、固定文件无 external_directory 附加卡、保护拒绝与表外目录审批。 |
+| `scripts/gate-files.tsv`、本计划 | 机械计数与证据同步；不改 gate。 |
+
+### 顺序
+
+1. 在 profile/planner 既有测试补安装/配置规划、具体模板绑定与重指负例，完成 R7 到实际 profile 的接线；运行这些变动文件一次并提交。
+2. 接生产 server 与现有 R6 权限消费，运行 server/policy 的变动 case 与文件、类型检查；提交接线与相关旧行为断言同步。
+3. 一次性真实全局安装/用户配置 scenario 经生产入口、隔离 HOME/prefix/cache，八管理器逐个装一个真实 CLI 并调用；真实 git 与改文件工具分别按档位/拒绝核内容。固定表撤除、Git 锁撤除、表外 HOME 与 CF/C1 拒写均核真实磁盘。pnpm 钉版与 npm/Yarn Classic 版本管理器 prefix 纳入本次证据。重场景经 gate slot，只补失败行，不重复成功行；记录来源/摘要。最后较宽相关集合、类型、旧名、north-star、docs/affected-tests 与 diff 收口。
+
+### 风险
+
+- 真实系统 prefix 不用于本机安装；临时宿主拒绝准备 Mac 的系统安装目录，等同无该目录写权限，实际全局命令只选隔离 HOME 的固定族。记录此覆盖边界，不伪称系统 prefix 实装。
+- 模板中的版本目录先枚举/绑定，再展开后缀；不放行版本管理器整根或自动跟随新目标。用户文件只准备父级，保持文件级 allow 与保护优先。
+- 全局位置可写不等于权限档 allow；保留原工具/命令卡片，R6 只取消多余 external_directory 卡。安装失败需区分权限、CLI 配置与网络，退出 0 必须伴随 CLI 实际调用。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-11 | `process-fence-plan.test.ts` 的固定安装规划、真实目录/版本根 R7 重指；`process-fence-profile.test.ts` 的生产规则形状/deny 优先 | integration，affected PR/nightly，直接 import | 撤具体绑定后新目标被放行；撤实际规则后固定 CLI 安装路径不在 profile；宽根误放会使表外反例可写。 |
+| AC-11 | 临时 `global package installations`，八真实管理器、固定 HOME 族、三档/拒绝、pnpm `.tools` 与 npm/Yarn 版本 prefix | 一次 scenario 留命令/输出，nightly 层，不加入每 PR 矩阵 | 撤清单同次安装拒写；跳过原审批使拒绝臂落盘；仅安装返回 0 但 CLI 不能调用仍失败。 |
+| AC-12 | planner 用户文件/软链重指；现有 policy 的 R6 文件状态与三档用例 | integration，affected PR/nightly | 把文件当目录查询会要求 HOME；撤精确文件允许后真实编辑拒写；保护位置不能成为 writable。 |
+| AC-12 | 临时真实 `git config --global`、原引擎 write/edit shell 文件；批准/拒绝、移除文件表及 Git `.lock` 对照；CF/C1/两处 shell cache 保护 | 一次 scenario，gate slot | 撤配置或 lock 同操作失败；提前 allow 改变拒绝臂文件；扩大到 HOME 或保护优先错误会使负例落盘。 |
+
+### 偏离记录
+
+暂无。

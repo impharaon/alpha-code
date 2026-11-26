@@ -3179,3 +3179,44 @@ packageIt.live("FileChanged watches literal files and dynamic paths once and wit
   yield* sessions.wait(session.id)
   expect(rows()).toHaveLength(7)
 })))
+
+packageIt.live("SessionStart and FileChanged shell environments reach later package processes only in that real Session", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const event of ["SessionStart", "FileChanged", "PostToolUse"]) for (const group of hooks.hooks[event]) {
+    if (event === "FileChanged") group.matcher = "signal.txt"
+    for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();if(input.hook_event_name==='SessionStart')fs.appendFileSync(process.env.CLAUDE_ENV_FILE,'export R18_HOOK_VALUE=\"$(printf session_start)\"\\n');if(input.hook_event_name==='FileChanged')fs.appendFileSync(process.env.CLAUDE_ENV_FILE,'export R18_HOOK_VALUE=\"$(printf file_changed)\"\\n');fs.appendFileSync('environment-events.jsonl',JSON.stringify({event:input.hook_event_name,session:input.session_id,value:process.env.R18_HOOK_VALUE,file:process.env.CLAUDE_ENV_FILE})+'\\n')"]
+    }
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { SessionStart: hooks.hooks.SessionStart, FileChanged: hooks.hooks.FileChanged, PostToolUse: hooks.hooks.PostToolUse } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const log = join(location.directory, "environment-events.jsonl")
+  writeFileSync(join(location.directory, "signal.txt"), "initial")
+  const rows = () => { try { return readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line)) } catch { return [] } }
+  const first = yield* sessions.create({ location: { directory: location.directory }, title: "First environment", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_env_one", "write", { path: "one.txt", content: "one" }), TestLLM.text("First done", "env-one"))
+  yield* sessions.prompt({ sessionID: first.id, text: "Write one" })
+  yield* sessions.wait(first.id)
+  expect(rows().find(row => row.event === "PostToolUse")).toMatchObject({ session: first.id, value: "session_start" })
+  writeFileSync(join(location.directory, "signal.txt"), "changed")
+  yield* ext.finish(Effect.sync(() => rows().some(row => row.event === "FileChanged")))
+  yield* llm.push(TestLLM.toolCall("call_env_two", "write", { path: "two.txt", content: "two" }), TestLLM.text("Second done", "env-two"))
+  yield* sessions.prompt({ sessionID: first.id, text: "Write two" })
+  yield* sessions.wait(first.id)
+  expect(rows().filter(row => row.event === "PostToolUse").at(-1)).toMatchObject({ session: first.id, value: "file_changed" })
+  const second = yield* sessions.create({ location: { directory: location.directory }, title: "Separate environment", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* llm.push(TestLLM.toolCall("call_env_other", "write", { path: "other.txt", content: "other" }), TestLLM.text("Other done", "env-other"))
+  yield* sessions.prompt({ sessionID: second.id, text: "Write other" })
+  yield* sessions.wait(second.id)
+  expect(rows().filter(row => row.event === "PostToolUse").at(-1)).toMatchObject({ session: second.id, value: "session_start" })
+  expect(rows().filter(row => row.event === "PostToolUse").every(row => row.file === undefined)).toBe(true)
+  expect(process.env.R18_HOOK_VALUE).toBeUndefined()
+})))

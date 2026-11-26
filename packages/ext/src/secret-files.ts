@@ -8,6 +8,12 @@ export function sourceVersion(value: Pick<BigIntStats, "dev" | "ino" | "size" | 
   return [value.dev, value.ino, value.size, value.mtimeNs, value.ctimeNs].join(":")
 }
 
+export async function resolveProtectedFile(file: string, roots: ProtectedFiles.ProtectedRoots) {
+  const lexical = ProtectedFiles.match({ path: file, roots })
+  const target = await available(() => realpath(file))
+  return lexical ?? (target ? ProtectedFiles.match({ path: target, roots }) : undefined)
+}
+
 export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   const directories = new Map<string, { version: string; entries: Dirent[] }>()
   const files = new Map<string, string>()

@@ -161,9 +161,12 @@ AC-01/05/07 的完整 read/权限/Windows 证明不在②宣告完成。去掉�
 
 2026-11-26 · 接线前发现冻结设计 §4.5/§4.7 的真实缺口，返回设计方，不更改冻结契约：`packages/core/src/tool.ts:272-278` 在 registry transforms 之外合成 CodeModeTool；`packages/core/src/codemode/tool.ts:126` 的外层 progress 直接发布 `:220-222` 构造的 toolCalls.input。现有 ToolEditor 包装不到该外层，before/after 没有 progress 字段。因此普通工具包装不能覆盖所有根工具进度；SC-01 当前只允许 Shell 捕获，不能借此改 Core 工具进度出口。最小所需能力是根工具共用的 progress 发布前可改写接缝，由扩展继续持有遮盖规则；其契约/接管范围须回设计方补齐。本段第二、第三提交未落地，未运行整段的移除对照或扩大相关集；不宣称②完成。
 
+2026-11-26 r4 · 编排器续派明确继续②的其它部分，再写③计划。外层进度单独保留为 pending SC-02（设计候选 v3.1 @ `4466819664`，未获 owner 决定）；不实现其 hook、不禁用 Code Mode、不移除直播、不削弱原失败断言。本轮继续原结果投影及接线两个提交单元。结果文件引用需要词法/真实目标共用判定，因此在原 `secret-files.ts` 增加 `resolveProtectedFile`，未增加文件范围或改变共享纯契约。
+
 ### ②实施检查收据
 
 - 采集基础 / Codex GPT-6 作者自查：`packages/ext` 下 `bun test src/secret-values.test.ts src/secret-files.test.ts`，exit 0，8 pass / 0 fail / 46 expect。Node v26.13.1 子进程使用生产模块和真实 SQLite，验证只读连接拒写、WAL 新值可见、普通列不进入集合。`bun typecheck` exit 0；上述四个 TS 文件 oxlint 为 0 warnings / 0 errors。每份 fixture 的 writer/一手来源与 SHA-256 见 provenance.json；未读取用户凭据。
 - 已保存采集提交 `d14b17a2ea`；未接线的投影草稿保存在临时证据目录 `/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codemode-mask-seam-el22rvgw/secret-mask.wip.ts`，工作树不保留未完成的生产模块。该目录的 `mask-projection.ts` 仅把草稿相对 import 改成当前仓绝对 import，供探针重现；不是出货实现或已通过的投影单元。
 - 设计接缝探针 / 同一真实 PluginHost、Promise adapter、Tool registry 和 Code Mode 执行入口：从 `packages/ext` 运行 `bun test /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codemode-mask-seam-el22rvgw/seam.test.ts`，exit 0，1 pass / 0 fail；仅观察到 `{virtualExecuteListed:false, liveContainsKnownValue:true, terminalContainsKnownValue:false}`。隔离来源含测试用变量，JS 计算一个同值参数发给子工具；没有网络、延时、窗口或用户凭据。
 - 同目录 `privacy.test.ts` 使用相同入口与输入，仅把断言改为要求实时进度不含该值：`bun test /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codemode-mask-seam-el22rvgw/privacy.test.ts`，exit 1，0 pass / 1 fail / 0 import errors。失败点是 liveContainsKnownValue 实际为 true；终态遮盖成功不能修补已发布的实时进度。此为缺口反例，不冒充已完成的移除对照或⑤验收。
+- r4 结果投影 / Codex GPT-6 作者自查：`packages/ext` 下 `bun test src/secret-mask.test.ts src/secret-files.test.ts`，exit 0，10 pass / 0 fail；包含 text/数字/布尔/动态键/重叠与 ANSI、附件字节与别名、begin 故障隐藏、child 不清 outer 和 Location 隔离。`bun typecheck` exit 0；三个改动 TS 文件 lint 为 0 warnings / 0 errors。SC-02 断言仍待决，不计入这些 PASS。

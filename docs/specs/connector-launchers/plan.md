@@ -387,3 +387,7 @@ r4 v2 main 准备子链：同一 createLauncherAssetAuthority 增加 prepareFile
 `bun test src/main/connector-launchers.test.ts src/main/pinned-files.test.ts` → 29 PASS / 254 assertions（`/tmp/connector-r4-assets-final.log`）；随后新增 invalid-binding failure 详情，最终相关收据另记。当前 10 个新增用例覆盖 raw file、zip/tar.gz/tar.bz2/tar.xz、完整字节/缓存/缺成员、整组先验零下载、代码/Node/env/cwd/摘要/代不匹配、合法文件与根目录链接、真实 tar 拒绝穿外链写入、二等待者一取消和另一完成。归档由系统 tar 从实际随包 pins JSON 生成，头部取既有原厂 fixture；不是手写 tar/PE/Mach-O 代用品。Windows 全链没有实测。
 
 尚待接上：entryFor 窄桥与 prepareFiles 的 sidecar adapter、生产 attempt/controller→managed binding 构造、Host/文档运行时/root 装配；本段的私有 main context 在 root 落地时只绑定已有权威，不新建第二份配置/身份源。
+
+r4 entryFor 桥：现有 PinnedFileRequest 增补冻结的 entryFor，严格校验 binding 形状与 generation；同一 progress 通知承载本域 preparation 事实，不把解包阶段推测成下载字节。createPinnedFileRequester 增加 ensureEntry/prepareFiles，仍是同一按 ID 的请求/取消/终结表；group 按首次顺序去重并汇合进度序号。main bridge 的受管入口端口缺席时给明确 unknown-file/内部接线详情，绝不把原始归档误当已准备入口。根装配可将 assetAuthority.ensureEntry 绑定到该端口，复用 prepareFiles 的同一验证/下载/展开，保留原 delivery.via 与失败证据。core SDK handler 与私有 main context 的 frozen 数据轴均无新用户配置。
+
+新证据：实际 requester→main bridge→同一 launcher authority→pinned authority→展开，返回模型目录而非归档，relay provenance 保留；缓存/去重只下载一次，preparation 阶段传回，缺端口/异代/外来 malformed 进度均不会借 raw 路径执行。master pin 不完整时，main 在第一条 entryFor I/O 前拒绝该受保护配方，故 sidecar 的逐 ID group 不会先下载前半组。Tool.Context 的既有 video 进度用例扩为 video+preparation，同一生产 Tool 注册表在 Location A/B 两次调用分别保留本次 Effect context。新文件仍只有 r4 已列两个 core 域模块与其测试，未改 gate、其它 spec 或围栏模块。

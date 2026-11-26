@@ -127,62 +127,279 @@ export function isConnectorLaunchFailure(value: unknown): value is ConnectorLaun
   return value.kind === "dependency" && "program" in value && typeof value.program === "string"
 }
 
-export type PinnedFileRequest = { type: "codepuppy.pinned-file.ensure"; id: number; sidecarGeneration: string; fileId: PinnedFileId }
+export type PinnedFileRequest = {
+  type: "codepuppy.pinned-file.ensure"
+  id: number
+  sidecarGeneration: string
+  fileId: PinnedFileId
+  entryFor?: ManagedFirstPartyBinding
+}
 export type PinnedFileCancel = { type: "codepuppy.pinned-file.cancel"; id: number; sidecarGeneration: string }
-export type PinnedFileReply = { type: "codepuppy.pinned-file.result"; id: number; sidecarGeneration: string; delivery: PinnedFileDelivery }
-export type PinnedFileProgress = { type: "codepuppy.pinned-file.progress"; id: number; sidecarGeneration: string; received: number; total: number }
+export type PinnedFileReply = {
+  type: "codepuppy.pinned-file.result"
+  id: number
+  sidecarGeneration: string
+  delivery: PinnedFileDelivery
+}
+export type PinnedFileProgress = { type: "codepuppy.pinned-file.progress"; id: number; sidecarGeneration: string } & (
+  | { received: number; total: number }
+  | { preparation: PinnedPreparationProgress }
+)
 
-export function isPinnedFileDelivery(value: unknown): value is PinnedFileDelivery {
-  if (!value || typeof value !== "object" || !("result" in value) || !value.result || typeof value.result !== "object" || !("ok" in value.result)) return false
-  const result = value.result
-  if (result.ok === true) return "path" in result && typeof result.path === "string" && /^(?:\/|[a-z]:[\\/])/i.test(result.path) && "via" in result && ["cache", "relay", "origin"].includes(String(result.via)) && (!("failure" in value) || value.failure === undefined)
-  if (result.ok !== false || !("error" in result) || !["unknown-file", "network", "integrity", "disk", "cancelled"].includes(String(result.error))) return false
-  if (!("failure" in value) || value.failure === undefined) return true
-  const failure = value.failure
-  return !!failure && typeof failure === "object" && "kind" in failure && "detail" in failure && typeof failure.detail === "string" && (
-    failure.kind === "http" ? "status" in failure && Number.isInteger(failure.status) && Number(failure.status) >= 100 && Number(failure.status) <= 599
-      : ["connect", "timeout", "resolution", "integrity", "disk", "other"].includes(String(failure.kind))
+export function isManagedFirstPartyBinding(value: unknown): value is ManagedFirstPartyBinding {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !("identity" in value) ||
+    !isLaunchIdentity(value.identity) ||
+    !("sidecarGeneration" in value) ||
+    typeof value.sidecarGeneration !== "string"
+  )
+    return false
+  if (
+    !("declarationSha256" in value) ||
+    typeof value.declarationSha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(value.declarationSha256) ||
+    !("recipeSha256" in value) ||
+    typeof value.recipeSha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(value.recipeSha256)
+  )
+    return false
+  if (!("entry" in value) || !value.entry || typeof value.entry !== "object") return false
+  const entry = value.entry
+  if (
+    !("type" in entry) ||
+    entry.type !== "local" ||
+    !("command" in entry) ||
+    !Array.isArray(entry.command) ||
+    !entry.command.length ||
+    !entry.command.every((arg) => typeof arg === "string")
+  )
+    return false
+  if ("cwd" in entry && entry.cwd !== undefined && typeof entry.cwd !== "string") return false
+  if (
+    "environment" in entry &&
+    entry.environment !== undefined &&
+    (!entry.environment ||
+      typeof entry.environment !== "object" ||
+      Array.isArray(entry.environment) ||
+      !Object.values(entry.environment).every((item) => typeof item === "string"))
+  )
+    return false
+  return (
+    Object.keys(value).every((key) =>
+      ["identity", "sidecarGeneration", "entry", "declarationSha256", "recipeSha256"].includes(key),
+    ) && Object.keys(entry).every((key) => ["type", "command", "environment", "cwd"].includes(key))
   )
 }
 
+function isPinnedPreparationProgress(value: unknown): value is PinnedPreparationProgress {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !("id" in value) ||
+    typeof value.id !== "string" ||
+    !("sequence" in value) ||
+    !Number.isSafeInteger(value.sequence) ||
+    Number(value.sequence) < 0 ||
+    !("phase" in value) ||
+    !["download", "unpack", "verify", "ready", "failed", "cancelled"].includes(String(value.phase))
+  )
+    return false
+  const received = "receivedBytes" in value ? value.receivedBytes : undefined
+  const total = "totalBytes" in value ? value.totalBytes : undefined
+  for (const count of [received, total])
+    if (count !== undefined && (!Number.isSafeInteger(count) || Number(count) < 0)) return false
+  if (typeof received === "number" && typeof total === "number" && received > total) return false
+  if (
+    value.phase === "ready" &&
+    (("error" in value && value.error !== undefined) || ("failure" in value && value.failure !== undefined))
+  )
+    return false
+  if (
+    "error" in value &&
+    value.error !== undefined &&
+    !["unknown-file", "network", "integrity", "disk", "cancelled"].includes(String(value.error))
+  )
+    return false
+  return !("failure" in value) || value.failure === undefined || isDownloadFailureEvidence(value.failure)
+}
+
+function isDownloadFailureEvidence(failure: unknown): failure is DownloadFailureEvidence {
+  return (
+    !!failure &&
+    typeof failure === "object" &&
+    "kind" in failure &&
+    "detail" in failure &&
+    typeof failure.detail === "string" &&
+    (failure.kind === "http"
+      ? "status" in failure &&
+        Number.isInteger(failure.status) &&
+        Number(failure.status) >= 100 &&
+        Number(failure.status) <= 599
+      : ["connect", "timeout", "resolution", "integrity", "disk", "other"].includes(String(failure.kind)))
+  )
+}
+
+export function isPinnedFileDelivery(value: unknown): value is PinnedFileDelivery {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !("result" in value) ||
+    !value.result ||
+    typeof value.result !== "object" ||
+    !("ok" in value.result)
+  )
+    return false
+  const result = value.result
+  if (result.ok === true)
+    return (
+      "path" in result &&
+      typeof result.path === "string" &&
+      /^(?:\/|[a-z]:[\\/])/i.test(result.path) &&
+      "via" in result &&
+      ["cache", "relay", "origin"].includes(String(result.via)) &&
+      (!("failure" in value) || value.failure === undefined)
+    )
+  if (
+    result.ok !== false ||
+    !("error" in result) ||
+    !["unknown-file", "network", "integrity", "disk", "cancelled"].includes(String(result.error))
+  )
+    return false
+  if (!("failure" in value) || value.failure === undefined) return true
+  return isDownloadFailureEvidence(value.failure)
+}
+
 /** Bound to one parent port/generation. Preparation has no ordinary RPC total timeout. */
-export function createPinnedFileRequester(post: (message: PinnedFileRequest | PinnedFileCancel) => void, sidecarGeneration: string) {
+export function createPinnedFileRequester(
+  post: (message: PinnedFileRequest | PinnedFileCancel) => void,
+  sidecarGeneration: string,
+) {
   let next = 0
   let closed = false
-  const pending = new Map<number, { settle: (delivery: PinnedFileDelivery) => void; progress: (received: number, total: number) => void }>()
+  const pending = new Map<
+    number,
+    {
+      fileId: PinnedFileId
+      settle: (delivery: PinnedFileDelivery) => void
+      progress?: (received: number, total: number) => void
+      preparation?: (update: PinnedPreparationProgress) => void
+    }
+  >()
   const cancelled = (): PinnedFileDelivery => ({ result: { ok: false, error: "cancelled" } })
+  const request = (
+    fileId: PinnedFileId,
+    entryFor: ManagedFirstPartyBinding | undefined,
+    signal: AbortSignal,
+    progress: ((received: number, total: number) => void) | undefined,
+    preparation: ((update: PinnedPreparationProgress) => void) | undefined,
+  ): Promise<PinnedFileDelivery> => {
+    if (closed || signal.aborted) return Promise.resolve(cancelled())
+    const id = ++next
+    return new Promise((resolve) => {
+      const settle = (value: PinnedFileDelivery) => {
+        if (!pending.delete(id)) return
+        signal.removeEventListener("abort", abort)
+        resolve(value)
+      }
+      const abort = () => {
+        try {
+          post({ type: "codepuppy.pinned-file.cancel", id, sidecarGeneration })
+        } catch {
+          /* The stopped parent cannot receive cancellation. */
+        } finally {
+          settle(cancelled())
+        }
+      }
+      pending.set(id, { fileId, settle, progress, preparation })
+      signal.addEventListener("abort", abort, { once: true })
+      try {
+        post({ type: "codepuppy.pinned-file.ensure", id, sidecarGeneration, fileId, ...(entryFor ? { entryFor } : {}) })
+      } catch {
+        settle(cancelled())
+      }
+    })
+  }
   return {
-    ensureFile(fileId: PinnedFileId, signal: AbortSignal, progress: (received: number, total: number) => void): Promise<PinnedFileDelivery> {
-      if (closed || signal.aborted) return Promise.resolve(cancelled())
-      const id = ++next
-      return new Promise((resolve) => {
-        const settle = (value: PinnedFileDelivery) => {
-          if (!pending.delete(id)) return
-          signal.removeEventListener("abort", abort)
-          resolve(value)
-        }
-        const abort = () => {
-          try { post({ type: "codepuppy.pinned-file.cancel", id, sidecarGeneration }) } catch { /* The stopped parent cannot receive cancellation. */ } finally { settle(cancelled()) }
-        }
-        pending.set(id, { settle, progress })
-        signal.addEventListener("abort", abort, { once: true })
-        try { post({ type: "codepuppy.pinned-file.ensure", id, sidecarGeneration, fileId }) }
-        catch { settle(cancelled()) }
-      })
+    ensureFile(fileId: PinnedFileId, signal: AbortSignal, progress: (received: number, total: number) => void) {
+      return request(fileId, undefined, signal, progress, undefined)
+    },
+    ensureEntry(
+      fileId: PinnedFileId,
+      entryFor: ManagedFirstPartyBinding,
+      signal: AbortSignal,
+      preparation: (update: PinnedPreparationProgress) => void,
+    ) {
+      return request(fileId, entryFor, signal, undefined, preparation)
+    },
+    async prepareFiles(
+      input: { binding: ManagedFirstPartyBinding; ids: readonly PinnedFileId[] },
+      signal: AbortSignal,
+      progress: (update: PinnedPreparationProgress) => void,
+    ): Promise<ManagedPinnedFilesResult> {
+      const ids = [...new Set(input.ids)]
+      if (!ids.length) return { ok: false, error: "unknown-file" }
+      let sequence = 0
+      const files: { id: PinnedFileId; path: string }[] = []
+      for (const id of ids) {
+        const delivery = await request(id, input.binding, signal, undefined, (update) =>
+          progress({ ...update, sequence: ++sequence }),
+        )
+        if (!delivery.result.ok) return delivery.result
+        files.push({ id, path: delivery.result.path })
+      }
+      return { ok: true, files }
     },
     receive(value: unknown) {
-      if (!value || typeof value !== "object" || !("type" in value) || !["codepuppy.pinned-file.result", "codepuppy.pinned-file.progress"].includes(String(value.type))) return false
-      if (!("sidecarGeneration" in value) || value.sidecarGeneration !== sidecarGeneration || !("id" in value) || typeof value.id !== "number") return true
+      if (
+        !value ||
+        typeof value !== "object" ||
+        !("type" in value) ||
+        !["codepuppy.pinned-file.result", "codepuppy.pinned-file.progress"].includes(String(value.type))
+      )
+        return false
+      if (
+        !("sidecarGeneration" in value) ||
+        value.sidecarGeneration !== sidecarGeneration ||
+        !("id" in value) ||
+        typeof value.id !== "number"
+      )
+        return true
       const entry = pending.get(value.id)
       if (!entry) return true
-      if (value.type === "codepuppy.pinned-file.result" && "delivery" in value && isPinnedFileDelivery(value.delivery)) entry.settle(value.delivery)
-      if (value.type === "codepuppy.pinned-file.progress" && "received" in value && "total" in value && Number.isSafeInteger(value.received) && Number.isSafeInteger(value.total) && Number(value.received) >= 0 && Number(value.total) > 0 && Number(value.received) <= Number(value.total)) entry.progress(Number(value.received), Number(value.total))
+      if (value.type === "codepuppy.pinned-file.result" && "delivery" in value && isPinnedFileDelivery(value.delivery))
+        entry.settle(value.delivery)
+      if (
+        value.type === "codepuppy.pinned-file.progress" &&
+        "received" in value &&
+        "total" in value &&
+        Number.isSafeInteger(value.received) &&
+        Number.isSafeInteger(value.total) &&
+        Number(value.received) >= 0 &&
+        Number(value.total) > 0 &&
+        Number(value.received) <= Number(value.total)
+      )
+        entry.progress?.(Number(value.received), Number(value.total))
+      if (
+        value.type === "codepuppy.pinned-file.progress" &&
+        "preparation" in value &&
+        isPinnedPreparationProgress(value.preparation) &&
+        value.preparation.id === entry.fileId
+      )
+        entry.preparation?.(value.preparation)
       return true
     },
     close() {
       closed = true
       for (const [id, entry] of pending) {
-        try { post({ type: "codepuppy.pinned-file.cancel", id, sidecarGeneration }) } catch { /* Closing always settles every local waiter. */ } finally { entry.settle(cancelled()) }
+        try {
+          post({ type: "codepuppy.pinned-file.cancel", id, sidecarGeneration })
+        } catch {
+          /* Closing always settles every local waiter. */
+        } finally {
+          entry.settle(cancelled())
+        }
       }
     },
   }

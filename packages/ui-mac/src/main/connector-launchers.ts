@@ -6,11 +6,11 @@ import { constants } from "node:fs"
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { promisify } from "node:util"
 import { pathToFileURL } from "node:url"
-import type { LauncherEnvironment, LauncherPlatform, ConnectorLaunchApi, ConnectorLaunchHost, ManagedFirstPartyBinding, ManagedPinnedFilesResult, PinnedEntryRecipe, PinnedPreparationProgress, DownloadFailureEvidence } from "../../../util/src/codepuppy-connector-launch"
+import type { LauncherEnvironment, LauncherPlatform, ConnectorLaunchApi, ConnectorLaunchHost, ManagedFirstPartyBinding, ManagedPinnedFilesResult, PinnedEntryRecipe, PinnedPreparationProgress, DownloadFailureEvidence, PinnedFileDelivery } from "../../../util/src/codepuppy-connector-launch"
 import { canonicalJsonDigest } from "../../../util/src/codepuppy-hash"
 import { declaredFirstPartyTools } from "../../../core/src/mcp/codepuppy-first-party-mcp"
 import { ensurePinnedDirectory } from "./pinned-files"
-import type { PinnedFiles } from "../../../util/src/codepuppy-pinned-files"
+import type { PinnedFiles, PinnedFileId, EnsurePinnedFileResult } from "../../../util/src/codepuppy-pinned-files"
 import lock from "../../resources/connector-launchers/lock.json"
 import { videoBinaryTarget } from "../../scripts/video-runtime-artifacts"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
@@ -181,9 +181,16 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
     await checkLauncherBundle(bundled, input.platform)
     if (input.bundle.form === "expanded") return environment
     const destination = dirname(dirname(environment.uv))
-    if (await lstat(destination).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error })) {
+    if (
+      await lstat(destination).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error
+      })
+    ) {
       if ((await realpath(destination)) !== destination) throw Error("launcher ready root is a symlink")
-      const valid = await checkLauncherBundle(destination, input.platform, input.bundle.preparedFiles).then(() => true, () => false)
+      const valid = await checkLauncherBundle(destination, input.platform, input.bundle.preparedFiles).then(
+        () => true,
+        () => false,
+      )
       if (valid) return environment
       await rm(destination, { recursive: true, force: true })
     }
@@ -191,86 +198,238 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
     if ((await realpath(dirname(destination))) !== dirname(destination)) throw Error("launcher parent is a symlink")
     const staging = await mkdtemp(join(dirname(destination), "launcher-candidate-"))
     try {
-      await populateLauncherTree(staging, { uv: join(bundled, "archives/uv"), node: join(bundled, "archives/node") }, input.platform)
+      await populateLauncherTree(
+        staging,
+        { uv: join(bundled, "archives/uv"), node: join(bundled, "archives/node") },
+        input.platform,
+      )
       await cp(join(bundled, "licenses"), join(staging, "licenses"), { recursive: true })
       await writeLauncherInventory(staging, input.platform, "expanded")
       await checkLauncherBundle(staging, input.platform, input.bundle.preparedFiles)
       await rename(staging, destination)
-    } finally { await rm(staging, { recursive: true, force: true }) }
+    } finally {
+      await rm(staging, { recursive: true, force: true })
+    }
     return environment
   }
-  return {
-    environment,
-    resolveAssets() { return pending ??= resolveAssets().finally(() => { pending = undefined }) },
-    /** The root binds this context, never MCP params. Both download and unpack remain in this authority. */
-    async prepareFiles(
-      context: { sidecarGeneration: string; snapshots: Pick<ConnectorLaunchApi, "list">; manifestPath: string; files: Pick<ConnectorLaunchHost, "ensureFile"> },
-      request: { binding: ManagedFirstPartyBinding; ids: readonly string[] },
-      signal: AbortSignal,
-      report: (update: PinnedPreparationProgress) => void,
-    ): Promise<ManagedPinnedFilesResult> {
-      if (signal.aborted) return { ok: false, error: "cancelled" }
-      const binding = request.binding
-      const current = binding.sidecarGeneration === context.sidecarGeneration && (await context.snapshots.list(binding.identity.directory)).some((row) => row.sidecarGeneration === context.sidecarGeneration && row.identity.directory === binding.identity.directory && row.identity.server === binding.identity.server && row.identity.attempt === binding.identity.attempt)
-      const declared = current ? declaredFirstPartyTools(binding.identity.server, binding.entry, context.manifestPath, readFileSync, undefined, environment) : undefined
-      const recipes = new Map(declared?.recipe?.map((recipe) => [recipe.id, recipe]))
-      const pins = new Map(input.pins.files.map((file) => [file.id, file]))
-      const ids = [...new Set(request.ids)]
-      let sequence = 0
-      if (!current || !declared || declared.declarationSha256 !== binding.declarationSha256 || declared.recipeSha256 !== binding.recipeSha256 || !ids.length || !ids.every((id) => {
+  const failed = (result: Extract<EnsurePinnedFileResult, { ok: false }>, failure?: DownloadFailureEvidence) => ({
+    result,
+    delivery: { result, ...(failure ? { failure } : {}) },
+  })
+  const prepareFiles = async (
+    context: {
+      sidecarGeneration: string
+      snapshots: Pick<ConnectorLaunchApi, "list">
+      manifestPath: string
+      files: Pick<ConnectorLaunchHost, "ensureFile">
+    },
+    request: { binding: ManagedFirstPartyBinding; ids: readonly string[] },
+    signal: AbortSignal,
+    report: (update: PinnedPreparationProgress) => void,
+  ): Promise<{ result: ManagedPinnedFilesResult; delivery: PinnedFileDelivery }> => {
+    if (signal.aborted) return failed({ ok: false, error: "cancelled" })
+    const binding = request.binding
+    const current =
+      binding.sidecarGeneration === context.sidecarGeneration &&
+      (await context.snapshots.list(binding.identity.directory)).some(
+        (row) =>
+          row.sidecarGeneration === context.sidecarGeneration &&
+          row.identity.directory === binding.identity.directory &&
+          row.identity.server === binding.identity.server &&
+          row.identity.attempt === binding.identity.attempt,
+      )
+    const declared = current
+      ? declaredFirstPartyTools(
+          binding.identity.server,
+          binding.entry,
+          context.manifestPath,
+          readFileSync,
+          undefined,
+          environment,
+        )
+      : undefined
+    const recipes = new Map(declared?.recipe?.map((recipe) => [recipe.id, recipe]))
+    const pins = new Map(input.pins.files.map((file) => [file.id, file]))
+    const ids = [...new Set(request.ids)]
+    let sequence = 0
+    if (
+      !current ||
+      !declared ||
+      declared.declarationSha256 !== binding.declarationSha256 ||
+      declared.recipeSha256 !== binding.recipeSha256 ||
+      ![...recipes.keys()].every((id) => pins.has(id)) ||
+      !ids.length ||
+      !ids.every((id) => {
         const pin = pins.get(id as PinnedEntryRecipe["id"])
-        return recipes.has(id as PinnedEntryRecipe["id"]) && pin && (pin.target === "any" || pin.target === input.platform)
-      })) {
-        for (const id of ids) if (pins.has(id as PinnedEntryRecipe["id"]) && !signal.aborted) report({ id: id as PinnedEntryRecipe["id"], sequence: ++sequence, phase: "failed", error: "unknown-file", failure: { kind: "other", detail: "Managed pinned-file binding, declaration or recipe is not current" } })
-        return { ok: false, error: "unknown-file" }
+        return (
+          recipes.has(id as PinnedEntryRecipe["id"]) && pin && (pin.target === "any" || pin.target === input.platform)
+        )
+      })
+    ) {
+      for (const id of ids)
+        if (pins.has(id as PinnedEntryRecipe["id"]) && !signal.aborted)
+          report({
+            id: id as PinnedEntryRecipe["id"],
+            sequence: ++sequence,
+            phase: "failed",
+            error: "unknown-file",
+            failure: { kind: "other", detail: "Managed pinned-file binding, declaration or recipe is not current" },
+          })
+      return failed(
+        { ok: false, error: "unknown-file" },
+        { kind: "other", detail: "Managed pinned-file binding, declaration or recipe is not current" },
+      )
+    }
+    const files: Extract<ManagedPinnedFilesResult, { ok: true }>["files"] = []
+    const deliveries: PinnedFileDelivery[] = []
+    for (const id of ids) {
+      const recipe = recipes.get(id as PinnedEntryRecipe["id"])!
+      const pin = pins.get(recipe.id)!
+      const emit = (update: Omit<PinnedPreparationProgress, "id" | "sequence">) => {
+        if (!signal.aborted) report({ ...update, id: recipe.id, sequence: ++sequence })
       }
-      const files: Extract<ManagedPinnedFilesResult, { ok: true }>["files"] = []
-      for (const id of ids) {
-        const recipe = recipes.get(id as PinnedEntryRecipe["id"])!
-        const pin = pins.get(recipe.id)!
-        const emit = (update: Omit<PinnedPreparationProgress, "id" | "sequence">) => { if (!signal.aborted) report({ ...update, id: recipe.id, sequence: ++sequence }) }
-        emit({ phase: "download", receivedBytes: 0, totalBytes: pin.bytes })
-        const delivery = await context.files.ensureFile(recipe.id, signal, (receivedBytes, totalBytes) => emit({ phase: "download", receivedBytes, totalBytes }))
-        if (!delivery.result.ok) {
-          emit({ phase: delivery.result.error === "cancelled" ? "cancelled" : "failed", error: delivery.result.error, ...(delivery.failure ? { failure: delivery.failure } : {}) })
-          return delivery.result
-        }
-        if (signal.aborted) return { ok: false, error: "cancelled" }
-        const archive = delivery.result.path
-        emit({ phase: "unpack" })
-        const key = canonicalJsonDigest({ id: recipe.id, sha256: pin.sha256, recipeSha256: binding.recipeSha256, platform: input.platform })
-        const shared = entries.get(key) ?? (() => {
-          const work = preparePinnedEntry(environment, pin, recipe, binding.recipeSha256, archive, realpathSync(input.userData)).finally(() => entries.delete(key))
+      emit({ phase: "download", receivedBytes: 0, totalBytes: pin.bytes })
+      const delivery = await context.files.ensureFile(recipe.id, signal, (receivedBytes, totalBytes) =>
+        emit({ phase: "download", receivedBytes, totalBytes }),
+      )
+      if (!delivery.result.ok) {
+        emit({
+          phase: delivery.result.error === "cancelled" ? "cancelled" : "failed",
+          error: delivery.result.error,
+          ...(delivery.failure ? { failure: delivery.failure } : {}),
+        })
+        return failed(delivery.result, delivery.failure)
+      }
+      if (signal.aborted) return failed({ ok: false, error: "cancelled" })
+      const archive = delivery.result.path
+      emit({ phase: "unpack" })
+      const key = canonicalJsonDigest({
+        id: recipe.id,
+        sha256: pin.sha256,
+        recipeSha256: binding.recipeSha256,
+        platform: input.platform,
+      })
+      const shared =
+        entries.get(key) ??
+        (() => {
+          const work = preparePinnedEntry(
+            environment,
+            pin,
+            recipe,
+            binding.recipeSha256,
+            archive,
+            realpathSync(input.userData),
+          ).finally(() => entries.delete(key))
           entries.set(key, work)
           return work
         })()
-        const prepared = await new Promise<{ ok: true; path: string } | { ok: false; error: "disk" | "integrity" | "cancelled"; failure?: DownloadFailureEvidence }>((resolve) => {
-          const finish = (value: { ok: true; path: string } | { ok: false; error: "disk" | "integrity" | "cancelled"; failure?: DownloadFailureEvidence }) => { signal.removeEventListener("abort", abort); resolve(signal.aborted ? { ok: false, error: "cancelled" } : value) }
-          const abort = () => finish({ ok: false, error: "cancelled" })
-          signal.addEventListener("abort", abort, { once: true })
-          if (signal.aborted) abort()
-          void shared.then((path) => finish({ ok: true, path }), (error: unknown) => {
-            const kind = error instanceof Error && "code" in error && typeof error.code === "string" ? "disk" : "integrity"
-            finish({ ok: false, error: kind, failure: { kind, detail: error instanceof Error ? error.message : String(error) } })
-          })
+      const prepared = await new Promise<
+        | { ok: true; path: string }
+        | { ok: false; error: "disk" | "integrity" | "cancelled"; failure?: DownloadFailureEvidence }
+      >((resolve) => {
+        const finish = (
+          value:
+            | { ok: true; path: string }
+            | { ok: false; error: "disk" | "integrity" | "cancelled"; failure?: DownloadFailureEvidence },
+        ) => {
+          signal.removeEventListener("abort", abort)
+          resolve(signal.aborted ? { ok: false, error: "cancelled" } : value)
+        }
+        const abort = () => finish({ ok: false, error: "cancelled" })
+        signal.addEventListener("abort", abort, { once: true })
+        if (signal.aborted) abort()
+        void shared.then(
+          (path) => finish({ ok: true, path }),
+          (error: unknown) => {
+            const kind =
+              error instanceof Error && "code" in error && typeof error.code === "string" ? "disk" : "integrity"
+            finish({
+              ok: false,
+              error: kind,
+              failure: { kind, detail: error instanceof Error ? error.message : String(error) },
+            })
+          },
+        )
+      })
+      if (!prepared.ok) {
+        emit({
+          phase: prepared.error === "cancelled" ? "cancelled" : "failed",
+          error: prepared.error,
+          ...(prepared.failure ? { failure: prepared.failure } : {}),
         })
-        if (!prepared.ok) { emit({ phase: prepared.error === "cancelled" ? "cancelled" : "failed", error: prepared.error, ...(prepared.failure ? { failure: prepared.failure } : {}) }); return { ok: false, error: prepared.error } }
-        emit({ phase: "verify" })
-        files.push({ id: recipe.id, path: prepared.path })
-        emit({ phase: "ready" })
+        return failed({ ok: false, error: prepared.error }, prepared.failure)
       }
-      return signal.aborted ? { ok: false, error: "cancelled" } : { ok: true, files }
+      emit({ phase: "verify" })
+      files.push({ id: recipe.id, path: prepared.path })
+      deliveries.push({ result: { ...delivery.result, path: prepared.path } })
+      emit({ phase: "ready" })
+    }
+    return signal.aborted
+      ? failed({ ok: false, error: "cancelled" })
+      : { result: { ok: true, files }, delivery: deliveries.at(-1)! }
+  }
+  return {
+    environment,
+    resolveAssets() {
+      return (pending ??= resolveAssets().finally(() => {
+        pending = undefined
+      }))
+    },
+    // Both domains share validation, download and unpack. The ID bridge retains original delivery provenance.
+    async prepareFiles(...args: Parameters<typeof prepareFiles>): Promise<ManagedPinnedFilesResult> {
+      return (await prepareFiles(...args)).result
+    },
+    async ensureEntry(
+      context: Parameters<typeof prepareFiles>[0],
+      binding: ManagedFirstPartyBinding,
+      id: PinnedFileId,
+      signal: AbortSignal,
+      report: (update: PinnedPreparationProgress) => void,
+    ): Promise<PinnedFileDelivery> {
+      return (await prepareFiles(context, { binding, ids: [id] }, signal, report)).delivery
     },
   }
 }
 
-async function preparePinnedEntry(environment: LauncherEnvironment, pin: PinnedFiles["files"][number], recipe: PinnedEntryRecipe, recipeSha256: string, archive: string, userData: string) {
+async function preparePinnedEntry(
+  environment: LauncherEnvironment,
+  pin: PinnedFiles["files"][number],
+  recipe: PinnedEntryRecipe,
+  recipeSha256: string,
+  archive: string,
+  userData: string,
+) {
   const destination = safe(join(environment.runtimeRoot, "assets"), `${pin.id}/${recipeSha256}`)
   await ensurePinnedDirectory(userData, dirname(destination))
-  const receipt = { schema: 1, ready: true, id: pin.id, sha256: pin.sha256, recipeSha256, platform: environment.platform }
-  const ready = await readFile(join(destination, "ready.json"), "utf8").then((text) => { try { return JSON.parse(text) } catch { return undefined } }, () => undefined)
-  if (JSON.stringify(ready) === JSON.stringify(receipt) && await verifyPinnedEntry(destination, recipe, environment.platform).then(() => true, () => false)) return safe(destination, recipe.entry)
-  const prior = await lstat(destination).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error })
+  const receipt = {
+    schema: 1,
+    ready: true,
+    id: pin.id,
+    sha256: pin.sha256,
+    recipeSha256,
+    platform: environment.platform,
+  }
+  const ready = await readFile(join(destination, "ready.json"), "utf8").then(
+    (text) => {
+      try {
+        return JSON.parse(text)
+      } catch {
+        return undefined
+      }
+    },
+    () => undefined,
+  )
+  if (
+    JSON.stringify(ready) === JSON.stringify(receipt) &&
+    (await verifyPinnedEntry(destination, recipe, environment.platform).then(
+      () => true,
+      () => false,
+    ))
+  )
+    return safe(destination, recipe.entry)
+  const prior = await lstat(destination).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== "ENOENT") throw error
+  })
   if (prior?.isSymbolicLink()) throw Error("prepared asset root is a symlink")
   if (prior) await rm(destination, { recursive: true, force: true })
   const staging = await mkdtemp(join(dirname(destination), "asset-candidate-"))
@@ -283,12 +442,15 @@ async function preparePinnedEntry(environment: LauncherEnvironment, pin: PinnedF
     await verifyPinnedEntry(staging, recipe, environment.platform)
     await writeFile(join(staging, "ready.json"), JSON.stringify(receipt))
     await rename(staging, destination)
-  } finally { await rm(staging, { recursive: true, force: true }) }
+  } finally {
+    await rm(staging, { recursive: true, force: true })
+  }
   return safe(destination, recipe.entry)
 }
 
 async function verifyPinnedEntry(root: string, recipe: PinnedEntryRecipe, platform: LauncherPlatform) {
-  if ((await realpath(root)) !== root || !(await lstat(root)).isDirectory()) throw Error("prepared asset root is not a real directory")
+  if ((await realpath(root)) !== root || !(await lstat(root)).isDirectory())
+    throw Error("prepared asset root is not a real directory")
   for (const member of new Set([recipe.entry, ...recipe.required])) {
     const file = safe(root, member)
     const targetPath = await realpath(file)
@@ -298,7 +460,11 @@ async function verifyPinnedEntry(root: string, recipe: PinnedEntryRecipe, platfo
     if (!info.isFile()) throw Error("prepared member is not a file or directory")
     const handle = await open(file)
     const header = Buffer.alloc(4096)
-    try { await handle.read(header, 0, header.length, 0) } finally { await handle.close() }
+    try {
+      await handle.read(header, 0, header.length, 0)
+    } finally {
+      await handle.close()
+    }
     const target = videoBinaryTarget(header)
     if (target && target !== platform) throw Error("prepared binary target mismatch")
   }

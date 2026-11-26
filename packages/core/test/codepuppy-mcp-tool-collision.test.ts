@@ -37,8 +37,9 @@ const mcp = Layer.succeed(
   Mcp.Service.of({
     ...emptyMcp,
     tools: () => Deferred.await(gate).pipe(Effect.as(CATALOG)),
-    callTool: (_input, videoProgress) => Effect.promise(async () => {
+    callTool: (input, videoProgress) => Effect.promise(async () => {
       await videoProgress?.({ phase: "transcribing", completed: 1000, total: 2000, unit: "ms" })
+      await input.preparation?.report({ id: "speech-model/any/owned-fixture", phase: "download", sequence: 1, receivedBytes: 10, totalBytes: 20 })
       return { isError: false, content: [{ type: "text" as const, text: "answer" }] }
     }),
   }),
@@ -119,7 +120,7 @@ describe("test isolation", () => {
 
 
 class ProgressContext extends Context.Service<ProgressContext, { location: string }>()("test/video-progress-context") {}
-it.live("video progress binds the whole current invocation context instead of the registry's initialization context", () =>
+it.live("video and pinned progress bind the whole current invocation context instead of the registry's initialization context", () =>
   Effect.gen(function* () {
     const registry = yield* Tool.Service
     yield* Deferred.succeed(gate, undefined)
@@ -131,7 +132,10 @@ it.live("video progress binds the whole current invocation context instead of th
       id: "call" as never, sessionID: "session" as never, messageID: "message" as never, agent: "build" as never,
       progress: (update) => Effect.gen(function* () { received.push({ location: Option.getOrThrow(yield* Effect.serviceOption(ProgressContext)).location, update }) }),
     }).pipe(Effect.provideService(ProgressContext, { location }))
-    expect(received).toEqual(["first", "second"].map((location) => ({ location, update: { "codepuppy.video.progress": { phase: "transcribing", completed: 1000, total: 2000, unit: "ms" } } })))
+    expect(received).toEqual(["first", "second"].flatMap((location) => [
+      { location, update: { "codepuppy.video.progress": { phase: "transcribing", completed: 1000, total: 2000, unit: "ms" } } },
+      { location, update: { preparation: { id: "speech-model/any/owned-fixture", phase: "download", sequence: 1, receivedBytes: 10, totalBytes: 20 } } },
+    ]))
     gate = Deferred.makeUnsafe<void>()
   }),
 )

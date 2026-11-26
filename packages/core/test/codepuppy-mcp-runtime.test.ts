@@ -936,3 +936,17 @@ test("production MCP client registers pinned requests only for its verified mana
     expect(updates).toEqual([{ id, phase: "ready", sequence: 1 }])
   } finally { await server.close() }
 })
+
+test("ordinary MCP client exposes no managed pinned-file request handler", async () => {
+  const server = new Server({ name: "owned-ordinary-server", version: "1" }, { capabilities: { tools: {} } })
+  const [left, right] = InMemoryTransport.createLinkedPair()
+  await server.connect(right)
+  try {
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      yield* McpClient.connect({ server: "ordinary", directory: ROOT, config: { type: "attached", transport: left } })
+      yield* Effect.promise(async () => {
+        await expect(server.request({ method: "codepuppy/pinned-files.ensure", params: { ids: ["speech-model/any/owned-fixture"] } }, fromJsonSchema({ type: "object" }))).rejects.toMatchObject({ code: -32601 })
+      })
+    })).pipe(Effect.provide(hostEnvironmentLayer)))
+  } finally { await server.close() }
+})

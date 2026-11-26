@@ -8,6 +8,8 @@ import { promisify } from "node:util"
 import { createHash } from "node:crypto"
 import { declaredFirstPartyTools } from "../../../core/src/mcp/codepuppy-first-party-mcp"
 import { createPinnedFileAuthority } from "./pinned-files"
+import { createPinnedFileMainBridge } from "./connector-launch-host"
+import { createPinnedFileRequester } from "../../../util/src/codepuppy-connector-launch"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import pins from "../../resources/pinned-files.json"
@@ -268,4 +270,71 @@ test("cancelling a managed download detaches one waiter while another prepares t
   expect(result.ok).toBe(true)
   if (result.ok) expect(await readFile(result.files[0]!.path)).toEqual(f.bytes)
   expect(calls).toBe(1)
+})
+
+test("entryFor bridge returns verified recipe paths and forwards preparation facts through the same authority", async () => {
+  const f = await managedAsset("tar.gz")
+  const progress: PinnedPreparationProgress[] = []
+  const requester = createPinnedFileRequester((message) => main.receive(message), f.binding.sidecarGeneration)
+  const main = createPinnedFileMainBridge({ ensureFile: f.context.files.ensureFile, ensureEntry: (id, binding, signal, report) => f.host.ensureEntry(f.context, binding, id, signal, report) }, f.binding.sidecarGeneration, (message) => requester.receive(message))
+  try {
+    const first = await requester.ensureEntry(f.recipe.id, f.binding, new AbortController().signal, (update) => progress.push(update))
+    if (!first.result.ok) throw Error(first.result.error)
+    expect(first.result.via).toBe("relay")
+    expect(first.result.path).not.toBe(f.context.files.targetPath(f.recipe.id))
+    expect(await readFile(join(first.result.path, "data.json"))).toEqual(await readFile(new URL("../../resources/pinned-files.json", import.meta.url)))
+    expect(progress.map((update) => update.phase)).toEqual(expect.arrayContaining(["download", "unpack", "verify", "ready"]))
+    expect(progress.at(-1)).toMatchObject({ id: f.recipe.id, phase: "ready" })
+    const cached = await requester.prepareFiles({ binding: f.binding, ids: [f.recipe.id, f.recipe.id] }, new AbortController().signal, () => {})
+    expect(cached).toEqual({ ok: true, files: [{ id: f.recipe.id, path: first.result.path }] })
+    expect(f.downloads()).toBe(1)
+  } finally { requester.close(); await main.dispose() }
+})
+
+test("entryFor cannot fall back to returning a raw archive when the managed host is unavailable", async () => {
+  const f = await managedAsset()
+  const requester = createPinnedFileRequester((message) => main.receive(message), f.binding.sidecarGeneration)
+  const main = createPinnedFileMainBridge(f.context.files, f.binding.sidecarGeneration, (message) => requester.receive(message))
+  try {
+    expect(await requester.ensureEntry(f.recipe.id, f.binding, new AbortController().signal, () => {})).toMatchObject({ result: { ok: false, error: "unknown-file" }, failure: { kind: "other" } })
+    expect(f.downloads()).toBe(0)
+  } finally { requester.close(); await main.dispose() }
+})
+
+test("entryFor progress rejects malformed foreign and stale facts without consuming the current reply", async () => {
+  const f = await managedAsset()
+  const updates: PinnedPreparationProgress[] = []
+  let requestID = 0
+  const requester = createPinnedFileRequester((message) => { if (message.type === "codepuppy.pinned-file.ensure") requestID = message.id }, f.binding.sidecarGeneration)
+  const result = requester.ensureEntry(f.recipe.id, f.binding, new AbortController().signal, (update) => updates.push(update))
+  const base = { type: "codepuppy.pinned-file.progress", id: requestID, sidecarGeneration: f.binding.sidecarGeneration }
+  for (const preparation of [
+    { id: f.recipe.id, sequence: -1, phase: "ready" },
+    { id: f.recipe.id, sequence: 1, phase: "download", receivedBytes: 10, totalBytes: 1 },
+    { id: f.recipe.id, sequence: 1, phase: "ready", error: "network" },
+    { id: "speech-model/any/foreign", sequence: 1, phase: "ready" },
+  ]) requester.receive({ ...base, preparation })
+  requester.receive({ ...base, sidecarGeneration: "old", preparation: { id: f.recipe.id, sequence: 1, phase: "ready" } })
+  expect(updates).toEqual([])
+  requester.receive({ ...base, preparation: { id: f.recipe.id, sequence: 2, phase: "unpack" } })
+  expect(updates).toEqual([{ id: f.recipe.id, sequence: 2, phase: "unpack" }])
+  requester.receive({ type: "codepuppy.pinned-file.result", id: requestID, sidecarGeneration: f.binding.sidecarGeneration, delivery: { result: { ok: false, error: "cancelled" } } })
+  expect(await result).toEqual({ result: { ok: false, error: "cancelled" } })
+  requester.close()
+})
+
+test("entryFor validates the protected recipe against the master pins before the first group download", async () => {
+  const f = await managedAsset()
+  const manifest = JSON.parse(await readFile(f.context.manifestPath, "utf8"))
+  const unknown = "speech-model/any/not-in-master" as const
+  manifest.formats.own.recipe.push({ ...f.recipe, id: unknown })
+  await writeFile(f.context.manifestPath, JSON.stringify(manifest))
+  const declared = declaredFirstPartyTools("own", f.binding.entry, f.context.manifestPath, readFileSync, undefined, f.host.environment)!
+  const binding = { ...f.binding, declarationSha256: declared.declarationSha256, recipeSha256: declared.recipeSha256 }
+  const requester = createPinnedFileRequester((message) => main.receive(message), binding.sidecarGeneration)
+  const main = createPinnedFileMainBridge({ ensureFile: f.context.files.ensureFile, ensureEntry: (id, current, signal, report) => f.host.ensureEntry(f.context, current, id, signal, report) }, binding.sidecarGeneration, (message) => requester.receive(message))
+  try {
+    expect(await requester.prepareFiles({ binding, ids: [f.recipe.id, unknown] }, new AbortController().signal, () => {})).toEqual({ ok: false, error: "unknown-file" })
+    expect(f.downloads()).toBe(0)
+  } finally { requester.close(); await main.dispose() }
 })

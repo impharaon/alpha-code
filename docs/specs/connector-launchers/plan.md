@@ -773,3 +773,5 @@ prepareConnectorLaunch 的 frozen 输入/返回现已定义并组合：先依赖
 - #1759接口与待接生产点沿r8准确表，最终只读复核；不复制位置/最终绑定authority。偏离随实现提交记录。
 
 r9 Python红先：真实 pinned uv 在移走已安装解释器的可执行文件后，`gate slot -- bun /tmp/connector-r5-npm-proof/python-damage-r9.ts` exit0，但 stdout收据为 install exit0 / `Python 3.12.16 is already installed` / restored=false（`/tmp/connector-r9-python-damage-real.log`）；探针finally已恢复自己移走的文件。新增既有测试 `connector preparation repairs missing Python and a damaged standard library`，真实Location/总入口、受控Python安装边界重放此事实，命名运行0 PASS/1 FAIL（`/tmp/connector-r9-python-red.log`），未修改产品代码。fixture/connector-preparation.ts为进程隔离Host及确定故障/真实子进程生命周期装配，输入是本模块自有契约和已有真实npm样本，不手写npm/UV输出格式。一次写fixture命令cwd误设core而路径仍含packages/core，写入未发生；随后在worktree根正确写入并运行命名例。
+
+r9 Python修复：有效receipt只做随包解释器 -I/-S 的版本启动检查（无解析/联网）；失败/文件缺失才进入原单一下载authority并在锁内 `uv python install --reinstall`，仍保留r4的CLT探测与PATH规则，安装后再次启动检查成功才发布receipt。没有新增用户选项/公共API/位置authority；明确重装只发生于无健康receipt的准备miss。红例断言不变转绿1 PASS/4 assertions；阶段整文件52 PASS/298 assertions（`/tmp/connector-r9-python-green.log`、`/tmp/connector-r9-python-file.log`）。

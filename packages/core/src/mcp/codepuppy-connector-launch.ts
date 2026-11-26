@@ -94,6 +94,10 @@ export function prepareConnectorLaunch(input: {
       }
       report("python", { unit: "activity", detail: "Preparing pinned Python" })
       const pythonReceipt = path.join(launchers.runtimeRoot, "python", canonicalJsonDigest({ pinSet: launchers.pinSet, id: launchers.pythonFileId }).slice("sha256:".length) + ".json")
+      const healthyPython = (target: string) => run(ChildProcess.make(target, ["-I", "-S", "-c", "import sys;print(sys.version.split()[0])"], { cwd: input.cwd, env: initial, extendEnv: false })).pipe(
+        Effect.map(result => result.exitCode === 0 && result.stdout.trim() === launchers.environment.UV_PYTHON),
+        Effect.catch(() => Effect.succeed(false)),
+      )
       const readPython = () => Effect.gen(function* () {
         const source = yield* location.files.read(pythonReceipt).pipe(Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)))
         if (!source) return
@@ -104,7 +108,7 @@ export function prepareConnectorLaunch(input: {
         const relative = path.relative(root, value.value.path)
         if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) return
         const kind = yield* Environment.typeFollowing(location.files, value.value.path).pipe(Effect.catchTag("Environment.NotFound", () => Effect.succeed(undefined)))
-        return kind === "file" ? value.value.path : undefined
+        return kind === "file" && (yield* healthyPython(value.value.path)) ? value.value.path : undefined
       })
       const cachedPython = yield* readPython()
       const python = cachedPython ?? (yield* Effect.gen(function* () {
@@ -127,6 +131,7 @@ export function prepareConnectorLaunch(input: {
           if (relative === undefined || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative))
             return yield* Effect.fail({ kind: "unknown", detail: "Managed Python resolved outside its bound installation root" } as const)
           if ((yield* Environment.typeFollowing(location.files, target)) !== "file") return yield* Effect.fail({ kind: "unknown", detail: "Managed Python is missing" } as const)
+          if (!(yield* healthyPython(target))) return yield* Effect.fail({ kind: "unknown", detail: "Managed Python did not pass its startup check" } as const)
           yield* location.files.mkdir(path.dirname(pythonReceipt))
           const temporary = pythonReceipt + "." + randomUUID() + ".part"
           yield* location.files.write(temporary, new TextEncoder().encode(JSON.stringify({ schema: 1, pinSet: launchers.pinSet, id: launchers.pythonFileId, path: target }))).pipe(Effect.andThen(location.files.move(temporary, pythonReceipt)), Effect.ensuring(location.files.remove(temporary).pipe(Effect.ignore)))
@@ -391,6 +396,7 @@ export function installConnectorPython(input: {
         "python",
         "install",
         input.launchers.environment.UV_PYTHON!,
+        "--reinstall",
         "--no-bin",
         "--mirror",
         input.launchers.environment.UV_PYTHON_INSTALL_MIRROR!,

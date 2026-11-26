@@ -548,3 +548,10 @@ r6 槽位绑定：红例提交 3ce60e164e（0 PASS / 2 FAIL，`/tmp/connector-r6
 新增 npm-launch fixture 是该次实际 prefix metadata 与 pinned npm/libnpmexec 的原始源码/manifest/LICENSE；多 bin 例将真实 npm manifest 的 bin 顺序反向，证明官方选择而非首项猜测。3 例 3 PASS / 10 assertions（`/tmp/connector-r6-capture-tests.log`）。新例均放现有测试文件，静态 import/字面 fixture URL 可追溯，属于受影响 PR 的模块/组件层；不新增 nightly/scenario 或全局必跑输入。准备模块整文件 37 PASS / 194 assertions（`bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2`，`/tmp/connector-r6-preparation-step.log`）；core `bun typecheck` exit 0，2068 files / 2 projects。
 
 文件偏离：新增两个 core helper 各持有语法边界与内容 key；diagnostic 仅共享现有秘密 query 名规则，避免第二份秘密规则；fixture 全是官方真实输出/源码。尚未完成：uv 持久安装/bin 捕获、uv/npm 全语法归一到 key、产品 installer、完整 prepareConnectorLaunch 组合；不能以本阶段当作 AC-04/10 已完成。#1759 接口表仍适用，其同一 env 的最终投影继续由 R2 拥有。
+
+
+### r6 uv 持久入口捕获（实物验证，不增加机器依赖常驻测试）
+
+同一 connector-launch 模块增加 captureUvConnectorPreparation：在 Location spawner 用已钉 Python 的 `-I -S` 运行 stdlib tomllib/importlib.metadata，只读真实 uv-receipt.toml、pyvenv.cfg、site-packages 的分发元数据与实际 install-path；不导入连接器包，不运行 .pth。主包和 --with 的实际版本进入同一准备 schema；所有 receipt/metadata/入口需落在当前 prefix，uv 自己的 Scripts/bin 结果直接采用，不猜 console script 文件名。Python/uv 所需资源仍由现有 authority 和安装子链提供，不复制 R1/R2。
+
+一次性命令 `gate slot -- bun /tmp/connector-r5-npm-proof/uv-capture-r6.ts` exit 0（`/tmp/connector-r6-uv-capture-proof.log`）：真实 pinned uv0.13.10 + 已接受的 pinned Python3.12.16，离线安装 Python 自带的官方 pip26.3 wheel 到 prepared/key；产品 capture→publish→read，得到 pip/pip3/pip3.12 的真实入口及 pip=26.3，cacheHit=true；直接入口 `--version` 输出 pip26.3 / Python3.12。site-packages 注入自有 .pth 写标记的移除臂，capture 未执行标记；只替换真实 receipt 的一个 install-path 到 prefix 外的自有文件时，产品 capture 失败 escaped its prefix。探针及输出作为实物/机器一次性证据，不把本机 Python 路径和 wheel 加入常驻 PR 测试。原始样本命令 `/tmp/connector-r6-uv-install-probe.py` 另记录了未经修改的 uv receipt 格式。产品完整 installer/语法转换/prepare 仍未实现，本节没有缩小合法声明支持范围的产品分支。

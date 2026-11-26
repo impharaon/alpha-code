@@ -276,6 +276,102 @@ export function preparedNpmEntry(preparation: ConnectorPreparation, input: { kin
   return preparation.entries[npmEntryPrefixes[input.kind] + input.name]
 }
 
+/** Read uv's installed receipt and distribution metadata without importing connector code or .pth files. */
+export function captureUvConnectorPreparation(input: {
+  launchers: LauncherEnvironment
+  key: string
+  python: string
+  cwd: string
+  environment: Record<string, string>
+}) {
+  return Effect.gen(function* () {
+    if (!/^[a-f0-9]{64}$/.test(input.key))
+      return yield* Effect.fail({ kind: "unknown", detail: "Invalid connector preparation key" } as const)
+    const environment = yield* Environment.Service
+    const handle = yield* environment.spawner.spawn(
+      ChildProcess.make(input.python, ["-I", "-S", "-c", uvCaptureProgram], {
+        cwd: input.cwd,
+        env: input.environment,
+        extendEnv: false,
+        stdin: {
+          stream: Stream.succeed(
+            new TextEncoder().encode(
+              JSON.stringify({
+                prefix: path.join(input.launchers.runtimeRoot, "prepared", input.key),
+                key: input.key,
+              }),
+            ),
+          ),
+          endOnDone: true,
+        },
+      }),
+    )
+    const [code, stdout, stderr] = yield* Effect.all(
+      [handle.exitCode, Stream.mkUint8Array(handle.stdout), Stream.mkUint8Array(handle.stderr)],
+      { concurrency: "unbounded" },
+    )
+    if (code !== 0) return yield* Effect.fail({ kind: "unknown", detail: new TextDecoder().decode(stderr) } as const)
+    return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ConnectorPreparation))(
+      new TextDecoder().decode(stdout),
+    )
+  }).pipe(Effect.mapError(launchFailure))
+}
+
+const uvCaptureProgram = String.raw`
+import importlib.metadata
+import json
+import pathlib
+import sys
+import tomllib
+
+try:
+    data = json.load(sys.stdin)
+    prefix = pathlib.Path(data['prefix'])
+    canonical = prefix.resolve(strict=True)
+    def owned(source):
+        target = pathlib.Path(source).resolve(strict=True)
+        if not target.is_relative_to(canonical):
+            raise ValueError('Prepared uv file escaped its prefix')
+        return prefix / target.relative_to(canonical)
+    packages = {}
+    entries = {}
+    required = set()
+    receipts = list((prefix / 'uv' / 'tools').glob('*/uv-receipt.toml'))
+    if not receipts:
+        raise ValueError('Installed uv tool receipt is missing')
+    for source in receipts:
+        receipt = owned(source)
+        tool = receipt.parent
+        required.update([str(receipt), str(owned(tool / 'pyvenv.cfg'))])
+        sites = list(tool.glob('lib/python*/site-packages'))
+        windows = tool / 'Lib' / 'site-packages'
+        if windows.is_dir():
+            sites.append(windows)
+        if not sites:
+            raise ValueError('Installed uv tool environment is missing')
+        for site in sites:
+            directory = owned(site)
+            required.add(str(directory))
+            for distribution in importlib.metadata.distributions(path=[str(directory)]):
+                packages[distribution.metadata['Name']] = distribution.version
+                # Files in the real installed RECORD locate metadata without importing the package.
+                for file in distribution.files or []:
+                    if file.name == 'METADATA':
+                        required.add(str(owned(distribution.locate_file(file))))
+        with receipt.open('rb') as stream:
+            declaration = tomllib.load(stream)['tool']
+        for entry in declaration['entrypoints']:
+            target = owned(entry['install-path'])
+            if not target.is_file():
+                raise ValueError('Installed uv entry is missing')
+            entries[entry['name']] = str(target)
+            required.add(str(target))
+    print(json.dumps(dict(schema=1, ready=True, key=data['key'], runner='uv-tool', packages=packages, entries=entries, required=sorted(required))))
+except Exception as error:
+    print(str(error), file=sys.stderr)
+    sys.exit(1)
+`
+
 const npmCaptureProgram = String.raw`
 const fs = require('node:fs')
 const path = require('node:path')

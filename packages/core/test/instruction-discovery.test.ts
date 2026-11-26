@@ -115,6 +115,16 @@ function triggerAndWait<E, R>(trigger: Effect.Effect<void, E, R>) {
 }
 
 describe("InstructionDiscovery", () => {
+  it.effect("preserves instruction source provenance through editing and admission encoding", () =>
+    Effect.gen(function* () {
+      const discovery = yield* InstructionDiscovery.Service
+      const source = { packageId: "local:paypal", sourcePath: "CLAUDE.md", scope: "Project" as const }
+      yield* discovery.transform(editor => editor.add(new InstructionDiscovery.File({ path: "/repo/CLAUDE.md", content: "project guidance", source })))
+      expect(yield* discovery.list()).toEqual([{ path: "/repo/CLAUDE.md", content: "project guidance", source }])
+      expect((yield* readInitial(yield* discovery.load())).values["core/instructions"]).toEqual([{ path: "/repo/CLAUDE.md", content: "project guidance", source }])
+    }).pipe(Effect.provide(AppNodeBuilder.build(LayerNode.group([InstructionDiscovery.node, Bus.node])))),
+  )
+
   it.effect("stores ordered values with last-write-wins precedence", () =>
     Effect.gen(function* () {
       const discovery = yield* InstructionDiscovery.Service

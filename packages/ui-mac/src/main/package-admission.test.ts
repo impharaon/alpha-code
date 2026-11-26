@@ -125,11 +125,23 @@ test("whole plugin profile retains package MCP paths for runtime binding", async
   expect(graph.notRunning?.some(entry => entry.kind === "mcp")).toBe(false)
   expect(state.records.some(record => record.kind === "mcp")).toBe(true)
   expect(graph.children.filter(node => node.kind === "skill")).toHaveLength(7)
+  expect(graph.children.filter(node => node.kind === "command")).toHaveLength(1)
+  expect(graph.children.filter(node => node.kind === "agent")).toHaveLength(3)
+  expect(state.records.filter(record => record.kind === "command")).toHaveLength(1)
+  expect(state.records.filter(record => record.kind === "agent")).toHaveLength(3)
   expect(graph.children.some(node => node.kind === "mcp")).toBe(true)
   const mcp = state.records.find(record => record.kind === "mcp")!
   expect(parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp[mcp.name].command).toContain("${CLAUDE_PLUGIN_ROOT}/servers/db-server.js")
   const live = resolveLiveGenerationDir(root, graph.pluginTree!.storeKey)!
   expect(readFileSync(join(live, "tree/.mcp.json"), "utf8")).toContain("${CLAUDE_PLUGIN_ROOT}/servers/db-server.js")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const instructions = graph.children.filter(node => node.kind === "command" || node.kind === "agent")
+  expect(await setPackageStateV1({ packageId: envelope.prelude.packageId, state: "enabled" }, deps)).toMatchObject({ ok: true })
+  const enabled = JSON.parse(readFileSync(skillsEnabledPath(root), "utf8"))
+  expect(instructions.every(node => enabled.keys.includes(node.kind + "--" + node.name))).toBe(true)
+  expect(await setPackageStateV1({ packageId: envelope.prelude.packageId, state: "disabled" }, deps)).toMatchObject({ ok: true })
+  const disabled = JSON.parse(readFileSync(skillsEnabledPath(root), "utf8"))
+  expect(instructions.some(node => disabled.keys.includes(node.kind + "--" + node.name))).toBe(false)
 })
 
 test("project-only catalog admission commits effect with the graph and keeps persistent MCP disabled", async () => {

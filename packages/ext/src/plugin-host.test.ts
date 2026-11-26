@@ -1968,6 +1968,11 @@ packageIt.live("package skill arguments and denies expire at the next user promp
   const file = join(location.directory, "scope-output.txt")
   expect(Exit.isFailure(yield* execute("write", { path: file, content: "not yet" }, "call_skill_denied").pipe(Effect.exit))).toBe(true)
   expect(yield* Effect.promise(() => Bun.file(file).exists())).toBe(false)
+  yield* (yield* PluginHooks.Service).trigger("session", "experimental.idle", { sessionID: parent.id, background: [] })
+  yield* execute("write", { path: file, content: "after idle" }, "call_skill_idle")
+  expect(yield* Effect.promise(() => Bun.file(file).text())).toBe("after idle")
+  yield* execute("skill", { id: skill!.id, arguments: "again" }, "call_skill_again")
+  expect(Exit.isFailure(yield* execute("write", { path: file, content: "still scoped" }, "call_skill_again_denied").pipe(Effect.exit))).toBe(true)
   yield* sessions.prompt({ sessionID: parent.id, text: "new user turn" })
   yield* sessions.wait(parent.id)
   yield* execute("write", { path: file, content: "after user turn" }, "call_skill_cleared")
@@ -1991,4 +1996,31 @@ packageIt.live("package agent Edit remains available when source Write is denied
   const request = requests.find(request => JSON.stringify(request).includes("expert code reviewer"))!
   expect(request.tools.map(tool => tool.name)).toContain("edit")
   expect(request.tools.map(tool => tool.name)).not.toContain("write")
+})))
+
+for (const mode of ["user", "local"] as const) packageIt.live("package agent reads its " + mode + " memory through the file tool", () => packageJourney(Effect.gen(function* () {
+  const { pluginDataDirectory } = yield* Effect.promise(() => import("../../ui-mac/src/shared/installed-plugin-settings"))
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:plugin-dev"))
+  const path = "agents/skill-reviewer.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("claude:plugin-dev", { [path]: source.replace("\n---\n", "\nmemory: " + mode + "\nbackground: false\n---\n") })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const target = sample.hostNames["agent:" + path]!
+  yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+  const location = yield* Location.Service
+  const data = pluginDataDirectory(join(scratch, "data"), "local:claude:plugin-dev")
+  const root = join(data, "agent-memory", target, mode, ...(mode === "local" ? [createHash("sha256").update(realpathSync(location.directory)).digest("hex")] : []))
+  mkdirSync(root, { recursive: true })
+  writeFileSync(join(root, "MEMORY.md"), "EXISTING_" + mode + "_MEMORY")
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Memory " + mode, agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_memory_" + mode as never, call: { type: "tool-call", name: "subagent", id: "call_memory_" + mode, input: { agent: target, description: "Memory " + mode, prompt: "review" } } })))
+  const request = (yield* (yield* TestLLM.Test).requests())[0]!
+  expect(JSON.stringify(request.system)).toContain(root)
+  expect(JSON.stringify(request.system)).toContain("EXISTING_" + mode + "_MEMORY")
+  const refused = yield* sessions.create({ location: { directory: location.directory }, title: "Denied memory " + mode, agent: "build", model: { providerID: "test", id: "picked" }, permissions: [{ action: "read", resource: "*", effect: "deny" }] } as never)
+  const denied = yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: refused.id, agent: "build" as never, messageID: "msg_memory_denied" as never, call: { type: "tool-call", name: "subagent", id: "call_memory_denied", input: { agent: target, description: "Denied memory", prompt: "review" } } })), Effect.exit)
+  expect(Exit.isFailure(denied)).toBe(true)
+  expect(yield* (yield* TestLLM.Test).requests()).toHaveLength(1)
 })))

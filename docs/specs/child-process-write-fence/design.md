@@ -361,7 +361,7 @@ renderer tracker 收到后丢掉该 `(引擎代, server, directory)` 的缓存;�
 | --- | --- | --- | --- |
 | 路径含 `"` / `\` / 控制字符的项目让下一代引擎起不来 | `selectWorkspaceUnion` 不滤这类路径,`renderProcessFenceProfile` 遇到即抛(`process-fence-profile.ts:122-139`)⇒ 拒绝 fork(读,未实跑);令牌不经 seatbelt 字面量,运行期能放行这类目录,但下一代整个引擎起不来 | 现有缺陷,不由本方案引入;建议编排者按 External Bug 处理(规则 4 增加一条排除并出日志) | 立即(现存暴露) |
 | 「访问项目以外的文件夹」批准后仍写不进 | 批准只放行引擎权限(P-14) | 请求由模型发起,不属用户亲手打开 | owner 若希望批准即可写,经 intent 提出 |
-| 被围栏的工具经 LaunchServices 借未被围栏的应用执行(R-b) | 推,未实跑 | 与本方案无关的现有围栏缺口 | 编排者按 External Bug 或 INT-safety 处理 |
+| 被围栏的工具经 LaunchServices 借未被围栏的应用执行(R-b) | 推,未实跑 | 与本方案无关的现有围栏缺口 | 编排者按 External Bug 或 impharaon/alpha-work:INT-safety 处理 |
 | 自动化面板选的项目不在 tab 里 ⇒ 不在 W1 | 选中时已登记并放行本代;之后换代是否可写取决于 tab(推,未核实) | 不在本增量的打开入口内 | 有自动化写盘失败的实例时 |
 | 剩余情形里模型只拿到裸 EPERM | 模型无法向用户转述原因 | 用户侧已有一句话 | 有用户困惑实例时 |
 | `issue_file` flags 0x1 在禁签发下仍返回令牌 | handle=0,写 EPERM(E5),不放宽 | 无影响 | 系统升级后 V2 矩阵出现落盘时 |
@@ -733,7 +733,7 @@ Windows 不运行 Seatbelt，也不宣称 CF/C1 有 OS 围栏保证；沿规格�
 
 - 已批准输入：SPEC-child-process-write-fence **v5**，[提交 `834e269da977f6b4888c3b7a6a268bfe835d9cf5` 的规格](https://github.com/impharaon/alpha%2Dcode/blob/834e269da977f6b4888c3b7a6a268bfe835d9cf5/docs/specs/child-process-write-fence/spec.md)（#1765）。本次按 brief 执行 `git fetch -q origin && git show origin/alpha:docs/specs/child-process-write-fence/spec.md`，核对 BR-09 的 v5 句、限制段新增行和版本 5 批准记录；没有 merge/rebase 或修改本分支的 spec.md。
 - 只覆盖 BR-09/AC-11 的 Homebrew 执行方式及对应 v5 限制；沿用普通命令卡、原审批、输出和取消，无新页面、按钮、批准卡或用户步骤。只读档仍不能运行命令。此 main 分流只在围栏在线的 darwin 启用；非 darwin 沿原命令通路，进程本来就在系统围栏之外，不为复用 helper 另起代理或声称已有系统围栏。
-- owner（2026-11-26，意图 INT-safety U-38）：对「由应用替助手在围栏外运行 brew；代价是 Homebrew 软件包自带的脚本在围栏外运行」答「好的。」。引用来自本次 brief 与上述已批准规格，不把技术取舍记成 owner 的额外决定。
+- owner（2026-11-26，意图 impharaon/alpha-work:INT-safety U-38）：对「由应用替助手在围栏外运行 brew；代价是 Homebrew 软件包自带的脚本在围栏外运行」答「好的。」。引用来自本次 brief 与上述已批准规格，不把技术取舍记成 owner 的额外决定。
 - 代码与既有设计基线：`efc8ba3abd585e5f3e6b2820ee4e73b96d2f1060`。不调查/修复其它进程通路，不把 B1 扩成通用的围栏外执行工具。
 
 ## 2. 地面真相
@@ -956,7 +956,7 @@ R1 的反向材料必须进入同一真实入口证明：改写/删除 launcher�
 ## 1. 基线
 
 - 批准输入：[SPEC-child-process-write-fence v6](https://github.com/impharaon/alpha%2Dcode/blob/7966eb280a7ed3c5341dbc98a1c5c690e6c20c5a/docs/specs/child-process-write-fence/spec.md)，提交 `7966eb280a`，覆盖 BR-07 / AC-09 的 Cargo 例外及 U2。已执行 `git fetch -q origin`、`git show origin/alpha:docs/specs/child-process-write-fence/spec.md` 并核对固定提交；未 merge，也未修改本分支 spec.md。
-- owner 2026-11-27，INT-safety U-40 原话：「Cargo 选 1，第二处引擎改动允许，Supabase 报告批准」。本增量只消费“Cargo 选 1”：命令可写平常 `~/.cargo` 的缓存与锁，配置/镜像/凭据保持原含义；其余两项不进入本设计范围。cache 例外不改 BR-09/10 的全局安装与配置编辑审批。
+- owner 2026-11-27，impharaon/alpha-work:INT-safety U-40 原话：「Cargo 选 1，第二处引擎改动允许，Supabase 报告批准」。本增量只消费“Cargo 选 1”：命令可写平常 `~/.cargo` 的缓存与锁，配置/镜像/凭据保持原含义；其余两项不进入本设计范围。cache 例外不改 BR-09/10 的全局安装与配置编辑审批。
 
 ## 2. 地面真相与停止边界
 

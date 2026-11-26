@@ -900,7 +900,8 @@ describe("protected files", () => {
     const value = randomUUID()
     await protectedRow(BUILD, {
       ".env": `KEY=${value}\n`,
-      "escape.mjs": "import fs from 'node:fs'; import {parseEnv} from 'node:util'; const wait=async f=>{while(!fs.existsSync(f)) await new Promise(r=>setTimeout(r,10))}; process.stdout.write('\\x1b]'+parseEnv(fs.readFileSync('.env','utf8')).KEY+'x'.repeat(1024*1024)); await wait('invalid'); process.stdout.write('\\x1bXvisible-tail'); await wait('finish');",
+      // Same invalid OSC prefix as secret-stream.test.ts; a digit/CSI-final UUID lead would be consumed by stripAnsi.
+      "escape.mjs": "import fs from 'node:fs'; import {parseEnv} from 'node:util'; const wait=async f=>{while(!fs.existsSync(f)) await new Promise(r=>setTimeout(r,10))}; process.stdout.write('\\x1b]xxx'+parseEnv(fs.readFileSync('.env','utf8')).KEY+'x'.repeat(1024*1024)); await wait('invalid'); process.stdout.write('\\x1bXvisible-tail'); await wait('finish');",
     }, async (row) => {
       const turn = await row.start("shell", { command: "node escape.mjs", timeout: 80000 })
       await eventually(() => row.captures.some((event) => event.phase === "chunk"), "encrypted escape capture")

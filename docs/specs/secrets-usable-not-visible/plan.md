@@ -480,7 +480,15 @@ r8 开始于 2026-11-26 10:41:43 UTC。直达 `.cases.ts` 命令增加 `./`（�
 
 ### r8 场景实施单元
 
-- 代码单元合并原先三个编写单元的同一 case 模块/宿主计数（共享观察器需要完整接通）；本轮采用“场景与初步收据 / 最终重例和移除臂收据”两个提交。没有增加文件、生产配置/接口、依赖、gate 或冻结决定；首提交填入⑤核对行。
+- 代码单元合并原先三个编写单元的同一 case 模块/宿主计数（共享观察器需要完整接通）；本轮采用“场景与初步收据 / 无效 escape fixture 修正 / 最终移除臂收据”三个提交。没有增加文件、生产配置/接口、依赖、gate 或冻结决定；首提交填入⑤核对行。
 - 引擎本身按模型选择 writer：非 GPT 列 edit/write、GPT 列 patch（Core `tool/plugin/patch.ts` 的既有 context hook）。AC-03 通过现成 `platformModels` fixture 提供 `gpt-fixture`，前两个 writer 后经原 `session.switchModel` 路由切换再调用 patch，未注入/替换 writer。三个阶段都核 duplicate keys 的实际原 RHS，最终接收端真实收到原值。独立命名检查 exit 0 / 1 pass（`/tmp/secrets-r8-writers-green.log`）。
 - 原 R3 裸权限断言的 readonly 期望改为 allow，真实 read 的三档安全视图由新 AC-01 行负责；原 `/goal` 外读 build 从 ask 改 allow，对应 BR-05。readonly 的 read 包装错误只有 `Unable to read`，该旧观察器补查同一权限服务的具名 `external_directory` deny，再认定拒绝；没有把任意错误认作 deny。旧断言先红（`/tmp/secrets-r8-replaced.log`），修订后的 `/goal` 已单独 PASS（`/tmp/secrets-r8-input-green.log`）。
 - 迭代证据：读三档 + 普通外读三档为 6 PASS；联合名单行、真实 SSH 为 2 PASS（`/tmp/secrets-r8-program-fix.log`，同批 AC-03 旧 fixture 断言红另行修正）；cat 与真实 AWS 格式行为为 2 PASS（`/tmp/secrets-r8-programs.log`）；capture 四相故障与 Code Mode 为 5 PASS（`/tmp/secrets-r8-closure.log`）。这些分次结果不冒充完整宿主结果；完整 48 行、一分钟与 1 MiB 及移除臂由后续收据记实际结果。
+
+### r8 完整宿主与重例版本
+
+`packages/ui-mac`：`gate slot -- bun test --max-concurrency 2 src/main/engine-cases.scenario.test.ts -t '三档 × R1'`（输入 `6e3ec00c81`），exit 1；child **47 pass / 1 fail / 48 tests / 778 expect**，99.99s，宿主 0 pass / 1 fail。唯一失败 `protected files invalid escape publishes streamed residue`；其余原 30 行及新增 17 行均 PASS，含真实 SSH、四相故障、Code Mode 和正常一分钟。日志 `/tmp/secrets-r8-host.log`。不把此命令写成通过。
+
+1 MiB fixture 原先紧接 `ESC ]` 打印随机 UUID，UUID 的数字/CSI-final 开头可被现成 `stripAnsi` 当作有效 ANSI 前缀消费，因此即使完整原值已不存在也不一定出现 `[REDACTED]`。一次只读正常化探针输出 `bareUuidSurvives=false, invalidPrefixPreservesUuid=true`，确认是新 fixture 的输入前提不稳定；改为现有 `secret-stream.test.ts` 已使用的 `ESC ]xxx` 后再接 UUID。保护、输出及当前 flush 断言完全保留，未改生产 normalizer/matcher。按计划的新版本重例规则，只重验这一改变输入的 1 MiB 行；没有重跑代码未变、已经 PASS 的正常一分钟，也没有再次跑整宿主。最终用完整宿主 47 行证据 + 修正后具名行补齐，明确保留整宿主首跑 exit 1。
+
+修正后 1 MiB：`gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/composer-tier-matrix.engine.cases.ts -t 'protected files invalid escape publishes streamed residue'`，exit 0，**1 pass / 0 fail / 18 expect**，5.76s；日志 `/tmp/secrets-r8-escape-green.log`。结合未改变的其它 47 行，48 个不同用例已通过；保留“整宿主首次检查不是 green”的验证限制。

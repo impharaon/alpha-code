@@ -179,3 +179,14 @@ const {visited}=await import('./audit.mjs');const values=files.values().map(v=>B
 console.log(JSON.stringify({unrelatedCalls:visited.filter(p=>p.includes('/Documents')||p.includes('/Library/Unrelated')).length,keychain:values.includes('fixture-encrypted-keychain'),aws:values.includes('fixture-secret-key'),kube:values.includes('fixture-kube-token')}));files.dispose();
 `)).toEqual({ unrelatedCalls: 0, keychain: true, aws: true, kube: true })
 })
+
+test("Node collection includes protected files below dot directories", async () => {
+  const { root, roots } = await setup()
+  await mkdir(path.join(roots.project, ".devcontainer"))
+  await writeFile(path.join(roots.project, ".devcontainer", ".env"), "KEY=fixture-dot-directory-token\n")
+  expect(await nodeCollector(root, roots, `
+import {createSecretFiles} from './collector.mjs';
+const files=createSecretFiles(JSON.parse(process.argv[2]));await files.refresh();
+console.log(JSON.stringify({captured:files.values().some(v=>Buffer.from(v).toString()==='fixture-dot-directory-token')}));files.dispose();
+`)).toEqual({ captured: true })
+})

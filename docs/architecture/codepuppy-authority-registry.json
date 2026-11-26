@@ -2192,7 +2192,7 @@
     },
     {
       "id": "plugin-invocation-semantics",
-      "decision": "DESIGN-local-plugin-install v3 S-01: one Location-owned command renderer compiles original source nodes before binding arguments and Text values; package calls use the same renderer as native commands. PreparedInstruction.arguments is the verbatim Invocation name order ([] if undeclared), per orchestrator ruling 2026-11-27. PackageAllowSetV3 includes bundle roots in the existing keys/scoped projection per orchestrator ruling 2026-11-27 (r8); roots remain absent from component rows.",
+      "decision": "DESIGN-local-plugin-install v3 S-01: one Location-owned command renderer compiles original source nodes before binding arguments and Text values; package calls use the same renderer as native commands. PreparedInstruction.arguments is the verbatim Invocation name order ([] if undeclared), per orchestrator ruling 2026-11-27. Review r9 B1: inline and fenced shell source share the same recognizer for execution and project trust; bound values never introduce shell nodes. PackageAllowSetV3 includes bundle roots in the existing keys/scoped projection per orchestrator ruling 2026-11-27 (r8); roots remain absent from component rows.",
       "adr": [
         "ADR-029",
         "ADR-047"
@@ -2206,6 +2206,14 @@
         "ladder": "Existing L3 increment only: private renderer exposed through self-owned @opencode/plugin/codepuppy-package-runtime, scoped disposal; ext does not import core or run a second shell renderer. L0 extension hooks wrap the existing skill/subagent executors and consume the r6 command/agent allow-set projection; actual model/tool registries own identity, effort, discovery and execution. Shell tool-rule matching consumes the existing pure ShellScan leaf, never executes or reparses a shell template."
       },
       "tests": [
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "fenced shell source executes before arguments without executing bound fences"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "untrusted project fenced shell stays source and records deferred execution"
+        },
         {
           "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
           "name": "package instruction renders source nodes before bound values and arguments"

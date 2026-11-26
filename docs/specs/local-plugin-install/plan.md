@@ -859,3 +859,12 @@ r8 最终收口（19:26 UTC+08:00，约 28 分钟，未达原 8–12 小时预�
 - UI/Ext 包内 bun typecheck 均 exit 0；最终 converter --check 和 artifact --check（20 files）均 exit 0；恢复后的 git diff --exit-code 为 0，plan 相对链接 8 pass，hooksPath=.githooks。文档保持 71 errors / 250 warnings 基线，两条已接受 unknown-id 原样。
 - `affected-tests --list` exit 0，**affected tests: 359 of 689 test files**（`/tmp/plugin-standard-r8-affected{,-scope}.txt`）；未扩大每 PR 的全局集、未动 `.gate-tests`。三条旧模型断言所在 command-subagent.test.ts 仍未选择，未修改/复跑。
 - 已核 Codex（GPT-6）。结论 **SEAM-CHANGE-NEEDED / 片 5 部分完成**；下一输入为上述 core 单一绑定权威的 shell command 目标合同。没有把运行 AC 标完成。遗留去向：S-01 补口 fix now 交编排器；外仓发布/re-vendor 与旧断言/docs 基线交原归属；真实 SaaS/工具链维持 integration acceptance。无新增 ARCH 或 OPTIONAL 项。
+
+
+## r9 · 片 4/3 审查修正与片 5 补口
+
+核对：IMPLEMENT (review fixes)，编排器 / Claude Opus 5.5 r9，spec v5 / design v3.1 @f313990 及本轮明确裁决。按 B1/B2/B5 → S-01 bind-only → 片 5 runtime → 其余 A/B 的指定顺序；保留片 5 既有提交，外仓 pin/vendor 不改。本轮起于 2026-11-26 19:28 UTC+08:00；未指定完整 gate，只有相关文件与 A1 engine case 的 gate slot。
+
+B1：2f43972024 独立回归先红（包内 `bun test --max-concurrency 2 test/codepuppy-command-model-priority.test.ts -t "fenced shell"`，0 pass / 2 fail，`/tmp/plugin-standard-r9-B1-red.log`）。真实 Ralph fenced 语法仅将 setup 命令换为可观测 printf；生产执行与项目插值闸门共用 source-before-values 识别器。未信任源文本原样保留、view 记录 command-run；绑定值中的 fence 不成为源码。现有 S-01 registry 同提交记增量；gate-files 5 的旧计数同步实际文件到 10（原本 8＋新增 2），不改标准/选择器。两条均 integration、现有 imports 可追踪，受影响 PR/nightly。
+
+B1 完成：完整行为文件 10 pass / 0 fail（`/tmp/plugin-standard-r9-B1-green-final.log`）。初次修正后负臂因通用测试 host 默认 /workspace 与 Location.Service 不一致而仍红；e4d521cc4e 仅修装配为实际 Location，原产品基线复验仍 0 pass / 2 fail（`/tmp/plugin-standard-r9-B1-red-correct-location.log`），未修改断言/产品规避。生产 recognizer 接回后全文件绿。

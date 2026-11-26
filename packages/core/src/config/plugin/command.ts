@@ -64,7 +64,7 @@ export const Plugin = define({
     yield* ctx.command.transform((editor) => {
       for (const document of loaded.documents) {
         for (const [name, command] of Object.entries(document.commands ?? {})) {
-          const gated = CodePuppyProjectGate.interpolation(ctx.location.directory, name, document.gated, document.file, command.template.match(shellRegex) !== null) // codepuppy(ADR-049)
+          const gated = CodePuppyProjectGate.interpolation(ctx.location.directory, name, document.gated, document.file, instructionNodes({ parts: [command.template], syntax: "opencode" }).some(node => node.kind === "shell")) // codepuppy(ADR-049)
           const subagent = command.subagent ?? command.subtask
           editor.add({
             name,
@@ -201,21 +201,31 @@ function decode(directory: string, filepath: string, content: string | undefined
 // codepuppy ── end
 
 type InstructionNode = { source: string } | { boundValue: string }
-type TemplateNode = { kind: "text" | "shell"; parts: InstructionNode[] }
+type TemplateNode = { kind: "text" | "shell"; parts: InstructionNode[]; delimiter?: "`" | "```" }
 
 // Compile source boundaries before inserting values. A bound value can occur inside a static shell node.
-function instructionNodes(input: PreparedInstruction): TemplateNode[] {
+function instructionNodes(input: Pick<PreparedInstruction, "parts" | "syntax">): TemplateNode[] {
   const characters = input.parts.flatMap<string | { boundValue: string }>(part => typeof part === "string" ? [...part] : [part])
   const nodes: TemplateNode[] = [{ kind: "text", parts: [] }]
+  const matches = (index: number, text: string) => [...text].every((character, offset) => characters[index + offset] === character)
+  const fence = (index: number) => (index === 0 || characters[index - 1] === "\n") && matches(index, "```")
   for (let index = 0; index < characters.length; index++) {
     const character = characters[index]!
     const node = nodes.at(-1)!
-    if (input.syntax !== "literal" && character === "!" && characters[index + 1] === "`" && node.kind === "text" && characters.slice(index + 2).includes("`")) {
-      nodes.push({ kind: "shell", parts: [] })
-      index++
+    if (input.syntax !== "literal" && node.kind === "text") {
+      const delimiter = fence(index) && matches(index, "```!") ? "```" : matches(index, "!`") ? "`" : undefined
+      const start = index + (delimiter === "```" ? 4 : 2)
+      if (delimiter && characters.some((_, closing) => closing >= start && (delimiter === "```" ? fence(closing) : matches(closing, "`")))) {
+        nodes.push({ kind: "shell", parts: [], delimiter })
+        index = start - 1
+        continue
+      }
+    }
+    if (node.kind === "shell" && (node.delimiter === "```" ? fence(index) : matches(index, "`"))) {
+      index += node.delimiter!.length - 1
+      nodes.push({ kind: "text", parts: [] })
       continue
     }
-    if (character === "`" && node.kind === "shell") { nodes.push({ kind: "text", parts: [] }); continue }
     const previous = node.parts.at(-1)
     if (typeof character === "string" && previous && "source" in previous) previous.source += character
     else node.parts.push(typeof character === "string" ? { source: character } : character)
@@ -281,11 +291,11 @@ function evaluateTemplate(
         return rendered + source(part.source.slice(end))
       }).join("")
     }
-    const rendered = nodes.map(node => ({ kind: node.kind, text: renderNode(node) }))
+    const rendered = nodes.map(node => ({ kind: node.kind, delimiter: node.delimiter, text: renderNode(node) }))
     const shell = rendered.some(node => node.kind === "shell") && !gated ? yield* services.shell.resolve({ priority: "config" }) : undefined
     const outputs = yield* Effect.forEach(rendered, node => {
       if (node.kind !== "shell") return Effect.succeed(node.text)
-      if (!shell) return Effect.succeed("!`" + node.text + "`")
+      if (!shell) return Effect.succeed(node.delimiter === "```" ? "```!" + node.text + "```" : "!`" + node.text + "`")
       return services.processes.run(ChildProcess.make(shell, ShellSelect.args(shell, node.text), { cwd: input.cwd, stdin: "ignore" }), { combineOutput: true }).pipe(
         Effect.map(result => (result.output ?? Buffer.concat([result.stdout, result.stderr])).toString("utf8")),
         Effect.mapError(error => new Error("Shell interpolation failed: " + error.message)),
@@ -317,5 +327,3 @@ function parseArguments(input: string, syntax: PreparedInstruction["syntax"]) {
   if (active) args.push(word)
   return args
 }
-
-const shellRegex = /!`([^`]+)`/g

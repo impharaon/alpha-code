@@ -13,9 +13,12 @@ import {
   pricingStatusText,
   withModelVariant,
 } from "./model-picker-core"
-import { V3_PRODUCER_CATALOG } from "../../../test-component/effective-catalog.fixture"
-
-import { effectiveCatalogFixture } from "../../../test-component/effective-catalog.fixture"
+import { projectPlatformModels } from "../../main/codepuppy-live-allowlist"
+import {
+  effectiveCatalogFixture,
+  v3Snapshot,
+  V3_PRODUCER_CATALOG,
+} from "../../../test-component/effective-catalog.fixture"
 
 // `#1556`:已应用目录 = 上游 V3 producer 快照(平台段)+ 随包首启引导(BYOK 段),经生产投影装配。
 const catalog = effectiveCatalogFixture()
@@ -509,7 +512,7 @@ describe("品牌图标:品牌从目录来,经固定映射落到现有图标集(#
     }
   })
 
-  test("AC3 品牌 → 图标是固定七项映射,全部落在上游图标集里;表外品牌(即使图标集里恰好有同名图形)回落通用图形", () => {
+  test("AC3 品牌 → 图标是固定八项映射,全部落在上游图标集里;表外品牌(即使图标集里恰好有同名图形)回落通用图形", () => {
     const table = {
       anthropic: "anthropic",
       openai: "openai",
@@ -518,16 +521,43 @@ describe("品牌图标:品牌从目录来,经固定映射落到现有图标集(#
       qwen: "alibaba",
       moonshot: "moonshotai",
       minimax: "minimax",
+      google: "google",
     }
     for (const [brand, icon] of Object.entries(table)) {
       expect(brandIconId(brand), brand).toBe(icon)
       expect(iconNames as readonly string[], icon).toContain(icon) // 不新增图形资源:只用已有 sprite id
     }
     expect(iconNames as readonly string[]).toContain("synthetic")
-    expect(iconNames as readonly string[]).toContain("google")
-    for (const outside of ["google", "openrouter", "zhipuai", "alibaba", "constructor", "", undefined]) {
+    expect(iconNames as readonly string[]).toContain("openrouter")
+    for (const outside of ["some-new-vendor", "openrouter", "zhipuai", "alibaba", "constructor", "", undefined]) {
       expect(brandIconId(outside), String(outside)).toBe("synthetic")
     }
+  })
+
+  // alpha-code#1754:厂商是开放字符串。picker 实际渲染的投影(projectPlatformModels → buildModelPickerRows)
+  // 对含 `google` 与表外新厂商的目录,行品牌原样保留,图标分别是 Google 的与通用的。
+  test("AC1754 含 google 与表外新厂商的平台目录:行品牌原样保留,google 出 Google 图标、新厂商出通用图形", () => {
+    const base = v3Snapshot()
+    const models = base.models.map((model, index) => ({
+      ...model,
+      display: { ...model.display, brand: index === 0 ? "google" : index === 1 ? "some-new-vendor" : model.display.brand },
+    }))
+    const platformModels = projectPlatformModels({ ...base, models })
+    const open = { ...catalog, platformModels }
+    const actual = buildModelPickerRows({
+      catalog: open,
+      models: platformModels.map((model) => info(catalog.platformProvider.id, model.id)),
+      listState: "ready",
+      keyStatusState: "ready",
+      keyStatus: keys,
+      accountState: "member",
+      sessionScoped: false,
+      query: "",
+    }).filter((row) => row.group === "platform")
+    expect(actual.map((row) => row.brand).slice(0, 2)).toEqual(["google", "some-new-vendor"])
+    expect(brandIconId(actual[0]!.brand)).toBe("google")
+    expect(brandIconId(actual[1]!.brand)).toBe("synthetic")
+    expect(modelBrandOf({ providerID: catalog.platformProvider.id, id: platformModels[0]!.id }, open)).toBe("google")
   })
 
   test("AC4 模型按钮的品牌与行同源:平台 / 直连 BYOK 取目录品牌,自定义节点 / 未选 / 目录未到为中性", () => {

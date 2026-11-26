@@ -78,6 +78,7 @@ import {
 import { applyPlatformCredentialsHot } from "./codepuppy-secret-files"
 import { setupAutoUpdater, showUpdaterDialog } from "./updater"
 import { revealWindow, windowClose } from "./window-close"
+import { createPluginSessionQuitHandler } from "./plugin-session-lifecycle"
 import {
   createMainWindow,
   productWindows,
@@ -717,14 +718,12 @@ const main = Effect.gen(function* () {
   // #1753:macOS 点程序坞图标 ⇒ 把(关窗时隐藏的)同一个窗口带回来。
   app.on("activate", () => revealWindow(productWindows()))
 
-  let quitSettled = false
+  const settlePluginQuit = createPluginSessionQuitHandler(stopSidecars, () => app.quit())
   app.on("before-quit", (event) => {
     windowClose.markQuitting() // #1753:退出期的关窗不再被拦成"隐藏"
     quittingApp = true // B5:退出期的 sidecar exit 不触发自愈
     if (selfHealTimer) clearTimeout(selfHealTimer)
-    if (quitSettled) return
-    event.preventDefault()
-    void stopSidecars().finally(() => { quitSettled = true; app.quit() })
+    settlePluginQuit(event)
   })
 
   app.on("will-quit", () => {

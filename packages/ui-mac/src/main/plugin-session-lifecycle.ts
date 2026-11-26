@@ -20,6 +20,16 @@ export function endViewedPluginSessions(reason: Extract<Action, { action: "leave
   return Promise.all([...new Set(viewed.values())].map(sessionId => sendPluginSessionAction({ sessionId, action: "leave", reason }))).then(() => {})
 }
 
+/** Await the existing SessionEnd/stop path before Electron retries the actual quit. */
+export function createPluginSessionQuitHandler(stop: () => Promise<void>, quit: () => void) {
+  let settled = false
+  return (event: import("./window-close").CloseEventLike) => {
+    if (settled) return
+    event.preventDefault()
+    void stop().finally(() => { settled = true; quit() })
+  }
+}
+
 export function createPluginSessionRequester(post: (message: PackageSessionMessage) => void) {
   let seq = 0
   const pending = new Map<number, { resolve(): void; reject(error: Error): void }>()

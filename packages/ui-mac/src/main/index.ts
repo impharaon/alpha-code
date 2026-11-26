@@ -69,7 +69,7 @@ import {
   pushCredentialsToSidecar,
   getDefaultServerUrl,
   preferAppEnv,
-  prepareShellProbeFence,
+  startupShellProbeFence,
   setDefaultServerUrl,
   spawnLocalServer,
   type SidecarListener,
@@ -718,7 +718,8 @@ const main = Effect.gen(function* () {
     fs: { readFileSync, writeFileSync, renameSync, mkdirSync, rmSync },
     log: (line) => logger.log(line),
   })
-  const probeFence = yield* Effect.promise(() => prepareShellProbeFence())
+  // A failing probe preparation is logged and skips only the login-shell merge; each engine fork still plans its own fence (fail-closed).
+  const probeFence = yield* Effect.promise(() => startupShellProbeFence())
   preferAppEnv(app.getPath("userData"), probeFence)
   // ⚠️ initAuthEnv / initByokKeys 不能在这里调(REQ-002 联调实锤,2026-07-03):它们解密 safeStorage
   // 凭证,而 macOS 上 app ready 之前 safeStorage 不可用 → 解密静默失败 → 每次冷启动都"未登录"、

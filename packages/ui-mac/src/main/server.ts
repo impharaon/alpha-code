@@ -525,7 +525,19 @@ export async function prepareShellProbeFence(): Promise<ShellProbeFenceContext> 
   return { ...snapshot, env, profile: fence?.profile ?? "" }
 }
 
-export function preferAppEnv(userDataPath: string, context: ShellProbeFenceContext) {
+/** Startup: a failing preparation (planning, proxy, truth) must not end startup; preferAppEnv then skips only the login-shell merge. */
+export async function startupShellProbeFence(): Promise<ShellProbeFenceContext | undefined> {
+  try {
+    return await prepareShellProbeFence()
+  } catch (error) {
+    getLogger()?.error(`shell probe fence unavailable — starting without the login-shell environment: ${error instanceof Error ? error.message : String(error)}`)
+    return undefined
+  }
+}
+
+export function preferAppEnv(userDataPath: string, probe: ShellProbeFenceContext | undefined) {
+  // Without a probe fence the trusted roots still come from the same resolver; only the login-shell probe/cache merge is skipped.
+  const context = probe ?? { ...resolveShellProbeRoots({ env: { ...process.env }, home: homedir(), userDataPath }), profile: "" }
   const userEnvironment = capturePackageManagerUserEnvironment(userDataPath, process.env)
   const apply = (source: Record<string, string>) => {
     // A default injected into the probe is not a user export when it comes back through env -0/cache.
@@ -537,7 +549,7 @@ export function preferAppEnv(userDataPath: string, context: ShellProbeFenceConte
   apply({})
   const logger = getLogger()
   const logShellEnvCache = (message: string, extra?: Record<string, unknown>) => write("main", message, extra)
-  const shell = process.platform === "win32" ? null : getUserShell()
+  const shell = process.platform === "win32" || !probe ? null : getUserShell()
   // 1. Login-shell env first -- a real `export` wins over the secrets file and ordinary defaults;
   //    the websearch capability controls below are explicit local sovereignty overrides.
   // B1:缓存命中 → 0ms 套用 + 后台异步真探测(成功即更新缓存、按「真 export 赢」套差异,新值下次

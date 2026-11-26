@@ -77,7 +77,7 @@ mock.module("./process-fence-plan", () => ({ ...fencePlanner, planUserWritableLo
 const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./codepuppy-secret-files")
 const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")
-const { forkedSecretNames, resolveShellProbeRoots, preferAppEnv, preplanConfigFenceRoots, pushCredentialsToSidecar, spawnLocalServer } = await import("./server")
+const { forkedSecretNames, resolveShellProbeRoots, preferAppEnv, preplanConfigFenceRoots, pushCredentialsToSidecar, spawnLocalServer, startupShellProbeFence } = await import("./server")
 const { configFenceLocations, resolveEngineRoots } = await import("./process-fence-profile")
 const { bootFenceWorkspaceTruth, readWorkspaceTruthOrThrow, writeWorkspaceTruth } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_KEY } = await import("./tabs-preclean")
@@ -488,6 +488,28 @@ describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
       if (original === undefined) delete process.env.BUN_INSTALL
       else process.env.BUN_INSTALL = original
       delete process.env.R8_PROBE_MARKER
+    }
+  })
+
+  test("a failing probe-fence preparation does not end startup: the login-shell merge is skipped, the rest still applies", async () => {
+    // No application environment here, so the real preparation throws as planning/proxy/truth failures do at startup.
+    process.env.SHELL = fakeLoginShell("unfenced-probe.sh", { R8_PROBE_MARKER: "fresh", PATH: "/usr/bin:/bin" })
+    writeShellEnvCache(userDataPath, process.env.SHELL, { R8_PROBE_MARKER: "cached", PATH: "/usr/bin:/bin" })
+    const stateHome = process.env.XDG_STATE_HOME
+    delete process.env.XDG_STATE_HOME
+    const before = errored.length
+    try {
+      const probeFence = await startupShellProbeFence()
+      expect(probeFence).toBeUndefined()
+      expect(errored.slice(before).join("\n")).toContain("shell probe fence unavailable")
+      preferAppEnv(userDataPath, probeFence)
+      await Bun.sleep(50)
+      expect(process.env.R8_PROBE_MARKER).toBeUndefined()
+      expect(process.env.XDG_STATE_HOME).toBe(userDataPath)
+    } finally {
+      delete process.env.R8_PROBE_MARKER
+      if (stateHome === undefined) delete process.env.XDG_STATE_HOME
+      else process.env.XDG_STATE_HOME = stateHome
     }
   })
 

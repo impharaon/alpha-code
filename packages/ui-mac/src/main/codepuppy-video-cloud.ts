@@ -17,7 +17,7 @@ import { guardCloudEnvelope } from "./cloud-envelope-guard"
 import { createVideoUploadSnapshot } from "./codepuppy-upload-manifest"
 import { videoFits, type dispatchVideoUpload } from "./codepuppy-video-transport"
 import type { createMainUploadService } from "./codepuppy-upload"
-import type { CloudJobStatus } from "../preload/types"
+import type { CloudJobStatus, CloudUploadResult } from "../preload/types"
 import type {
   VideoCall,
   VideoClip,
@@ -243,7 +243,7 @@ export function createMainVideoService(deps: {
           }
           return
         }
-        let latestConsent: string | undefined
+        const consents = new Map<string,string>()
         const stopAttempts = async () => {
           for (const attempt of record.attempts.filter((a) => a.state === "running" || a.state === "dispatching")) {
             if(!attempt.jobId && !attempt.bodyFullySent){
@@ -271,7 +271,7 @@ export function createMainVideoService(deps: {
                 clip: attempt.clip,
                 model: record.model,
                 signal: new AbortController().signal,
-                uploadConsent: latestConsent,
+                uploadConsent: consents.get(attempt.attemptKey),
                 progress: () => {},
               })
               if ("error" in recovered) {
@@ -402,9 +402,9 @@ export function createMainVideoService(deps: {
               const sender = snapshot.manifest.consent_required ? await deps.sender(call, signal) : 0
               identity()
               progress("uploading", 0, clip.bytes)
-              let uploaded = await deps.upload.prepareVideo(sender, snapshot, (access, consent) => {
+              const send = (access: {accessToken:string}, consent?:string) => {
                 identity()
-                latestConsent = consent
+                if(consent) consents.set(active.attemptKey,consent)
                 return deps.dispatch({
                   endpoint: deps.endpoint(),
                   accessToken: access.accessToken,
@@ -420,7 +420,14 @@ export function createMainVideoService(deps: {
                     progress("uploading",bytes,active.clip.bytes)
                   },
                 })
-              })
+              }
+              const consent=consents.get(active.attemptKey)
+              const access=deps.identity()
+              if(!access || access.tenantId !== record.tenant)throw new Error("not-authenticated")
+              const retried=consent ? await send(access,consent) : undefined
+              let uploaded: CloudUploadResult= retried
+                ? "error" in retried ? {status:"failed",error:retried.error} : {status:"sent",privacy:"confirmed",job:retried,directory:call.directory}
+                : await deps.upload.prepareVideo(sender,snapshot,send)
               if (uploaded.status === "consent-required") uploaded = await deps.upload.wait(uploaded.requestId, signal)
               if (uploaded.status === "cancelled") throw new Error("cancelled")
               if (uploaded.status !== "sent") {

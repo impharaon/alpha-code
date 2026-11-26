@@ -611,3 +611,25 @@ readNpmLaunchDeclaration 新增 transient resolutionOptions：向 Config 传入�
 **#1759 后机械接线，接口清单仍是前表**：最后只读复核 HEAD 为 ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f；同一次 planPackageManagerCaches 的绑定 env/cacheEnv/rules/locations/excluded 进入 fence与 bootstrap；resolvePackageManagerLocations 只是候选；最终 spawn 由 R2 的 installPackageManagerEnvironment / packageManagerEnvironment / refreshPackageManagerEnvironment / projectPackageManagerEnvironment / createPackageManagerEnvironmentRequester 单一所有者投影。main bootstrap.launchers mandatory、launch assets/download Host、sidecar publishConnectorLaunchHost→index/Slot/localLaunch、Node boot re-anchor、当前 identity 的状态/诊断/重试 controller、createConnectorLaunchState 返回值的 bindDocumentRuntime→runtime.retry()、renderer root 与正式包验收依此前组装表完成。不复制候选 env 为绑定结果，不另造缓存目录、下载器或任意安装 main RPC。
 
 遗留去向：上述独立余项→#1760续接；R1/R2/生产组装→#1759合入后本表接线；docs/README.md:1 index.stale 等既有仓级文档结果→文档治理（r5与本轮均56 errors/251 warnings，本 plan 0 findings）；Office compileall→documents已路由，本轮未工作。OPTIONAL：无。当前时间核对2026-11-26T20:12:36Z，自起始约68分钟，原预期约90分钟；范围没有扩到其它票或新依赖。
+
+
+## r7｜完整准备函数与独立余项
+
+- 依据：r7 IMPLEMENT；r6 b0f1272cbb..a2f56d8e64 已接受。SPEC v1 AC-02/04/05/06/07/08/10，DESIGN v2.2 §4.3–4.7、§8/§10；不重开既定决策。
+- 核对：Phase IMPLEMENT，Codex / GPT-6；本轮完成已列的独立余项，生产 bootstrap/Host/root/controller、文档 retry 与打包验收仍等 #1759。起始2026-11-26T20:17:28Z，预计90分钟；在每个子链后核对时间。
+
+### 改动与顺序
+1. `core/mcp/codepuppy-npm-launch.ts`：官方 npa/config 的完整需求和来源 facts、当前执行语义；Location 内官方 npm install --prefix 的产品路径。保留真实 npm 对包/别名/目录/git/URL、配置优先级和 bin 的所有权。
+2. `core/mcp/codepuppy-uv-launch.ts`：解析真实 resolved Debug 的 requirements/configuration，继续复用现有 uv install/捕获；当前 cwd、环境文件、命令参数单独绑定。
+3. 必要新增 `core/mcp/codepuppy-connector-content.ts`：仅承担规范化需求、文件/本地源内容身份、解析配置内容的同一责任；同一秘密字段/URL规则从现有 key owner 复用，不引入第二套配置/下载 authority。
+4. `core/mcp/codepuppy-connector-launch.ts`：冻结 prepareConnectorLaunch 输入/返回，组合资产、Python、内容 key、持久准备、当前输入绑定及有效 ready 快路径；安装/服务只通过 Location 执行，进度/取消/真实错误接现有 attempt 链。需要的同调用链文件在实际提交列明，不改 #1759 fence。
+5. 回归放既有 `core/test/codepuppy-connector-launch.test.ts`。新增输入使用真实 pinned CLI/manifest/receipt/config 的样本；确需机器/大实物的验证仅 gate slot 一次性记录，不加常驻重例。
+
+### 风险与证明
+- 完整语法适配不得变成目录包白名单或合法第三方拒绝分支；同内容换项目、业务参数/密钥轮换必须命中同一准备，包/解析内容变化必须失效。模块/组件层命名例与真实 pinned CLI 探针验证，删除对应归一/隔离/入口选择应失败。
+- 正常 cache hit 不能访问 registry、重装 Python 或启动后台更新；测试对 resolver/installer/下载调用计数，同时真实 stdio 验证当前 argv/cwd/环境。安装失败不发布 ready，取消不晚到 spawn。AC-06/07/08 继续由同一 producer/错误分类呈现。
+- 保留每步相关文件一次、返回前新增/改变 exports 的 mock 与枚举消费者一次、适用 typecheck、移除臂和 affected-tests --list；不跑 gate run/bin/check、全套、计时/容量、应用或窗口。
+- #1759 的准确接口清单沿前表，最终再次核对 branch HEAD；不复制位置计算、候选绑定或最终环境投影。
+
+### 偏离记录
+暂无。文件/证明/实际未完成边界随实现提交更新。

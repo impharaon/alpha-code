@@ -3109,6 +3109,8 @@ packageIt.live("main forwards real permission and completion notifications to th
     yield* Effect.addFinalizer(() => Effect.promise(watcher.stop))
     const sessions = yield* Sessions.Service
     const location = yield* Location.Service
+    const agents = yield* Agent.Service
+    yield* agents.transform(editor => editor.update("build" as never, agent => { agent.permissions = [{ action: "shell", resource: "*", effect: "ask" }] }))
     const session = yield* sessions.create({ location: { directory: location.directory }, title: "Native notification", agent: "build", model: { providerID: "test", id: "picked" } } as never)
     yield* sessions.prompt({ sessionID: session.id, text: "Complete this native task" })
     yield* sessions.wait(session.id)
@@ -3127,3 +3129,53 @@ packageIt.live("main forwards real permission and completion notifications to th
     expect(JSON.stringify(yield* sessions.context(session.id))).not.toContain("notification cannot stop execution")
   }), { id: "actual-notification-producer", setup: async context => { producer = context } })
 }))
+
+packageIt.live("FileChanged watches literal files and dynamic paths once and withdraws them with the package", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  const first = hooks.hooks.FileChanged[0]
+  first.matcher = "watched.txt"
+  for (const hook of first.hooks) {
+    hook.command = process.execPath
+    hook.args = ["-e", "const fs=require('node:fs');const path=require('node:path');const input=await Bun.stdin.json();fs.appendFileSync('file-events.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({continue:false,watchPaths:input.event==='unlink'||fs.readFileSync(input.file_path,'utf8').includes('withdraw')?[]:[path.join(input.cwd,'dynamic.txt')]}))"]
+  }
+  const observer = structuredClone(first)
+  delete observer.matcher
+  observer.hooks[0].args = ["-e", "const input=await Bun.stdin.json();require('node:fs').appendFileSync('file-events.jsonl',JSON.stringify(input)+'\\n')"]
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { FileChanged: [first, observer] } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const watched = join(location.directory, "watched.txt")
+  const dynamic = join(location.directory, "dynamic.txt")
+  const log = join(location.directory, "file-events.jsonl")
+  writeFileSync(watched, "initial")
+  writeFileSync(dynamic, "initial")
+  const rows = () => { try { return readFileSync(log, "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line)) } catch { return [] } }
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "File watcher", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* sessions.prompt({ sessionID: session.id, text: "Start watching" })
+  yield* sessions.wait(session.id)
+  writeFileSync(watched, "discover dynamic")
+  yield* ext.finish(Effect.sync(() => rows().length === 2))
+  // Settle the actual child exit and watch-list publication; this checks events, not elapsed time.
+  yield* Effect.sleep("150 millis")
+  writeFileSync(dynamic, "dynamic change")
+  yield* ext.finish(Effect.sync(() => rows().length === 3))
+  writeFileSync(watched, "withdraw dynamic")
+  yield* ext.finish(Effect.sync(() => rows().length === 5))
+  yield* Effect.sleep("150 millis")
+  writeFileSync(dynamic, "withdrawn change")
+  rmSync(watched)
+  yield* ext.finish(Effect.sync(() => rows().length === 7))
+  expect(rows().filter(row => row.file_path === dynamic)).toHaveLength(1)
+  expect(rows().filter(row => row.event === "unlink")).toHaveLength(2)
+  expect(rows().every(row => row.hook_event_name === "FileChanged" && row.session_id === session.id && row.cwd === location.directory)).toBe(true)
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify(membership))
+  writeFileSync(watched, "disabled change")
+  yield* sessions.prompt({ sessionID: session.id, text: "Continue without package" })
+  yield* sessions.wait(session.id)
+  expect(rows()).toHaveLength(7)
+})))

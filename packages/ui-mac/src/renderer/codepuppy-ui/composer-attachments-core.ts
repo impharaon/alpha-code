@@ -16,7 +16,9 @@ import {
 } from "../../shared/attachment-path"
 import { CODEPUPPY_OFFICE_CONNECTORS } from "../../shared/office-advisories"
 
-export type AttachmentKind = "image" | "text" | "document"
+import { MEDIA_METADATA_KEY, MEDIA_EXTENSIONS, mediaKindOf, type MediaAttachment, type MediaAttachmentResult } from "../../shared/media-attachment"
+
+export type AttachmentKind = "image" | "text" | "document" | "video" | "audio"
 
 /** 卡上能写的拒绝 / 失败原因(文案在 i18n,纯核只给码)。 */
 export type AttachmentFailure =
@@ -25,6 +27,7 @@ export type AttachmentFailure =
   | "text-size"
   | "document-size"
   | "read"
+  | Extract<MediaAttachmentResult, { ok: false }>["reason"]
   | AttachmentStageFailure
 
 export type AttachmentStageFailure = Extract<AttachmentStageResult, { ok: false }>["reason"]
@@ -32,6 +35,7 @@ export type AttachmentStageFailure = Extract<AttachmentStageResult, { ok: false 
 type AttachmentBase = { id: string; name: string; size: number }
 
 export type ComposerAttachment =
+  | (AttachmentBase & MediaAttachment)
   /** `url` = FileReader dataUrl(data:<mime>;base64,…)—— 提交时原样作 FilePart.url。 */
   | (AttachmentBase & { kind: "image"; mime: string; url: string })
   /** `url` = data:text/plain;base64,<UTF-8 正文>。 */
@@ -70,6 +74,8 @@ const TEXT_EXTENSIONS = new Set(
 /** <input accept> 值(选择器预过滤;真闸门是 classifyAttachment —— 拖拽/粘贴不经 accept)。 */
 export const ATTACH_ACCEPT = [
   ...IMAGE_MIME,
+  "video/*", "audio/*",
+  ...Object.values(MEDIA_EXTENSIONS).flat().map((extension) => `.${extension}`),
   ...CODEPUPPY_OFFICE_CONNECTORS.map((connector) => connector.extension),
   ...[...TEXT_EXTENSIONS].map((ext) => `.${ext}`),
   "text/*",
@@ -87,6 +93,7 @@ const extensionOf = (name: string) => {
 }
 
 export type AttachmentClass =
+  | { ok: true; kind: "video" | "audio" }
   | { ok: true; kind: "image" }
   | { ok: true; kind: "text" }
   | { ok: true; kind: "document"; reader: AttachmentReader; mime: string }
@@ -100,6 +107,8 @@ export function classifyAttachment(f: { name: string; type: string; size: number
     return f.size > MAX_ATTACHMENT_BYTES
       ? { ok: false, reason: "document-size" }
       : { ok: true, kind: "document", reader, mime: f.type || "application/octet-stream" }
+  const media = TEXT_EXTENSIONS.has(ext) ? undefined : mediaKindOf(f.name, f.type)
+  if (media) return { ok: true, kind: media }
   if (TEXT_EXTENSIONS.has(ext) || f.type.startsWith("text/") || f.type === "application/json")
     return f.size > TEXT_MAX_BYTES ? { ok: false, reason: "text-size" } : { ok: true, kind: "text" }
   return { ok: false, reason: "type" }
@@ -154,6 +163,10 @@ export function stagedComposerAttachment(meta: StagedAttachmentMeta, directory: 
 export function buildAttachmentParts(atts: readonly ComposerAttachment[]): unknown[] {
   return atts.flatMap((a): unknown[] => {
     if (a.kind === "image" || a.kind === "text") return [{ type: "file", mime: a.mime, url: a.url, filename: a.name }]
+    if (a.kind === "video" || a.kind === "audio") {
+      const meta: MediaAttachment = { kind: a.kind, path: a.path, name: a.name, bytes: a.bytes, durationMs: a.durationMs }
+      return [{ type: "text", text: "", synthetic: true, metadata: { [MEDIA_METADATA_KEY]: meta } }]
+    }
     if (a.kind !== "document") return []
     const meta: StagedAttachmentMeta = { v: 1, name: a.name, mime: a.mime, size: a.size, path: a.path, reader: a.reader }
     return [{ type: "text", text: "", synthetic: true, metadata: { [ATTACHMENT_METADATA_KEY]: meta } }]

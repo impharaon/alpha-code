@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { open } from "node:fs/promises"
+import { mediaKindOf } from "../shared/media-attachment"
 import { MAX_ATTACHMENT_BYTES } from "../shared/attachment-path"
 
 export function createPickedFileAuthorizations(
@@ -29,8 +30,8 @@ export function createPickedFileAuthorizations(
   }
 }
 
-export function assertAttachmentBudget(files: { size: number }[]) {
-  const total = files.reduce((sum, file) => sum + file.size, 0)
+export function assertAttachmentBudget(files: { size: number; name?: string }[]) {
+  const total = files.reduce((sum, file) => sum + (file.name && mediaKindOf(file.name) ? 0 : file.size), 0)
   if (total <= MAX_ATTACHMENT_BYTES) return
   throw new Error(`Selected attachments exceed the ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB limit`)
 }

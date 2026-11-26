@@ -77,3 +77,15 @@ describe("#1668 I11' 暂存附件往返", () => {
     expect(message!.parts.map((part) => part.type)).toEqual(["text", "file"])
   })
 })
+
+test("media metadata round-trips through the observed inline attachment wire without reading the original path", () => {
+  const media = { kind: "audio" as const, path: "/outside/会议.mp3", name: "会议.mp3", bytes: 2_000_000_000, durationMs: null }
+  const sent = buildAttachmentParts([{ ...media, id: "media", size: media.bytes }]) as Array<{ type: string; synthetic: boolean; metadata: Record<string, unknown> }>
+  const prompt = toPrompt(sent)
+  expect(prompt.text).toBe("")
+  expect(prompt.files[0]?.name).toBe("codepuppy-media.json")
+  expect(prompt.files[0]?.uri).not.toContain("file://")
+  expect(prompt.files[0]!.uri.length).toBeLessThan(1000)
+  const [message] = toV1Messages("ses_1", [stored(prompt.files, prompt.text)] as never)
+  expect(message!.parts.find((part) => part.type === "text" && part.synthetic)).toMatchObject(sent[0]!)
+})

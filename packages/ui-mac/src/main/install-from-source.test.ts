@@ -3,7 +3,7 @@ import { expect, spyOn, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { captureFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
+import { captureFixture, captureWholeFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
 import { convertPluginTree } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import { buildSkillTxItems } from "./ext-package-tx-builders"
 import { promotePayloadToCas, setPackageStateV1 } from "./ext-install-planner"
@@ -18,6 +18,7 @@ import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
 import { makeRecoveryGate } from "./ext-recovery-gate"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { parse } from "jsonc-parser"
+import { resolveLiveGenerationDir } from "./ext-transaction"
 
 function persistedMcp(root: string, name: string) {
   return (parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")) as { mcp?: Record<string, unknown> }).mcp?.[name]
@@ -49,6 +50,32 @@ async function sourceHarness(temporary: string) {
   const request = (candidateId: string, requestId = "request_a2_01") => ({ requestId, source: { kind: "candidate" as const, candidateId }, effect: { kind: "all-projects" as const }, via: "chat" as const })
   return { install, sources, root, temporary, activation, reloads, candidate, request, fetched }
 }
+
+test("whole plugin skills retain sibling directories and root resources", () => installerHarness(async h => {
+  const capture = await captureWholeFixture("plugin-dev", path => path.endsWith("/SKILL.md") || path === ".claude-plugin/plugin.json" || path === "README.md" || path === "skills/hook-development/scripts/hook-linter.sh")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const outcome = await h.install(h.request("real_plugin_dev"))
+  expect(outcome.ok && outcome.installed.filter(entry => entry.kind === "skill")).toHaveLength(7)
+  expect(outcome.ok && outcome.notRunning.filter(entry => entry.reason === "needs-plugin-files")).toEqual([])
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs[0]!
+  expect(graph.root.kind).toBe("bundle")
+  const resource = (graph as typeof graph & { pluginTree: { storeKey: string } }).pluginTree
+  const live = resolveLiveGenerationDir(h.root, resource.storeKey)!
+  expect(readFileSync(join(live, "tree/README.md"))).toEqual(Buffer.from(await capture.readFile("README.md")))
+  expect(readFileSync(join(live, "tree/skills/skill-development/../hook-development/SKILL.md"))).toEqual(Buffer.from(await capture.readFile("skills/hook-development/SKILL.md")))
+}))
+
+test("whole plugin remotion enables real cross-skill references", () => installerHarness(async h => {
+  const capture = await captureWholeFixture("remotion", path => path === ".codex-plugin/plugin.json" || ["remotion-create", "remotion-best-practices"].some(name => path === "skills/" + name + "/SKILL.md"))
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const outcome = await h.install(h.request("real_remotion"))
+  expect(outcome.ok && outcome.installed.map(entry => entry.sourceName).sort()).toEqual(["remotion-best-practices", "remotion-create"])
+  expect(outcome.ok && outcome.notRunning).toEqual([])
+}))
 
 test("A2 marketplace context7 commits one real enabled package and durable declarations", () => installerHarness(async (h) => {
   const input = h.request(await h.candidate("context7"))

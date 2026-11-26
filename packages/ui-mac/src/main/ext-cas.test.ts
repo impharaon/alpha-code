@@ -20,6 +20,7 @@ import {
   readCasPinsStrict,
   unpinCasBlob,
 } from "./ext-cas"
+import { captureWholeFixture } from "../../test-fixtures/plugin-helper/fixture"
 
 let base: string
 beforeEach(() => {
@@ -30,6 +31,17 @@ afterEach(() => {
 })
 
 const sha = (data: Buffer | string) => crypto.createHash("sha256").update(data).digest("hex")
+
+test("plugin tree file materialization preserves the real script execute mode", async () => {
+  const capture = await captureWholeFixture("superpowers", file => file === "skills/executing-plans/scripts/task-start")
+  const node = capture.nodes[0]!
+  if (node.kind !== "file") throw Error("real script is missing")
+  const data = Buffer.from(await capture.readFile(node.path))
+  expect(putCasBlobFromBuffer(base, data, node.digest.slice(7)).ok).toBe(true)
+  const file = { path: node.path, sha256: node.digest.slice(7), size: node.bytes, mode: node.mode }
+  materializeFilesFromCas(base, [file], path.join(base, "installed"))
+  expect(fs.statSync(path.join(base, "installed", node.path)).mode & 0o7777).toBe(node.mode)
+})
 
 describe("casBlobPath", () => {
   test("addresses by digest with 2-char shard; rejects malformed digests", () => {

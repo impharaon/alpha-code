@@ -34,6 +34,7 @@ last_reviewed: 2026-11-26
 | 拥有者 | 消费内容 / 版本 | 依赖边界 |
 | --- | --- | --- |
 | #1760 启动器 | [connector-launchers frozen design](../connector-launchers/design.md) @ `f7424aa45225a6d02d1958f4b4f72d247f99acc4`，DOC-NODE-v2 与固定文件公共口；继承文档设计 §1/§8 的回执 | 文档只消费现有两平台的 Node、bootstrap 读取面、固定文件获取及失败呈现。冻结设计不代表运行实现已经交付；片 2/3 集成时核对实际符号，不另带 Node 或下载器 |
+| #1760 retry 集成 | A3：现有 `runtime.retry()` → #1760 生产 retry action | 拥有者 #1760；本票 retry 已接受，生产 action 接线随 #1760 集成交付，不新增本票接口 |
 | alpha-web catalog-src 生产者 | 文档设计 §8 的四条 Office tools/描述、Excel 新字节 re-intake、artifactDigest 与 guard 锚点 | 本仓交付新 server/来源材料后由该仓发布；片 7 只运行既有同步器消费生成快照与锁。本轮及后续本仓实施都不改另一仓源，不手编桌面快照 |
 | LibreOffice 发行资产生产者、国内固定文件入口拥有者 | 文档设计 §4.3/§8 的实际原字节副本、源码/许可材料、完整 pin 与对应 relay 快照 | 发布和部署由调度方安排；片 3 不能虚构可取 URL、复制下载机制或临时绕过固定清单。AC-09 的北京/本机下载证据在真实入口就绪后取得 |
 | 调度方 / 受保护规则拥有者 | 文档设计 §4.1/§10 指出的 ADR-014 决策 5 精确修订 | 该已知冲突沿原保护资产流程处理；第一片不改 `.claude/rules/`，不扩展到相邻规则维护 |
@@ -705,3 +706,13 @@ ui-mac/ext/util/core 包目录各自 `bun typecheck` exit 0，UI 在两个 fixtu
 其它已接受外依赖去向仍为 #1760 集成、own-release/relay、Windows 实机与 slice 8；slice 8 AC-13 明确带 `<link rel=preconnect>` 的出网材料。本轮不修改隔离设计或为之增加用户限制。无新 OPTIONAL；未发现需扩修的无关缺陷。
 
 计数行新增用例出处（供获准 scoped 写回时逐项核对）：factory-skills 的 dev/packaged `resources retain discovery, licences and the pinned inventory` 两变体来自片 1 的真实装载/许可证明，片 7 删除原 writer 制作承诺的旧用例，净 25→26；hygiene 24→19 全为片 7 删除原 writer schema/制作能力的五条过期检查，没有削弱七技能/许可的发现证明。plugin-host 52→55 分别是片 5 `shell uses only its Location's document projection and removes inherited host keys`、片 6 `document ready admission uses the real promise plugin Session API and exact queued synthetic retry`、本轮 B3 `an unavailable document projection cannot invalidate a successfully merged MCP ownership`。Office stdio 按片 7 换为真实 reader 样本、移除 writer 旧用例，并保留未广告/不可调用负臂；片 5 的 `Excel stdio reads calculated values/error locations and delegates typed objects without a required describe step`、本轮 B7 的 `read_xlsx resumes the cursor sheet when the next request omits sheet` 均实际执行，当前 12。core 唯一新增为片 5 `Office declarations bind the exact trusted Python environment`（本轮具名 1 PASS）；无其它新增用例来源被计数掩盖。受阻的登记写回不把上述实测改说成脚本成功。
+
+## r12：审查遗留处置与计数同步
+
+依据 r12 bookkeeping 裁定，A3 按现实现接受，#1760 的生产 retry action 接线已列入上方集成依赖（拥有者 #1760）。A9 的共享 fontconfig cache 要求撤回，保留冻结 §4.10/R13 的 per-job cache；Windows 字体仅由 main 的准备阶段写入，ext render 只创建私有 profile，沿用 R13 的已配置私有字体目录，不改该实现或契约。
+
+本轮只改本 plan 与 gate-files.tsv 的五个具名 count 字段（core 数值以唯一一次 slot 测量为准）；四条已实测绿色行按 r12 明确授权机械同步为 Office stdio 12、hygiene 19、factory-skills 26、plugin-host 55，来源仍为 r11 的真实 scoped 脚本输出，不重新运行四个文件。原脚本无按行选择的检查参数，且保留至少 25 文件的守卫，因此不运行全登记簿或修改脚本；五行交 ship gate 校验。
+
+r12 证明：`cd packages/core && gate slot -- bun test test/codepuppy-mcp-runtime.test.ts` 唯一一次完整测量为 **25 PASS / 0 FAIL**、70 expect（20.58s，`/tmp/alpha-1761-r12/core-count.log`），包含本轮明确准许的时序/容量用例，无第二次执行；core count 24→25。五个 count 最终为 **12 / 19 / 26 / 55 / 25**。机械读回逐字段比较证明 TSV 除五处首列数字外全部字节与本轮前一致，不改 guarantee、委派、路径或阈值逻辑。
+
+r12 核对：Codex / GPT-6；文档影响为既有实施/验证证据与集成归属，未改产品行为、测试断言或 frozen design。16 个相对链接通过，docs contract 本 plan findings=0（全仓既有 69 errors/253 warnings，不扩修），diff 检查通过；`affected-tests --list` 仍 exit 2，旧基线缺 `.gate-tests`，无 scope line，随 ship 合入处理。登记簿只改五个 count 字段，全部本轮工作合成一个提交；无 gate run/bin/check、额外测试重跑、push/PR/merge。

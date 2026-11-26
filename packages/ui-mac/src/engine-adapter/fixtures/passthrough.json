@@ -1,6 +1,6 @@
 {
- "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 5ad0ceb994: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Every passthrough route called once through the adapter by the frozen client that sends it (OpenCode.make for the 1.17.13 client, createOpencodeClient for the v1 SDK), with the call shapes of the frozen call sites; `exchanges` keeps, per contract route, the first request and the adapter's status and body. session.active is read while a second session runs the mock's slow shell. The integration routes use a remote MCP added at runtime (PUT /api/experimental/mcp/oauthprobe) whose OAuth server is the local mock-oauth.ts next to the sampler; the engine runs the real MCP SDK flow against it (401 + resource metadata, authorization server metadata, dynamic registration, token exchange). The authorization page is not visited: the sampler builds the callback URL from the attempt's own redirect_uri and state with code sampler-code and passes it to complete. connect/key uses the first integration that offers a key method.",
- "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 8fd5c1d1e6: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Every passthrough route called once through the adapter by the frozen client that sends it (OpenCode.make for the 1.17.13 client, createOpencodeClient for the v1 SDK), with the call shapes of the frozen call sites; `exchanges` keeps, per contract route, the first request and the adapter's status and body. session.active is read while a second session runs the mock's slow shell. The integration routes use a remote MCP added at runtime (PUT /api/experimental/mcp/oauthprobe) whose OAuth server is the local mock-oauth.ts next to the sampler; the engine runs the real MCP SDK flow against it (401 + resource metadata, authorization server metadata, dynamic registration, token exchange). The authorization page is not visited: the sampler builds the callback URL from the attempt's own redirect_uri and state with code sampler-code and passes it to complete. connect/key uses the first integration that offers a key method.",
+ "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
  "integrations": {
   "mcp": "mcp_3a58ef3bf7dbc4b6",
   "keyed": "302ai",
@@ -21,18 +21,18 @@
    "status": 200,
    "body": {
     "data": {
-     "ses_e06e5105cffer8WGPiZJI7uFIp": {
+     "ses_de805c3ebffeMuxAqrjxTdD86I": {
       "type": "running"
      }
     }
    }
   },
   "GET /api/agent": {
-   "request": "GET /api/agent?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj&directory=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "GET /api/agent?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj&directory=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": [
      {
@@ -428,7 +428,7 @@
        },
        {
         "action": "edit",
-        "resource": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/home/.local/share/opencode/plan/*",
+        "resource": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/home/.local/share/opencode/plan/*",
         "effect": "allow"
        },
        {
@@ -447,11 +447,11 @@
    }
   },
   "GET /api/provider/:providerID": {
-   "request": "GET /api/provider/mock?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj&directory=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "GET /api/provider/mock?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj&directory=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": {
      "id": "mock",
@@ -467,20 +467,20 @@
    }
   },
   "GET /api/reference": {
-   "request": "GET /api/reference?directory=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj&location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "GET /api/reference?directory=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj&location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": [
      {
       "name": "notes",
-      "path": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj/sub",
+      "path": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj/sub",
       "description": "sampler notes",
       "source": {
        "type": "local",
-       "path": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj/sub"
+       "path": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj/sub"
       }
      }
     ]
@@ -492,8 +492,8 @@
    "body": {
     "data": [
      {
-      "id": "ses_e06e5105cffer8WGPiZJI7uFIp",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805c3ebffeMuxAqrjxTdD86I",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -506,20 +506,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180654500,
-       "updated": 1795180656091,
-       "busy": 1795180654501,
-       "idle": 1795180656092
+       "created": 1795698605077,
+       "updated": 1795698606705,
+       "busy": 1795698605079,
+       "idle": 1795698606706
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e51193ffetjvE18sz7TZJ2V",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805c524ffenGHTMsAV1Q2DEm",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 8,
@@ -532,20 +532,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180654236,
-       "updated": 1795180654437,
-       "busy": 1795180654296,
-       "idle": 1795180654438
+       "created": 1795698604810,
+       "updated": 1795698605015,
+       "busy": 1795698604871,
+       "idle": 1795698605016
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e514edffei4NB538Rd564iR",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805c8beffeL2VgN66nnEUmrz",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "agent": "build",
       "cost": 0,
       "tokens": {
@@ -559,20 +559,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180653331,
-       "updated": 1795180654058,
-       "busy": 1795180653537,
-       "idle": 1795180654043
+       "created": 1795698603842,
+       "updated": 1795698604604,
+       "busy": 1795698604054,
+       "idle": 1795698604587
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e514f5ffe61dmo0DFRr4m2T",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805c8d4ffeLNC0nhYM6EQ5QD",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 0,
@@ -584,17 +584,17 @@
        }
       },
       "time": {
-       "created": 1795180653322,
-       "updated": 1795180653322
+       "created": 1795698603822,
+       "updated": 1795698603822
       },
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e52fcaffe5Zvj6XqAgpWXJr",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805e3e9ffem3T450yciaWaEU",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 70,
@@ -607,21 +607,21 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180646453,
-       "updated": 1795180649689,
-       "busy": 1795180649293,
-       "idle": 1795180649691
+       "created": 1795698596888,
+       "updated": 1795698600221,
+       "busy": 1795698599767,
+       "idle": 1795698600223
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e52f07ffeKETkWJH09qvTpz",
-      "parentID": "ses_e06e52fcaffe5Zvj6XqAgpWXJr",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805e316ffe6YRN3y3OgqH0Wi",
+      "parentID": "ses_de805e3e9ffem3T450yciaWaEU",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "agent": "general",
       "cost": 0,
       "tokens": {
@@ -635,20 +635,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180646649,
-       "updated": 1795180649290,
-       "busy": 1795180646651,
-       "idle": 1795180649291
+       "created": 1795698597102,
+       "updated": 1795698599762,
+       "busy": 1795698597109,
+       "idle": 1795698599764
       },
       "title": "Say hello",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e5361affe7kLn4QjTCfw0d8",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805eab5ffelJH63lpOyhf2BZ",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -661,20 +661,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180644837,
-       "updated": 1795180646427,
-       "busy": 1795180644839,
-       "idle": 1795180646429
+       "created": 1795698595149,
+       "updated": 1795698596836,
+       "busy": 1795698595155,
+       "idle": 1795698596839
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e537afffecrGIg5YUGH2FDq",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805ecb6ffez0D3gXcLDlHCIv",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -687,20 +687,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180644432,
-       "updated": 1795180644803,
-       "busy": 1795180644434,
-       "idle": 1795180644805
+       "created": 1795698594634,
+       "updated": 1795698595049,
+       "busy": 1795698594636,
+       "idle": 1795698595053
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e53887ffe0uubHrKY98CEL5",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805ed96ffeJcgvRSEM3dEC80",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 8,
@@ -713,20 +713,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180644217,
-       "updated": 1795180644358,
-       "busy": 1795180644221,
-       "idle": 1795180644359
+       "created": 1795698594410,
+       "updated": 1795698594568,
+       "busy": 1795698594416,
+       "idle": 1795698594570
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e5395dffeH5sBNR64XY1UEI",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de805ee71ffe9y5BOvIhiNNldW",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 8,
@@ -739,20 +739,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180644003,
-       "updated": 1795180644145,
-       "busy": 1795180644006,
-       "idle": 1795180644146
+       "created": 1795698594192,
+       "updated": 1795698594344,
+       "busy": 1795698594195,
+       "idle": 1795698594346
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e550eaffepgSPOxtxKH1jH2",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8060610ffeNkbT46eDPDp6t8",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -765,20 +765,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180637974,
-       "updated": 1795180638369,
-       "busy": 1795180637975,
-       "idle": 1795180638370
+       "created": 1795698588144,
+       "updated": 1795698588590,
+       "busy": 1795698588146,
+       "idle": 1795698588592
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e554f2ffeNnyEsg9vQAw3Lb",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8060a95ffe7lAhjoFfqb5Db0",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 77,
@@ -791,20 +791,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180636942,
-       "updated": 1795180637935,
-       "busy": 1795180637549,
-       "idle": 1795180637937
+       "created": 1795698586987,
+       "updated": 1795698588038,
+       "busy": 1795698587600,
+       "idle": 1795698588040
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e5594cffeQ85R9DSAna3Of9",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8060efbffeawqsV9TH0xpyb1",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 77,
@@ -817,20 +817,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180635828,
-       "updated": 1795180636828,
-       "busy": 1795180636436,
-       "idle": 1795180636829
+       "created": 1795698585862,
+       "updated": 1795698586926,
+       "busy": 1795698586479,
+       "idle": 1795698586929
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e55ae2ffeonekOj7Z0srJXR",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8061103ffe20oslHkea3bLJC",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "model": {
        "id": "gpt-5-mock",
        "providerID": "mock",
@@ -848,20 +848,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180635422,
-       "updated": 1795180635821,
-       "busy": 1795180635424,
-       "idle": 1795180635823
+       "created": 1795698585341,
+       "updated": 1795698585778,
+       "busy": 1795698585345,
+       "idle": 1795698585780
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e55c78ffeNRBJ77Th2pO8no",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8061305ffeWel9wT41MOkA7g",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -874,20 +874,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180635016,
-       "updated": 1795180635391,
-       "busy": 1795180635017,
-       "idle": 1795180635392
+       "created": 1795698584828,
+       "updated": 1795698585254,
+       "busy": 1795698584831,
+       "idle": 1795698585257
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e55e0cffeES58y2ow1ucxh0",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de806150dffetfZHD1QnYK6eGv",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -900,20 +900,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180634612,
-       "updated": 1795180635010,
-       "busy": 1795180634613,
-       "idle": 1795180635011
+       "created": 1795698584308,
+       "updated": 1795698584772,
+       "busy": 1795698584316,
+       "idle": 1795698584775
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e56788ffe86ClIp8KTipmHR",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8061eeeffe81aC1TlcHdsSJf",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 77,
@@ -926,21 +926,21 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180632184,
-       "updated": 1795180633061,
-       "busy": 1795180632186,
-       "idle": 1795180633062
+       "created": 1795698581778,
+       "updated": 1795698582769,
+       "busy": 1795698581781,
+       "idle": 1795698582771
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e566c3ffeeVPnfyXGq0l5kK",
-      "parentID": "ses_e06e56788ffe86ClIp8KTipmHR",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8061e1bffeHTggdfxwEY5SZY",
+      "parentID": "ses_de8061eeeffe81aC1TlcHdsSJf",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "agent": "general",
       "cost": 0,
       "tokens": {
@@ -954,20 +954,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180632381,
-       "updated": 1795180632521,
-       "busy": 1795180632383,
-       "idle": 1795180632523
+       "created": 1795698581993,
+       "updated": 1795698582152,
+       "busy": 1795698582000,
+       "idle": 1795698582154
       },
       "title": "Say hello",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e569e9ffeRMh6azxyi5pW1f",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8062159ffew21QF5QPua2gjq",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -980,21 +980,21 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180631575,
-       "updated": 1795180632093,
-       "busy": 1795180631577,
-       "idle": 1795180632094
+       "created": 1795698581161,
+       "updated": 1795698581733,
+       "busy": 1795698581164,
+       "idle": 1795698581735
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e56924ffeovSGYTfmbe2YMY",
-      "parentID": "ses_e06e569e9ffeRMh6azxyi5pW1f",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8062085ffeFOpmDHgEoc5OmI",
+      "parentID": "ses_de8062159ffew21QF5QPua2gjq",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "agent": "general",
       "cost": 0,
       "tokens": {
@@ -1008,20 +1008,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180631773,
-       "updated": 1795180631913,
-       "busy": 1795180631775,
-       "idle": 1795180631915
+       "created": 1795698581374,
+       "updated": 1795698581531,
+       "busy": 1795698581377,
+       "idle": 1795698581534
       },
       "title": "Say hello",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e56b1effeQt567terZswbld",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de80622a6ffeztLZRFHL4CbRqf",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 0,
@@ -1033,17 +1033,17 @@
        }
       },
       "time": {
-       "created": 1795180631266,
-       "updated": 1795180631266
+       "created": 1795698580829,
+       "updated": 1795698580829
       },
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e56b20ffecM0R5CaMbWzdil",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de80622adffebLj4AYS8fS2i7F",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 0,
@@ -1055,17 +1055,17 @@
        }
       },
       "time": {
-       "created": 1795180631264,
-       "updated": 1795180631264
+       "created": 1795698580821,
+       "updated": 1795698580821
       },
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e56d84ffd41e4mHLR50wF3Q",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de806251fffeE231pCT8aJ8f7X",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 0,
@@ -1077,17 +1077,17 @@
        }
       },
       "time": {
-       "created": 1795180630652,
-       "updated": 1795180630652
+       "created": 1795698580194,
+       "updated": 1795698580194
       },
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e56d85ffeQEVF1SEV9Urw8D",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8062521ffeNWGVf6lna90kZC",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 0,
@@ -1099,17 +1099,17 @@
        }
       },
       "time": {
-       "created": 1795180630651,
-       "updated": 1795180630651
+       "created": 1795698580191,
+       "updated": 1795698580191
       },
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e57242ffeFVOxiaNK3lq10q",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8062b1bffeR7JVUbsiTiJ0nd",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 105,
@@ -1122,20 +1122,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180629438,
-       "updated": 1795180630622,
-       "busy": 1795180630246,
-       "idle": 1795180630624
+       "created": 1795698578661,
+       "updated": 1795698580097,
+       "busy": 1795698579681,
+       "idle": 1795698580099
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e57449ffeVEGR7LwHIFvseY",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8062d2affegE5Ffm3saZSSho",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -1148,20 +1148,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180628919,
-       "updated": 1795180629320,
-       "busy": 1795180628920,
-       "idle": 1795180629321
+       "created": 1795698578135,
+       "updated": 1795698578577,
+       "busy": 1795698578138,
+       "idle": 1795698578579
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e575deffen2IjoWruabdOTX",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de806305effeoofampthmzDVZ6",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -1174,20 +1174,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180628514,
-       "updated": 1795180628891,
-       "busy": 1795180628515,
-       "idle": 1795180628893
+       "created": 1795698577315,
+       "updated": 1795698578034,
+       "busy": 1795698577319,
+       "idle": 1795698578036
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e57774ffe34qzPygSfz0qCz",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8063264ffeUL7OJ9uhvYRBMo",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -1200,20 +1200,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180628108,
-       "updated": 1795180628487,
-       "busy": 1795180628110,
-       "idle": 1795180628489
+       "created": 1795698576798,
+       "updated": 1795698577219,
+       "busy": 1795698576802,
+       "idle": 1795698577221
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e579d5ffeBPJn7alpzwl5VJ",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8063468ffeT1khvBk5TwEFR2",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -1226,20 +1226,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180627499,
-       "updated": 1795180628041,
-       "busy": 1795180627501,
-       "idle": 1795180628043
+       "created": 1795698576280,
+       "updated": 1795698576698,
+       "busy": 1795698576284,
+       "idle": 1795698576701
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e57d42ffejIM7utZoF1jDQb",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de80637e6ffeTCXIRgaThFfpjz",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 42,
@@ -1252,20 +1252,20 @@
       },
       "outcome": "succeeded",
       "time": {
-       "created": 1795180626636,
-       "updated": 1795180627423,
-       "busy": 1795180626893,
-       "idle": 1795180627425
+       "created": 1795698575386,
+       "updated": 1795698576236,
+       "busy": 1795698575666,
+       "idle": 1795698576240
       },
       "title": "Mock title",
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      },
      {
-      "id": "ses_e06e57d5dffe1uQwVzl2EMxxM4",
-      "projectID": "1db7657a5adca949084724df5713725855de576f",
+      "id": "ses_de8063802ffeZ8FNjkifBk76OF",
+      "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
       "cost": 0,
       "tokens": {
        "input": 0,
@@ -1277,10 +1277,10 @@
        }
       },
       "time": {
-       "created": 1795180626618,
-       "updated": 1795180626618
+       "created": 1795698575382,
+       "updated": 1795698575382
       },
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
       "permissions": [
        {
         "action": "*",
@@ -1289,23 +1289,23 @@
        }
       ],
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
       }
      }
     ],
     "cursor": {
-     "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTA2ZTUxMDVjZmZlcjhXR1BpWkpJN3VGSXAiLCJ0aW1lIjoxNzk1MTgwNjU2MDkxLCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
-     "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTA2ZTU3ZDVkZmZlMXVRd1Z6bDJFTXh4TTQiLCJ0aW1lIjoxNzk1MTgwNjI2NjE4LCJkaXJlY3Rpb24iOiJuZXh0In19"
+     "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZGU4MDVjM2ViZmZlTXV4QXFyanhUZEQ4NkkiLCJ0aW1lIjoxNzk1Njk4NjA2NzA1LCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
+     "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZGU4MDYzODAyZmZlWjhGTmpraWZCazc2T0YiLCJ0aW1lIjoxNzk1Njk4NTc1MzgyLCJkaXJlY3Rpb24iOiJuZXh0In19"
     }
    }
   },
   "GET /api/session/:sessionID": {
-   "request": "GET /api/session/ses_e06e51193ffetjvE18sz7TZJ2V",
+   "request": "GET /api/session/ses_de805c524ffenGHTMsAV1Q2DEm",
    "status": 200,
    "body": {
     "data": {
-     "id": "ses_e06e51193ffetjvE18sz7TZJ2V",
-     "projectID": "1db7657a5adca949084724df5713725855de576f",
+     "id": "ses_de805c524ffenGHTMsAV1Q2DEm",
+     "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
      "cost": 0,
      "tokens": {
       "input": 8,
@@ -1318,38 +1318,38 @@
      },
      "outcome": "succeeded",
      "time": {
-      "created": 1795180654236,
-      "updated": 1795180654437,
-      "busy": 1795180654296,
-      "idle": 1795180654438
+      "created": 1795698604810,
+      "updated": 1795698605015,
+      "busy": 1795698604871,
+      "idle": 1795698605016
      },
      "title": "Mock title",
-     "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+     "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
      }
     }
    }
   },
   "POST /api/session/:sessionID/model": {
-   "request": "POST /api/session/ses_e06e51193ffetjvE18sz7TZJ2V/model",
+   "request": "POST /api/session/ses_de805c524ffenGHTMsAV1Q2DEm/model",
    "status": 204,
    "body": null
   },
   "POST /api/session/:sessionID/fork": {
-   "request": "POST /api/session/ses_e06e51193ffetjvE18sz7TZJ2V/fork",
+   "request": "POST /api/session/ses_de805c524ffenGHTMsAV1Q2DEm/fork",
    "status": 200,
    "body": {
     "data": {
-     "id": "ses_e06e509feffeDLvVjm6jLaJT65",
+     "id": "ses_de805bd74ffeDsse7X34a0iZWs",
      "fork": {
-      "sessionID": "ses_e06e51193ffetjvE18sz7TZJ2V",
+      "sessionID": "ses_de805c524ffenGHTMsAV1Q2DEm",
       "boundary": {
        "type": "through",
-       "messageID": "msg_1f91af600001AMt21LyNHNJXLD"
+       "messageID": "msg_217fa428a001iIg71GTGEwQYek"
       }
      },
-     "projectID": "1db7657a5adca949084724df5713725855de576f",
+     "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
      "model": {
       "id": "m",
       "providerID": "mock",
@@ -1366,31 +1366,31 @@
       }
      },
      "time": {
-      "created": 1795180656130,
-      "updated": 1795180656130
+      "created": 1795698606731,
+      "updated": 1795698606731
      },
      "title": "Mock title (fork #1)",
-     "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+     "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
      }
     }
    }
   },
   "POST /api/session/:sessionID/shell": {
-   "request": "POST /api/session/ses_e06e51193ffetjvE18sz7TZJ2V/shell",
+   "request": "POST /api/session/ses_de805c524ffenGHTMsAV1Q2DEm/shell",
    "status": 204,
    "body": null
   },
   "POST /api/session/:sessionID/compact": {
-   "request": "POST /api/session/ses_e06e51193ffetjvE18sz7TZJ2V/compact",
+   "request": "POST /api/session/ses_de805c524ffenGHTMsAV1Q2DEm/compact",
    "status": 200,
    "body": {
     "data": {
-     "id": "msg_1f91af7fe001gfrT7AU92n73os",
-     "sessionID": "ses_e06e51193ffetjvE18sz7TZJ2V",
+     "id": "msg_217fa448b001bxL5s08gcEhBpX",
+     "sessionID": "ses_de805c524ffenGHTMsAV1Q2DEm",
      "time": {
-      "created": 1795180656639
+      "created": 1795698607243
      },
      "type": "compaction",
      "payload": {},
@@ -1403,8 +1403,8 @@
    "status": 200,
    "body": {
     "data": {
-     "id": "ses_e06e5060affeneyqMUBHcyjNAj",
-     "projectID": "1db7657a5adca949084724df5713725855de576f",
+     "id": "ses_de805b97dffev4FLiRuaOuWxLB",
+     "projectID": "344ca403e7c9f03e0dd940f568ec38c485b31e3c",
      "agent": "build",
      "model": {
       "id": "m",
@@ -1422,27 +1422,27 @@
       }
      },
      "time": {
-      "created": 1795180657148,
-      "updated": 1795180657148
+      "created": 1795698607747,
+      "updated": 1795698607747
      },
-     "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+     "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
      }
     }
    }
   },
   "DELETE /api/session/:sessionID": {
-   "request": "DELETE /api/session/ses_e06e5060affeneyqMUBHcyjNAj",
+   "request": "DELETE /api/session/ses_de805b97dffev4FLiRuaOuWxLB",
    "status": 204,
    "body": null
   },
   "GET /api/fs/find": {
-   "request": "GET /api/fs/find?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj&query=a&type=file&limit=10",
+   "request": "GET /api/fs/find?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj&query=a&type=file&limit=10",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": [
      {
@@ -1489,11 +1489,11 @@
    }
   },
   "GET /api/vcs/status": {
-   "request": "GET /api/vcs/status?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "GET /api/vcs/status?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": [
      {
@@ -1572,11 +1572,11 @@
    }
   },
   "GET /api/vcs/diff": {
-   "request": "GET /api/vcs/diff?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj&mode=working",
+   "request": "GET /api/vcs/diff?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj&mode=working",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": [
      {
@@ -1616,7 +1616,7 @@
      },
      {
       "file": "opencode.json",
-      "patch": "diff --git a/opencode.json b/opencode.json\nnew file mode 100644\nindex 0000000..cec7f0f\n--- /dev/null\n+++ b/opencode.json\n@@ -0,0 +1 @@\n+{\"references\":{\"notes\":{\"path\":\"/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj/sub\",\"description\":\"sampler notes\"}}}\n\\ No newline at end of file\n",
+      "patch": "diff --git a/opencode.json b/opencode.json\nnew file mode 100644\nindex 0000000..8c57d74\n--- /dev/null\n+++ b/opencode.json\n@@ -0,0 +1 @@\n+{\"references\":{\"notes\":{\"path\":\"/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj/sub\",\"description\":\"sampler notes\"}}}\n\\ No newline at end of file\n",
       "additions": 1,
       "deletions": 0,
       "status": "added"
@@ -1667,76 +1667,76 @@
    }
   },
   "POST /api/pty": {
-   "request": "POST /api/pty?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "POST /api/pty?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": {
-     "id": "pty_1f91afa500017lrnMrSUBqAlX1",
+     "id": "pty_217fa46da001fynvzNgfwpaKB3",
      "title": "sampler",
      "command": "/bin/zsh",
      "args": [
       "-l"
      ],
-     "cwd": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+     "cwd": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
      "status": "running",
-     "pid": 22518
+     "pid": 40930
     }
    }
   },
   "GET /api/pty/:ptyID": {
-   "request": "GET /api/pty/pty_1f91afa500017lrnMrSUBqAlX1?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "GET /api/pty/pty_217fa46da001fynvzNgfwpaKB3?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": {
-     "id": "pty_1f91afa500017lrnMrSUBqAlX1",
+     "id": "pty_217fa46da001fynvzNgfwpaKB3",
      "title": "sampler",
      "command": "/bin/zsh",
      "args": [
       "-l"
      ],
-     "cwd": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+     "cwd": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
      "status": "running",
-     "pid": 22518
+     "pid": 40930
     }
    }
   },
   "PUT /api/pty/:ptyID": {
-   "request": "PUT /api/pty/pty_1f91afa500017lrnMrSUBqAlX1?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "PUT /api/pty/pty_217fa46da001fynvzNgfwpaKB3?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": {
-     "id": "pty_1f91afa500017lrnMrSUBqAlX1",
+     "id": "pty_217fa46da001fynvzNgfwpaKB3",
      "title": "sampler 2",
      "command": "/bin/zsh",
      "args": [
       "-l"
      ],
-     "cwd": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj",
+     "cwd": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj",
      "status": "running",
-     "pid": 22518
+     "pid": 40930
     }
    }
   },
   "DELETE /api/pty/:ptyID": {
-   "request": "DELETE /api/pty/pty_1f91afa500017lrnMrSUBqAlX1?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "DELETE /api/pty/pty_217fa46da001fynvzNgfwpaKB3?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 204,
    "body": null
   },
   "GET /api/integration/:integrationID": {
-   "request": "GET /api/integration/mcp_3a58ef3bf7dbc4b6?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "GET /api/integration/mcp_3a58ef3bf7dbc4b6?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": {
      "id": "mcp_3a58ef3bf7dbc4b6",
@@ -1756,48 +1756,48 @@
    }
   },
   "POST /api/integration/:integrationID/connect/oauth": {
-   "request": "POST /api/integration/mcp_3a58ef3bf7dbc4b6/connect/oauth?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "POST /api/integration/mcp_3a58ef3bf7dbc4b6/connect/oauth?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": {
-     "attemptID": "con_1f91afac3001fCKOyYWNi5KD3m",
-     "url": "http://127.0.0.1:47930/authorize?response_type=code&client_id=sampler-client&code_challenge=UMhq2RvZ4saM-30LgPEdD5HIPxzE8oC6WNzGiPxc31U&code_challenge_method=S256&redirect_uri=http%3A%2F%2F127.0.0.1%3A50087%2Fcallback&state=gM8Q5qJ30zC1NCD_CwhxAz7GTt7FY0xRfTskt7pNhd0&resource=http%3A%2F%2F127.0.0.1%3A47930%2Fmcp",
+     "attemptID": "con_217fa474a001hlxURheCk1LEUC",
+     "url": "http://127.0.0.1:47930/authorize?response_type=code&client_id=sampler-client&code_challenge=UL8qLHcFTWUuRukRuWoCjpYL1Cc0jaM2EDoAlek2XyM&code_challenge_method=S256&redirect_uri=http%3A%2F%2F127.0.0.1%3A65381%2Fcallback&state=Xa1_3Efb9N51iTP6ZLB1q9GgEH0nkRFO6njC0sTaZh4&resource=http%3A%2F%2F127.0.0.1%3A47930%2Fmcp",
      "instructions": "Authorize oauthprobe in your browser. This window will close automatically.",
      "mode": "auto",
      "paste": true,
      "time": {
-      "created": 1795180657347,
-      "expires": 1795181257347
+      "created": 1795698607946,
+      "expires": 1795699207946
      }
     }
    }
   },
   "GET /api/integration/:integrationID/connect/oauth/:attemptID": {
-   "request": "GET /api/integration/mcp_3a58ef3bf7dbc4b6/connect/oauth/con_1f91afac3001fCKOyYWNi5KD3m?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "GET /api/integration/mcp_3a58ef3bf7dbc4b6/connect/oauth/con_217fa474a001hlxURheCk1LEUC?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 200,
    "body": {
     "location": {
-     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-Tlpb83/proj"
+     "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-ZrMTUs/proj"
     },
     "data": {
      "status": "pending",
      "time": {
-      "created": 1795180657347,
-      "expires": 1795181257347
+      "created": 1795698607946,
+      "expires": 1795699207946
      }
     }
    }
   },
   "POST /api/integration/:integrationID/connect/oauth/:attemptID/complete": {
-   "request": "POST /api/integration/mcp_3a58ef3bf7dbc4b6/connect/oauth/con_1f91afac3001fCKOyYWNi5KD3m/complete?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "POST /api/integration/mcp_3a58ef3bf7dbc4b6/connect/oauth/con_217fa474a001hlxURheCk1LEUC/complete?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 204,
    "body": null
   },
   "POST /api/integration/:integrationID/connect/key": {
-   "request": "POST /api/integration/302ai/connect/key?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-Tlpb83%2Fproj",
+   "request": "POST /api/integration/302ai/connect/key?location%5Bdirectory%5D=%2Fvar%2Ffolders%2Fw5%2F9ltc186j4xx99mfzlbmh8z0w0000gn%2FT%2Fcodepuppy-sampler-ZrMTUs%2Fproj",
    "status": 204,
    "body": null
   }
@@ -1809,13 +1809,13 @@
    "packages/cli": "544883d154af3d90d64f2638bef467852fe252aa",
    "packages/client": "3d3c95581389d702c46e0fe7ccdadbcce295872b",
    "packages/codemode": "eb7ca2279c0d93a2e967709e18346f3aa31a8e23",
-   "packages/core": "1e6ae04b45cdece68a7a45969916c2935d2a4c5b",
+   "packages/core": "67d42084c7a61492bb3b3e382fde46dcdbdf9869",
    "packages/latex": "abcd38e17eb09d996d975964f46be0a2e758fdf4",
    "packages/merman": "3feaef89d940956096deb30e2b9f85f3fabdfe15",
-   "packages/plugin": "d82062f713a03e48755e632f13d25a38707077a5",
+   "packages/plugin": "f16f237205d777931695d221d76b1dfd00d6af19",
    "packages/plugin-browser": "a3fd121205a803d1a82d97514cc09245010656cb",
    "packages/protocol": "3117071f374c96909ccc2250cd5333a11d521854",
-   "packages/schema": "c24d8b246d201115b2dd08f2211d314fd650108c",
+   "packages/schema": "e9cb318997b6335136e7529a7ab8f16de9dea20c",
    "packages/server": "48bfa1e931af6e4c7d973119e173d28124aaa53d",
    "packages/simulation": "7b707eb9b69aa826e91677a8416cfb8cda3efcf5",
    "packages/theme": "0afba31d85d03fa7e34f8a98a38ccf355d6ec6c5",

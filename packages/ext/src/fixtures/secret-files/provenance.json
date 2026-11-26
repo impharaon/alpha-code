@@ -1,0 +1,72 @@
+{
+  "npm.ini": {
+    "source": "npm config set --userconfig isolated file",
+    "version": "11.20.0",
+    "sha256": "16bd54cffcbb2bfccc5a14285a40596607467286b4f6e13d87375a339c0a146e"
+  },
+  "kube.yaml": {
+    "source": "kubectl config set-credentials --kubeconfig isolated file",
+    "version": "{\n  \"clientVersion\": {\n    \"major\": \"1\",\n    \"minor\": \"34\",\n    \"gitVersion\": \"v1.34.1\",\n    \"gitCommit\": \"93248f9ae092f571eb870b7664c534bfc7d00f03\",\n    \"gitTreeState\": \"clean\",\n    \"buildDate\": \"2025-09-09T19:44:50Z\",\n    \"goVersion\": \"go1.24.6\",\n    \"compiler\": \"gc\",\n    \"platform\": \"darwin/arm64\"\n  },\n  \"kustomizeVersion\": \"v5.7.1\"\n}",
+    "sha256": "47cab512b35770e6669058d7430dc96c29eb59c61a16a64290aa4a133617f28e"
+  },
+  "private-key.txt": {
+    "source": "ssh-keygen -t ed25519 in isolated temporary directory",
+    "version": "system OpenSSH; generated test key only",
+    "sha256": "822a54a1e0439db4295a8973448dca9b95d5f1dd96b84d71c1ee662d4c2713be"
+  },
+  "git-credentials.txt": {
+    "source": "git credential-store --file isolated file",
+    "version": "git version 2.50.1 (Apple Git-155)",
+    "sha256": "0c4550c493f3a231a615f26964875f572273f981180e7bd64f5cad05ed80d534"
+  },
+  "node-env.txt": {
+    "source": "https://raw.githubusercontent.com/nodejs/node/v24.0.0/test/fixtures/dotenv/valid.env",
+    "version": "node v24.0.0 official fixture, unmodified",
+    "sha256": "2630934c3515ecf460aa2cec305630f6fce0666f14de661c51ac3bd602882ce8"
+  },
+  "docker.json": {
+    "source": "https://raw.githubusercontent.com/docker/cli/v28.0.0/cli/config/config_test.go",
+    "version": "v28.0.0 raw JSON test literal",
+    "sha256": "decc1b1b979cae2c910a49c088e89c814d8ecd06fb26b62e4e98360eba84357b"
+  },
+  "gcp.json": {
+    "source": "https://raw.githubusercontent.com/googleapis/google-auth-library-python/v2.38.0/tests/data/authorized_user.json",
+    "version": "v2.38.0 official authorized_user fixture",
+    "sha256": "5354ca2af0ecf17e81f7ac469318d720684c51c11bb2569ccf0cb48a4223f5a1"
+  },
+  "netrc.txt": {
+    "source": "https://raw.githubusercontent.com/python/cpython/v3.13.2/Lib/test/test_netrc.py",
+    "version": "v3.13.2 official netrc test literal; trailing whitespace and blank tail removed",
+    "sha256": "6f31145578d58a200390bd104ea2b6ea521b176723b0aff858a36f2033e3e64f"
+  },
+  "pypi.ini": {
+    "source": "https://raw.githubusercontent.com/pypa/packaging.python.org/main/source/specifications/pypirc.rst",
+    "version": "official pypirc code block, unmodified",
+    "sha256": "da4b95d808c1ccc7726973d9895cbcb190b8c4cf173059354460aab19460b726"
+  },
+  "azure-entry.json": {
+    "source": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-python/1.31.0/tests/test_token_cache.py",
+    "version": "1.31.0 actual access_token_entry literal from testAddByAad",
+    "sha256": "ebafbfa2d875e3a807978093e1e02000b6348e3936968a35ae3a345e506dfa8b"
+  },
+  "aws-config.ini": {
+    "source": "aws configure set in isolated HOME and explicit output files",
+    "version": "aws CLI 2; original writer output",
+    "sha256": "567d070b394161cb7f51d551cfcb64d5bdbd03cb8444e7a271823476dc0fd1e6"
+  },
+  "aws-credentials.ini": {
+    "source": "aws configure set in isolated HOME and explicit output files",
+    "version": "aws CLI 2; original writer output",
+    "sha256": "a132f51a05c58f68be64ca92086a97ff96062256483204d202e87d7ac060d269"
+  },
+  "credentials.toml": {
+    "source": "https://raw.githubusercontent.com/rust-lang/cargo/0.85.0/tests/testsuite/credential_process.rs",
+    "version": "0.85.0 raw registry credentials TOML test literal; trailing whitespace and blank tail removed",
+    "sha256": "742ba2668b976800bf040fcd7e47177bdd0fc0ea170cc839fca1e1ece42e0e0f"
+  },
+  "gcloud.sql": {
+    "source": "Google Cloud SDK 594.0.1 lib/googlecloudsdk/core/credentials/creds.py AccessTokenCache._COLUMNS",
+    "version": "source SHA-256 af6b60dd4e30c7438af090b0556812814881967a90f483a3c294db96da7bc878",
+    "sha256": "96e1b8b992b6771d1a4c5beebf228db1701c1c49b6e50db311b70cd7e3f483dd"
+  }
+}

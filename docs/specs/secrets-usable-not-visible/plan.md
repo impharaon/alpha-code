@@ -101,9 +101,9 @@ AC-02、03、05、08、09 本段不触及执行路径，其证据责任已列在
 ## ② Location 采集与通用工具收口
 
 - 依据：[规格 v3](spec.md) @ `aa2476b378da663115e6735b991f6cbf2e04b5c6`，BR-01/03/04/06/07、AC-02/04/06/08/10 的采集与通用结果处理部分；[冻结设计](design.md) @ `66313542d35b182ef8fdbd2d4c4597d715149c35` §4.1、§4.3、§4.3.1 的预览出口、§4.5 的非 shell 出口、§4.7、§5、§6、§10。① @ `1b35e096a5004cfb41c830bc559c76109d6777c0` 已由 Claude Opus 5.5（orchestrator）在 r2 续派单接受，继承规则/路径/公开值与八个移除对照结论；不重新审查。#1758；本段读码基线同①提交。
-- 核对：待编排器核对；首个②实施提交从续派单 `Phase:` 行填写计划提交、核对者/模型及结论。
+- 核对：Phase: IMPLEMENT — `e3e8196bf7` · Claude Opus 5.5 (orchestrator) · segment-② plan accepted：变化发现、profile/SQLite 采集、根/Code Mode 生命周期和结果/错误/进度/预览遮盖按三个提交单元实施，具名用例和移除对照已核，冻结决定未变。来源为 2026-11-26 r3 续派单的 `Phase:` 行。
 
-本段不实现 read 分流、env 写回、目录审批例外、风险器迁移或 Shell.capture；分别留③④。SecretMask 只落本段需要的能力，不为后续方法加空实现、透传或关闭开关。根事实先可供③消费；不在②放宽权限。以下均为实施安排，尚未执行本段测试。
+本段不实现 read 分流、env 写回、目录审批例外、风险器迁移或 Shell.capture；分别留③④。SecretMask 只落本段需要的能力，不为后续方法加空实现、透传或关闭开关。根事实先可供③消费；不在②放宽权限。实际执行证据见本段检查收据，其余为实施安排。
 
 ### 改动
 
@@ -157,4 +157,8 @@ AC-01/05/07 的完整 read/权限/Windows 证明不在②宣告完成。去掉�
 
 ### 偏离记录
 
-暂无。PLAN 只追加本段及同步本文件摘要/导语，不修改①的实施收据，不变更冻结决定；索引等文档写入留②实施。
+暂无文件范围或冻结决定偏离。真实样本来源及哈希记录于 `packages/ext/src/fixtures/secret-files/provenance.json`；MSAL 样本明确是官方缓存 entry（不冒充完整账户库），其余同一 JSON selector 的发布数据继承①验证。
+
+### ②实施检查收据
+
+- 采集基础 / Codex GPT-6 作者自查：`packages/ext` 下 `bun test src/secret-values.test.ts src/secret-files.test.ts`，exit 0，8 pass / 0 fail / 46 expect。Node v26.13.1 子进程使用生产模块和真实 SQLite，验证只读连接拒写、WAL 新值可见、普通列不进入集合。`bun typecheck` exit 0；上述四个 TS 文件 oxlint 为 0 warnings / 0 errors。每份 fixture 的 writer/一手来源与 SHA-256 见 provenance.json；未读取用户凭据。

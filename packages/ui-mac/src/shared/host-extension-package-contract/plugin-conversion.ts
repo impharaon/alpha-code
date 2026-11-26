@@ -47,15 +47,33 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     if (known) return known
     const bytes = files.get(path)
     if (!bytes) { diagnostics.push({ path, code: "missing-entry", message: "Declared file is missing" }); return }
-    const parsed = parseJson(bytes, path.endsWith(".jsonc"))
+    const parsed = (() => { try { return parseJson(bytes, path.endsWith(".jsonc")) } catch { diagnostics.push({ path, code: "invalid-definition", message: "JSON definition could not be parsed" }); return undefined } })()
     if (!object(parsed)) { diagnostics.push({ path, code: "invalid-definition", message: "Definition is not a JSON object" }); return }
     documents.set(path, parsed)
     return parsed
   }
-  const opencode = input.source.ecosystem === "opencode" || (input.source.ecosystem === undefined && ([...files.keys()].some((path) => /^(?:\.opencode\/|opencode\.jsonc?$)/.test(path)) || (files.has("package.json") && !files.has(".claude-plugin/plugin.json") && !files.has(".codex-plugin/plugin.json") && !files.has("plugin.json"))))
-  const codex = !opencode && (input.source.ecosystem === "codex" || files.has(".codex-plugin/plugin.json") || (!files.has(".claude-plugin/plugin.json") && files.has("plugin.json")))
-  const manifestPath = opencode ? "package.json" : codex ? files.has(".codex-plugin/plugin.json") ? ".codex-plugin/plugin.json" : "plugin.json" : ".claude-plugin/plugin.json"
-  const manifest = files.has(manifestPath) ? json(manifestPath) : undefined
+  const portable = files.has("plugin.json") ? json("plugin.json") : undefined
+  const claude = files.has(".claude-plugin/plugin.json") ? json(".claude-plugin/plugin.json") : undefined
+  const codexManifest = files.has(".codex-plugin/plugin.json") ? json(".codex-plugin/plugin.json") : undefined
+  const opencode = input.source.ecosystem === "opencode" || (!input.source.ecosystem && !portable && !claude && !codexManifest && ([...files.keys()].some(path => /^(?:\.opencode\/|opencode\.jsonc?$)/.test(path)) || files.has("package.json")))
+  const codex = !opencode && (input.source.ecosystem === "codex" || (!input.source.ecosystem && (!!portable || !claude && !!codexManifest)))
+  const manifestPath = opencode ? "package.json" : codex ? portable ? "plugin.json" : ".codex-plugin/plugin.json" : ".claude-plugin/plugin.json"
+  const primary = opencode ? files.has("package.json") ? json("package.json") : undefined : codex ? portable ?? codexManifest : claude
+  const secondary = opencode ? undefined : codex ? portable ? claude : undefined : portable
+  const manifest = primary || secondary ? { ...secondary, ...primary } : undefined
+  const manifests = [{ path: codex ? ".claude-plugin/plugin.json" : "plugin.json", value: secondary }, { path: manifestPath, value: primary }].filter(item => !!item.value)
+  const options: Record<string, import("./plugin-package").PluginOption> = {}
+  const optionNeeds = new Map<string, SecretNeed>()
+  const optionCredentials = new Map<string, Uint8Array>()
+  const optionChanged = new Set<string>()
+  for (const source of manifests) if (object(source.value?.userConfig)) for (const [key, value] of Object.entries(source.value.userConfig)) {
+    if (!object(value) || !["string", "number", "boolean"].includes(String(value.type)) || value.default !== undefined && (typeof value.default !== value.type || typeof value.default === "number" && !Number.isFinite(value.default))) {
+      diagnostics.push({ path: source.path, field: "/userConfig/" + escapePointer(key), code: "invalid-definition", message: "Invalid plugin option type or default" }); continue
+    }
+    const secret = value.sensitive === true && value.default !== undefined ? credentialNeed(key, { componentId: "$package", file: source.path, pointer: "/userConfig/" + escapePointer(key) + "/default", sensitive: true, needs: optionNeeds, credentials: optionCredentials, replace: () => {} }, String(value.default)) : undefined
+    options[key] = { type: value.type as "string" | "number" | "boolean", title: string(value.title) ?? key, description: string(value.description) ?? "", required: value.required === true, sensitive: value.sensitive === true, ...(value.default === undefined ? {} : { default: secret ? { secret } : value.default as string | number | boolean }) }
+    if (secret) { replacePointer(documents.get(source.path)!, "/userConfig/" + escapePointer(key) + "/default", "{secret:" + secret + "}"); optionChanged.add(source.path) }
+  }
   if (codex && files.has(".app.json")) {
     const apps = json(".app.json")
     if (object(apps?.apps)) for (const [name, app] of Object.entries(apps.apps)) {
@@ -63,7 +81,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     }
   }
   const entries: Entry[] = []
-  const roots = opencode ? ["skills", "skill", ".opencode/skills", ".opencode/skill"] : ["skills", ...declaredPaths(manifest?.skills, manifestPath, "skills", diagnostics)]
+  const roots = opencode ? ["skills", "skill", ".opencode/skills", ".opencode/skill"] : ["skills", ...manifests.flatMap(item => declaredPaths(item.value?.skills, item.path, "skills", diagnostics))]
   const loose = !manifest && !opencode ? [...files.keys()].filter(path => /^[^/]+\/SKILL\.md$/.test(path)) : []
   const skillFiles = [...files.keys()].filter((path) => path === "SKILL.md" || (loose.length === 1 && path === loose[0]) || roots.some((root) => path.startsWith(root + "/") && path.endsWith("/SKILL.md")))
   for (const path of skillFiles) {
@@ -82,14 +100,13 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     if (!object(servers)) return
     for (const [name, value] of Object.entries(servers)) definitions.push({ name, path, pointer: pointer + (wrapped ? "/mcpServers" : "") + "/" + escapePointer(name), value })
   }
-  if (files.has(".mcp.json")) {
-    const root = json(".mcp.json")
-    if (root) addServers(".mcp.json", root, "")
-  }
-  if (object(manifest?.mcpServers)) addServers(manifestPath, manifest.mcpServers, "/mcpServers")
-  for (const path of declaredPaths(manifest?.mcpServers, manifestPath, "mcpServers", diagnostics, true)) {
-    const definition = json(path)
-    if (definition) addServers(path, definition, "")
+  for (const path of ["mcp.json", ".mcp.json"]) if (files.has(path)) { const root = json(path); if (root) addServers(path, root, "") }
+  for (const item of manifests) {
+    if (object(item.value?.mcpServers)) addServers(item.path, item.value.mcpServers, "/mcpServers")
+    const extension = object(item.value?.extensions) && object(item.value.extensions["com.openai"]) ? item.value.extensions["com.openai"] : undefined
+    for (const path of [...declaredPaths(item.value?.mcpServers, item.path, "mcpServers", diagnostics, true), ...declaredPaths(extension?.mcpServers, item.path, "extensions/com.openai/mcpServers", diagnostics, true)]) {
+      const definition = json(path); if (definition) addServers(path, definition, "")
+    }
   }
   if (opencode) {
     for (const path of ["opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"]) {
@@ -140,12 +157,12 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
   }
   const unique = [...new Map(definitions.map((definition) => [definition.path + "#" + definition.pointer, definition])).values()]
   const winners = new Map(unique.map((definition) => [definition.name, definition]))
-  const needs = new Map<string, SecretNeed>()
-  const credentials = new Map<string, Uint8Array>()
-  const changed = new Set<string>()
+  const needs = optionNeeds
+  const credentials = optionCredentials
+  const changed = optionChanged
   for (const definition of unique) {
     const winner = winners.get(definition.name)!
-    const id = "mcp:" + winner.path + "#" + definition.name
+    const id = "mcp:" + definition.name
     const text = (value: string, pointer: string, sensitive = false) => credentialText(value, {
       componentId: id, file: definition.path, pointer, sensitive, needs, credentials,
       replace: (replacement) => { replacePointer(documents.get(definition.path)!, pointer, replacement); changed.add(definition.path) },
@@ -164,7 +181,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
       schema: "codepuppy.plugin-package.v1", provider: opencode ? "opencode" : codex ? "codex" : !manifest && files.has("SKILL.md") ? "skill" : "claude-code",
       name: string(manifest?.name) ?? input.source.entryName ?? entries.find((entry) => entry.kind === "skill")?.sourceName ?? input.source.pluginPath?.split("/").at(-1) ?? "plugin",
       ...(typeof (manifest?.version ?? input.source.version) === "string" ? { version: String(manifest?.version ?? input.source.version) } : {}), ...(typeof manifest?.description === "string" ? { description: manifest.description } : {}),
-      source: input.source, tree, treeDigest: pluginTreeDigest(tree), entries, secrets: [...needs.values()], diagnostics,
+      source: input.source, tree, treeDigest: pluginTreeDigest(tree), entries, secrets: [...needs.values()], options, defaults: {}, diagnostics,
     },
     replacements, privateCredentials: credentials,
   }
@@ -258,7 +275,7 @@ function declaredPaths(value: unknown, path: string, field: string, diagnostics:
 function mcpEntry(definition: { name: string; path: string; pointer: string; value: unknown }, id: string, text: (value: string, pointer: string, sensitive?: boolean) => Text): Entry | undefined {
   const value = definition.value
   if (!object(value)) return
-  const base = { kind: "mcp" as const, id, sourcePath: definition.path, sourceName: definition.name, ...(typeof value.timeout === "number" && value.timeout > 0 ? { timeoutMs: value.timeout } : {}) }
+  const base = { kind: "mcp" as const, id, sourcePath: definition.path, sourceName: definition.name, ...(typeof value.timeout === "number" && value.timeout > 0 ? { timeoutMs: value.timeout } : {}), ...((typeof value.startup_timeout_sec === "number" || typeof value.tool_timeout_sec === "number") ? { timeouts: { ...(typeof value.startup_timeout_sec === "number" ? { startupMs: value.startup_timeout_sec * 1000 } : {}), ...(typeof value.tool_timeout_sec === "number" ? { executionMs: value.tool_timeout_sec * 1000 } : {}) } } : {}) }
   if ((value.type === "local" && Array.isArray(value.command)) || (typeof value.command === "string" && value.command && (value.type === undefined || value.type === "stdio"))) {
     if (Array.isArray(value.command) && (!value.command.length || !value.command.every((arg) => typeof arg === "string"))) return
     if (value.args !== undefined && (!Array.isArray(value.args) || !value.args.every((arg) => typeof arg === "string"))) return
@@ -269,15 +286,18 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
     const commandIndex = ["npx", "uvx"].includes(command[0]!) ? command.findIndex((arg, index) => index > 0 && !arg.startsWith("-")) : -1
     const token = command[commandIndex]
     return {
-      ...base, transport: "stdio", command: command.map((part) => pluginText(part)),
+      ...base, transport: "stdio", command: command.map((part, index) => text(part, definition.pointer + (Array.isArray(value.command) ? "/command/" + index : index === 0 ? "/command" : "/args/" + (index - 1)))),
       environment: Object.fromEntries(Object.entries(stringMap(environment) ? environment : {}).map(([key, part]) => [key, text(part, definition.pointer + (value.type === "local" ? "/environment/" : "/env/") + escapePointer(key), /token|secret|password|api[_-]?key/i.test(key))])),
+      forwardEnvironment: Array.isArray(value.env_vars) ? value.env_vars.flatMap(item => typeof item === "string" ? [{ name: item, source: "local" as const }] : object(item) && typeof item.name === "string" && (item.source === "local" || item.source === "remote") ? [{ name: item.name, source: item.source }] : []) : [],
       ...(typeof value.cwd === "string" ? { cwd: pluginText(value.cwd) } : {}),
       ...(token && !/@\d/.test(token) ? { floatingVersion: { commandIndex, token } } : {}),
     }
   }
-  if (typeof value.url !== "string" || !value.url || (value.type !== undefined && value.type !== "http" && value.type !== "sse" && value.type !== "remote")) return
+  if (typeof value.url !== "string" || !value.url || (value.type !== undefined && value.type !== "http" && value.type !== "sse" && value.type !== "remote" && value.type !== "streamable-http" && value.type !== "streamable_http")) return
   if (value.headers !== undefined && !stringMap(value.headers)) return
   const headers = Object.fromEntries(Object.entries(stringMap(value.headers) ? value.headers : {}).map(([key, part]) => [key, text(part, definition.pointer + "/headers/" + escapePointer(key), /authorization|token|secret|api[_-]?key|cookie/i.test(key))]))
+  if (stringMap(value.env_http_headers)) for (const [header, name] of Object.entries(value.env_http_headers)) headers[header] = [{ environment: { name } }]
+  if (typeof value.bearer_token_env_var === "string" && !Object.keys(headers).some(key => key.toLowerCase() === "authorization")) headers.Authorization = ["Bearer ", { environment: { name: value.bearer_token_env_var } }]
   const oauth = object(value.oauth) ? value.oauth : undefined
   const login: LoginNeed = {
     ...mcpLogin(id, definition.name, value.url),
@@ -289,7 +309,7 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
       ...(typeof oauth?.authorizationServerUrl === "string" ? { authorizationServerUrl: oauth.authorizationServerUrl } : {}),
     } } : {}),
   }
-  return { ...base, transport: value.type === "sse" ? "sse" : "http", url: pluginText(value.url), headers, ...(value.oauth === false ? { oauth: false } : !Object.keys(headers).some((key) => /authorization|token|secret|api[_-]?key|cookie/i.test(key)) || oauth ? { oauth: login } : {}) }
+  return { ...base, transport: value.type === "sse" ? "sse" : "http", url: text(value.url, definition.pointer + "/url"), headers, ...(value.oauth === false ? { oauth: false } : !Object.keys(headers).some((key) => /authorization|token|secret|api[_-]?key|cookie/i.test(key)) || oauth ? { oauth: login } : {}) }
 }
 
 function mcpLogin(componentId: string, serviceId: string, serverUrl: string): LoginNeed {
@@ -308,26 +328,38 @@ function credentialNeed(label: string, context: CredentialContext, literal?: str
 }
 
 function credentialText(value: string, context: CredentialContext): Text {
-  const need = (label: string, literal?: string) => credentialNeed(label, context, literal)
-  const pieces: Text[number][] = []
+  const structured = pluginText(value)
+  if (structured.some(part => typeof part !== "string")) {
+    if (!context.sensitive) return structured
+    const result = structured.map(part => {
+      if (typeof part === "string" || !("environment" in part)) return part
+      const environment = part.environment
+      const fallback = environment.default
+      if (fallback && !fallback.every(part => typeof part === "string")) return part
+      const id = credentialNeed(environment.name, context, fallback ? fallback.join("") : undefined)
+      return { environment: { ...environment, default: [{ secret: id }] } }
+    })
+    context.replace(result.map(part => typeof part === "string" ? part : "environment" in part ? "{secret:" + ((part.environment.default?.[0] as { secret: string }).secret) + "}" : "option" in part ? "${user_config." + part.option + "}" : "binding" in part ? value : "{secret:" + part.secret + "}").join(""))
+    return result
+  }
+  if (!context.sensitive || !value || /^\{secret:[^}]+\}$/.test(value)) return structured
+  const parts: Text[number][] = []
   let offset = 0
-  for (const match of value.matchAll(/\$\{([A-Za-z_][\w]*)(?::-[^}]*)?\}|\$([A-Za-z_][\w]*)|\{([A-Za-z_][\w]*)\}|<([A-Za-z_][\w]*)>|\{env:([A-Za-z_][\w]*)\}/g)) {
-    const label = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5]!
-    if (pluginPathBinding(label) || ["PATH", "HOME", "USER", "TMPDIR"].includes(label)) continue
-    if (match.index > offset) pieces.push(...pluginText(value.slice(offset, match.index)))
-    pieces.push({ secret: need(label) })
-    offset = match.index + match[0].length
+  // These placeholders occur in recorded credential fields, never in arbitrary prose or shell source.
+  for (const match of value.matchAll(/\$([A-Za-z_][\w]*)|\{(?:env:)?([A-Za-z_][\w]*)\}|<([A-Za-z_][\w]*)>/g)) {
+    if (match.index! > offset) parts.push(value.slice(offset, match.index))
+    parts.push({ secret: credentialNeed(match[1] ?? match[2] ?? match[3]!, context) })
+    offset = match.index! + match[0].length
   }
-  if (!pieces.length && context.sensitive && value) {
-    const prefix = value.match(/^(Bearer |Basic )/i)?.[0] ?? ""
-    const id = need(context.pointer.split("/").at(-1)!, value.slice(prefix.length))
-    context.replace(prefix + "{secret:" + id + "}")
-    return [...(prefix ? [prefix] : []), { secret: id }]
+  if (parts.length) {
+    if (offset < value.length) parts.push(value.slice(offset))
+    context.replace(parts.map(part => typeof part === "string" ? part : "secret" in part ? "{secret:" + part.secret + "}" : "").join(""))
+    return parts
   }
-  if (!pieces.length) return pluginText(value)
-  if (offset < value.length) pieces.push(...pluginText(value.slice(offset)))
-  context.replace(pieces.map((part) => typeof part === "string" ? part : "secret" in part ? "{secret:" + part.secret + "}" : "$" + "{" + (part.binding === "pluginRoot" ? "CLAUDE_PLUGIN_ROOT" : part.binding === "skillDir" ? "CLAUDE_SKILL_DIR" : "CLAUDE_PROJECT_DIR") + "}").join(""))
-  return pieces
+  const prefix = value.match(/^(Bearer |Basic )/i)?.[0] ?? ""
+  const id = credentialNeed(context.pointer.split("/").at(-1)!, context, value.slice(prefix.length))
+  context.replace(prefix + "{secret:" + id + "}")
+  return [...(prefix ? [prefix] : []), { secret: id }]
 }
 
 function invocation(data: Record<string, unknown>): Invocation {

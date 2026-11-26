@@ -76,9 +76,9 @@ test("whole plugin profile installs its signed tree and registered skills throug
   expect(state.records.map(record => record.kind)).toEqual(["bundle", "skill"])
   const live = resolveLiveGenerationDir(root, state.packageGraphs[0]!.pluginTree!.storeKey)!
   expect(readFileSync(join(live, "tree/skills/using-superpowers/SKILL.md"), "utf8")).toContain("superpowers")
-  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).toContain("skill--using-superpowers")
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).toContain("skill--using-superpowers-63fb5846cb")
   expect(await setPackageStateV1({ packageId: sample.envelope.prelude.packageId, state: "disabled" }, deps)).toMatchObject({ ok: true })
-  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers")
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers-63fb5846cb")
 })
 
 test("whole plugin profile reports package-dependent MCP entries without installing a broken command", async () => {

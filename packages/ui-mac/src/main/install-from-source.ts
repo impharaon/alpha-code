@@ -1,5 +1,6 @@
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { convertCreatedPlugin } from "./created-plugin"
+import { renderPluginText } from "../shared/host-extension-package-contract/plugin-package"
 import { renderInstalledSkill } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import type { Capture, Entry, Text } from "../shared/host-extension-package-contract/plugin-conversion"
 import {
@@ -89,7 +90,7 @@ export function createSourceInstaller(deps: Dependencies) {
       if (!projectMatches())
         return { ok: false, code: "transaction-failed", detail: "Project identity changed during source capture" }
       const captured = { capture: converted.capture }
-      const wholePackage = captured.capture.source.kind === "marketplace" && (captured.capture.source.ecosystem === "claude" || captured.capture.source.ecosystem === "codex")
+      const wholePackage = ["folder", "git", "listing", "marketplace"].includes(captured.capture.source.kind) && converted.package.provider !== "opencode"
       const before = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
       if (!before.ok)
         return { ok: false, code: "transaction-failed", detail: "Package installation state is unreadable" }
@@ -178,9 +179,9 @@ export function createSourceInstaller(deps: Dependencies) {
       const nodes: PackageGraphNodeV1[] = []
       const version = converted.package.version ?? "content." + converted.package.treeDigest.slice(7, 23)
       for (const item of mapped) {
-        const componentId = wholePackage ? pluginComponentId(packageId, item.entry) : "user:" + item.hostName.toLowerCase()
+        const componentId = pluginComponentId(packageId, item.entry, item.hostName)
         const receipt: UpsertInput = {
-          id: "user:" + item.hostName.toLowerCase(),
+          id: pluginComponentId(packageId, item.entry, item.hostName),
           kind: item.entry.kind,
           name: item.hostName,
           scope: { kind: "global" },
@@ -408,18 +409,9 @@ export function createSourceInstaller(deps: Dependencies) {
 }
 
 function renderText(text: Text): string {
-  return text
-    .map((part) =>
-      typeof part === "string"
-        ? part
-        : "secret" in part
-          ? "{secret:" + part.secret + "}"
-          : part.binding === "projectDir"
-            ? "."
-            : "",
-    )
-    .join("")
+  return renderPluginText(text, { pluginRoot: "${CLAUDE_PLUGIN_ROOT}", projectDir: "." })
 }
+
 function sourceOf(capture: Capture, publisher?: import("./plugin-sources").CandidateV1["publisher"]): PackageSourceV1 {
   const source = capture.source
   if (source.kind === "created") return { kind: "created" }

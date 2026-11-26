@@ -5,7 +5,7 @@ import { renderInstalledSkill } from "../shared/host-extension-package-contract/
 import {
   canonicalPluginJson,
   pluginTreeDigest,
-  validPluginPackage,
+  renderPluginText, validPluginPackage,
   type Entry,
   type Text,
   type PluginPackage,
@@ -144,37 +144,28 @@ export function pluginHostName(
   occupied: Set<string>,
   available: (name: string) => boolean,
 ): string {
-  const safe =
-    entry.sourceName
-      .replace(/[^a-zA-Z0-9._-]/g, "-")
-      .replace(/^[^a-zA-Z0-9]+/, "")
-      .slice(0, 64) || "component"
-  const name =
-    occupied.has(entry.kind + ":" + safe) || !available(safe)
-      ? safe.slice(0, 55) + "-" + hash(Buffer.from(packageId + entry.kind + entry.sourcePath)).slice(0, 8)
-      : safe
-  occupied.add(entry.kind + ":" + name)
-  return name
+  const identity = hash(Buffer.from(JSON.stringify([packageId, entry.kind, entry.sourceName])))
+  const prefix = entry.sourceName.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^[^a-z0-9]+|-+$/g, "") || entry.kind
+  const budget = entry.kind === "mcp" ? 24 : 43
+  for (let length = 10; length < budget; length++) {
+    const name = prefix.slice(0, budget - length - 1) + "-" + identity.slice(0, length)
+    if (occupied.has("identity:" + name + ":" + identity)) return name
+    if (occupied.has(entry.kind + ":" + name) || !available(name)) continue
+    occupied.add(entry.kind + ":" + name)
+    occupied.add("identity:" + name + ":" + identity)
+    return name
+  }
+  throw Error("Plugin component identity collision")
 }
 
-export function pluginComponentId(packageId: string, entry: { kind: string; id: string }): string {
-  return entry.kind + ":" + hash(Buffer.from(packageId + entry.id)).slice(0, 32)
+export function pluginComponentId(packageId: string, entry: { kind: string; sourceName: string }, hostName?: string, origin: "direct" | "catalog" = "direct"): string {
+  if (origin === "catalog") return entry.kind + ":" + hash(Buffer.from(JSON.stringify([packageId, entry.kind, entry.sourceName]))).slice(0, 32)
+  return "user:" + (hostName ?? pluginHostName({ ...entry, sourcePath: "" }, packageId, new Set(), () => true))
 }
 
 /** Existing v1 MCP leaf projection for the converter's normalized entries. */
 export function pluginMcpConfig(entry: Extract<Entry, { kind: "mcp" }>): McpConfigLeafV1 {
-  const render = (text: Text) =>
-    text
-      .map((part) =>
-        typeof part === "string"
-          ? part
-          : "secret" in part
-            ? "{secret:" + part.secret + "}"
-            : part.binding === "projectDir"
-              ? "."
-              : "",
-      )
-      .join("")
+  const render = (text: Text) => renderPluginText(text, { pluginRoot: "${CLAUDE_PLUGIN_ROOT}", projectDir: "${CLAUDE_PROJECT_DIR}" })
   return entry.transport === "stdio"
     ? {
         type: "local",

@@ -1040,7 +1040,7 @@ async function resolvePreparedPackage(
         blobs.set(ref.sha256, bytes)
       }
       const mcps = runnable.filter((entry): entry is Extract<Entry, { kind: "mcp" }> => entry.kind === "mcp")
-      const nodes = runnable.map(entry => ({ componentId: pluginComponentId(packageId, entry), kind: entry.kind, name: names.get(entry.id)!, required: true, manifestDigest: "sha256:" + component.payloadRef.sha256 }))
+      const nodes = runnable.map(entry => ({ componentId: pluginComponentId(packageId, entry, names.get(entry.id)!, "catalog"), kind: entry.kind, name: names.get(entry.id)!, required: true, manifestDigest: "sha256:" + component.payloadRef.sha256 }))
       const base = { environment: deps.environment(), scope: { kind: "global" as const }, origin: "catalog" as const, version: facts.envelope.prelude.version, desiredState: "disabled" as const, installedAt: new Date().toISOString(), payloadDigest: "sha256:" + component.payloadRef.sha256 }
       const skills = nodes.filter(node => node.kind === "skill").map(node => ({ ...base, id: node.componentId, kind: node.kind, name: node.name }))
       const built = await buildPluginPackageTxItems({ root: deps.root(), casBaseRoot: deps.casBaseRoot(), key, receipt: { ...base, id: "bundle:" + name, kind: "bundle", name }, description: payload.description, hostNames: names, skillReceipts: skills, readFile: async path => { const node = payload.description.tree.find(node => node.path === path); if (node?.kind !== "file") throw Error("Missing plugin file"); return node.bytes === 0 ? new Uint8Array() : blobs.get(node.digest.slice(7))! } })
@@ -1221,7 +1221,7 @@ async function executePreparedPackage(
         const hostName = plugin.names.get(entry.id)!
         const needs = plugin.description.secrets.filter(need => need.componentId === entry.id)
         const leaf = pluginMcpConfig(entry)
-        const mcp = buildMcpTxItems({ root, key: "mcp--" + hostName, name: hostName, receipt: { ...receipt, id: pluginComponentId(prepared.facts.envelope.prelude.packageId, entry), name: hostName, kind: "mcp" }, capabilities: [], manifestDigest, userDataPath: deps.userDataPath, effect: lifecycle.graph.effect, newSecretVersionId: deps.secretVersionId ?? newMcpSecretVersionId, leaf, secretNeeds: needs.map(need => ({ needId: need.id })), secretValues: Object.fromEntries(needs.map(need => [need.id, intent.grants?.secrets?.[component.accepted.component.id + "#" + need.id] ?? ""])) })
+        const mcp = buildMcpTxItems({ root, key: "mcp--" + hostName, name: hostName, receipt: { ...receipt, id: pluginComponentId(prepared.facts.envelope.prelude.packageId, entry, hostName, "catalog"), name: hostName, kind: "mcp" }, capabilities: [], manifestDigest, userDataPath: deps.userDataPath, effect: lifecycle.graph.effect, newSecretVersionId: deps.secretVersionId ?? newMcpSecretVersionId, leaf, secretNeeds: needs.map(need => ({ needId: need.id })), secretValues: Object.fromEntries(needs.map(need => [need.id, intent.grants?.secrets?.[component.accepted.component.id + "#" + need.id] ?? ""])) })
         if (!mcp.ok) return { ok: false, reason: mcp.reason }
         pluginMcpBuilds.push(mcp.build)
       }

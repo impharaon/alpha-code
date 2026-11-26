@@ -65,7 +65,7 @@ test("whole plugin skills retain sibling directories and root resources", () => 
   const resource = (graph as typeof graph & { pluginTree: { storeKey: string } }).pluginTree
   const live = resolveLiveGenerationDir(h.root, resource.storeKey)!
   expect(readFileSync(join(live, "tree/README.md"))).toEqual(Buffer.from(await capture.readFile("README.md")))
-  expect(readFileSync(join(live, "tree/skills/skill-development/../hook-development/SKILL.md"))).toEqual(Buffer.from(await capture.readFile("skills/hook-development/SKILL.md")))
+  expect(readFileSync(join(live, "tree/skills/skill-development/../hook-development/SKILL.md"), "utf8")).toBe(new TextDecoder().decode(await capture.readFile("skills/hook-development/SKILL.md")).replace("name: hook-development", "name: " + graph.children.find(node => node.name.startsWith("hook-development-"))!.name))
 }))
 
 test("whole plugin remotion enables real cross-skill references", () => installerHarness(async h => {
@@ -104,11 +104,11 @@ test("whole plugin removal deletes its owned tree without treating member skills
 test("A2 marketplace context7 commits one real enabled package and durable declarations", () => installerHarness(async (h) => {
   const input = h.request(await h.candidate("context7"))
   const outcome = await h.install(input)
-  expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7", source: { kind: "marketplace", ecosystem: "claude" }, installed: [{ kind: "mcp", hostName: "context7", sourceName: "context7" }] })
+  expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7", source: { kind: "marketplace", ecosystem: "claude" }, installed: [{ kind: "mcp", hostName: "context7-de6dee1ccd", sourceName: "context7" }] })
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled"])
   expect(state.ok && state.packageGraphs[0]?.declarations?.[0]?.mcp).toMatchObject({ type: "remote", url: "https://mcp.context7.com/mcp?client=claude-code-plugin" })
-  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=claude-code-plugin" } })
+  expect(readMcpLeafStrict("context7-de6dee1ccd")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=claude-code-plugin" } })
   expect(h.activation).toEqual(["claude:context7"])
   expect(h.reloads).toEqual([])
   expect(await h.install(input)).toEqual(outcome)
@@ -151,17 +151,17 @@ test("E2 project-only MCP stays globally disabled through install and package-ro
   if (!identity.ok) throw new Error(identity.reason)
   const outcome = await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: alias } })
   expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7" })
-  expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
+  expect(persistedMcp(h.root, "context7-de6dee1ccd")).toMatchObject({ enabled: false })
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
   expect(state.ok && state.records.every((record) => record.scope.kind === "global" && record.desiredState === "enabled")).toBe(true)
   const deps = { globalRoot: () => h.root, advisoryGate: () => ({ allowed: true as const }), resolvePackage: async () => { throw new Error("non-catalog package") } }
   for (const state of ["disabled", "enabled"] as const) {
     expect((await setPackageStateV1({ packageId: "claude:context7", state }, deps)).ok).toBe(true)
-    expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
+    expect(persistedMcp(h.root, "context7-de6dee1ccd")).toMatchObject({ enabled: false })
   }
   expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({
-    v: 3, keys: [], scoped: [{ kind: "mcp", name: "context7", projectPath: realpathSync(project) }], mcp: [{ name: "context7", enabled: false }],
+    v: 3, keys: [], scoped: [{ kind: "mcp", name: "context7-de6dee1ccd", projectPath: realpathSync(project) }], mcp: [{ name: "context7-de6dee1ccd", enabled: false }],
   })
   expect(readdirSync(project)).toEqual(["existing.json"])
   expect(readFileSync(join(project, "existing.json"), "utf8")).toBe("project bytes\n")
@@ -172,10 +172,10 @@ test("E3 remote definition publication retains the project-only disabled project
   const project = join(h.temporary, "remote-project")
   mkdirSync(project)
   expect(await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: project } })).toMatchObject({ ok: true })
-  const leaf = readMcpLeafStrict("context7")
+  const leaf = readMcpLeafStrict("context7-de6dee1ccd")
   if (!leaf.ok || !leaf.value) throw Error("installed definition missing")
-  expect(persistMcp("context7", leaf.value)).toMatchObject({ ok: true })
-  expect(persistedMcp(h.root, "context7")).toEqual({ enabled: false })
+  expect(persistMcp("context7-de6dee1ccd", leaf.value)).toMatchObject({ ok: true })
+  expect(persistedMcp(h.root, "context7-de6dee1ccd")).toEqual({ enabled: false })
 }))
 
 test("E2 project-only skill is stored globally and projected only as scoped", () => installerHarness(async (h) => {
@@ -190,7 +190,7 @@ test("E2 project-only skill is stored globally and projected only as scoped", ()
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
   expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({
-    v: 3, keys: [], scoped: [{ kind: "skill", name: "frontend-design", projectPath: identity.scope.projectPath }], mcp: [],
+    v: 3, keys: [], scoped: [{ kind: "skill", name: "frontend-design-3ee253227f", projectPath: identity.scope.projectPath }], mcp: [],
   })
   expect(existsSync(join(project, ".codepuppy"))).toBe(false)
 }))
@@ -209,7 +209,7 @@ test("E2 startup reconcile cannot globally enable a project-only MCP", () => ins
   mkdirSync(project)
   expect((await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: project } })).ok).toBe(true)
   expect(reconcileDesiredStateAtBoot(h.root, { userDataPath: h.temporary, channel: "stable" }).ok).toBe(true)
-  expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
+  expect(persistedMcp(h.root, "context7-de6dee1ccd")).toMatchObject({ enabled: false })
 }))
 
 test("A2 host-name collision preserves existing content and rewrites only installed skill name", () => installerHarness(async (h) => {
@@ -220,7 +220,7 @@ test("A2 host-name collision preserves existing content and rewrites only instal
   const outcome = await h.install(h.request(await h.candidate("frontend-design")))
   expect(outcome.ok).toBe(true)
   if (!outcome.ok) throw Error(outcome.detail)
-  expect(outcome.installed[0]?.hostName).toMatch(/^frontend-design-[a-f0-9]{8}$/)
+  expect(outcome.installed[0]?.hostName).toMatch(/^frontend-design-[a-f0-9]{10}$/)
   expect(readFileSync(original, "utf8")).toBe("user owned bytes")
   expect(h.reloads).toEqual([outcome.packageId])
   const { readCurrentGeneration } = await import("./ext-transaction")
@@ -395,7 +395,7 @@ test("A2 same pinned source with changed real bytes updates its package instead 
   const after = readPackageLedgerStateV1(h.root)
   expect(after.ok && after.packageGraphs).toHaveLength(1)
   expect(after.ok && before.ok && after.packageGraphs[0]!.installedGraphDigest).not.toBe(before.ok && before.packageGraphs[0]!.installedGraphDigest)
-  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
+  expect(readMcpLeafStrict("context7-de6dee1ccd")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
   expect(after.ok && after.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled"])
 }))
 
@@ -487,7 +487,7 @@ test("BC2a pinned marketplace prepares opaque choices and only the selected real
   expect(await h.install(h.request(selected.id, "bc2_selected_context7"))).toMatchObject({ ok: true, packageId: "claude:context7" })
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs.map(graph => graph.packageId)).toEqual(["claude:context7"])
-  expect(state.ok && state.records.map(record => record.name)).toEqual([state.ok && state.packageGraphs[0]!.root.name, "context7"])
+  expect(state.ok && state.records.map(record => record.name)).toEqual([state.ok && state.packageGraphs[0]!.root.name, "context7-de6dee1ccd"])
   expect(h.activation).toEqual(["claude:context7"])
   expect(h.reloads).toEqual([])
 }))
@@ -622,7 +622,7 @@ test("review C5 an existing user MCP keeps its name and bytes when a real same-n
   const result = await h.install(h.request(id, "c5_collision"))
   if (!result.ok) throw Error(result.detail)
   expect(result.installed).toHaveLength(1)
-  expect(result.installed[0]!.hostName).toMatch(/^context7-[a-f0-9]{8}$/)
+  expect(result.installed[0]!.hostName).toMatch(/^context7-[a-f0-9]{10}$/)
   expect(readMcpLeafStrict("context7")).toEqual(before)
   expect(readMcpLeafStrict(result.installed[0]!.hostName)).toMatchObject({ ok: true })
   const state = readPackageLedgerStateV1(h.root)
@@ -652,7 +652,7 @@ test("review AC11 local marketplace folder installs only the selected real plugi
   const state = readPackageLedgerStateV1(h.root)
   if (!state.ok) throw Error(state.reason)
   expect(state.packageGraphs.map(graph => graph.packageId)).toEqual([result.packageId])
-  expect(state.records.map(record => record.name)).toEqual(["context7"])
+  expect(state.records.filter(record => record.kind !== "bundle").map(record => record.name)).toEqual(result.installed.map(entry => entry.hostName))
   expect(result.source).toEqual({ kind: "local-folder" })
   expect(h.activation).toEqual([result.packageId])
   expect(h.reloads).toEqual([])

@@ -393,8 +393,9 @@ for ciphertext, ephemeral projections, rollback and uninstall ownership.
 `plugin-package@1` carries `{schema, description, blobs}`. The schema token is
 `codepuppy.host-extension-package.payload.plugin-package.v1`; `description` is
 the normalized `PluginPackage` contract. Its authoritative types and validation
-are in `plugin-package.ts`; the converter re-exports those types and remains a
-separately generated desktop module outside this artifact. Normalized contract
+are in `plugin-package.ts`; the converter re-exports those types. Its self-contained `plugin-conversion.mjs`
+and declarations are included in this same artifact for desktop and publisher
+consumers; `generate-plugin-conversion.ts` remains their sole build owner. Normalized contract
 validation does not interpret provider manifests.
 
 The description binds every directory, file mode, symlink target, entry and tree
@@ -408,3 +409,14 @@ or its blobs. The envelope header and network timeout checks still apply. Packag
 The root maps to the existing `bundle` ledger kind and owns one tree generation;
 skills refer to their real directories in that tree. Commands, agents and hooks
 can be retained as package content without claiming their runtime is connected.
+
+Standard plugin definitions use the frozen DESIGN-local-plugin-install v3
+contracts (§4.8/4.10/4.13). Source provider selection precedes discovery; root
+portable and Claude declarations merge with the selected provider taking
+precedence. `Text` retains environment/default, option, secret and DATA bindings
+until the consuming runtime binds them. Options retain their declared scalar
+types; sensitive defaults are replaced with package-owned secret references.
+MCP names use their original server key, independent of the definition file.
+The desktop allocates host identities once and persists the same mapping in
+its package declarations. Portable HTTP aliases normalize to HTTP; explicit SSE
+remains SSE. Forwarded environment declarations contain names and source only.

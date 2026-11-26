@@ -23,7 +23,11 @@ export type TreeNode =
   | { kind: "file"; path: RelPath; mode: number; bytes: number; digest: Sha256 }
   | { kind: "symlink"; path: RelPath; target: string }
 export type Capture = { source: Source; nodes: readonly TreeNode[]; readFile(path: RelPath): Promise<Uint8Array> }
-export type Text = readonly (string | { binding: "pluginRoot" | "skillDir" | "projectDir" } | { secret: string })[]
+export type Text = readonly (string | { binding: "pluginRoot" | "skillDir" | "projectDir" | "pluginData" } | { secret: string } | { option: string } | { environment: { name: string; default?: Text } })[]
+export type PluginOption = { type: "string" | "number" | "boolean"; title: string; description: string; required: boolean; sensitive: boolean; default?: string | number | boolean | { secret: string } }
+export type EnvironmentForward = { name: string; source: "local" | "remote" }
+export type McpTimeouts = { startupMs?: number; catalogMs?: number; executionMs?: number }
+export type PackageTextBindings = { pluginRoot: string; skillDir?: string; projectDir: string; pluginData: string; resolveOption(key: string): string | number | boolean | undefined; resolveEnvironment(name: string): string | undefined; resolveSecret(id: string): string | undefined }
 export type ToolRule = { tool: string; pattern?: string }
 export type ModelHint = { alias: string } | { providerID: string; modelID: string }
 export type Invocation = {
@@ -97,6 +101,8 @@ export type Entry = EntryBase &
         transport: "stdio"
         command: Text[]
         environment: Record<string, Text>
+        forwardEnvironment?: EnvironmentForward[]
+        timeouts?: McpTimeouts
         cwd?: Text
         timeoutMs?: number
         floatingVersion?: { commandIndex: number; token: string }
@@ -106,6 +112,7 @@ export type Entry = EntryBase &
         transport: "http" | "sse"
         url: Text
         headers: Record<string, Text>
+        timeouts?: McpTimeouts
         timeoutMs?: number
         oauth?: false | LoginNeed
       }
@@ -129,6 +136,8 @@ export type PluginPackage = {
   treeDigest: Sha256
   entries: Entry[]
   secrets: SecretNeed[]
+  options?: Record<string, PluginOption>
+  defaults?: { agent?: string }
   diagnostics: Diagnostic[]
 }
 export type MarketplaceEntry = {
@@ -231,6 +240,8 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
       "entries",
       "secrets",
       "diagnostics",
+      "options",
+      "defaults",
     ]) ||
     value.schema !== "codepuppy.plugin-package.v1"
   )
@@ -273,6 +284,8 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
     new Set(value.entries.map((entry) => entry.id)).size !== value.entries.length
   )
     return false
+  if (value.options !== undefined && (!object(value.options) || !Object.values(value.options).every(validPluginOption))) return false
+  if (value.defaults !== undefined && (!object(value.defaults) || !keys(value.defaults, ["agent"]) || !optionalString(value.defaults.agent))) return false
   const paths = new Set(value.tree.filter((node) => node.kind !== "directory").map((node) => node.path))
   if (value.entries.some((entry) => !paths.has(entry.sourcePath))) return false
   const entries = value.entries
@@ -284,7 +297,7 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
         keys(need, ["id", "componentId", "label", "targets"]) &&
         typeof need.id === "string" &&
         typeof need.componentId === "string" &&
-        entries.some((entry: Entry) => entry.id === need.componentId) &&
+        (need.componentId === "$package" || entries.some((entry: Entry) => entry.id === need.componentId)) &&
         typeof need.label === "string" &&
         Array.isArray(need.targets) &&
         need.targets.every(
@@ -312,15 +325,18 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
   )
 }
 
-export function renderPluginText(
-  text: Text,
-  paths: { pluginRoot: string; skillDir: string; projectDir: string },
-): string {
-  return text
-    .map((part) =>
-      typeof part === "string" ? part : "secret" in part ? "{secret:" + part.secret + "}" : paths[part.binding],
-    )
-    .join("")
+export function validPluginOption(value: unknown): value is PluginOption {
+  return object(value) && keys(value, ["type", "title", "description", "required", "sensitive", "default"]) && ["string", "number", "boolean"].includes(String(value.type)) && typeof value.title === "string" && typeof value.description === "string" && typeof value.required === "boolean" && typeof value.sensitive === "boolean" && (value.default === undefined || typeof value.default === value.type && (typeof value.default !== "number" || Number.isFinite(value.default)) || value.sensitive === true && object(value.default) && keys(value.default, ["secret"]) && typeof value.default.secret === "string")
+}
+
+export function renderPluginText(text: Text, paths: Pick<PackageTextBindings, "pluginRoot" | "projectDir"> & Partial<PackageTextBindings>): string {
+  return text.map(part => {
+    if (typeof part === "string") return part
+    if ("secret" in part) return paths.resolveSecret?.(part.secret) ?? "{secret:" + part.secret + "}"
+    if ("option" in part) return String(paths.resolveOption?.(part.option) ?? "${user_config." + part.option + "}")
+    if ("environment" in part) return paths.resolveEnvironment?.(part.environment.name) ?? (part.environment.default ? renderPluginText(part.environment.default, paths) : "${" + part.environment.name + "}")
+    return paths[part.binding] ?? "${" + (part.binding === "pluginData" ? "CLAUDE_PLUGIN_DATA" : "CLAUDE_SKILL_DIR") + "}"
+  }).join("")
 }
 
 function validEntry(value: unknown): value is Entry {
@@ -344,11 +360,13 @@ function validEntry(value: unknown): value is Entry {
     )
   }
   if (value.kind === "mcp") {
+    if (value.timeouts !== undefined && (!object(value.timeouts) || !keys(value.timeouts, ["startupMs", "catalogMs", "executionMs"]) || !Object.values(value.timeouts).every(value => typeof value === "number" && Number.isFinite(value) && value >= 0))) return false
+    if (value.forwardEnvironment !== undefined && (!Array.isArray(value.forwardEnvironment) || !value.forwardEnvironment.every(item => object(item) && keys(item, ["name", "source"]) && typeof item.name === "string" && (item.source === "local" || item.source === "remote")))) return false
     if (value.timeoutMs !== undefined && (!Number.isSafeInteger(value.timeoutMs) || Number(value.timeoutMs) < 0))
       return false
     if (value.transport === "stdio")
       return (
-        keys(value, [...base, "transport", "command", "environment", "cwd", "timeoutMs", "floatingVersion"]) &&
+        keys(value, [...base, "transport", "command", "environment", "cwd", "timeoutMs", "floatingVersion", "forwardEnvironment", "timeouts"]) &&
         Array.isArray(value.command) &&
         value.command.every(text) &&
         textMap(value.environment) &&
@@ -362,7 +380,7 @@ function validEntry(value: unknown): value is Entry {
             typeof value.floatingVersion.token === "string"))
       )
     return (
-      keys(value, [...base, "transport", "url", "headers", "timeoutMs", "oauth"]) &&
+      keys(value, [...base, "transport", "url", "headers", "timeoutMs", "oauth", "timeouts"]) &&
       (value.transport === "http" || value.transport === "sse") &&
       text(value.url) &&
       textMap(value.headers) &&
@@ -478,8 +496,8 @@ function text(value: unknown): value is Text {
       (part) =>
         typeof part === "string" ||
         (object(part) &&
-          ((keys(part, ["binding"]) && ["pluginRoot", "skillDir", "projectDir"].includes(String(part.binding))) ||
-            (keys(part, ["secret"]) && typeof part.secret === "string"))),
+          ((keys(part, ["binding"]) && ["pluginRoot", "skillDir", "projectDir", "pluginData"].includes(String(part.binding))) ||
+            (keys(part, ["secret"]) && typeof part.secret === "string") || (keys(part, ["option"]) && typeof part.option === "string") || (keys(part, ["environment"]) && object(part.environment) && keys(part.environment, ["name", "default"]) && typeof part.environment.name === "string" && (part.environment.default === undefined || text(part.environment.default))))),
     )
   )
 }
@@ -505,20 +523,17 @@ function object(value: unknown): value is Record<string, unknown> {
 export function pluginText(value: string): Text {
   const parts: Text[number][] = []
   let offset = 0
-  for (const match of value.matchAll(/\$\{(CLAUDE_PLUGIN_ROOT|CLAUDE_SKILL_DIR|CLAUDE_PROJECT_DIR)\}/g)) {
-    if (match.index > offset) parts.push(value.slice(offset, match.index))
-    parts.push({ binding: pluginPathBinding(match[1]!)! })
-    offset = match.index + match[0].length
+  for (const match of value.matchAll(/\$\{(user_config\.[^}]+|[A-Za-z_][\w]*(?::-[^}]*)?)\}/g)) {
+    if (match.index! > offset) parts.push(value.slice(offset, match.index))
+    const expression = match[1]!
+    const binding = pluginPathBinding(expression)
+    const split = expression.indexOf(":-")
+    parts.push(binding ? { binding } : expression.startsWith("user_config.") ? { option: expression.slice(12) } : { environment: { name: split < 0 ? expression : expression.slice(0, split), ...(split < 0 ? {} : { default: pluginText(expression.slice(split + 2)) }) } })
+    offset = match.index! + match[0].length
   }
   if (offset < value.length) parts.push(value.slice(offset))
   return parts.length ? parts : [value]
 }
-export function pluginPathBinding(value: string): "pluginRoot" | "skillDir" | "projectDir" | undefined {
-  return value === "CLAUDE_PLUGIN_ROOT"
-    ? "pluginRoot"
-    : value === "CLAUDE_SKILL_DIR"
-      ? "skillDir"
-      : value === "CLAUDE_PROJECT_DIR"
-        ? "projectDir"
-        : undefined
+export function pluginPathBinding(value: string): "pluginRoot" | "skillDir" | "projectDir" | "pluginData" | undefined {
+  return value === "CLAUDE_PLUGIN_ROOT" || value === "PLUGIN_ROOT" ? "pluginRoot" : value === "CLAUDE_SKILL_DIR" ? "skillDir" : value === "CLAUDE_PROJECT_DIR" ? "projectDir" : value === "CLAUDE_PLUGIN_DATA" || value === "PLUGIN_DATA" ? "pluginData" : undefined
 }

@@ -81,7 +81,11 @@
               "type": "string"
             },
             "ecosystem": {
-              "enum": ["claude", "codex", "opencode"]
+              "enum": [
+                "claude",
+                "codex",
+                "opencode"
+              ]
             },
             "entryName": {
               "type": "string"
@@ -225,42 +229,7 @@
                     "type": "string"
                   },
                   "instruction": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "invocation": {
                     "type": "object",
@@ -414,42 +383,7 @@
                     "const": "command"
                   },
                   "instruction": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "invocation": {
                     "type": "object",
@@ -594,42 +528,7 @@
                     "const": "agent"
                   },
                   "instruction": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "invocation": {
                     "type": "object",
@@ -780,122 +679,17 @@
                   "command": {
                     "type": "array",
                     "items": {
-                      "type": "array",
-                      "items": {
-                        "oneOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "binding"
-                            ],
-                            "properties": {
-                              "binding": {
-                                "enum": [
-                                  "pluginRoot",
-                                  "skillDir",
-                                  "projectDir"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "secret"
-                            ],
-                            "properties": {
-                              "secret": {
-                                "type": "string"
-                              }
-                            }
-                          }
-                        ]
-                      }
+                      "$ref": "#/$defs/Text"
                     }
                   },
                   "environment": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "array",
-                      "items": {
-                        "oneOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "binding"
-                            ],
-                            "properties": {
-                              "binding": {
-                                "enum": [
-                                  "pluginRoot",
-                                  "skillDir",
-                                  "projectDir"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "secret"
-                            ],
-                            "properties": {
-                              "secret": {
-                                "type": "string"
-                              }
-                            }
-                          }
-                        ]
-                      }
+                      "$ref": "#/$defs/Text"
                     }
                   },
                   "cwd": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "timeoutMs": {
                     "type": "integer",
@@ -915,6 +709,46 @@
                       },
                       "token": {
                         "type": "string"
+                      }
+                    }
+                  },
+                  "timeouts": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "startupMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "catalogMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "executionMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "forwardEnvironment": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "source"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "enum": [
+                            "local",
+                            "remote"
+                          ]
+                        }
                       }
                     }
                   }
@@ -954,82 +788,12 @@
                     ]
                   },
                   "url": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "headers": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "array",
-                      "items": {
-                        "oneOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "binding"
-                            ],
-                            "properties": {
-                              "binding": {
-                                "enum": [
-                                  "pluginRoot",
-                                  "skillDir",
-                                  "projectDir"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "secret"
-                            ],
-                            "properties": {
-                              "secret": {
-                                "type": "string"
-                              }
-                            }
-                          }
-                        ]
-                      }
+                      "$ref": "#/$defs/Text"
                     }
                   },
                   "timeoutMs": {
@@ -1080,42 +844,7 @@
                                 "type": "string"
                               },
                               "clientSecret": {
-                                "type": "array",
-                                "items": {
-                                  "oneOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "object",
-                                      "additionalProperties": false,
-                                      "required": [
-                                        "binding"
-                                      ],
-                                      "properties": {
-                                        "binding": {
-                                          "enum": [
-                                            "pluginRoot",
-                                            "skillDir",
-                                            "projectDir"
-                                          ]
-                                        }
-                                      }
-                                    },
-                                    {
-                                      "type": "object",
-                                      "additionalProperties": false,
-                                      "required": [
-                                        "secret"
-                                      ],
-                                      "properties": {
-                                        "secret": {
-                                          "type": "string"
-                                        }
-                                      }
-                                    }
-                                  ]
-                                }
+                                "$ref": "#/$defs/Text"
                               },
                               "scopes": {
                                 "type": "array",
@@ -1134,6 +863,24 @@
                         }
                       }
                     ]
+                  },
+                  "timeouts": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "startupMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "catalogMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "executionMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
                   }
                 }
               },
@@ -1196,42 +943,7 @@
                         "type": "string"
                       },
                       "command": {
-                        "type": "array",
-                        "items": {
-                          "oneOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "object",
-                              "additionalProperties": false,
-                              "required": [
-                                "binding"
-                              ],
-                              "properties": {
-                                "binding": {
-                                  "enum": [
-                                    "pluginRoot",
-                                    "skillDir",
-                                    "projectDir"
-                                  ]
-                                }
-                              }
-                            },
-                            {
-                              "type": "object",
-                              "additionalProperties": false,
-                              "required": [
-                                "secret"
-                              ],
-                              "properties": {
-                                "secret": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          ]
-                        }
+                        "$ref": "#/$defs/Text"
                       },
                       "timeoutSeconds": {
                         "type": "number",
@@ -1373,6 +1085,58 @@
               }
             }
           }
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "title",
+              "description",
+              "required",
+              "sensitive"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "sensitive": {
+                "type": "boolean"
+              },
+              "default": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "object"
+                ]
+              }
+            }
+          }
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "agent": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -1405,6 +1169,83 @@
             "pattern": "^https://"
           }
         }
+      }
+    }
+  },
+  "$defs": {
+    "Text": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "binding"
+            ],
+            "properties": {
+              "binding": {
+                "enum": [
+                  "pluginRoot",
+                  "skillDir",
+                  "projectDir",
+                  "pluginData"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "secret"
+            ],
+            "properties": {
+              "secret": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "option"
+            ],
+            "properties": {
+              "option": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "environment"
+            ],
+            "properties": {
+              "environment": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "default": {
+                    "$ref": "#/$defs/Text"
+                  }
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

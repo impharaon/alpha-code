@@ -250,7 +250,7 @@ test("real GitHub credential placeholder becomes a need and every public byte is
   const converted = await (await converter()).convertPluginTree(captured)
   expect(converted.package.secrets).toMatchObject([{ componentId: converted.package.entries[0]!.id, label: "GITHUB_PERSONAL_ACCESS_TOKEN", targets: [{ file: ".mcp.json", pointer: "/github/headers/Authorization" }] }])
   const need = converted.package.secrets[0]!
-  expect(converted.package.entries).toMatchObject([{ headers: { Authorization: ["Bearer ", { secret: need.id }] } }])
+  expect(converted.package.entries).toMatchObject([{ headers: { Authorization: ["Bearer ", { environment: { name: "GITHUB_PERSONAL_ACCESS_TOKEN", default: [{ secret: need.id }] } }] } }])
   expect(converted.privateCredentials.size).toBe(0)
   expect(new TextDecoder().decode(converted.replacements.get(".mcp.json"))).toContain(`{secret:${need.id}}`)
   // Controlled value substitution uses a non-credential marker. The source itself is unchanged.

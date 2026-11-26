@@ -20,7 +20,10 @@ import {
   type IdentityInput,
 } from "./identity"
 import { displaySnapshot } from "./display"
-import { canonicalJsonDigest } from "./store"
+import { canonicalJsonDigest, loadPolicyDocument, savePolicyDocument } from "./store"
+import { resolveToolPolicy } from "./resolver"
+import { expandFirstPartyCommand } from "../../../core/src/mcp/codepuppy-first-party-mcp"
+import type { LauncherEnvironment } from "../../../util/src/codepuppy-connector-launch"
 import { canonicalToolIdentity } from "../../../schema/src/tool-identity"
 
 isolate()
@@ -208,4 +211,88 @@ describe("authority minting (ADR-041 §5)", () => {
       location: { kind: "local" },
     })
   })
+})
+
+
+// Integration layer, affected PR/nightly: own declaration format, protected bytes and
+// production identity/store/resolver on real temporary disk. No app, Node asset or timer.
+function slotPolicyFixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "first-party-slot-policy-"))
+  const resources = path.join(root, "resources")
+  fs.mkdirSync(path.join(resources, "office-mcp"), { recursive: true })
+  fs.mkdirSync(path.join(resources, "own"))
+  const code = Buffer.from("/* owned policy fixture; never executed */\n")
+  fs.writeFileSync(path.join(resources, "own/server.js"), code)
+  const manifest = path.join(resources, "office-mcp/tools.json")
+  const declaration = {
+    command: ["{codepuppyNode}", "{codepuppyResources}/own/server.js", "{workspace}", "--cache-root", "{codepuppyCacheRoot}", "--mode=read"],
+    environment: { MODE: "read" }, cwd: root,
+    codeSha256: { "own/server.js": createHash("sha256").update(code).digest("hex") },
+    tools: [{ name: "echo", inputSchema: { type: "object" } }],
+  }
+  const launchers: LauncherEnvironment = {
+    platform: "darwin-arm64", pinSet: "a".repeat(64), uv: path.join(root, "uv"), uvx: path.join(root, "uvx"),
+    node: path.join(root, "pin-a/node"), npmCli: path.join(root, "npm.js"), npxCli: path.join(root, "npx.js"),
+    runtimeRoot: path.join(root, "runtime"), pythonFileId: "python/darwin-arm64/3.12.16-20261124",
+    packageManagerEnv: {}, environment: {}, firstPartyCacheRoots: { own: path.join(root, "cache-a") },
+  }
+  const facts = (descriptor: LauncherEnvironment, current = declaration, extra: { environment?: Record<string, string>; cwd?: string; command?: string[] } = {}) => {
+    fs.writeFileSync(manifest, JSON.stringify({ formats: { own: current } }))
+    const entry = { type: "local" as const, command: expandFirstPartyCommand(current.command, resources, descriptor, "own"), environment: current.environment, cwd: current.cwd, ...extra }
+    return toolFacts({ id: "owned_echo", name: "echo", options: { namespace: "owned" }, ...mcpToolMark("owned", "echo") }, base({ mcp: new Map([["owned", entry]]), officeMcpManifest: manifest, launchers: descriptor }))
+  }
+  const partition = { account: "own-account", workspace: "own-workspace" }
+  const caps = { managed: { status: "ok" as const, ruleset: [], sources: [] } }
+  const resolveSaved = (subject: ReturnType<typeof facts>) => {
+    const loaded = loadPolicyDocument(root, partition)
+    if (loaded.status !== "ok") throw Error("expected policy from real disk")
+    return resolveToolPolicy({ subject, caps, user: { status: "ok", records: loaded.doc.records } })
+  }
+  return { root, declaration, launchers, facts, partition, resolveSaved }
+}
+
+test("host slot re-anchoring keeps saved first-party tool and service approvals on disk", () => {
+  const f = slotPolicyFixture()
+  try {
+    const before = f.facts(f.launchers)
+    expect(before.authority.kind).toBe("codepuppy-bundled")
+    for (const selector of [{ level: "tool", canonical: "mcp:owned:echo" }, { level: "service", source: "mcp", origin: "owned" }] as const) {
+      savePolicyDocument(f.root, f.partition, [{ selector, state: "enabled", bindingDigest: before.bindingDigest }])
+      expect(f.resolveSaved(before).state).toBe("enabled")
+      for (const descriptor of [
+        { ...f.launchers, node: path.join(f.root, "pin-b/node") },
+        { ...f.launchers, firstPartyCacheRoots: { own: path.join(f.root, "cache-b") } },
+      ]) {
+        const after = f.facts(descriptor)
+        expect(after.authority.kind).toBe("codepuppy-bundled")
+        expect(f.resolveSaved(after)).toEqual({ state: "enabled", action: "allow", reason: { kind: "user", level: selector.level } })
+      }
+    }
+  } finally { fs.rmSync(f.root, { recursive: true, force: true }) }
+})
+
+test("first-party declaration changes and identity mismatches still rebind saved approval", () => {
+  const f = slotPolicyFixture()
+  try {
+    const before = f.facts(f.launchers)
+    savePolicyDocument(f.root, f.partition, [{ selector: { level: "tool", canonical: "mcp:owned:echo" }, state: "enabled", bindingDigest: before.bindingDigest }])
+    for (const current of [
+      { ...f.declaration, command: [...f.declaration.command.slice(0, -1), "--mode=write"] },
+      { ...f.declaration, environment: { MODE: "write" } },
+      { ...f.declaration, cwd: path.join(f.root, "other-workspace") },
+    ]) {
+      const changed = f.facts(f.launchers, current)
+      expect(changed.authority.kind).toBe("codepuppy-bundled")
+      expect(f.resolveSaved(changed)).toMatchObject({ state: "ask", reason: { kind: "binding-changed" } })
+    }
+    for (const extra of [
+      { command: [path.join(f.root, "untrusted-node"), ...expandFirstPartyCommand(f.declaration.command, path.join(f.root, "resources"), f.launchers, "own").slice(1)] },
+      { environment: { ...f.declaration.environment, EXTRA: "not-declared" } },
+      { cwd: path.join(f.root, "undeclared-workspace") },
+    ]) {
+      const changed = f.facts(f.launchers, f.declaration, extra)
+      expect(changed.authority.kind).toBe("not-asserted")
+      expect(f.resolveSaved(changed).state).toBe("ask")
+    }
+  } finally { fs.rmSync(f.root, { recursive: true, force: true }) }
 })

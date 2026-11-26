@@ -211,7 +211,7 @@ const ARM_BUDGET_MS = 12_000
  * 等 fixture 相关的进程**全部死透**再断言(`#945`):判「core.hooksPath 还原了」必须在所有
  * 可能晚到的写手消失之后读 —— 复现实测:旧实现里孤儿化的 bootstrap 子进程带着陈旧基线,
  * 在父进程死后**再过 2 秒**才覆写共享配置;读得太早,红会变假绿。
- * 匹配轴:①fixture 仓的绝对路径(bootstrap/嵌套探针的 argv 里带它);②husky-sim 的
+ * 匹配轴:①fixture 仓的绝对路径(bootstrap 的 argv 里带它);②husky-sim 的
  * corruptTo 片段(prepare 的 sh 进程 argv 里带它)。两轴都空了才算静。
  */
 async function quiesceFixture(repo: string, extraPattern?: string) {
@@ -318,7 +318,7 @@ describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(codepuppy-che
     addWorktree(repo, home, "wtboot-probe-999996-3077-pos") // 上一轮被 KILL 留下的
     addWorktree(repo, home, "lane-620-continue") // 别人的 lane
 
-    const r = run(repo, ["bash", "scripts/assert-worktree-bootstrap.sh"], home, { CODEPUPPY_WT_PROBE_NESTED: "1" })
+    const r = run(repo, ["bash", "scripts/assert-worktree-bootstrap.sh"], home, { CODEPUPPY_WT_PROBE_SKIP_CONTRACT: "1" })
     // 夹具仓里能力判据当然失守 —— 这正是「脚本中途失败」那条退出路径。
     expect(r.code).not.toBe(0)
 
@@ -335,7 +335,7 @@ describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(codepuppy-che
 
     const proc = Bun.spawn(["bash", "scripts/assert-worktree-bootstrap.sh"], {
       cwd: repo,
-      env: { ...gitEnv(home), CODEPUPPY_WT_PROBE_NESTED: "1" },
+      env: { ...gitEnv(home), CODEPUPPY_WT_PROBE_SKIP_CONTRACT: "1" },
       stdout: "ignore",
       stderr: "ignore",
     })
@@ -374,7 +374,7 @@ describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(codepuppy-che
 
     const proc = Bun.spawn(["bash", "scripts/assert-worktree-bootstrap.sh"], {
       cwd: repo,
-      env: { ...gitEnv(home), CODEPUPPY_WT_PROBE_NESTED: "1" },
+      env: { ...gitEnv(home), CODEPUPPY_WT_PROBE_SKIP_CONTRACT: "1" },
       stdout: "ignore",
       stderr: "ignore",
     })
@@ -412,7 +412,7 @@ describe("生产接线:真跑 scripts/assert-worktree-bootstrap.sh(codepuppy-che
 
     const proc = Bun.spawn(["bash", "scripts/assert-worktree-bootstrap.sh"], {
       cwd: repo,
-      env: { ...gitEnv(home), CODEPUPPY_WT_PROBE_NESTED: "1" },
+      env: { ...gitEnv(home), CODEPUPPY_WT_PROBE_SKIP_CONTRACT: "1" },
       stdout: "pipe",
       stderr: "ignore",
     })
@@ -544,7 +544,7 @@ describe("可达性判别依据(#941):半通不通降级,恒 'network' 硬红", 
       FLAKY_STATE: join(fx.root, "curl-calls.n"),
       FLAKY_SEQ: seq,
       FLAKY_DEFAULT: dflt,
-      CODEPUPPY_WT_PROBE_NESTED: "1",
+      CODEPUPPY_WT_PROBE_SKIP_CONTRACT: "1",
     }
   }
 

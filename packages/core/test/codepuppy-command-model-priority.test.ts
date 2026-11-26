@@ -27,6 +27,8 @@ import { LayerNode } from "@opencode/util/effect/layer-node"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Bus } from "@opencode/core/bus"
 import { AppProcess } from "@opencode/util/process"
+import { ChildProcess } from "effect/process"
+import { tmpdirScoped } from "./fixture/tmpdir"
 import { Location } from "@opencode/core/location"
 import { Mcp } from "@opencode/core/mcp/index"
 import { ShellSelect } from "@opencode/core/shell/select"
@@ -130,6 +132,23 @@ it.live("shell runtime values stay data in command substitutions and unquoted he
   const actual: string[] = []
   for (const item of cases) actual.push(yield* Effect.promise(() => renderPackageInstruction(location, { parts: [item.source], rawArguments: "'" + item.value + "'", arguments: [], syntax: "claude", cwd: location.directory })))
   expect(actual).toEqual(cases.map(item => item.expected))
+}))
+
+it.live("bind-only shell target shares the binding authority without executing", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const fs = yield* FSUtil.Service
+  const processes = yield* AppProcess.Service
+  const tmp = yield* tmpdirScoped()
+  const marker = tmp.path + "/bound marker"
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const value = 'two words; $(printf INJECTED) " quote'
+  const bound = yield* Effect.promise(() => runtime.bindPackageShellCommand(location, { parts: ["printf '%s' ", { boundValue: value }, "; printf touched > ", { boundValue: marker }] }))
+  expect(yield* fs.exists(marker)).toBe(false)
+  expect(bound.argv.join(" ")).not.toContain(value)
+  const result = yield* processes.run(ChildProcess.make(bound.executable, [...bound.argv], { cwd: tmp.path, env: bound.env }))
+  expect(result.stdout.toString()).toBe(value)
+  expect(yield* fs.readFileString(marker)).toBe("touched")
 }))
 
 /** Runs one configured command through the production plugin and Command service; records what it asked the session to do. */

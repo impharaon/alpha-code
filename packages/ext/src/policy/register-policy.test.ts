@@ -44,7 +44,7 @@ import {
   Tool,
   WebFetchTool,
 } from "./policy-host.cases"
-import { registerPolicy } from "./index"
+import { registerPolicy, type PolicyRegistration } from "./index"
 import { attachDirectoryDisplay } from "./display"
 import { projectPluginContext, trackMcpNamespaces } from "../plugin-fanout"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
@@ -105,6 +105,7 @@ const setup = (options: Setup = {}) =>
     const plugins = yield* Plugin.Service
     const location = yield* Location.Service
     const services = yield* Effect.context<never>()
+    let registration: PolicyRegistration | undefined
     const tool = (name: string, key: keyof typeof counts, extra: Record<string, unknown> = {}) => ({
       name,
       description: name,
@@ -135,6 +136,7 @@ const setup = (options: Setup = {}) =>
       })),
       promisePlugin("codepuppy-ext", async (ctx: any) => {
         const policy = options.policy === false ? undefined : await registerPolicy(ctx, createUnattendedState())
+        registration = policy
         await ctx.tool.transform((editor: any) => editor.add(tool(ALIAS_PROBE, "probe")))
         await options.inside?.(ctx)
         await policy?.seal()
@@ -182,7 +184,7 @@ const setup = (options: Setup = {}) =>
       prompt: { text: "go" },
       delivery: "queue",
     } as never)
-    return { session }
+    return { session, registration }
   })
 
 /** The catalog the model request is built from (`SessionContext.select`), after the context hook. */
@@ -266,6 +268,33 @@ const pending = Effect.gen(function* () {
 const disabled = (canonical: string) => ({ selector: { level: "tool", canonical }, state: "disabled" })
 const classEnabled = (cls: string) => ({ selector: { level: "class", class: cls }, state: "enabled" })
 const NEUTRAL = [classEnabled("third-party-mcp"), classEnabled("plugin")]
+
+it.live("package invocation permissions expire without changing persistent rules", () => Effect.gen(function* () {
+  const { session, registration } = yield* setup({ rules: [ALLOW_ALL, { action: ID_BUILTIN_WRITE, resource: "*", effect: "ask" }] })
+  const policy = registration!
+  policy.bindPackageInvocation(session.id, { allowedTools: [{ tool: ALIAS_WRITE }], deniedTools: [] }, {}, () => true)
+  expect(Exit.isSuccess(yield* callRaw(session.id, ALIAS_WRITE))).toBe(true)
+  expect(counts.write).toBe(1)
+  policy.clearPackageInvocation(session.id)
+  const blocked = yield* Effect.forkChild(callRaw(session.id, ALIAS_WRITE))
+  const permission = yield* Permission.Service
+  const request = (yield* pending)[0]
+  expect(request).toBeDefined()
+  expect(counts.write).toBe(1)
+  yield* permission.reply({ requestID: request!.id, reply: "reject" })
+  expect(Exit.isFailure(yield* E.Fiber.join(blocked))).toBe(true)
+}))
+
+it.live("package invocation allows preserve hard deny and available tools", () => Effect.gen(function* () {
+  const { session, registration } = yield* setup({ records: [...NEUTRAL, disabled(ID_BUILTIN_WRITE)] })
+  const policy = registration!
+  policy.bindPackageInvocation(session.id, { allowedTools: [{ tool: ALIAS_WRITE }], deniedTools: [] }, {}, () => true)
+  expect(Exit.isFailure(yield* callRaw(session.id, ALIAS_WRITE))).toBe(true)
+  expect(counts.write).toBe(0)
+  policy.bindPackageInvocation(session.id, { allowedTools: [{ tool: "*" }], deniedTools: [], availableTools: [{ tool: ALIAS_WRITE }] }, {}, () => true)
+  expect((yield* catalog(session.id)).direct).not.toContain(ALIAS_PROBE)
+  policy.clearPackageInvocation(session.id)
+}))
 
 describe("catalog gate (#725 group A) — SessionContext.select + session.hook.context", () => {
   it.live("A5 negative control: with no deny, every source is in the catalog (direct and Code Mode)", () =>

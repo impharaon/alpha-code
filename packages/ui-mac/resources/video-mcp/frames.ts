@@ -60,28 +60,7 @@ export async function framesOf(source: Source, selection: FrameSelection, runtim
     const input = await sourceFile(source)
     const probe = await runtime.component("ffprobe")
     const ffmpeg = await runtime.component("ffmpeg")
-    const pts = await runComponent(
-      probe.path,
-      [
-        "-v",
-        "error",
-        "-select_streams",
-        "v:0",
-        "-show_frames",
-        "-show_entries",
-        "frame=best_effort_timestamp_time",
-        "-of",
-        "csv=p=0",
-        input,
-      ],
-      runtime,
-    )
-    const points = pts.stdout
-      .split(/\r?\n/)
-      .filter((line) => line.trim())
-      .map((line) => Number(line.split(",")[0]))
-      .filter((value) => Number.isFinite(value))
-      .map((time) => Math.round(time * 1000) - info.startMs)
+    let progressBuffer=""
     const scene =
       selection.kind === "scenes"
         ? await runComponent(
@@ -89,6 +68,7 @@ export async function framesOf(source: Source, selection: FrameSelection, runtim
             [
               "-nostdin",
               "-copyts",
+              "-progress", "pipe:2", "-nostats",
               "-v",
               "info",
               "-i",
@@ -101,11 +81,19 @@ export async function framesOf(source: Source, selection: FrameSelection, runtim
               "-",
             ],
             runtime,
+            undefined,
+            async chunk=>{
+              progressBuffer+=chunk
+              const lines=progressBuffer.split(/\r?\n/);progressBuffer=lines.pop() ?? ""
+              for(const line of lines){const time=/^out_time_us=(\d+)$/.exec(line);if(time)await runtime.progress({phase:"frames",completed:Math.min(info.durationMs,Math.max(0,Math.round(Number(time[1])/1000)-info.startMs)),total:info.durationMs,unit:"ms"})}
+            },
           )
         : undefined
     const changes = [...(scene?.stderr ?? "").matchAll(/pts_time:([\d.e+-]+)/g)].map(
       (match) => Math.round(Number(match[1]) * 1000) - info.startMs,
     )
+    const range=selection.kind === "times" ? {startMs:0,endMs:info.durationMs} : (selection.range ?? {startMs:0,endMs:info.durationMs})
+    const points=selection.kind === "times" ? [...selection.timesMs].sort((a,b)=>a-b) : selection.kind === "scenes" ? [range.startMs,...changes].sort((a,b)=>a-b) : Array.from({length:Math.ceil((range.endMs-range.startMs)/selection.intervalMs)},(_,index)=>range.startMs+index*selection.intervalMs)
     const selected = selectedTimes(selection, points, info.durationMs, changes)
     const frames: Frame[] = []
     const directory = cachePath(runtime, "frames", source.sourceId, key)
@@ -113,37 +101,20 @@ export async function framesOf(source: Source, selection: FrameSelection, runtim
     const created: string[] = []
     try {
       for (const entry of selected) {
-        const id = digest(`${source.sourceId}:${entry.actualMs}:${runtime.recipe.frames}`)
-        const existing = frames.find((item) => item.id === id)
-        if (existing) {
-          frames.push({ ...existing, ...entry })
-          continue
-        }
-        const target = `${directory}/${id}-${randomUUID()}.jpg`
+        const target = `${directory}/${randomUUID()}.jpg`
         created.push(target)
-        await runComponent(
+        const extraction=await runComponent(
           ffmpeg.path,
-          [
-            "-nostdin",
-            "-v",
-            "error",
-            "-ss",
-            String(entry.actualMs / 1000),
-            "-i",
-            input,
-            "-frames:v",
-            "1",
-            "-vf",
-            "scale=iw*sar:ih,setsar=1",
-            "-f",
-            "image2pipe",
-            "-vcodec",
-            "mjpeg",
-            "pipe:1",
-          ],
+          ["-nostdin","-copyts","-ss",String(entry.actualMs/1000),"-noaccurate_seek","-i",input,
+            "-vf",`trim=end=${(entry.actualMs+info.startMs+1)/1000},select='lte(t,${(entry.actualMs+info.startMs)/1000})',scale=iw*sar:ih,setsar=1,showinfo`,
+            "-fps_mode","passthrough","-update","1","-f","image2",target],
           runtime,
-          target,
         )
+        const decoded=[...extraction.stderr.matchAll(/pts_time:([\d.e+-]+)/g)].map(match=>Math.round(Number(match[1])*1000)-info.startMs)
+        const actualMs=frameAt(decoded,entry.actualMs)
+        const id=digest(`${source.sourceId}:${actualMs}:${runtime.recipe.frames}`)
+        const existing=frames.find(item=>item.id === id)
+        if(existing){await rm(target,{force:true});frames.push({...existing,requestedMs:entry.requestedMs});continue}
         const dimensions = await runComponent(
           probe.path,
           ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", target],
@@ -151,7 +122,7 @@ export async function framesOf(source: Source, selection: FrameSelection, runtim
         )
         const size = (JSON.parse(dimensions.stdout) as { streams: { width: number; height: number }[] }).streams[0]!
         const ocr = await readFrameText(target, size.width, size.height, runtime)
-        frames.push(frame.parse({ id, ...entry, path: target, mime: "image/jpeg", ...size, ocr: ocr.ocr }))
+        frames.push(frame.parse({ id, ...entry, actualMs, path: target, mime: "image/jpeg", ...size, ocr: ocr.ocr }))
         await runtime.progress({ phase: "frames", completed: frames.length, total: selected.length, unit: "items" })
       }
       await verifySourceFile(source, input)

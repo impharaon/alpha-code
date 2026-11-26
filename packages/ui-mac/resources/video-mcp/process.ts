@@ -5,12 +5,16 @@ import { pipeline } from "node:stream/promises"
 import { fail, type VideoRuntime } from "./runtime"
 
 /** Media bytes are piped into a file; only small control output is collected. */
-export async function runComponent(executable: string, args: readonly string[], runtime: Pick<VideoRuntime, "signal">, output?: string) {
+export async function runComponent(executable: string, args: readonly string[], runtime: Pick<VideoRuntime, "signal">, output?: string,onStderr?:(chunk:string)=>void|Promise<void>) {
   runtime.signal.throwIfAborted()
   const child = spawn(executable, [...args], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, shell: false, signal: runtime.signal })
   const errors: Buffer[] = []
   const controls: Buffer[] = []
-  child.stderr.on("data", (value: Buffer) => errors.push(value))
+  let notified=Promise.resolve(),notificationError:unknown
+  child.stderr.on("data",(value:Buffer)=>{
+    errors.push(value)
+    if(onStderr)notified=notified.then(()=>onStderr(value.toString("utf8"))).catch(error=>{notificationError=error;child.kill()})
+  })
   if (!output) child.stdout.on("data", (value: Buffer) => controls.push(value))
   const destination = output ? createWriteStream(output, { flags: "wx" }) : undefined
   let created = false
@@ -28,6 +32,8 @@ export async function runComponent(executable: string, args: readonly string[], 
   })
   try {
     await Promise.all([copied, ended])
+    await notified
+    if(notificationError)throw notificationError
   } catch (error) {
     child.kill()
     await closed

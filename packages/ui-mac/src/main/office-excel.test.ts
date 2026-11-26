@@ -135,3 +135,14 @@ with OfficeExcel.edit(str(path)) as w:w['Data']['B2']=55
 assert load_workbook(path)['Data']['B2'].value==55
 `))
 })
+
+for (const [name, source, calculated] of [
+  ["decimal", "=0.10+A1", "=0.1+A1"],
+  ["function case", "=sum(A1)", "=SUM(A1)"],
+  ["reference case and sheet quotes", "='Sales'!$a$1", "=Sales!$A$1"],
+] as const) test(`formula tokens normalize ${name} as observed in the pinned LO save`, () => run(`
+from codepuppy_office.cache import expression
+assert expression(${JSON.stringify(source)}) == expression(${JSON.stringify(calculated)})
+assert expression('="MiXeD"') != expression('="mixed"')
+assert expression('=A1+1') != expression('=A1+2')
+`))

@@ -65,10 +65,11 @@ function bootOrderViolations(source: string): string[] {
   const order = [
     "app.requestSingleInstanceLock",
     "runNamingMigrationBoot",
-    "preferAppEnv",
     "runNamingMigrationDbStep",
     "runKeychainRenameStep",
     "initCodePuppyEnvironment",
+    "prepareShellProbeFence",
+    "preferAppEnv",
   ]
   for (const name of order) if (at(name) < 0) out.push(`${name} is not called inside main`)
   for (let i = 1; i < order.length; i++)
@@ -95,7 +96,7 @@ function bootOrderViolations(source: string): string[] {
   return out
 }
 
-describe("R17 —— index.ts:A 段在锁之后、preferAppEnv 之前;会话库一步在 preferAppEnv 之后、首个异步边界之前", () => {
+describe("R17 —— index.ts:A 段在锁之后、preferAppEnv 之前;会话库与改名在探针之前、首个异步边界之前", () => {
   const source = readFileSync(join(MAIN, "index.ts"), "utf8")
 
   test("真 index.ts 零违例", () => {

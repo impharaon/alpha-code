@@ -1,6 +1,25 @@
 import { spawnSync } from "node:child_process"
 import { userInfo } from "node:os"
 import { basename } from "node:path"
+import type { EngineRoots } from "./process-fence-profile"
+
+export type ShellProbeFenceContext = {
+  profile: string
+  env: Readonly<Record<string, string>>
+  roots: EngineRoots & { stateHome: string; engineConfigDirectory: string }
+}
+
+const ROOT_KEYS = ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG", "OPENCODE_DB"] as const
+
+/** Every probe/cache merge restores this same trusted snapshot, including absent optional roots. */
+export function applyTrustedShellEnvironment(target: NodeJS.ProcessEnv, source: Record<string, string>, context: ShellProbeFenceContext) {
+  Object.assign(target, source)
+  for (const key of ROOT_KEYS) {
+    const value = context.env[key]
+    if (value === undefined) delete target[key]
+    else target[key] = value
+  }
+}
 
 const TIMEOUT = 5_000
 
@@ -48,12 +67,14 @@ export function minimalProbeEnv(source: Record<string, string | undefined>): Rec
   return env
 }
 
-function probe(shell: string, mode: "-il" | "-l"): Probe {
-  const out = spawnSync(shell, [mode, "-c", "env -0"], {
+function probe(shell: string, mode: "-il" | "-l", context: ShellProbeFenceContext): Probe {
+  const fenced = process.platform === "darwin"
+  const out = spawnSync(fenced ? "/usr/bin/sandbox-exec" : shell, fenced ? ["-p", context.profile, shell, mode, "-c", "env -0"] : [mode, "-c", "env -0"], {
     stdio: ["ignore", "pipe", "ignore"],
     timeout: TIMEOUT,
     windowsHide: true,
-    env: minimalProbeEnv(process.env),
+    env: context.env,
+    cwd: context.roots.home,
   })
 
   const err = out.error as NodeJS.ErrnoException | undefined
@@ -83,13 +104,13 @@ export function isNushell(shell: string) {
   return name === "nu" || name === "nu.exe" || raw.endsWith("\\nu.exe")
 }
 
-export function loadShellEnv(shell: string, logger: ShellEnvLogger) {
+export function loadShellEnv(shell: string, logger: ShellEnvLogger, context: ShellProbeFenceContext) {
   if (isNushell(shell)) {
     logger.log(`[server] Skipping shell env probe for nushell: ${shell}`)
     return null
   }
 
-  const interactive = probe(shell, "-il")
+  const interactive = probe(shell, "-il", context)
   if (interactive.type === "Loaded") {
     logger.log(`[server] Loaded shell environment with -il (${Object.keys(interactive.value).length} vars)`)
     return interactive.value
@@ -99,7 +120,7 @@ export function loadShellEnv(shell: string, logger: ShellEnvLogger) {
     return null
   }
 
-  const login = probe(shell, "-l")
+  const login = probe(shell, "-l", context)
   if (login.type === "Loaded") {
     logger.log(`[server] Loaded shell environment with -l (${Object.keys(login.value).length} vars)`)
     return login.value

@@ -85,7 +85,7 @@ describe("迁移接线顺序 (ac#1571 §5.3 / AC3 / AC6 / R21-3)", () => {
   })
 
   test("变异副本:改名步之前先读 store ⇒ 报违例", () => {
-    const early = replaceOnce(INDEX_SOURCE, '  preferAppEnv(app.getPath("userData"))\n', '  getStore()\n  preferAppEnv(app.getPath("userData"))\n')
+    const early = replaceOnce(INDEX_SOURCE, "  const naming = runNamingMigrationBoot(", "  getStore()\n  const naming = runNamingMigrationBoot(")
     expect(migrationOrderViolations(early).join("\n")).toContain("改名步之前引用了 getStore")
   })
 
@@ -182,8 +182,9 @@ function migrationOrderViolations(source: string): string[] {
 
   // ①
   const rename = at("runKeychainRenameStep")
-  for (const before of ["app.requestSingleInstanceLock", "app.setName", "preferAppEnv", "runNamingMigrationDbStep"])
+  for (const before of ["app.requestSingleInstanceLock", "app.setName", "runNamingMigrationDbStep"])
     if (at(before) >= rename) out.push(`钥匙串改名步必须在 ${before} 之后`)
+  if (at("prepareShellProbeFence") <= rename) out.push("钥匙串改名步必须在受围栏探针之前")
   if (rename >= firstYield) out.push("钥匙串改名步必须在第一个 yield* 之前(ready 前后 Chromium 就会按新名查钥匙串)")
   for (const ref of references.filter((r) => r.pos < rename && BEFORE_RENAME_FORBIDDEN.has(r.text)))
     out.push(`改名步之前引用了 ${ref.text}(index.ts:${lineOf(ref.pos)})`)

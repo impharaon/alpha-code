@@ -10,7 +10,7 @@
 import { spawn } from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { isNushell, minimalProbeEnv, parseShellEnv } from "./shell-env"
+import { isNushell, parseShellEnv, type ShellProbeFenceContext } from "./shell-env"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 const FILE = USER_DATA_LAYOUT.shellEnv
@@ -90,16 +90,18 @@ export function writeShellEnvCache(
 }
 
 /** 异步登录 shell 探测(镜像 shell-env.ts 的同步版:-il 优先,失败退 -l;nushell 跳过)。 */
-export async function probeShellEnvAsync(shell: string): Promise<Record<string, string> | null> {
+export async function probeShellEnvAsync(shell: string, context: ShellProbeFenceContext): Promise<Record<string, string> | null> {
   if (isNushell(shell)) return null
   for (const mode of ["-il", "-l"] as const) {
     const env = await new Promise<Record<string, string> | null>((resolve) => {
       // REQ-047:与同步探测同款最小干净 env —— 裸继承会把 app 自身(可能已被毒缓存污染的)env
       // 回灌进缓存,构成自续毒化;干净探测使异步刷新真正具备「整份重写自愈」能力。
-      const child = spawn(shell, [mode, "-c", "env -0"], {
+      const fenced = process.platform === "darwin"
+      const child = spawn(fenced ? "/usr/bin/sandbox-exec" : shell, fenced ? ["-p", context.profile, shell, mode, "-c", "env -0"] : [mode, "-c", "env -0"], {
         stdio: ["ignore", "pipe", "ignore"],
         windowsHide: true,
-        env: minimalProbeEnv(process.env),
+        env: context.env,
+        cwd: context.roots.home,
       })
       const chunks: Buffer[] = []
       const timer = setTimeout(() => {

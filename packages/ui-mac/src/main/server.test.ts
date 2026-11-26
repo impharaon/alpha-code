@@ -73,7 +73,7 @@ mock.module("./codepuppy-keychain-backend", () => ({
 const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./codepuppy-secret-files")
 const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")
-const { forkedSecretNames, preferAppEnv, preplanConfigFenceRoots, pushCredentialsToSidecar, spawnLocalServer } = await import("./server")
+const { forkedSecretNames, resolveShellProbeRoots, preferAppEnv, preplanConfigFenceRoots, pushCredentialsToSidecar, spawnLocalServer } = await import("./server")
 const { configFenceLocations, resolveEngineRoots } = await import("./process-fence-profile")
 const { bootFenceWorkspaceTruth, readWorkspaceTruthOrThrow, writeWorkspaceTruth } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_KEY } = await import("./tabs-preclean")
@@ -196,7 +196,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // `webSearch.killSwitch`(此前是两个恒等于它的 CODEPUPPY_*_WEBSEARCH_DENY 环境变量;那两个名字已不在 fork 环境里,由下面
   // 「#1698 fork 的环境与 start 消息」一组判)。
   test("登录用户冷启动:main 不写任何 keyless flag;两条腿的拒绝判决都不置位", async () => {
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     expect(keylessFlagsOf(process.env)).toEqual(noKeylessFlags)
 
     applyAuthEnvLikeLogin()
@@ -209,7 +209,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   test("用户 shell export 的 keyless flag 照旧原样进 sidecar —— kill-switch 也不再改写它(判决走启动文档)", async () => {
     process.env.OPENCODE_ENABLE_PARALLEL = "1"
 
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
@@ -222,7 +222,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   test("logged-out/BYOK:main 不写任何 keyless flag,也不置位拒绝判决", async () => {
     process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp" // URL 在场但无密钥文件 = 未登录
 
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
 
     const { env, bootstrap } = await forkSidecarWithBootstrap()
     expect(keylessFlagsOf(env)).toEqual(noKeylessFlags)
@@ -230,7 +230,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   })
 
   test("re-forking without an auth change is idempotent", async () => {
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
 
     const first = await forkSidecarWithBootstrap()
@@ -243,7 +243,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // 断言走真实 fork,证明判决确实进了交给 sidecar 的启动文档(`#1698`;此前是 sidecar env)。
   test("the sovereignty verdict reaches the sidecar so the tool itself can refuse", async () => {
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
 
     expect(await forkedKillSwitch()).toBe(true)
   })
@@ -252,7 +252,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // 代付也置位本地拒绝判决。代付不再关本地腿 ⇒ 这条判决在代付态必须缺席,否则工具自身那道最终闸
   // 会把本地腿在**执行时**拒掉(permission 层看不出来,模型只会拿到一句「别重试」)。
   test("代付不再把本地拒绝判决送进 sidecar —— 两条腿的通道都保持干净", async () => {
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
 
     expect(await forkedKillSwitch()).toBe(false)
@@ -260,7 +260,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
 
   test("`#1195` 判据换轴:登录但无 mcp_access(旧轴文件在、新轴文件缺)不算代付,本地腿不被拒", async () => {
     // pre-T1 服务端 / 信封未带字段的真实形态:applyAuthEnv 写了 CODEPUPPY_CLOUD_TOKEN,没写 CODEPUPPY_MCP_TOKEN。
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
     delete process.env.CODEPUPPY_MCP_TOKEN
 
@@ -272,7 +272,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // 置位它的状态。登出那一格追加一条:它在任何方向上都不该让判决重新出现。
   test("kill-switch 关掉之后 respawn 清掉本地拒绝判决,而不是把工具留在死状态", async () => {
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
     expect(await forkedKillSwitch()).toBe(true)
 
@@ -291,7 +291,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // kill-switch 下真定义仍在文档的 `cloudMcp` 里(ext 的 installCloudMcp 据它在闸就位之后装,R5),只是带 {file:} 引用、不带令牌。
   test("the kill switch ships a cloud verdict to the sidecar; platform-pays does not", async () => {
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
     const killed = await forkSidecarWithBootstrap()
     expect(killed.bootstrap.webSearch.killSwitch).toBe(true)
@@ -406,14 +406,14 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
     }
 
     test("登录代付:第三方 web search 可用(本地腿也活着,拦它护不住任何能力)", async () => {
-      preferAppEnv(userDataPath)
+      preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
       applyAuthEnvLikeLogin()
 
       expect(thirdPartyDenial(await forkSidecarWithBootstrap())).toBeUndefined()
     })
 
     test("登出 / BYOK:第三方 web search 可用", async () => {
-      preferAppEnv(userDataPath)
+      preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
 
       expect(thirdPartyDenial(await forkSidecarWithBootstrap())).toBeUndefined()
     })
@@ -422,7 +422,7 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
     // 它同时证明上面两条不是「怎么测都绿」。
     test("kill-switch:第三方 web search 照样被关", async () => {
       process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-      preferAppEnv(userDataPath)
+      preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
       applyAuthEnvLikeLogin()
 
       expect(thirdPartyDenial(await forkSidecarWithBootstrap())).toContain("kill switch")
@@ -430,7 +430,7 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
 
     test("kill-switch 关掉之后,下一次 fork 第三方回来", async () => {
       process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-      preferAppEnv(userDataPath)
+      preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
       applyAuthEnvLikeLogin()
       expect(thirdPartyDenial(await forkSidecarWithBootstrap())).toContain("kill switch")
 
@@ -457,6 +457,30 @@ describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
     return script
   }
 
+  test("trusted probe roots survive cached input and the real asynchronous refresh", async () => {
+    const context = { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: { ...process.env }, home: process.env.HOME!, userDataPath }) }
+    process.env.SHELL = fakeLoginShell("root-refresh.sh", { HOME: "/wrong/fresh", XDG_CONFIG_HOME: "/wrong/fresh", XDG_DATA_HOME: "/wrong/fresh", OPENCODE_DB: "/wrong/fresh.db", R8_PROBE_MARKER: "fresh", PATH: "/usr/bin:/bin" })
+    writeShellEnvCache(userDataPath, process.env.SHELL, { HOME: "/wrong/cache", XDG_CONFIG_HOME: "/wrong/cache", XDG_DATA_HOME: "/wrong/cache", R8_PROBE_MARKER: "cached", PATH: "/usr/bin:/bin" })
+    try {
+      preferAppEnv(userDataPath, context)
+      expect(process.env.R8_PROBE_MARKER).toBe("cached")
+      expect(process.env.HOME).toBe(context.roots.home)
+      expect(process.env.XDG_CONFIG_HOME).toBe(context.roots.configHome)
+      const deadline = Date.now() + 2_000
+      while (process.env.R8_PROBE_MARKER !== "fresh" && Date.now() < deadline) await Bun.sleep(5)
+      expect(process.env.R8_PROBE_MARKER).toBe("fresh")
+      expect(process.env.HOME).toBe(context.roots.home)
+      expect(process.env.XDG_CONFIG_HOME).toBe(context.roots.configHome)
+      expect(process.env.XDG_DATA_HOME).toBe(context.roots.dataHome)
+      expect(process.env.OPENCODE_DB).toBe(context.env.OPENCODE_DB)
+      const { env, bootstrap } = await forkSidecarWithBootstrap()
+      expect(env.XDG_CONFIG_HOME).toBe(context.roots.configHome)
+      expect(bootstrap.paths.engineConfigDirectory).toBe(context.roots.engineConfigDirectory)
+    } finally {
+      delete process.env.R8_PROBE_MARKER
+    }
+  })
+
   // `#1667`(清点表 E2):v1 时代这里钉的是「force-off 之前截取的基线必须是真实 shell 导入之后的值」。main 不再写这 4 个 flag
   // 之后,那套基线不复存在;新事实更简单:真实 shell 导入的值原样留在 env 里,登录、登出、kill-switch 开关一整圈都不改写它。
   test("a shell-exported keyless flag is never rewritten: login, logout and the kill-switch round trip all leave it alone", async () => {
@@ -466,7 +490,7 @@ describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
     })
     expect(process.env.OPENCODE_ENABLE_PARALLEL).toBeUndefined()
 
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     expect(process.env.OPENCODE_ENABLE_PARALLEL).toBe("1")
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
@@ -488,7 +512,7 @@ describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
     process.env.SHELL = shell
     writeShellEnvCache(userDataPath, shell, { PATH: "/usr/bin:/bin", OPENCODE_ENABLE_PARALLEL: "1" })
 
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     expect(process.env.OPENCODE_ENABLE_PARALLEL).toBe("1")
 
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
@@ -1172,7 +1196,7 @@ describe("#1562 fork 给 sidecar 的环境里没有 OTEL_*", () => {
   })
 
   test("main 自己的环境里带着整套 OTLP 变量,fork 出去的 sidecar 环境里一个都没有", async () => {
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     const env = await forkSidecar()
     expect(env.PATH).toBeDefined() // 拿到的确实是 fork 用的那份环境
     expect(Object.keys(env).filter((name) => /^otel_/i.test(name))).toEqual([])

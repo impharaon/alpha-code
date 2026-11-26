@@ -39,7 +39,7 @@ import { posixModesEffective } from "./platform"
 import { pollUntilHealthy } from "./health-poll"
 import { getLogger, rotateServerLogs, write } from "./logging"
 import { createSidecarEnv, sidecarEgressProxyEnv } from "./sidecar-env"
-import { getUserShell, loadShellEnv } from "./shell-env"
+import { applyTrustedShellEnvironment, getUserShell, loadShellEnv, minimalProbeEnv, type ShellProbeFenceContext } from "./shell-env"
 import { probeShellEnvAsync, readShellEnvCache, sanitizeCachedShellEnv, writeShellEnvCache } from "./shell-env-cache"
 import { getStore } from "./store"
 import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
@@ -52,7 +52,7 @@ import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
 // sidecar 在 import 引擎之前 apply。计划做不出来 = 拒绝 fork(fail-closed,原因可读),不静默无围栏。
-import { planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
+import { planPackageManagerCaches, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
 import { trialCompileProfile } from "./process-fence-compile"
 import type { ProcessFenceStartInput } from "./process-fence-apply"
 // REQ-137 `#1337`:网络出网的强制半场接线。围栏(profile N1–N4)把 sidecar 那棵树的出网收成 loopback 上**一个**端口,
@@ -77,7 +77,7 @@ import { loadFenceAddon } from "./process-fence-apply"
 import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRules } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
-import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, type FenceRunWritable } from "./process-fence-workspaces"
+import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, writableLocationTruthPath, type FenceRunWritable } from "./process-fence-workspaces"
 import { homedir } from "node:os"
 import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
@@ -427,7 +427,41 @@ export function setDefaultServerUrl(url: string | null) {
   getStore().delete(DEFAULT_SERVER_URL_KEY)
 }
 
-export function preferAppEnv(userDataPath: string) {
+export function resolveShellProbeRoots(input: { env: Record<string, string | undefined>; home: string; userDataPath: string }): Pick<ShellProbeFenceContext, "roots" | "env"> {
+  const exported = usableExportedPaths({ env: input.env, home: input.home, log: (line) => getLogger()?.warn(line) })
+  const roots = resolveEngineRoots(exported.env, exported.home)
+  const stateHome = exported.env.XDG_STATE_HOME || input.userDataPath
+  const engineConfigDirectory = engineGlobalConfigDirectory(exported.env, exported.home)
+  return { roots: { ...roots, stateHome, engineConfigDirectory }, env: {
+    ...minimalProbeEnv(exported.env), HOME: roots.home,
+    XDG_CONFIG_HOME: roots.configHome, XDG_DATA_HOME: roots.dataHome, XDG_CACHE_HOME: roots.cacheHome, XDG_STATE_HOME: stateHome,
+    OPENCODE_CONFIG_DIR: engineConfigDirectory,
+    ...Object.fromEntries(["OPENCODE_CONFIG", "OPENCODE_DB"].flatMap((key) => exported.env[key] === undefined ? [] : [[key, exported.env[key]!]])),
+  } }
+}
+
+export async function prepareShellProbeFence(): Promise<ShellProbeFenceContext> {
+  const userDataPath = electronNs.app.getPath("userData")
+  const info = tryGetCodePuppyEnvironment()
+  if (!info) throw new Error("shell probe fence: application environment not initialized")
+  // A probe may not take the engine planner's missing-truth fallback.
+  readWorkspaceTruthOrThrow(fenceWorkspaceTruthPath(info.casBaseRoot, info.environment), { readFileSync })
+  const snapshot = resolveShellProbeRoots({ env: { ...process.env }, home: homedir(), userDataPath })
+  const caches = planPackageManagerCaches({
+    platform: process.platform === "win32" ? "win32" : process.platform === "darwin" ? "darwin" : "linux",
+    home: snapshot.roots.home, userDataPath, configHome: snapshot.roots.configHome,
+    appData: electronNs.app.getPath("appData"), localAppData: process.platform === "darwin" ? join(snapshot.roots.home, "Library", "Caches") : snapshot.roots.cacheHome,
+    truthPath: writableLocationTruthPath(info.casBaseRoot, info.environment),
+    eligibility: { homeDir: snapshot.roots.home, appStateRoot: info.casBaseRoot, configFenceRoots: () => preplanConfigFenceRoots({ env: snapshot.env, home: snapshot.roots.home, userDataPath, appStateRoot: info.casBaseRoot, codepuppyGlobalRoot: codepuppyGlobalRoot() }), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory() },
+  })
+  const port = process.platform === "darwin" ? (await ensureEgressPolicyProxy()).port : undefined
+  const env = { ...snapshot.env, ...caches.env, ...(port === undefined ? {} : sidecarEgressProxyEnv(port)) }
+  const fence = planProductionFence({ userDataPath, sidecarEnv: env, egressProxyPort: port, carriedWorkspaces: [], engineConfigDirectory: snapshot.roots.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
+  return { ...snapshot, env, profile: fence?.profile ?? "" }
+}
+
+export function preferAppEnv(userDataPath: string, context: ShellProbeFenceContext) {
+  applyTrustedShellEnvironment(process.env, {}, context)
   const logger = getLogger()
   const logShellEnvCache = (message: string, extra?: Record<string, unknown>) => write("main", message, extra)
   const shell = process.platform === "win32" ? null : getUserShell()
@@ -438,9 +472,9 @@ export function preferAppEnv(userDataPath: string) {
   if (shell) {
     const cached = readShellEnvCache(userDataPath, shell, logShellEnvCache)
     if (cached) {
-      Object.assign(process.env, cached)
+      applyTrustedShellEnvironment(process.env, cached, context)
       logger.log(`[server] Shell env from cache (${Object.keys(cached).length} vars) — refreshing in background`)
-      void probeShellEnvAsync(shell)
+      void probeShellEnvAsync(shell, context)
         .then((fresh) => {
           if (!fresh) return
           // REQ-098 #301:新鲜异步探测结果同样要剥离会话级控制键(CODEPUPPY_GLOBAL_DIR / OPENCODE_CONFIG_DIR
@@ -452,13 +486,13 @@ export function preferAppEnv(userDataPath: string) {
               `[server] [req301] stripped session-control keys from refreshed shell env: ${stripped.join(", ")}`,
             )
           writeShellEnvCache(userDataPath, shell, cleanFresh, logShellEnvCache)
-          Object.assign(process.env, cleanFresh)
+          applyTrustedShellEnvironment(process.env, cleanFresh, context)
           logger.log(`[server] Shell env refreshed in background (${Object.keys(cleanFresh).length} vars)`)
         })
         .catch(() => {})
     } else {
-      const probed = loadShellEnv(shell, logger)
-      Object.assign(process.env, probed ?? {})
+      const probed = loadShellEnv(shell, logger, context)
+      applyTrustedShellEnvironment(process.env, probed ?? {}, context)
       if (probed) writeShellEnvCache(userDataPath, shell, probed, logShellEnvCache)
     }
   }

@@ -13,7 +13,6 @@
 import { spawn } from "node:child_process"
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
 import { Server } from "@modelcontextprotocol/server"
-import { ElicitResultSchema } from "@modelcontextprotocol/core"
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio"
 
 const env = process.env
@@ -44,19 +43,10 @@ server.setRequestHandler("tools/list", async () => {
   if (env.CODEPUPPY_MCP_TOOLS_FILE) return { tools: JSON.parse(readFileSync(env.CODEPUPPY_MCP_TOOLS_FILE, "utf8")) }
   return { tools: [{ name: "echo", description: "echo", inputSchema: { type: "object" as const, properties: { text: { type: "string" } } } }] }
 })
-const elicitationPeers: (() => void)[] = []
 server.setRequestHandler("tools/call", async (request) => {
   if (env.CODEPUPPY_MCP_CALL_LOG) appendFileSync(env.CODEPUPPY_MCP_CALL_LOG, `${request.params.name}\n`)
   const args = (request.params.arguments ?? {}) as Record<string, unknown>
   if (request.params.name === "slow") await Bun.sleep(Number(args.ms ?? 0))
-  if (request.params.name === "elicit") {
-    if (args.waitForPeer) await new Promise<void>(resolve => {
-      elicitationPeers.push(resolve)
-      if (elicitationPeers.length === 2) for (const release of elicitationPeers) release()
-    })
-    const answer = await server.request({ method: "elicitation/create", params: { mode: "form", message: "SDK fixture input", requestedSchema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] } } }, ElicitResultSchema)
-    return { content: [{ type: "text" as const, text: JSON.stringify(answer) }] }
-  }
   return { content: [{ type: "text" as const, text: String(args.text ?? request.params.name) }] }
 })
 await server.connect(new StdioServerTransport())

@@ -34,19 +34,24 @@ export function createPluginSessionQuitHandler(stop: () => Promise<void>, quit: 
 
 export function createPluginSessionRequester(post: (message: PackageSessionMessage) => void) {
   let seq = 0
-  const pending = new Map<number, { resolve(): void; reject(error: Error): void }>()
-  const notices = new Map<string, Promise<void>>()
+  const pending = new Map<number, { resolve(): void; reject(error: Error): void; action: Pick<Action, "action" | "sessionId"> }>()
+  const notices = new Map<string, Map<string, Promise<void>>>()
   const requester = {
     request(action: Action): Promise<void> {
-      const occurrence = action.action === "notification" ? JSON.stringify([action.sessionId, action.notification.occurrenceId]) : undefined
-      if (occurrence && notices.has(occurrence)) return notices.get(occurrence)!
+      const occurrence = action.action === "notification" ? action.notification.occurrenceId : undefined
+      const sessionNotices = notices.get(action.sessionId)
+      if (occurrence && sessionNotices?.has(occurrence)) return sessionNotices.get(occurrence)!
       const result = new Promise<void>((resolve, reject) => {
         const id = ++seq
-        pending.set(id, { resolve, reject })
+        pending.set(id, { resolve, reject, action })
         try { post({ ...action, type: "codepuppy.plugin.session", id }) }
         catch { pending.delete(id); reject(Error("runtime-failed: package session transport unavailable")) }
       })
-      if (occurrence) notices.set(occurrence, result)
+      if (occurrence) {
+        const session = sessionNotices ?? new Map<string, Promise<void>>()
+        session.set(occurrence, result)
+        notices.set(action.sessionId, session)
+      }
       return result
     },
     receive(value: unknown) {
@@ -54,10 +59,14 @@ export function createPluginSessionRequester(post: (message: PackageSessionMessa
       const waiting = pending.get(value.id)
       if (!waiting) return false
       pending.delete(value.id)
-      if (value.ok) waiting.resolve()
+      if (value.ok) {
+        if (waiting.action.action === "leave") notices.delete(waiting.action.sessionId)
+        waiting.resolve()
+      }
       else waiting.reject(Error("runtime-failed: package session receiver failed"))
       return true
     },
+    clearSessionNotices(sessionId: string) { notices.delete(sessionId) },
     close() {
       if (current === requester) current = undefined
       for (const waiting of pending.values()) waiting.reject(Error("runtime-failed: package session engine exited"))
@@ -73,10 +82,15 @@ export function createPluginSessionRequester(post: (message: PackageSessionMessa
 /** Consume original native identities once; OS notification settings do not control package events. */
 export function watchPluginSessionNotifications(client: Pick<EngineClient, "event"> & { session: Pick<EngineClient["session"], "get"> }) {
   const controller = new AbortController()
+  const generation = current
   const active = new Set<Promise<void>>()
   const subscription = (async () => {
-    for await (const event of client.event.subscribe({ types: ["permission.asked", "session.execution.succeeded", "form.created"], signal: controller.signal })) {
+    for await (const event of client.event.subscribe({ types: ["permission.asked", "session.execution.succeeded", "form.created", "session.deleted", "session.archived"], signal: controller.signal })) {
       if (event.type === "server.connected") continue
+      if (event.type === "session.deleted" || event.type === "session.archived") {
+        generation?.clearSessionNotices(event.data.sessionID)
+        continue
+      }
       if (event.type === "form.created" && event.data.form.metadata?.kind !== "mcp-elicitation") continue
       const notify = (async () => {
         const sessionId = event.type === "form.created" ? event.data.form.sessionID : event.data.sessionID

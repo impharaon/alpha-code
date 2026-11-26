@@ -2687,3 +2687,136 @@ packageIt.live("an always monitor waits for a real prompt and does not restart o
   yield* sessions.wait(session.id)
   expect(readFileSync(join(location.directory, "always-monitor-started"), "utf8").trim().split("\n")).toEqual(["started"])
 })))
+
+const runtimePromptSample = (event: "Stop" | "PostToolUse" | "PostToolUseFailure" | "UserPromptSubmit" | "UserPromptExpansion" | "PermissionRequest" | "PostToolBatch", continueOnBlock: boolean) => Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
+  const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  const group = source.hooks.PreToolUse[0]
+  group.hooks[0].continueOnBlock = continueOnBlock
+  group.hooks[0].prompt = "Judge this fixture phase. " + group.hooks[0].prompt
+  if (!["PostToolUse", "PostToolUseFailure", "PermissionRequest"].includes(event)) delete group.matcher
+  source.hooks = { [event]: [group] }
+  const sample = yield* invocationSample(event === "UserPromptExpansion" ? "claude:feature-dev" : "claude:paypal", { "hooks/hooks.json": JSON.stringify(source) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  return sample
+})
+
+for (const impossible of [false, true]) packageIt.live(`package prompt Stop ${impossible ? "allows an impossible task to finish" : "continues the same task"}`, () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("Stop", false)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt Stop semantics", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Work remains", "prompt-stop-work"), TestLLM.text(JSON.stringify({ ok: false, reason: "fixture Stop judgment", impossible }), "prompt-stop-judgment"), ...(!impossible ? [TestLLM.text("Task finished", "prompt-stop-finished"), TestLLM.text('{"ok":true}', "prompt-stop-final-judgment")] : []))
+  yield* sessions.prompt({ sessionID: session.id, text: "Complete this task" })
+  yield* sessions.wait(session.id)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(impossible ? 2 : 4)
+  expect(requests[1]!.tools).toHaveLength(0)
+  expect(JSON.stringify(requests[1])).toContain('"hook_event_name":"Stop"')
+  if (!impossible) expect(JSON.stringify(yield* sessions.context(session.id))).toContain("fixture Stop judgment")
+})))
+
+for (const continueOnBlock of [false, true]) packageIt.live(`package prompt PostToolUse ${continueOnBlock ? "feeds back" : "ends the turn"} after preserving the completed write`, () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("PostToolUse", continueOnBlock)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt post semantics", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("prompt_post_write", "write", { path: "completed-payment.ts", content: "paypal.Buttons()" }), TestLLM.text('{"ok":false,"reason":"fixture post judgment"}', "prompt-post-judgment"), TestLLM.text("Feedback received", "prompt-post-feedback"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Write the payment file" })
+  yield* sessions.wait(session.id)
+  const history = yield* sessions.context(session.id)
+  const call = history.flatMap(message => message.type === "assistant" ? message.content : []).find(part => part.type === "tool" && part.id === "prompt_post_write")
+  expect(call).toMatchObject({ type: "tool", state: { status: "completed" } })
+  expect(readFileSync(join(location.directory, "completed-payment.ts"), "utf8")).toBe("paypal.Buttons()")
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(continueOnBlock ? 3 : 2)
+  expect(requests[1]!.tools).toHaveLength(0)
+  expect(JSON.stringify(history)).toContain("fixture post judgment")
+})))
+
+packageIt.live("package prompt PostToolUseFailure feeds back even when continueOnBlock is false", () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("PostToolUseFailure", false)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt failure feedback", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("prompt_failed_write", "write", { path: "invalid-payment.ts" }), TestLLM.text('{"ok":false,"reason":"fixture failure feedback"}', "prompt-failure-judgment"), TestLLM.text("Recovered from the error", "prompt-failure-recovery"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Try the invalid write" })
+  yield* sessions.wait(session.id)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(3)
+  expect(requests[1]!.tools).toHaveLength(0)
+  expect(JSON.stringify(requests[2])).toContain("fixture failure feedback")
+})))
+
+for (const event of ["UserPromptSubmit", "UserPromptExpansion"] as const) packageIt.live(`package prompt ${event} rejects before the primary model despite continueOnBlock`, () => packageJourney(Effect.gen(function* () {
+  const sample = yield* runtimePromptSample(event, true)
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt entry rejection", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text('{"ok":false,"reason":"fixture prompt entry rejection"}', "prompt-entry-judgment"))
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]
+  if (event === "UserPromptExpansion") yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const exit = yield* (event === "UserPromptSubmit" ? sessions.prompt({ sessionID: session.id, text: "Reject this input" }) : commands.execute({ name: command!, invocation: { sessionID: session.id, prompt: { text: "Reject this expansion" }, delivery: "queue" } })).pipe(Effect.exit)
+  expect(Exit.isFailure(exit)).toBe(true)
+  expect(JSON.stringify(exit)).toContain("fixture prompt entry rejection")
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(1)
+  expect(requests[0]!.tools).toHaveLength(0)
+})))
+
+for (const ok of [false, true]) packageIt.live(`package prompt PermissionRequest ok=${ok} keeps the native approval`, () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("PermissionRequest", false)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt permission no-decision", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text(JSON.stringify({ ok, ...(ok ? {} : { reason: "fixture permission advice" }) }), "permission-prompt-judgment"))
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const running = yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_prompt_permission" as never, call: { type: "tool-call", name: "write", id: "prompt_permission_write", input: { path: "approved-payment.ts", content: "paypal.Buttons()" } } }).pipe(Effect.exit, Effect.forkChild)
+  const permission = yield* Permission.Service
+  let asks = 0
+  for (let waited = 0; waited < 2000 && !running.pollUnsafe(); waited += 10) {
+    for (const request of yield* permission.forSession(session.id)) { asks++; yield* permission.reply({ requestID: request.id, reply: "once" }) }
+    yield* Effect.sleep("10 millis")
+  }
+  expect(Exit.isSuccess(yield* Fiber.join(running))).toBe(true)
+  expect(asks).toBe(1)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(1)
+  expect(requests[0]!.tools).toHaveLength(0)
+}), { id: "prompt-permission-ask", setup: async context => { await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "edit", resource: "*", effect: "ask" }))) } }))
+
+packageIt.live("package prompt PostToolBatch stops the current turn despite continueOnBlock", () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("PostToolBatch", true)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt batch rejection", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("prompt_batch_write", "write", { path: "batch-payment.ts", content: "paypal.Buttons()" }), TestLLM.text('{"ok":false,"reason":"fixture batch judgment"}', "batch-prompt-judgment"), TestLLM.text("Must not run", "unexpected-batch-continuation"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Write then judge the batch" })
+  yield* sessions.wait(session.id)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(2)
+  expect(requests[1]!.tools).toHaveLength(0)
+  const history = yield* sessions.context(session.id)
+  expect(history.flatMap(message => message.type === "assistant" ? message.content : []).some(part => part.type === "text" && part.text.includes('"ok":false'))).toBe(false)
+  expect(JSON.stringify(history)).toContain("fixture batch judgment")
+})))

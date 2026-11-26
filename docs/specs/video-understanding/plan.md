@@ -555,7 +555,80 @@ UI 的既有 wrapper 实际运行 `test-component/session-timeline.cases.ts`，�
 
 ## D5 平台视频理解桌面接线
 
-待本片 PLAN 展开；范围、AC 和依赖见总览，实施依据为视频设计 §4.4/§4.5/§5/§6 D5。平台契约只消费 producer 固定产物，不在桌面定义副本。
+- 依据：impharaon/alpha-work:SPEC-video-understanding v1 @ `25afeda6285b66b3de9d83531fa2e5a6cafa468f` 的 AC-13 桌面入口/上传显示/最终结果，及本片涉及的 AC-09/14/16/17 边界；冻结视频设计 @ `870002ed698f1a83efa9d6ecb359ea5a0d0d41af` §4.1、§4.4、§4.5、§5、§6 D5、§10；#1775 r7 允许同轮计划与实施，但出现未定设计问题时先返计划。D4 已由 r7 接受，继承其进度/vision/卡片证据，不再审查 D1..D4。
+- 核对：本节为 r7 的计划产物；尚未实施，待下述唯一运输预算接缝处置。续派后首个实施提交填写本计划 commit 与检查收据，不自称独立审查通过。
+
+### 改动
+
+本片文档影响为 interface/data 的实施计划与验证证据，canonical 落本节；实际 producer 契约仍由平台拥有。冻结设计的类型、错误、资金与权限规则只引用，不另定 DTO/schema、价目或上游参数。
+
+| 文件（相对本仓） | 改什么 |
+| --- | --- |
+| `packages/codepuppy-contracts-consumer/scripts/vendor-codepuppy-contracts.ts`、独立 `alpha-platform-video-understanding.lock.json` / `vendor/alpha-platform-video-understanding/`（新） | 仿现有 capability-scoped/commitBound pin：视频 schema、producer 正负 fixtures 与必要的运输权威产物一起固定 Git commit/路径/SHA；不推动其它已锁 bundle。具体运输产物待下述接缝回复，不能把私有实现当作新公开 contract |
+| 该包 `src/decode.ts` / `types.ts` / 既有 `contracts.test.ts` | 四种视频值统一从该 pin 校验，包含 source_range 半开区间、模型默认值/声明、usage 安全整数等语义；导出的类型只是 consumer 投影，不在 ext/main 各写 schema。完整结果文件读出的对象走 decoder，不能错误套用控制信封文本 reader 的容量界 |
+| `packages/ui-mac/resources/video-mcp/contracts.ts` / `tools.ts` / `prepare.ts` / `clip.ts`，既有 `video-service.test.ts` / `video-tools.test.ts` / `video-contracts.fast.test.ts` | 增加 understand 的产品输入/最终输出与内部 prepare 执行结果；内层仅准备完成 clip/来源引用。自动分片继续使用同一受限服务/真实组件和源时间，不让 main 新起 ffmpeg 或从模型参数取得可执行路径。必要的压缩参数按平台实际运输界派生；不加总时长/片长用户帽 |
+| `packages/ext/src/video-understanding.ts`（新）/ `plugin.ts` / 既有 policy facts reader | 用 ToolEditor.update 包住实际已核验的首方 understand；可信 session/agent/callId 从本次 Tool.Context 注入，原 signal/progress 贯穿 prepare 与 bridge。未核验同名工具不获 main 上传入口；CLI 无 parentPort 返回明确原因。内部准备 payload 不作为最终答案返回模型 |
+| `packages/ext/src/hub-bridge.ts`、`packages/ui-mac/src/main/codepuppy-sidecar-messages.ts` / `hub-view.ts` / `ext-ipc.ts`（必要 composition wiring）、既有两端消息/host 测试 | 扩展同一 parentPort 请求簿记与消息族 `codepuppy.video.understand`，先回持久 requestId，查询/订阅/取消关联同一调用；长上传不塞入 20 秒 RPC。main 只接受可信路由和宿主根内该调用已完成的 clip，不接受自填 authority、任意原文件读取或新 L1 业务通道 |
+| `packages/ui-mac/src/main/codepuppy-video-cloud.ts`（新） | main 独占 §5 云请求记录/原子写/同 key 文件锁：读取已有记录后继续原 attempt/job，回执前与回执后的持久化顺序、未知结果的同字节重放、重启重接、分片结果/usage/jobIds 顺序合并、成功缓存及 tenant 隔离；不保存 token/consent。仅在原 job 已确认为失败/无扣费后建立新 attempt。并发订阅合并，取消一订阅不损坏其它订阅 |
+| `packages/ui-mac/src/main/codepuppy-upload.ts` / `codepuppy-upload-manifest.ts` / `cloud-ipc.ts`、既有上传测试 | 扩展原上传状态 authority 的 typed 视频分支，复用 pending/confirm/cancel、当前身份/租户、敏感签发与消费。快照仅用宿主完成记录核过的 bytes/SHA/MIME，来源敏感性取宿主附件事实或已经授权原路径；保留原名/路径标记，不扫描二进制冒充文本，也不把所有视频一概判敏感。不复制另一套隐私状态 |
+| `packages/ui-mac/src/main/codepuppy-cloud-jobs.ts`、必要窄 `codepuppy-video-transport.ts`（新）、既有 cloud jobs cases | 现有发现/认证/错误咽喉下读模型描述、流式 multipart、同控制字节重接、进度/取消；不继承 JSON 派发的 15 秒整体超时。控制字段与文件长度按实际序列化核算；运输精确上游界消费 producer 权威数据，当前缺口不能补常量。状态/取消沿原 job API，产物沿 listCloudArtifacts/downloadCloudArtifactTo/artifact.read，不新增出网 client 或资金写者 |
+| `packages/ui-mac/src/preload/{types,index}.ts`、`src/renderer/index.tsx` 的宿主挂载、既有 `renderer/extensions/upload-consent-dialog.tsx` / 测试与 `i18n/{zh,en}.ts`（必要时） | sender/session 从可信调用恢复；原上传确认卡复用视频目的/范围，普通内容无确认，不开选择文件框。沿原入口公开安全预览和 confirm/cancel，不把 token/manifest 泄露给 renderer。UI 只复用已有批准组件/工具卡，编辑前核 PAGE-MAP 与相应复用依据，不创建新视觉方向 |
+| `packages/ui-mac/src/renderer/codepuppy-ui/session-timeline/cards/tool-card-model.ts` / 既有模型与组件测试 | 将已持久化首方 understand 加到既有视频工具规则；同卡显示上传实际字节、理解进度和所有实际 jobIds 对应结果/账本关联，不把内部准备或截短文本显示为完成。原 D4 metadata authority 不重建 |
+| 对应既有 `codepuppy-upload*.test.ts`、`codepuppy-cloud-jobs.cases.ts`、`codepuppy-sidecar-messages.test.ts` / `hub-view.test.ts`、`ext/src/hub-bridge.test.ts`；新 owner 的 `codepuppy-video-cloud.test.ts` / `codepuppy-video-transport.test.ts` / `ext/src/video-understanding.test.ts` | 在最低可捕捉层验证下表；新文件仅因新 module 尚无测试。跨系统消息用真实 producer bytes，内部请求/持久状态由实际代码产生，禁止编造 ffprobe/平台回执。只跑相关文件与最终真实导入/mock/枚举读方 |
+| `packages/ui-mac/resources/office-mcp/tools.json`（原 producer 输出）与 `docs/specs/video-understanding/plan.md`，必要 `docs/architecture/modules.md` 职责行 | understand 定义/服务代码变化后通过既有 build/gen 脚本同步同一 manifest；不手改 SHA、不重建 D3 native/pins、不改 gate 或受保护 ADR |
+
+### 顺序
+
+1. 仅提交本计划。先由平台 producer/设计者处置下述精确预算缺口；本轮不选一个新公开字段或在桌面复制私有上游表，不触碰其它仓。修正后按原 vendor producer 同步视频独立 pin/真实 fixture，并在第一实施提交填核对行；先跑该 decoder 的具名正负例。
+2. 内层 understand prepare 与 ext 外层、main 窄桥一起建立；先核已验证身份/完成产物/可信调用归属、进度和取消，再连实际 HTTP。main 的 clip 打开/realpath/长度/SHA 复核与来源敏感判定属于准入，不靠 connector 自报 safety。
+3. 扩原上传 authority 和 binary transport；先持久化原 attempt/envelope/manifest/clip，再派发，先写真实 jobId，再等待。原状态/产物读取返回完整结果；已有记录分别核未知/在途/完成/明确失败/取消，不为了重启刷新键或重传已 ready 字节。
+4. 接运输超界、非 JSON 413 和 provider_timeout 的自动本机压缩/连续分片，范围带原偏移并按顺序合并；确认原作业失败/不扣费后才重试新字节。最后复用原隐私卡/工具卡，不增用户步骤。恢复命中只用完整且摘要正确的 clip/结果。
+5. 每步仅改动用例/行为文件；末尾按 import、服务 mock、工具枚举、manifest/snapshot 与上下文登记读方扩一次相关集、包 typecheck、affected-tests --list、north-star/旧名及文档核对；删除对照恢复后跑绿并提交收据。无付费调用/窗口/完整 gate 或整包测试。真安装包与 Windows 场景留既有验收路径。
+
+### 风险与需处置的唯一设计问题
+
+**SEAM-CHANGE-NEEDED：VideoUnderstandingV1 的上游请求精确预算数据。**
+
+冻结设计 `impharaon/alpha-work:docs/specs/video-understanding/design.md:280` 要求桌面发送前用实际 `prefixBytes + 4*ceil(videoBytes/3) + suffixBytes` 校验。当前固定候选 schema 只公开 `upstream_request_bytes_limit`；没有 prefix/suffix、固定 JSON 开销或可调用的同权威 serializer。opaque revision 不能反推这些字节。实际前后缀由平台私有 `videoUpstreamJsonParts(row, question, mime)` 依赖上游模型/推理参数生成，而这些参数明确不由桌面另定。`upload_media_bytes_exclusive` 的 producer 算式只交集 inline 与 multipart 入站界，不能把它当作已扣除上游 base64/JSON 开销的界。
+
+只读证据已结束该调查（不扫描其它平台模块）：
+
+- 平台工作分支 `feat/621-video-cloud-tool` @ `1331acbf742b17d1bf371bf747a7d3e55f7e89ef`；schema 首次引入 `a2f3c43851a1e9c8c4f1ebd24493ed246d0bdeba`；`git show HEAD:contracts/v1/video-understanding.schema.json` 的 SHA-256 为 r7 指定的 **f7e20441ea3c07e681bf3003abee3655ba840cbf8f6ce76a5f29cbd88a2d6d66**。这三个相关源文件无未提交差异。`origin/main` @ `dfd8a1bb2141a61bd65f42cf2a08773f5c0dfd6a` 尚无该 artifact；当前候选必须说明来自未合并分支，不假称来自主线。已读该 repo 的 origin/main，未 merge/rebase/改平台代码。
+- `impharaon/alpha-platform:packages/gateway/src/lib/video-models.ts:91-94` 的 `videoUploadMediaBytesExclusive` 只减控制/入站 framing；`:115-122` 的实际公开投影没有出站 serializer 数据；`packages/gateway/src/lib/video-transport.ts:53-71` 依赖私有 row 的模型参数构造 prefix/suffix 并计数。schema 的 `$defs.VideoModelsV1.properties.models.items.properties`（同 SHA 产物）只有 `key,label,revision,mimes,inline_media_bytes_exclusive,upload_request_bytes_limit,upload_media_bytes_exclusive,upstream_request_bytes_limit,context_tokens,output_tokens,price`。
+- 一次性 Python 读取该 schema 输出：`upstream serializer/budget data: []`；纯整数算式 `raw_bytes=78643200; base64_bytes=104857600; upstream_limit=104857600; JSON_overhead_remaining=0`。因此不能只对比 base64 长度与上限；也不能加一块自选余量冒充实际前后缀。未下载模型、未运行媒体引擎/上游、未发付费调用。
+
+需要的最小处置（二选一，由原设计/producer 拥有者决定，本计划不裁决）：
+
+1. **建议：平台从同一 serializer 派生并发布可固定的精确预算数据/纯计算产物**，能由模型行/revision、实际 question 的 JSON/UTF-8 编码、MIME 与视频字节数算出完整上游请求长度；保持上游参数唯一归属平台。D5 pin 该修正产物/fixture 后照冻结精确校验实施，无用户可见变化。
+2. 原设计明确改为桌面仅精确核入站，出站交平台预检及 413 后自动分片；会改变冻结设计 :280 的桌面职责，且可能多传一轮媒体。未经该处置不能把它作为本票普通实现选择。
+
+未验证前提：不存在另一份已批准、可固定且已向桌面公开的运输预算产物；若平台提供它的路径/版本，即可用同一 pin 消费结束问题，不必新增字段或重作其它设计。这里没有要求新增模型/报价、用户配置、限制或确认。
+
+其余实施风险沿既定方案处理，不新开问题：主进程不能信任随机 clip 名带来的宽松敏感事实；已落盘请求的未知结果不能当作失败；取消与重启不能重复付费；完整结果 artifact 不能被通用 inline scrub/控制信封 reader 截掉；本机准备与最终模型答案 schema 必须分开；D3/#1760 真身份集成继续 pending，不用 mock 冒充集成通过。
+
+### 证明
+
+| AC / 本片行为 | 具名证据 / 对应命令（从包目录） | 层与运行时机 | 去掉行为为什么红 |
+| --- | --- | --- | --- |
+| AC-13 契约与完成答案 | contracts-consumer 的 `contracts.test.ts` 加 `video producer fixtures decode through the pinned schema`；main 新 owner 的 `video full result follows the registered artifact reference`，读取 producer 的 inline/artifact/负 usage/未知字段真实 fixture | fast decoder / integration 本机 HTTP 与文件；受影响 PR 与 nightly | 错模型/负 token/额外字段被接受，或 artifact 分支只返回 ID/截短文本，断言失败 |
+| AC-13 原工具/桥归属 | ext `video-understanding.test.ts` 的 `verified understand wraps preparation and returns the final cloud result`；既有 `hub-bridge.test.ts` / `codepuppy-sidecar-messages.test.ts` / `hub-view.test.ts` 的 video request/query/cancel case | integration，实际 ToolEditor/消息簿记，受影响 PR 与 nightly | 去掉 authority/可信调用关联、把 prepare 冒充答案、长任务占住首个 RPC、错误/取消仍报成功会红 |
+| AC-13 上传与隐私 | `codepuppy-upload.test.ts` / `codepuppy-upload-manifest.test.ts` 的 `video uses the same sender and tenant bound consent state`；`video binary transport preserves control bytes and streams the real file` | integration，本机 server + 真实媒体文件；受影响 PR 与 nightly | 源敏感路径被 clip 名冲掉、跨 sender/tenant 确认、无同意上传敏感内容、任意/变更/逃逸文件、JSON/base64 控制体或伪字节数会红；普通视频确认次数须为零 |
+| AC-09 / AC-13 重启与缓存 | `codepuppy-video-cloud.test.ts` 的 `video resumes a persisted dispatch or job without minting another attempt`、`video successful cache is tenant and model revision scoped` | integration，实际文件记录/锁与新服务实例；受影响 PR 与 nightly | 先派发后落盘、丢响应换键/控制字节、已有 job 重派发、未知结果当失败、换号命中旧答案、失败写成功 cache 均红 |
+| AC-13 自动缩片 | `codepuppy-video-cloud.test.ts` / `codepuppy-video-transport.test.ts` 的 `video size and timeout recovery preserves source coverage and original jobs` | fast 预算/范围算法 + integration 本机 HTTP；受影响 PR 与 nightly | 边界少算 JSON/base64、忽略非 JSON 413、在原 job 未失败时重派、丢偏移/片段/usage/jobIds，或要求用户重发会红 |
+| AC-13 上传显示/取消，AC-16 错误 | 原 upload dialog、tool-card-model 与 session-timeline cases 追加 video 目的、实际上传字节/无 total、继续原卡片、所有在途取消和迟到成功不入 cache | fast 模型 / integration Solid 与 main 调用；受影响 PR 与 nightly | 无上传进度、错误空白、取消只停 UI、失败或内部 prepare 被显示为成功会红。平台失败是否真正零扣费仍由 #621 的 settlement 证明 |
+| AC-14 本机默认与 AC-17 两平台 | 继续 D4 零自动 HTTP；桥/stream 不依赖单平台路径；真实无讲话按钮录屏、本机包 Mac/Windows 的成功/上游失败/未登录/余额不足各次 | 真实场景/收费验收为 nightly 或授权一次性记录；本轮不执行 | 无有效结果/次序/原账本事实或完整产物就不得记通过，不能用 mock 结算代替平台证明 |
+
+样本只使用平台 producer 的 `contracts/v1/fixtures/video-understanding/{input,result,job-inline,job-artifact,models-test-price,input-unknown-model,input-unknown-field,result-negative-usage}.json` 等原字节与来源说明。binary 流/摘要测试候选是平台已有真实 `packages/gateway/test/fixtures/video-understanding/sample.mp4`（1019 B，SHA-256 `c0f31876d4a3763354a8b1979f0b5c48b54f7e700100a7e945841bad932c142a`），provenance 同目录 JSON 记录原 zh_test.mp4 摘要与真实 ffmpeg 命令；取用时与产物同 commit 固定，不编造容器或解码输出。它仅证明真实字节传输，不冒充三按钮动作识别样本或 D3 pinned 编码器实测。
+
+实施后的删除对照至少覆盖：verified wrapper、原字节/attempt 持久化、已有 job 重接、同租户成功缓存、上游精确字节开销、敏感来源沿同 authority、完整 artifact 读取、范围覆盖与取消全部在途 job。逐臂具名 expect 红后恢复，最终只扩相关集。当前为计划阶段，**未运行这些用例、0 新 PASS、0 删除对照**，不继承 D4 的七臂冒充 D5 证据。
+
+### 偏离记录与 r7 计划收据
+
+2026-11-26 · 只读阶段已确认上述跨仓预算输入缺口，按 r7「unless an undecided design question appears」停在 PLAN；本轮只写本 D5 节，没有写业务代码、vendor/pin 或修改冻结设计。候选 pin 来自未合并分支的事实已记录，实际 pin 等同权威运输数据被指明/补齐再提交。
+
+已核：Codex / GPT-6，核对 r7、冻结 §4.4 :280、平台候选 schema SHA、实际投影/serializer 与现有 bridge/upload-state/artifact seam；不是设计重审。已定勿重开：D1..D4、原桥、同一上传/身份/敏感确认 authority、main 独占云状态、平台资金及价目归属。下一步交 orchestrator/平台 producer 或原 designer 仅处置上述预算数据，然后续派 D5 实施；其余原接缝/付费/包/Windows pending 继承，不顺修全仓问题。
+
+本轮检查：canonical `check_docs_contract.check_repo(worktree, "impharaon/alpha-code", coordination_repo, project.url, "HEAD")` 为既有 **69 errors / 253 warnings**，本 plan **0 finding**；`git diff --check` exit 0。`affected-tests --list` exit 2，仍因本 worktree 缺 `.gate-tests` 未产出 scope line，遗留交 orchestrator/gate owner，不改 gate。只有本 plan 变更，没有测试/类型检查/业务改动，故没有新增 PASS 或删除臂可报。
 
 ### r3 D2 第一步实施记录
 

@@ -1121,3 +1121,6 @@ K1/K2 不变：档位/审批照旧，固定位置仍只在 R1，消费者不推�
 | frozen；独立 review rounds=0、reviewed_sha 为空；限定范围审查标记而非 not-required | 单纯 quartet 符合 R1/R2 模式；但保留 go env -w 目标需要新增围栏内原生查询接缝，超出纯固定路径替换，故按 r8 的“flag otherwise”标记。只审 §4.1 原目录读取/失败分支及 §4.2 配套投影与其直接后果；不重开 v4/v5/v4.1 或规格决定。本地 Go/入口证据不能替代该接缝的独立审查 |
 
 **交接收据：** Codex（GPT-6，designer）完成 G42-P02–P04；两个真实入口、bootstrap map 投影、安装目标与两个消融臂均有本机证据，签名负臂可失败。未声称新 planner/查询已实现、产品签名进程树或 Windows 已通过。旧名称扫描 10 pass/0 fail（2,347 断言），`git diff --check` 通过；文档契约检查与 HEAD 同为 70 error/252 warning，逐 finding 对比无新增。已运行 `affected-tests --list`，当前工作树缺 `.gate-tests`，工具返回缺文件错误、没有 scope 行，未将其记为范围检查通过。没有 owner 待决、规格变化或新增用户步骤；只修改本设计，未 merge、实现或发布。v4/v5 的审查与处置及 v4.1 Cargo 裁决保持原文。
+
+**v4.2 限定范围审查与编排器处置（2026-11-27）**：独立审查（Claude Opus 5.5，只读）结论 MERGE，2 Minor 均采纳，用户无感：① 只在查询返回空 GOBIN 时才注入「原 GOPATH 第一项/bin」；返回非空时不注入，由 Go 自己读环境或配置（用户 `go env -w GOBIN` 立即生效）。② 启动时查询结果为 null（尚未安装 Go）时，在下一次 Shell/PTY 环境合成前重新查询（会话中 `brew install go` 后无需重启）。观察留档：`GO111MODULE=off` 的 GOPATH 模式下，原 GOPATH/src 源码在重定向后不可见，不在本增量处理。
+

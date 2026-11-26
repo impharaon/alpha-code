@@ -1,7 +1,7 @@
 ---
 id: PLAN-secrets-usable-not-visible
 title: 密钥文件程序可用、助手不可见 实施计划
-summary: 列明共享规则、Location 采集与工具收口、安全读写及权限、SC-01 捕获、真引擎验收五段；本轮只细化共享规则段。
+summary: 列明五个交付段，细化共享保护规则段的文件、顺序和证明，并记录该段快测及移除对照证据。
 kind: plan
 status: active
 spec: SPEC-secrets-usable-not-visible
@@ -12,7 +12,7 @@ last_reviewed: 2026-11-26
 
 # PLAN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 实施计划
 
-本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；本轮仅展开第一段。以下测试均为实施安排，本次 PLAN 没有执行行为验收。
+本计划服务于 [#1758](https://github.com/impharaon/alpha-code/issues/1758)。规格、接口与裁决只引用 [spec.md](spec.md) 和 [design.md](design.md)，不在此另定。每段开始实施前展开本段；当前只展开第一段。第一段实际检查见下方实施收据，完整真引擎行为验收仍在⑤。
 
 ## 交付段落
 
@@ -29,13 +29,13 @@ last_reviewed: 2026-11-26
 ## ① 共享保护名单与发布判定
 
 - 依据：[规格 v3](spec.md) @ `aa2476b378da663115e6735b991f6cbf2e04b5c6`，BR-01、BR-06 与 AC-01/04/06/07/10 的共享判定部分；[冻结设计](design.md) @ `66313542d35b182ef8fdbd2d4c4597d715149c35` §4.1、§4.2、§6、§10；#1758。代码读取基线 `f7424aa45225a6d02d1958f4b4f72d247f99acc4`；与设计代码基线比较 Core/Plugin/Ext/ANSI 源码无差异，继承其收据。
-- 核对：待编排器核对；首次实施提交从续派单的 `Phase:` 行填写计划提交、核对者/模型及结论。本轮不自填通过。
+- 核对：Phase: IMPLEMENT — `3266bd9497` · Claude Opus 5.5 (orchestrator) · plan accepted：五段覆盖 AC，①命名用例及移除对照成立，完整行为证明留⑤，冻结决定未变。来源为 2026-11-26 r1 续派单的 `Phase:` 行。
 
 ### 改动
 
 | 文件 | 改什么 |
 | --- | --- |
-| `packages/schema/src/codepuppy-protected-files.ts`（新增） | 按设计 §4.1/4.2 实现 `ProtectedFiles` 纯契约与发布数据：`sources`、`match`、`probe`、`isPublicValue`，格式/profile/凭据字段及列选择数据、统一说明常量。无文件采集、宿主环境读取或权限副作用。采用现有叶模块 namespace 投影，消费既有 `./*` 导出。 |
+| `packages/schema/src/codepuppy-protected-files.ts`（新增） | 按设计 §4.1/4.2 实现 `ProtectedFiles` 纯契约与发布数据：`sources`、`match`、`probe`、`isPublicValue`，格式/profile/凭据字段及列选择数据、统一说明常量。`isCredentialName` 供后续凭据字段采集复用同一秘密词判定。无文件采集、宿主环境读取或权限副作用。采用现有叶模块 namespace 投影，消费既有 `./*` 导出。 |
 | `packages/schema/src/codepuppy-protected-files.test.ts`（新增） | 新模块没有既有测试文件，按 `codepuppy-unattended.test.ts` 的邻接布局添加 fast 表驱动用例；只调用生产纯函数，不手抄 matcher 或风险器。 |
 | `docs/architecture/modules.md` | 仅在 Schema 既有行补上保护规则权威文件，保留现有依赖方向；不顺带整理旧模块条目。 |
 | `docs/README.md` | 实施时用现有索引生成器提取本计划的新增索引行，及本段实际改变摘要所需的行；本次 PLAN 按派单只写/提交 plan.md，不更新索引。 |
@@ -73,6 +73,27 @@ Schema 的 `package.json` 已有 `./*` 导出，本段不改包清单、根 barr
 
 AC-02、03、05、08、09 本段不触及执行路径，其证据责任已列在交付段落表；不得以文档检查填作行为通过。
 
+### ①实施检查收据（2026-11-26）
+
+- 已核：Codex / GPT-6 作者自查；消费上述计划核对与冻结版本。`packages/schema` 下 `bun test src/codepuppy-protected-files.test.ts`，exit 0，**6 pass / 0 fail / 595 expect**；涵盖上表五项 AC 的共享判定基础，不宣告完整行为验收通过。
+- `packages/schema` 下 `bun typecheck`，exit 0，144 files 无类型错误；`bunx --no-install oxlint src/codepuppy-protected-files.ts src/codepuppy-protected-files.test.ts`，exit 0，**0 warnings / 0 errors**。仅定向文件，无包级测试或全量门。
+- 一次相关集搜索：`rg -l 'codepuppy-protected-files|ProtectedFiles' packages/schema/src packages/schema/test` 只命中新模块及其测试，无额外 mock/枚举消费者需要运行。
+- 文档按 Alpha profile 调用 `check_repo(..., changed_since="HEAD")`，plan.md findings 为 0；模块地图报 13 个既有缺失链接，检查 exit 1，不宣称全仓文档通过。唯一基线核对用 `git show HEAD:docs/architecture/modules.md` 的链接与当前磁盘比较，旧/新均 13、新增缺失为 0；本次新增权威链接存在。`docs/README.md` 的既有 index.stale 仍在，只从生成器补本计划行，不扩项修复。去向交编排器的文档治理，不阻断①。
+- 移除对照仅在临时副本运行，不修改工作树生产实现、不增加测试开关。命令：`python3 /var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/secrets-rules-removal-kgn2bsq6/removal.py /Users/pharaon/app/wt/alpha-code-feat-1758-secrets-masking`，exit 0（脚本逐臂断言测试确实失败）；各臂日志在该目录的 `<arm>/output.log`。每臂使用 `bun test <临时测试路径> -t '<下列命名用例>'`，均为 **exit 1 / 0 pass / 1 fail**：
+
+| arm / 单独移除内容 | 变红的命名用例 |
+| --- | --- |
+| match / 匹配 | `published protected file families` |
+| exclusion / 排除 | `published sources and probes share exclusions` |
+| windows-case / Windows 不区分大小写 | `protected paths follow platform semantics` |
+| public-values / 空值公开分支 | `public values preserve credential names` |
+| credential-priority / 秘密词优先 | `public values preserve credential names` |
+| sources-only / 仅来源枚举 | `one published rule reaches all rule consumers` |
+| probe-only / 仅命令探针 | `one published rule reaches all rule consumers` |
+| credential-field / kube OIDC id-token 字段 | `published credential fields exclude ordinary values` |
+
+数据样本只包含 §4.1/4.2 的文件族/目录及显式测试根；没有读取用户凭据或原始配置。来源发现、真实格式解析、三消费者接线、终态/实时收口和真机证据仍分别由②..⑤提供。
+
 ### 偏离记录
 
-暂无。PLAN 阶段仅本文件；生成索引的写入随①实施处理，原因是本轮明确的单文件写入范围。
+2026-11-26 · 无文件范围、交付顺序或冻结决定偏离。落实细节为导出共享 `isCredentialName`，让后续 credential-document 字段采集与公开值判定不重复秘密词逻辑；未更改冻结四个入口。索引按原计划在本次①补入，PLAN 提交仍只有 plan.md。

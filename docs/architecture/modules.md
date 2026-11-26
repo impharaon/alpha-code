@@ -38,7 +38,7 @@ review_after: 2027-05-09
 | `packages/opencode/` | OpenCode 1 引擎入口与运行逻辑 | `codemode`, `llm`, `plugin`, `protocol`, `schema`, `script`, `server`, `tui` | 见架构约束 | [入口](../../packages/opencode/package.json) |
 | `packages/plugin/` | 上游插件接口和类型 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/plugin/package.json) |
 | `packages/protocol/` | 新引擎协议 | `schema` | Server | [入口](../../packages/protocol/package.json) |
-| `packages/schema/` | 共享 schema、权限和工具分类 | 无已核实的同仓清单依赖 | Core、Protocol 或 Server | [入口](../../packages/schema/package.json) |
+| `packages/schema/` | 共享 schema、权限和工具分类 | 无已核实的同仓清单依赖 | Core、Protocol 或 Server | [入口](../../packages/schema/package.json)；[保护名单与发布判定](../../packages/schema/src/codepuppy-protected-files.ts) |
 | `packages/script/` | 上游工作区脚本包 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/script/package.json) |
 | `packages/sdk-next/` | 新引擎 SDK 组合 | `client`, `core`, `server` | 见架构约束 | [入口](../../packages/sdk-next/package.json) |
 | `packages/sdk/` | 上游兼容 SDK | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/sdk/) |

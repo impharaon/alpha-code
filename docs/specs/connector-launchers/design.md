@@ -3,7 +3,7 @@ id: DESIGN-connector-launchers
 title: 连接器启动器与失败处理 技术设计
 summary: 统一连接器启动器与固定文件准备；v2 接纳两平台文档 Node 读取及受管第一方 MCP 的运行期按 ID 准备，核验声明身份与逐调用进度归属。
 kind: tech-design
-status: frozen-pending-review
+status: frozen
 version: "2.1"
 spec: SPEC-connector-launchers
 spec_version: 1
@@ -25,7 +25,7 @@ last_reviewed: 2026-11-26
 
 # DESIGN-connector-launchers｜连接器启动器与失败处理 技术设计
 
-版本适用：以下 v1 正文与 R1 收据保持冻结，基线为 #1766 合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`；文末 v2 增量仅替代其明确点名的条款，状态为 **frozen**，已按本增量 R1 与 owner 平台澄清修正，收据见文末 §10。 v2 已合入 `f7424aa45225a6d02d1958f4b4f72d247f99acc4`；文末 v2.1 仅补充可信 Node 命令槽及启动前准备，状态 **frozen-pending-review**，v1/v2 正文和审查收据保留为各自版本的冻结基线。
+版本适用：以下 v1 正文与 R1 收据保持冻结，基线为 #1766 合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`；文末 v2 增量仅替代其明确点名的条款，状态为 **frozen**，已按本增量 R1 与 owner 平台澄清修正，收据见文末 §10。 v2 已合入 `f7424aa45225a6d02d1958f4b4f72d247f99acc4`；文末 v2.1 仅补充可信 Node 命令槽及启动前准备，状态 **frozen**，v1/v2 正文和审查收据保留为各自版本的冻结基线。
 
 本文按编排器对独立审查 R1 的「ALL ACCEPTED；修正后冻结」指令完成修正并冻结。规格的体验约定直接消费，不增加页面或设计稿；文件改动、实施顺序和具体用例归后续 plan.md。
 
@@ -685,7 +685,7 @@ V2-R1 已撤回；V2-R2..R5 是设计决定 raise，不假称当前代码已经�
 
 ## 1. v2.1 基线与边界
 
-继承 SPEC-connector-launchers v1（原 §1）及 v2 合入 `f7424aa45225a6d02d1958f4b4f72d247f99acc4` 的全部冻结决定；仅补 v2 §4.3/V2-R4 的 Node 命令模板约定和其启动依赖，支撑原 BR-01/03/06/11 与相关 AC，不改 AC、平台或环境作用域。输入是 #1775 D1 的 `31d4cacaf0`、`docs/specs/video-understanding/plan.md:111-113` 的 BLOCKED: design；本文是唯一新增技术决定，未实施。状态 **frozen-pending-review**，独立审查尚未发生。
+继承 SPEC-connector-launchers v1（原 §1）及 v2 合入 `f7424aa45225a6d02d1958f4b4f72d247f99acc4` 的全部冻结决定；仅补 v2 §4.3/V2-R4 的 Node 命令模板约定和其启动依赖，支撑原 BR-01/03/06/11 与相关 AC，不改 AC、平台或环境作用域。输入是 #1775 D1 的 `31d4cacaf0`、`docs/specs/video-understanding/plan.md:111-113` 的 BLOCKED: design；本文是唯一新增技术决定，未实施。状态 **frozen**，独立审查尚未发生。
 
 ## 2. v2.1 地面真相
 
@@ -752,7 +752,7 @@ K1/K2 不变：Node 路径、签名和准备由 launcher authority 持有；模�
 
 | 接收回执 | 决定与适用范围 | 依据 / 状态 |
 | --- | --- | --- |
-| **FIRST-PARTY-NODE-v2.1** | **接受** #1775 返回的 Node 模板接缝：保留槽 `{codepuppyNode}` 由本代宿主 launchers 唯一展开，精确匹配两种合法包形态中该代选定的 Node；冷资产保持首方身份并经正常 preparing 等待，随后才 spawn | v2.1 §4、§6 V21-R1/R2；与 VIDEO-L1-v2 / DOC-NODE-v2 一并引用。状态 frozen-pending-review，尚无本增量独立审查；不声称运行集成已通过 |
+| **FIRST-PARTY-NODE-v2.1** | **接受** #1775 返回的 Node 模板接缝：保留槽 `{codepuppyNode}` 由本代宿主 launchers 唯一展开，精确匹配两种合法包形态中该代选定的 Node；冷资产保持首方身份并经正常 preparing 等待，随后才 spawn | v2.1 §4、§6 V21-R1/R2；与 VIDEO-L1-v2 / DOC-NODE-v2 一并引用。状态 frozen，尚无本增量独立审查；不声称运行集成已通过 |
 
 **否决的替代**：以 workspace 槽借位会接受任意绝对可执行路径，已被真实 matcher 探针证伪；只把 Node 写成 resources 路径不能覆盖已批准归档形态；把准备前的缺文件当普通服务器会丢掉正确首方声明。三者均由本槽和单一准备 authority 取代，无新增用户步骤。
 
@@ -761,3 +761,5 @@ K1/K2 不变：Node 路径、签名和准备由 launcher authority 持有；模�
 **作者回执**：Codex / GPT-6；依据为 v2 合入基线、#1775 固定阻塞证据与本轮真实匹配探针。新增能力全部映射至 V21-R1/R2；v1/v2 的独立审查收据分别保留于 review.v1/review.v2，本增量 review.rounds=0。待 owner 定：无。两平台真实归档展开、签名/公证、首方声明冷启动和准备取消仍未验证，归实施集成证明，不能从纯函数旧行为探针推断通过。
 
 **本轮验证回执**：v1/v2 正文逐字保留核对通过（版本适用说明除外），当前增量状态及历史审查收据核对通过；ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail，2347 assertions），`git diff --check` exit 0。官方文档检查函数对本文 0 finding，仓级另有 69 errors / 253 warnings，均在本轮未改范围，不顺修；依本轮只提交 design.md 的指令未改索引或任何实现。新槽及真实启动行为仍未实施验证。
+
+**v2.1 审查与编排器裁决（2026-11-26）**：独立审查 R1（Claude Opus 5.5，只读）结论 MERGE，1 Minor。处置：已写入配置的首方条目，其 command 首项（Node 路径）由开机对账用同一 `expandFirstPartyCommand` 重锚到本代 `launchers.node`，沿用 Office 的既有先例（`codepuppy-office-instance.ts:117-124` reanchorOfficeCommand；`ext-mcp-policy.ts:47-50`「Boot reconciliation owns migrating already-installed entries」）。这是应用自身条目随版本保持可用，不是旧版本兼容。实施注意：`ext/src/policy/identity.ts:136` 的 evidenceDigest 散列已展开的 command，Node pin 变化会使它变化，实施时确认没有按它持久化的状态因此失效。v2.1 状态：frozen。

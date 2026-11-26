@@ -11,12 +11,14 @@ const NpmDeclaration = Schema.Struct({
   call: Schema.String,
   scriptShell: Schema.NullOr(Schema.String),
   options: Schema.Record(Schema.String, Schema.Unknown),
+  resolutionOptions: Schema.Record(Schema.String, Schema.Unknown),
 })
 
 // Execute the pinned npm's own npx rewrite and configuration parser, not an imitation of
 // its flags/shorthands. Intercept only the final CLI dispatch: parsing must not run the service.
-// `options` contains transient effective configuration, including authentication. It is NOT
-// a preparation fingerprint or receipt and must never be logged or persisted as one.
+// Both option records contain transient effective configuration, including authentication.
+// resolutionOptions preserves semantic release-age inputs, but still needs the key owner's
+// non-secret projection. Neither record is a receipt and neither may be logged or persisted.
 const npmDeclarationProgram = String.raw`
 const fs = require('node:fs')
 const path = require('node:path')
@@ -34,7 +36,17 @@ const { createRequire } = require('node:module')
     const intercept = Object.assign((id) => id === '../lib/cli.js' ? () => {} : npxRequire(id), { resolve: npxRequire.resolve })
     vm.compileFunction(fs.readFileSync(input.npxCli, 'utf8').replace(/^#![^\n]*(?:\n|$)/, ''), ['require', 'process', 'console'], { filename: input.npxCli })(intercept, declarationProcess, console)
   }
-  const config = new Config({ definitions, shorthands, flatten, nerfDarts, npmPath: path.dirname(path.dirname(input.npmCli)), argv: declarationProcess.argv })
+  let before = null
+  const config = new Config({ definitions, shorthands, flatten: (source, target) => flatten(source, new Proxy(target, {
+    set(object, key, value) {
+      // Observe the official flatten's winning write, rather than repeating npm's
+      // source precedence or recording its Date.now-derived cutoff as content.
+      if (key === 'before') before = value === null ? null : Object.hasOwn(source, 'before')
+        ? { kind: 'before', date: value }
+        : { kind: 'relative-age', days: source['min-release-age'] }
+      return Reflect.set(object, key, value)
+    },
+  })), nerfDarts, npmPath: path.dirname(path.dirname(input.npmCli)), argv: declarationProcess.argv })
   await config.load()
   const command = config.parsedArgv.remain.shift()
   const { deref } = npmRequire('../lib/utils/cmd-list.js')
@@ -43,7 +55,8 @@ const { createRequire } = require('node:module')
     const parsed = npa(specification, process.cwd())
     return { specification, name: parsed.name ?? null, type: parsed.type }
   })
-  process.stdout.write(JSON.stringify({ arguments: config.parsedArgv.remain, packages, call: config.get('call'), scriptShell: config.get('script-shell'), options: config.flat }))
+  const options = config.flat
+  process.stdout.write(JSON.stringify({ arguments: config.parsedArgv.remain, packages, call: config.get('call'), scriptShell: config.get('script-shell'), options, resolutionOptions: { ...options, before } }))
 })().catch((error) => { process.stderr.write(String(error.message) + '\n'); process.exitCode = 1 })
 `
 

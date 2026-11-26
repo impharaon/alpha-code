@@ -572,3 +572,12 @@ r6 key 字段补核：从真实 pinned npm 的 definitions/Arborist 确认 min-r
 
 
 r6 秘密 URL 补核：同一个 isConnectorSecretQueryParameter owner 补密码/凭据/用户名及 ref/version 名称；诊断按标准 URLSearchParams 解码参数名后调用它，保留原编码名和非秘密字段，只替换秘密值，避免 key 与崩溃转交有两套 URL 规则。扩大现有真实 stderr/内容 key 用例的自有输入（%70assword、credentialRef、authVersion），红例 e13ec1f13c 为 0 PASS / 2 FAIL；实现后相同命令 `bun test test/codepuppy-connector-launch.test.ts -t 'connector content keys exclude invocation|connector diagnostics tee complete masked stderr' --max-concurrency=2` 为 2 PASS / 17 assertions（`/tmp/connector-r6-secret-query-{red,green}.log`）。业务参数普通字段/崩溃原文仍保留，没有放宽错误或移除旧断言；此为 AC-08 遮密与非秘密 key 同链修正。
+
+
+### r6 npm 相对发布时间语义（内容键的官方配置读侧）
+
+readNpmLaunchDeclaration 新增 transient resolutionOptions：向 Config 传入的 flatten 仍调用官方 flatten，仅以 Proxy 观察它对 before 的**实际获胜写入**，记录固定日期 / 相对 days / 无限制，不自行重算配置来源顺序；原 options 仍是完整真实临时配置，安装语义不改。两个 record 仍含认证，必须经 key owner 非秘密投影，不能直接持久化/hash。现有换项目/轮换密钥的 key 例改消费 resolutionOptions。
+
+红例 8bd85cc37b 为 0 PASS / 2 FAIL（`/tmp/connector-r6-npm-relative-red.log`）；保留其全部断言后 2 PASS / 9 assertions（`/tmp/connector-r6-npm-relative-green.log`）。新增例覆盖相对 age 稳定、exclude 生效、固定日期覆盖、CLI relative 覆盖低层 before、0 清除；没有时钟 mock、sleep 或计时断言。第一轮 green 暴露**夹具输入版本差异**：共享 Config10.8.1 无 exclude 且拒绝 before/min-release-age 并存，而产品随包10.13.0允许优先级组合。没有放宽断言、为生产添加旧版兼容或升级依赖；只在此用例解包完整钉住 Config 的原始 lib/package.json/LICENSE，复用原有已安装依赖。
+
+新增字面读取 `test/fixture/npm-launch/npm-config-source.json.gz` 是15个 upstream 原文件的 gzip JSON 容器，40423 bytes，sha256 `76a49a961d79df277407bf54b560d22d4eb0231091a012ab651e9318c281e743`。逐文件 byte 比对 upstream 原件全相同，LICENSE 在容器内；不把原库4566行复制为可执行生产代码，不更改仓库依赖/门控。实际随包 Node26.13.1 / npm11.20.0 / Config10.13.0 一次性 `gate slot -- bun /tmp/connector-r5-npm-proof/npm-relative-r6.ts` exit 0（`/tmp/connector-r6-npm-relative-proof.log`），同样全部语义与稳定 key 通过。它补齐上文所列 relative-age **读侧**缺口；requirements/本地源内容到 facts、npm install 与总 prepare 的余项仍在。

@@ -14,6 +14,7 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { createRequire } from "node:module"
+import { gunzipSync } from "node:zlib"
 import { connectorPreparationKey } from "@opencode/core/mcp/codepuppy-connector-key"
 import {
   parseUvToolSettings,
@@ -1483,23 +1484,51 @@ test("connector content key reuses identical effective npm resolution in another
 // Integration layer: the real npm Config reads own .npmrc files and CLI precedence.
 test("official npm resolution facts preserve relative release age without a clock in the key", async () => {
   const input = npmDeclarationFixture()
-  const config = path.join(input.root, ".npmrc")
-  const parse = (args: string[] = []) => Effect.runPromise(
-    Effect.scoped(readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: [...args, "own@1.2.3"] })).pipe(Effect.provide(hostEnvironmentLayer)),
+  // The shared fixture uses Config 10.8.1. Load the pinned 10.13.0's complete
+  // unmodified Config sources in this child's directory, retaining all assertions.
+  const util = createRequire(new URL("../../util/package.json", import.meta.url))
+  const configModule = path.join(path.dirname(path.dirname(input.launchers.npmCli)), "node_modules/@npmcli/config")
+  rmSync(configModule) // Only the symlink created by npmDeclarationFixture.
+  const sources: Record<string, string> = JSON.parse(
+    gunzipSync(readFileSync(new URL("./fixture/npm-launch/npm-config-source.json.gz", import.meta.url))).toString(),
   )
-  const key = (options: Record<string, unknown>) => connectorPreparationKey({runner:"npm-exec", launchers:input.launchers, requirements:[{kind:"registry",name:"own",version:"1.2.3"}],options,configuration:[]})
+  for (const [file, source] of Object.entries(sources)) {
+    const target = path.join(configModule, file)
+    mkdirSync(path.dirname(target), { recursive: true })
+    writeFileSync(target, source)
+  }
+  symlinkSync(
+    path.resolve(path.dirname(util.resolve("@npmcli/config/package.json")), "../.."),
+    path.join(configModule, "node_modules"),
+    "dir",
+  )
+  const config = path.join(input.root, ".npmrc")
+  const parse = (args: string[] = []) =>
+    Effect.runPromise(
+      Effect.scoped(
+        readNpmLaunchDeclaration({ ...input, cwd: input.root, syntax: "npx", arguments: [...args, "own@1.2.3"] }),
+      ).pipe(Effect.provide(hostEnvironmentLayer)),
+    )
+  const key = (options: Record<string, unknown>) =>
+    connectorPreparationKey({
+      runner: "npm-exec",
+      launchers: input.launchers,
+      requirements: [{ kind: "registry", name: "own", version: "1.2.3" }],
+      options,
+      configuration: [],
+    })
   writeFileSync(config, "min-release-age=7\nmin-release-age-exclude[]=@own/*\n")
   const first = await parse()
-  expect(first.resolutionOptions.before).toEqual({kind:"relative-age",days:7})
+  expect(first.resolutionOptions.before).toEqual({ kind: "relative-age", days: 7 })
   expect(first.resolutionOptions.minReleaseAgeExclude).toEqual(["@own/*"])
   const second = await parse()
   expect(key(second.resolutionOptions)).toBe(key(first.resolutionOptions))
   const absolute = await parse(["--before=2020-01-01T00:00:00.000Z"])
-  expect(absolute.resolutionOptions.before).toEqual({kind:"before",date:"2020-01-01T00:00:00.000Z"})
+  expect(absolute.resolutionOptions.before).toEqual({ kind: "before", date: "2020-01-01T00:00:00.000Z" })
   expect(key(absolute.resolutionOptions)).not.toBe(key(first.resolutionOptions))
   writeFileSync(config, "before=2020-01-01T00:00:00.000Z\nmin-release-age=7\n")
   const override = await parse(["--min-release-age=14"])
-  expect(override.resolutionOptions.before).toEqual({kind:"relative-age",days:14})
+  expect(override.resolutionOptions.before).toEqual({ kind: "relative-age", days: 14 })
   expect(key(override.resolutionOptions)).not.toBe(key(first.resolutionOptions))
   const disabled = await parse(["--min-release-age=0"])
   expect(disabled.resolutionOptions.before).toBeNull()

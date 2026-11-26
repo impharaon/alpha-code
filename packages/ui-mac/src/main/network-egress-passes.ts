@@ -1,7 +1,7 @@
 import { resolve } from "node:path"
 import { hasEgressKeys, isEgressSequence, parseSessionRef, type EgressPass, type EgressPassSummary } from "../shared/network-egress-wire"
 import { EGRESS_GRANTS_DIRNAME, isEgressTimestamp } from "./egress-grant-truth"
-import { admitUserEgressGrant } from "./network-egress-grants"
+import { admitUserEgressGrant, canonicalEgressHost } from "./network-egress-grants"
 import type { AppEnvironment } from "./codepuppy-environment"
 
 export function egressPassPath(base: string, environment: AppEnvironment): string {
@@ -72,7 +72,7 @@ export function createEgressPassLog(store: { read(): ReturnType<typeof readEgres
       const persistence: "ok" | "unreadable" | "write-failed" = disk.persistence === "unreadable" ? "unreadable" : [...memory.keys()].some((id) => !ids.has(id)) ? "write-failed" : "ok"
       const summaries = new Map<string, EgressPassSummary>()
       for (const pass of new Map([...disk.passes.map((pass) => [pass.id, pass] as const), ...memory]).values()) {
-        const destination = { host: pass.destination.host.toLowerCase(), port: pass.destination.port }
+        const destination = { host: canonicalEgressHost(pass.destination.host) ?? pass.destination.host.toLowerCase(), port: pass.destination.port }
         const key = JSON.stringify(destination)
         const summary = summaries.get(key)
         if (!summary) { summaries.set(key, { destination, firstAt: pass.at, lastAt: pass.at, count: 1 }); continue }

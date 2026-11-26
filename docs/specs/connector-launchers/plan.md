@@ -761,3 +761,13 @@ prepareConnectorLaunch 的 frozen 输入/返回现已定义并组合：先依赖
 **#1759 合入后的生产工作，接口已准确固定**：最后只读复核 HEAD ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f。R1 `process-fence-profile.ts` 的 resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations 仅候选；消费 `process-fence-plan.ts` planPackageManagerCaches(input: PackageManagerLocationInput & { truthPath:string; eligibility:WorkspaceDirectoryInput }) 同次绑定的 env/cacheEnv/rules/locations/excluded。R2 `shared/package-manager-environment.ts` 的 installPackageManagerEnvironment(value:unknown,pull?:()=>Promise<PackageManagerEnvironment>)、packageManagerEnvironment()、refreshPackageManagerEnvironment()、projectPackageManagerEnvironment<T>(source:Readonly<Record<string,T>>|undefined)、createPackageManagerEnvironmentRequester(post,initial) signatures 与前表一致；最终spawn消费R2，不自行投影候选位置。按前组装表接：mandatory bootstrap.launchers及校验；main assets/唯一下载Host；sidecar发布Host→index/Slot/localLaunch；Node boot重锚；当前identity/代的controller/状态/diagnostic/retry；bindDocumentRuntime→runtime.retry()；renderer root；再完成正式Mac/Win包真机器AC。没有“#1759一合入本票自动完成”的假设。
 
 偏离/规模：初始表以外的 util共享命令owner、main两个re-export及npm解码隐私错误，均为同一调用链必要项，理由见上一节；相对r7共14文件、约1018增37删（本收据另计），没有依赖/迁移/新配置。时间核对2026-11-26T23:18Z，起始约97分钟，原预期90分钟；独立余项未完成，返回PARTIAL而非DONE-INDEPENDENT。遗留去向：上述独立余项→#1760续接；生产装配→#1759合入后本票；Office compileall→documents已路由，准确原命令/exit1/stderr空继承r4记录，本轮未碰；既有仓级docs结果→文档治理。OPTIONAL：无。
+
+## r9｜独立准备事务收口
+
+- 依据：r9 Phase IMPLEMENT；r8 c48aba66e0..24f49aae24 已接受；SPEC v1 AC-02/04/05/06/07/08/10，DESIGN v2.2 §4.3–4.7及既有裁定。
+- 核对：Codex / GPT-6，IMPLEMENT；起始2026-11-26T23:20:16Z，预计90分钟；本轮不重做已接受子链，不改#1759或生产组装。
+- 文件：core/mcp/codepuppy-connector-launch.ts（缺损Python修复/总事务），codepuppy-uv-launch.ts（远端来源缓存边界）；既有 core/test/codepuppy-connector-launch.test.ts，必要隔离Host进程的fixture（只承担本模块测试装配，静态import可追踪）；唯一文档为本plan。
+- 顺序：先命名回归与真实pinned UV准备探针；红先补缺损Python/远端缓存缺陷并最小修复；总入口验证同key合并、取消、失败重试、进度和egress事实；最后相关消费者/typecheck/移除臂/scope收据。真实原件沿已有/tmp缓存，重实物命令经gate slot，不重复下载。
+- 风险：Host进程内仅发布一次，常驻测试用独立子进程避免污染其它模块；外部格式沿真实samples，受控故障只发生在应用自有进程/Host边界。私有来源的认证不写key/ready；缓存不跨权限凭据复用未授权内容。取消必须在锁释放前结束子进程，并保证晚到progress/结果不重新spawn。
+- 证明：AC-02/04/05→真实UV全prepare及Python缺损恢复；AC-06→总入口各等待者阶段/字节/真实活动；AC-07→一次瞬时恢复、确定故障不重试、egress精确identity/目标；AC-08→失败原文沿既有诊断生产；AC-10→有效ready快路径和远端源离线重启。组件/集成层只运行受影响命名例，阶段结束完整本文件一次，最终相关消费者一次；移除对应行为应使命名证据失败。
+- #1759接口与待接生产点沿r8准确表，最终只读复核；不复制位置/最终绑定authority。偏离随实现提交记录。

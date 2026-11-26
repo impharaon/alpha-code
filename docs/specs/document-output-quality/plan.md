@@ -734,3 +734,5 @@ bun.lock 随 origin 改变，`bun install --frozen-lockfile` exit 0（2 packages
 已复现：fixture-identity 4 PASS/1 FAIL（core/util tree 身份已改变，需真实重采，分类 c）；engine-cases 25 PASS/1 FAIL（无人值守子文件两种拒绝错误未投影，分类 a，正在核对）；ext-security 7 PASS/1 FAIL（document Chromium 窗口漏 webviewTag:false，分类 a，窗口清单新增点属 c）。OfficeExcel 15 PASS 与 schema snapshot 2 PASS 单独均绿，而 full gate 的 Python import 缺 text_budget.py / circular import，加上 installOfficeExcel 每次先删安装目录，表明必须修正共享环境的并行安装（分类 a），不能称 flaky。old-name 扫描 9 PASS/1 FAIL，唯一 stale 行为旧 office-docs 的 /code-puppy 计数（分类 c）。
 
 静态入口复现：`bash -c 'source scripts/docs-gates.sh; docs_gate_nul'` exit 1，实际 Office/解释器二进制 fixture 未在既有 binary 机制登记（分类 c）；`bash scripts/assert-seed-assets.sh` exit 1，默认制作入口重写后漏掉原社区 Excel 明确退役事实（分类 b，片 7 / §4.1/4.8 并未复活社区连接器，将恢复该事实而不放宽 guard）。后续修正均保留原守卫规则、阈值和地板。
+
+r14 NUL green（c）：沿原 BINARY_SUFFIXES 登记实际 docx/pptx/xlsx/pdf 格式，沿 EXCLUDED_PREFIXES 仅登记两份真实 Mach-O/PE 头文件（非整个目录或源文本）。同一 docs_gate_nul 入口 exit 0：5969 个受检文件零 NUL，1333 个已登记二进制、4 个非文本条目及 11260 个原样上游条目跳过；4000 地板未变。首轮漏列 control.pdf/头文件名字不准确已逐项核对后补齐，不把失败轮计为通过。

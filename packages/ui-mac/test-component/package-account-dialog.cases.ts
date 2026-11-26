@@ -145,7 +145,7 @@ test("connector suggestion refreshes an open dialog without replacing user input
   let disposed = false
   Object.assign(window, { api: { ext: {
     onHubViewChanged: (listener: () => void) => { changed = listener; return () => { disposed = true } },
-    packageAuthorization: async (packageId: string) => ({ ok: true, packageId, items: [item] }),
+    packageAuthorization: async (packageId: string) => ({ ok: true, packageId, items: [{ ...item }] }),
   } } })
   const host = document.createElement("div"); document.body.append(host)
   const dispose = web.render(() => solid.createComponent(PackageAccountDialog, { packageId: "build-ios-apps", label: "Xcode", needId: "version", save: async () => ({ ok: true }), onClose: () => {}, onSaved: () => {} } as never), host)

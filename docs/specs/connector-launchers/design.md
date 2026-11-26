@@ -1,20 +1,27 @@
 ---
 id: DESIGN-connector-launchers
 title: 连接器启动器与失败处理 技术设计
-summary: 随包提供 uv 与官方 Node/npm，主进程校验固定文件，围栏内准备连接器环境；准备和握手分开计时，持久化可离线启动的入口，并统一失败原因与动作。
+summary: 统一连接器启动器与固定文件准备；v2 接纳 Intel Mac 文档 Node 消费及受管第一方 MCP 的运行期按 ID 准备接缝。
 kind: tech-design
-status: frozen
+status: frozen-pending-review
+version: 2
 spec: SPEC-connector-launchers
 spec_version: 1
 review:
-  rounds: 1
-  reviewed_sha: ceeee7d4df
-  verdict: "fix-then-merge; R1 5 Major 2 Minor accepted and corrected"
+  rounds: 0
+  reviewed_sha: ""
+  verdict: "pending; v2 seam increment awaits independent review"
+  v1:
+    rounds: 1
+    reviewed_sha: ceeee7d4df
+    verdict: "fix-then-merge; R1 5 Major 2 Minor accepted and corrected"
 owners: [owner]
 last_reviewed: 2026-11-26
 ---
 
 # DESIGN-connector-launchers｜连接器启动器与失败处理 技术设计
+
+版本适用：以下 v1 正文与 R1 收据保持冻结，基线为 #1766 合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`；文末 v2 增量仅替代其明确点名的条款，状态为 **frozen-pending-review**，尚未经过本增量的独立审查。
 
 本文按编排器对独立审查 R1 的「ALL ACCEPTED；修正后冻结」指令完成修正并冻结。规格的体验约定直接消费，不增加页面或设计稿；文件改动、实施顺序和具体用例归后续 plan.md。
 
@@ -426,3 +433,179 @@ python3 <转发运维目录>/pinned-files.py probe --manifest <待发包内清�
 | --- | --- | --- | --- |
 | 当前生成文档索引在写本文前已 stale；文档合同检查基线有既有错误与警告 | 基线 `docs_index.py --check` 非零；官方 `check_repo(..., changed_since="origin/alpha")` 为 69 errors / 252 warnings。新设计无 finding；因只加生成的本设计索引行，索引原有两个未解析跨仓 ID 从 warning 升为 changed-file error，现为 71 / 250，另仍有原 stale | 只保留生成器产出的本设计行；不顺带收进全量索引漂移，也不清理旁支文档/保护资产。依据为既有 Alpha Delivery profile 对当前工作树调用同一官方检查函数 | 既有索引 stale 及两项引用告知调度方，本设计未新增无效引用 |
 | 应用之外的实际国内下载、Windows、正式公证事实 | 当前证据未覆盖，不能以 pilot 替代 | 本次禁止启动 GUI、正式分发与联网下载包；这里只读公开文档/元数据 | 实施与平台验收取得真实证据，按受影响条款更新回执 |
+
+
+# v2 增量｜文档启动器与受管固定文件接缝
+
+## 1. v2 基线与边界
+
+本增量只处理本次 brief 路由的两个消费者请求，不重审 v1 的产品取舍或 R1 已处置项：
+
+- **文档请求**：#1761 `docs/specs/document-output-quality/design.md`，请求提交 `279e9bf1c1`；按 brief 读取其 HEAD `5c3a3beae0e1c93a8478dfe4752a8d260c69bc21` 的 §1、§4.1、§4.8、§8 和 §10，Node/bootstrap/Intel 接缝请求仍在。消费方已批准规格 v1 的 AC-09/15；其它文档能力归该设计。
+- **视频 L1**：#233 `docs/specs/video-understanding/design.md`，固定提交 `9f438a7bc8` 的 §4.2 L1（`:138-152`）、§6 D3、§10 pending-seam（`:476`）。只接收受管第一方 MCP 取固定文件的端口；L2 的 family/source 变更仍归固定文件权威，D5 云调用仍归消费者自己的工具外层通道。
+- **原权威**：v1 的 `LauncherEnvironment`、资产签名/归档退路、`ConnectorLaunchHost` 与 ID-only main 桥；固定文件仍消费共享 `86a58c7` §4.11/§10，缓存位置仍消费 #1759 R1/R2。本次不改共享下载 schema、来源或 package manager。
+- 当前代码基线 `aa2476b378da663115e6735b991f6cbf2e04b5c6`。文档影响为同一 feature design 的接口增量；只改本文及对应生成索引行。以下接收回执是技术接纳并待审，不是运行实现或产品验收已通过。
+
+## 2. v2 地面真相
+
+调查仅回答：Intel 能否复用同一发行系列与投影；文档该从哪里合法读 Node；MCP 的方法、调用归属和 metadata 在何处接线。找到合法符号或明确 raise 后停止。
+
+| 编号 | 已观察事实 / 依据 | 对决定的影响 |
+| --- | --- | --- |
+| V2-F01 | v1 §4.3 的 platform 只含 darwin-arm64/win32-x64，而 #1761 §4.1 的 DocumentEnvironment.node 指向同一 LauncherEnvironment；其 §4.8 的 DocumentHost.environment 经可信 ext/Location 桥投影 | 接收现有平台轴和只读消费面扩展，不为文档再带 Node 或套用运行器环境 |
+| V2-F02 | pilot 原始 `dl/node/SHASUMS256.txt`、`dl/python312/SHA256SUMS` 已含下表 Intel 文件；本次只读 uv 官方 `.sha256` 和 Python release 元数据，exit 0。没有下载/执行 Intel 包 | 沿用相同版本、签名与目录投影，补齐同一 LauncherEnvironment 的目标行；摘要/字节是元数据证据，非运行实测 |
+| V2-F03 | `packages/ui-mac/scripts/target-arch.ts:41-44` 当前 resolveMacTargetArch 明确拒绝 x64；TargetArch 自身与后续切片检查已有 x64。v1 的资源代码位置均在已有打包 authority 下 | Intel 接纳必须扩展这个唯一选择入口并保留其真实架构检查，不能另造文档专用打包选择器或绕过守卫 |
+| V2-F04 | `packages/util/src/codepuppy-bootstrap.ts:250-265` 由 publishCodePuppyBootstrap 深冻结、codepuppyBootstrap 逐 bundle 解析后读取；v1 R3a 已决定增加 launchers 数据，尚未实现 | 文档加入这个只读面；函数仍走宿主端口，不序列化回调 |
+| V2-F05 | 当前 SDK 2.3.1 的 Protocol.setRequestHandler 有 `(method, {params,result}, handler)` 自定义方法重载（本地 `dist/index-B-4n9P0J.d.mts:2329-2354`）；core `mcp/client.ts:285-326` 在 connect 前注册 handlers | 新私有方法可在已有 client 构造点注册，不需要新 HTTP/Server API、SDK patch 或新依赖 |
+| V2-F06 | SDK BaseContext.mcpReq._meta 可读取当前请求的协议元数据（本地 `dist/index-B-4n9P0J.d.mts:1925-1942`）；client.ts:550-554 已向 tools/call 写 _meta。该 SDK 的 InputRequest 联合（同 d.mts `:654-677`）仅有 sampling/roots/elicitation，故不能借 input_required 发送这个自定义方法。Tool.Context.progress 在 `packages/schema/src/tool.ts:14-19`；core `tool/mcp.ts:92-98` → `mcp/index.ts:889-892` → `mcp/client.ts:547-563` 目前没有准备进度回调、onprogress 为空 | 决定走同一 stdio 的自定义 JSON-RPC，用协议 _meta 的本次调用关联值取得确切归属，并新增内部回调；不改 SDK、不猜“最近调用”或宣称 metadata 已接入 |
+| V2-F07 | `declaredFirstPartyTools`（core `mcp/codepuppy-first-party-mcp.ts:46-64`）核对真实命令模板及随包字节摘要，declaredListedTools/listsDeclaration 核对列出的工具。#233 §4.1/§10 已选择复用此身份权威、增加视频服务声明，不按 server 名认首方 | handler 只随这个已核对的绑定开放；配方成为同一首方声明的附属数据，不新建身份白名单 |
+| V2-F08 | 本次 Bun CLI 使用真实 SDK Client/Server、InMemoryTransport.createLinkedPair、setRequestHandler 三参数重载、server.request 和 client.callTool 做嵌套请求；调用 _meta 回传后 ctx.mcpReq._meta 保持关联，原 call 返回成功，exit 0 | 证明私有方法/协议 metadata/原调用继续的 SDK 基础端口可用；没有 TCP、下载、解包或 Tool.Context metadata 接线，后者仍是新增能力 |
+
+## 4. v2 接口契约
+
+### 4.1 文档接收：平台、资产与只读 Node
+
+**接纳 #1761 请求。** v1 §4.3 的 `LauncherEnvironment.platform` 值域替换为 `LauncherPlatform`，其它字段与 v1 R1 的环境作用域不变：
+
+```ts
+type LauncherPlatform = "darwin-arm64" | "darwin-x64" | "win32-x64"
+// CodePuppyBootstrap 新增的同一字段（v1 R3a 的具体读取名）：
+// launchers: LauncherEnvironment，其中 platform: LauncherPlatform。
+```
+
+Intel 与其它 Mac 目标共用 `<resources>/connector-launchers/{uv,node}`，打包时只放目标架构那一份；Node/npm 仍为 v1 的官方 26.13.1 / 11.20.0，签名三项、归档退路及 app data 位置不另起一套。为使同一个 LauncherEnvironment 的 uv/uvx/pythonFileId 也完整可构造，同步补同系列已有的 Intel uv/Python 行，复用原安装流程，不为文档调用它们。以下新增条目与 v1 的行合并为同一构建锁/固定文件清单，禁止另写文档版本常量：
+
+| entry / 使用点 | 官方文件、SHA-256 与 bytes |
+| --- | --- |
+| `node-darwin-x64` / 构建 | `https://nodejs.org/dist/v26.13.1/node-v26.13.1-darwin-x64.tar.xz`；`2693310b2820f9350d29524f21344e1c623875bab773457d55b2aceb9670716f`；完整官方 npm 布局同 v1 |
+| `uv-darwin-x64` / 构建 | `astral-sh/uv` release `0.13.10` 的 `uv-x86_64-apple-darwin.tar.gz`；`153e03197588204c04fc4c81cc4bafbfa4280222a385e4ee36a87aeec0ae63b4` |
+| `python/darwin-x64/3.12.16-20261124` / 既有连接器流程首次准备 | `astral-sh/python-build-standalone` release `20261124` 的 `cpython-3.12.16+20261124-x86_64-apple-darwin-install_only_stripped.tar.gz`；`6d7ef4efa1adf65f312e6e865040ce03ef8a4bd7e1b45415193295c9ffc0dbdd`；`bytes=25002314`；其它字段/URL 编码消费 v1 与共享 schema |
+
+签名/架构选择继续经过同一 resolveMacTargetArch/assertMacTargetArch。**本次明确 raise** 是将该入口的 Mac 选择域扩展到 arm64/x64、按目标锁投影资源并核验每个 Mach-O 及引擎原生资源的目标切片；不通过另一个 Node 包或旁路打包器避开现有检查。当前拒绝 Intel 的观察由本增量在这个目标扩展范围内替代；真实 Intel 打包、签名、公证与消费者执行仍待实施证据，本次没有发布授权。
+
+合法消费面增补为：DocumentHost 的 main/sidecar 环境投影器，以及其受管 ext 文档适配器。main 读取 composition root 构建/校验后传入的本代 bootstrap 对象；sidecar 与受管 ext 经既有 util `codepuppyBootstrap().launchers` **只读**取 platform/pinSet/node/npmCli/npxCli 资产描述，不让 main 在尚未 publish 的进程槽里读取。描述仍由主进程唯一构建，发布为每代一次。原生文档脚本继续只拿 DocumentEnvironment.node 和自己的 nodeModules，不注入 uv-tool/npm-exec 的 PATH、UV_PYTHON 或 XDG 覆盖。renderer/模型/第三方包不因此获得整份 bootstrap、函数发布或任意主进程调用权。
+
+归档退路的 Node 入口在首次使用前须经同一资产 authority 展开，bootstrap 中的目标绝对路径不等于该文件已经 ready。决定给既有 ConnectorLaunchHost **增补** `resolveAssets(): Promise<LauncherEnvironment>`：按本代 bootstrap.platform/pinSet 解析并完成 v1 的随包展开/核验，返回与 bootstrap 描述一致的可执行入口；两类运行器准备和 DocumentHost.environment 都调用它。该端口没有 URL、命令、目标路径或平台覆盖输入，复用 v1 资产解析/展开，不下载另一份 Node；不序列化到 bootstrap。#1761 通过 DocumentHost.environment 把最终 node 字段交执行侧，无须重写它的环境权威。
+
+### 4.2 L1 接收：固定文件准备与展开
+
+**接纳视频 L1。** 接口名保持消费者请求的私有 MCP 方法 `codepuppy/pinned-files.ensure`，params 只含 ids；不新增下载器、包管理器或固定文件来源表。
+
+```ts
+type PinnedFilesEnsure = { ids: PinnedFileId[] }
+type ManagedPinnedFilesResult =
+  | { ok: true; files: { id: PinnedFileId; path: string }[] }
+  | Extract<EnsurePinnedFileResult, { ok: false }>
+type PinnedPreparationProgress = {
+  id: PinnedFileId
+  phase: "download" | "unpack" | "verify" | "ready" | "failed" | "cancelled"
+  sequence: number
+  receivedBytes?: number
+  totalBytes?: number
+  error?: Extract<EnsurePinnedFileResult, { ok: false }>["error"]
+  failure?: DownloadFailureEvidence // 沿 v1 原始事实，避免把 404 当暂时 network
+}
+type ManagedFirstPartyBinding = {
+  identity: LaunchIdentity
+  sidecarGeneration: string
+  declarationSha256: string       // 已核对的随包声明摘要，64 位小写 hex
+  recipeSha256: string            // 同一声明中配方内容的摘要，64 位小写 hex
+}
+type PinnedFilesCallPreparation = {
+  callID: Tool.CallID
+  report: (update: PinnedPreparationProgress) => Effect.Effect<void>
+}
+type PinnedEntryRecipe = {
+  id: PinnedFileId
+  archive: "file" | "zip" | "tar.gz" | "tar.bz2" | "tar.xz"
+  entry: string                    // 根内相对文件/目录入口；不可为绝对路径或逃逸路径
+  required: readonly string[]      // 必需的根内成员，至少包含 entry
+}
+```
+
+ids 必填非空，无人为数量帽；同一次请求按首次出现顺序去重。全部 ID 必须已在当前 PinnedFiles 清单且属于这个受管服务的受保护配方，先验证整组再发生 I/O。配方只贡献 ID、归档形态、相对入口和必需成员，不含另一份版本、URL、bytes、摘要或绝对目标；这些仍读唯一清单/宿主根。配方由该首方服务的随包声明 producer 贡献并绑定已校验字节摘要，同一既有首方声明/解析权威持有，不能由连接器传入配方或 renderer 编辑。
+
+main 的同一 launcher authority 拥有 `resolveAssets` 和固定文件的 resolve/unpack：每个 id 先调原 ensurePinnedFile、完整 bytes/sha256 验证后，在 `<runtimeRoot>/assets/<id>/<配方内容摘要>/` 的私有暂存兄弟目录展开；file 项将已验原始文件按配方 entry 相对名硬链接或复制到同一暂存根，保持字节不变。tar 三种压缩由同一平台 tar 适配（mac `/usr/bin/tar`、Windows 系统 `System32/tar.exe`），zip 沿 v1 的系统归档适配；不启动 Python、不执行包安装脚本，不借视频包的库自动下载。Windows 系统 tar 的存在/bsdtar 性质有 [Microsoft 文档](https://learn.microsoft.com/en-us/windows/tar/)依据，实际格式与 Windows 包全链路仍未实测。
+
+展开维持已有路径边界：成员及软/硬链接的最终目标都留在暂存根内，保留合法内部链接和原二进制签名/执行位；不能为简化而把所有链接拒绝掉。验证配方的 required/entry 实际存在、类型和目标架构/已有签名要求匹配后原子发布 ready；成功的 path 是 recipe.entry 在该发布根内的真实绝对路径，既可以是可执行文件也可以是模型目录/原始数据文件。ID、原文件摘要、配方内容摘要、平台共同标识已准备结果；同 id/配方合并在途展开，不设过期或启动时刷新。签名/许可与具体归档成员事实由各资产 producer 提供，本文不虚构视频具体文件名或替代 L2 的接收。
+
+私有桥保持 `codepuppy.pinned-file.ensure` 的 ID-only 输入。**决定增补** `entryFor?: ManagedFirstPartyBinding` 宿主附属字段：缺席时是 v1 的已验归档路径，存在时返回上述配方入口；这是本代合法的归档/入口两个消费域，不是旧版本迁移分支。binding 由已核验的 client 构造上下文附上，不来自 MCP params，main 再据现有首方声明校验本代服务、清单和配方归属；targetPath 始终 main 派生。两种路径都走原 ensurePinnedFile 的按 id 合并、换源从 byte 0、校验与取消语义，不能再建一份 URL/回退表。
+
+### 4.3 L1 的 client、调用归属、进度与取消
+
+`ManagedFirstPartyBinding` 是当前 Location/client/sidecar generation 下由现有 declaredFirstPartyTools/declaredListedTools 身份核验产生的进程内绑定（含现有 LaunchIdentity、声明摘要与配方引用）；构造时先核对实际命令/随包摘要，真实 tools/list 再经 listsDeclaration 核对，符合声明的实际工具才登记后述 call 关联值。因而 handler 可以先注册，握手期间仍没有能启动下载的活跃调用；声明被 refuted 的调用不得获得该关联值。身份不是 server 名或自报 `first-party:true`。本次接纳范围是 #233 已获授权的受管视频服务；已有 Office 及普通第三方没有该配方时不注册此 handler、不宣告对应 experimental capability。不会因为能连接或工具名相同就获得文件准备能力。
+
+在已有 `McpClient.connect` 的 initialize/client 构造处，**只对该绑定**调用 SDK 的三参数重载 `client.setRequestHandler("codepuppy/pinned-files.ensure", {params,result}, handler)`，使用上节严格业务 schema；协议 _meta 单独解析，下述关联键不成为业务参数。params 的业务字段只收 ids，不接受 URL、目标、配方或其它业务字段。非法 params/不属于配方的 ID 返回 SDK 的 InvalidParams，普通第三方该方法不存在；这是被请求的身份/参数边界，不增加用户批准或填写步骤。调用底层宿主端口为本次明确 raise：
+
+```ts
+// 增补到 v1 ConnectorLaunchHost；以下上下文由 core/sidecar 绑定，不经 MCP params。
+prepareFiles(input: {
+  binding: ManagedFirstPartyBinding
+  ids: readonly PinnedFileId[]
+}, signal: AbortSignal,
+   progress: (update: PinnedPreparationProgress) => void): Promise<ManagedPinnedFilesResult>
+```
+
+它逐 id 调同一 ID-only main 桥（由 binding 取固定配方），不把 service 任意文本交 main 执行。`resolveAssets` 与 `prepareFiles` 均是既有 ConnectorLaunchHost 的增补方法；publish/get 权威和结构化克隆纪律不变。
+
+使用同一 stdio 上的**普通自定义 JSON-RPC 请求**，不通过 SDK 的 input_required：core 仅为这个受管 client 的实际 tools/call 生成当前调用关联值，在协议 `_meta["codepuppy/pinned-files.call"]` 附上；连接器在处理该 call 时回传同一协议 _meta 值，以 `codepuppy/pinned-files.ensure` 请求 `{ids}` 并等待结果，然后在原 call 内继续处理。同一协议 _meta 还带 `codepuppy/pinned-files.deadline`（原调用已有 execution 预算派生的 UTC 毫秒绝对值，安全整数）；受管服务的嵌套 SDK request 使用原调用剩余预算和取消信号，不另落入 SDK 独立的短默认超时。关联值由 core 生成，关联当前 client、generation、callID 与本次 SDK 请求尝试的 signal，不从 server 名/sessionID 推断，也不是模型输入。它只关联已有调用，不参与放行/拒绝的身份判定，不能代替首方声明验证。
+
+服务启动、initialize 和 tools/list 不请求模型；注册 handler/读取静态配方不启动下载。没有活跃 call 的协议关联值就不开始取文件，返回 SDK InvalidRequest；普通第三方不注册方法。连接成功后的冷下载只写工具 metadata，连接器保持 connected，不消耗握手 startup。execution 时限/工具取消继续归已有调用，不新增时钟，也不因 progress 重置它。
+
+**调用接缝明确 raise**：core 的 `tool/mcp.ts` 取得 Tool.Context.id/sessionID、Location 与 progress，将 `preparation?: PinnedFilesCallPreparation` 这个内部可选字段逐层交 `Mcp.Service.callTool` → `McpClient.Connection.callTool` / PerRequest。report 用既有 `context.progress` 发布 `{ preparation: PinnedPreparationProgress }` 到该次工具 metadata。client 在 tools/call 的 SDK 请求开始时生成/登记上述关联值与 report；每次真正重发是独立关联值，结束便删除。handler 先从当前请求的 ctx.mcpReq._meta 取值，只查这个已核验 client 当前在途表，再使用原调用的 report；不能查全局“最后一次调用”或凭 server 传来的 sessionID 找会话。SDK 三参数 handler 的 schema 分离标准 _meta 后严格校验业务 ids；对本接缝新增的关联键只接受 core 生成的字符串形状，deadline 只接受已登记原调用的 UTC 毫秒值且不据回传值延长期限；不接受 URL/路径/能力选择；标准 MCP 元数据仍由 SDK 处理。
+
+这里沿用已有 _meta 承载机制和 SDK 自定义 handler，不改 protocol codec/SDK patch。handler 用 initialize 已捕获的 Effect context 执行 report，保持 Location；进度使用本调用内递增 sequence。metadata 中仅合并 preparation 字段，保留工具其它 metadata；结束时也与最终工具结果合并。没有 preparation 的普通调用保持原路径。
+
+prepareFiles 将嵌套请求 signal、登记的原 call signal 与本代 client scope 关联；任一取消/停止只解除该调用的等待者并给 cancelled。客户端重连/请求完成/重试结束时撤销对应关联值，晚到请求/进度不能写入另一代或另一次调用；共享下载中的其它等待者继续，不能因一次取消破坏 ready。完成后原 server handler 在同一个 tools/call 中继续，无需重放已提交的用户副作用。
+
+failed/cancelled 阶段在上述 metadata 中附同一 failure/error 事实；ready 不带错误，进度阶段不提前宣称成功。失败联合保持 EnsurePinnedFileResult 原样：传输 network 在调用进度/错误 metadata 复用既有 download 归因，磁盘为 disk，取消为 cancelled；404、解析/完整性等仍保留 v1 的具体证据/未知失败处理，不伪装成暂时网络。ready 前不返回半个入口，失败无需停止整个 MCP 服务。D5 云调用、上传、计费及 L2 family/source 接收均不属于本方法。
+
+## 5. v2 数据与失败
+
+没有数据迁移、兼容期或新用户配置。Node 描述/资产只一份；模型准备缓存由固定清单和受保护配方标识，下载/展开分别合并，失败不发布 ready。原生文档脚本保持 v1 R1 的环境范围；视频首次模型准备只影响发起的工具调用。新增调用关联仅为当前原调用/当前代的在途记录，结束即解除，不写权限或身份真源。
+
+## 6. v2 架构与接缝映射
+
+仍落在模块图的 ui-mac 宿主、core MCP、schema/util 纯数据边界（v1 §6）；不新增顶层包，不让 core/ext import main。K1 不变；K2 继续由 launcher、共享 downloader、首方声明、Tool.Context.progress 各自拥有本域，未新建 Node、下载器、身份表或包管理器。
+
+| 本次能力 | 既有可调用符号 / 明确新增端口 |
+| --- | --- |
+| Intel 选择/资源投影及签名 | 现有 resolveTargetArch、resolveMacTargetArch、assertMacTargetArch（target-arch.ts:23-44,295）；**V2-R1** 扩展同一选择域和锁行，沿 v1 R1/R3a 签名/LauncherEnvironment 投影 |
+| 文档 bootstrap 读取与首次展开 | publishCodePuppyBootstrap/codepuppyBootstrap（util `:250,261`）、resourcesRoot（ext-fs-installer `:260`）；**V2-R2** 为 launchers 字段与 document 环境投影器/受管 ext 读取声明，新增 ConnectorLaunchHost.resolveAssets，沿 v1 的唯一资源展开 authority |
+| 固定文件 ID 获取与入口准备 | v1 R2/R7、ensurePinnedFile 与已有归档 OS 命令；**V2-R3** 为同一桥的 entryFor、受保护配方/原子展开及 ConnectorLaunchHost.prepareFiles，未复制 download |
+| 首方身份与 handler | declaredFirstPartyTools/declaredListedTools/listsDeclaration（core 自有 MCP 模块）；SDK setRequestHandler 自定义方法重载；**V2-R4** 在已收编 client.ts 的构造点消费现有核验绑定与配方注册 handler；#233 贡献视频声明，不另做名字白名单 |
+| 原工具调用/metadata/取消 | Tool.Context.progress（schema/tool.ts:14-19）、client.ts:550-554 的 _meta 与 SDK ctx.mcpReq._meta；**V2-R5** 在已收编 tool/mcp.ts、mcp/index.ts、mcp/client.ts 传递 preparation report，绑定原始调用 scope。不改未收编 stdio、不新增 SDK patch/公开 Server API |
+
+这些 V2-R1..R5 是设计决定 raise，不假称当前代码已经提供。签名、归档入口验证、包/模型格式、并发/取消元数据关联必须在真实入口取得可失败证据；本次没有运行应用或以文档核对代替这些证据。
+
+## 8. v2 所有权与交接
+
+| 产出方 | 本次产出 / 消费 | 设计输入 / 集成依赖 |
+| --- | --- | --- |
+| 本设计 / launcher authority | 同一 Intel 资产/环境投影、文档只读消费面；V2-R1/R2 | #1761 引用文末 DOC-NODE-v2 接收回执及本提交；Intel 打包/公证与 DocumentHost 实际执行仍为集成证据 |
+| #1761 文档拥有者 | DocumentEnvironment/DocumentHost 读同一 node，制作包与 Office Python 继续由自己构建锁持有 | 只更新其 §1/§4.1/§4.8/§6/§8/§10 的受影响依赖，不重开其它 frozen 决定；独立审查本增量后再结束 pending-seam 的实施交接 |
+| 本设计 / launcher + MCP client | L1 handler、同一 ID-only main 桥及固定文件展开；V2-R3..R5 | #233 引用 VIDEO-L1-v2 接收回执与本提交；调用 metadata/取消、原子入口与真实 Windows 结果仍需集成 |
+| #233 视频拥有者 | 首方声明/配方、实际 tools/call 中的私有 JSON-RPC 请求及准备后续处理 | 仅结束 L1 依赖的设计缺口；L2 未被本文接收，D5 沿其已定通道；具体 pin/许可/成员路径继续由资产 producer 提供 |
+
+接受设计请求不扩大本次生产发布授权。共享清单新增 Intel Python 行/以后视频合法条目仍按 v1 §8 的 relay snapshot → 打包清单核对/HEAD probe → 应用发布次序；不在此改来源、版本发布或收费契约。
+
+## 9. v2 回滚
+
+不适用。无迁移或不可逆数据改变，没有兼容/回滚路径。
+
+## 10. v2 裁决与接收回执
+
+| 接收回执 | 请求与决定 | 消费者可引用的精确契约 / 状态 |
+| --- | --- | --- |
+| **DOC-NODE-v2** | **接受** #1761 的 darwin-x64 Node/npm/platform 投影和合法 bootstrap 只读消费请求；不带第二份 Node，原生文档环境不套运行器覆盖 | v2 §4.1、§6 V2-R1/R2。引用本次提交及此回执即可定位已接收的设计决定；当前为 frozen-pending-review，尚非 Intel 成品已可运行或本增量独立审查通过 |
+| **VIDEO-L1-v2** | **接受** #233 L1：受管第一方 client 的 codepuppy/pinned-files.ensure，只收 IDs，经本来 launcher resolve/unpack 与 main 桥；原工具 metadata 进度、取消及失败复用 | v2 §4.2/§4.3、§6 V2-R3..R5。只包含 L1；L2 与 D5 无授权扩展。引用本次提交及此回执；当前为 frozen-pending-review，尚非新 handler 已实现 |
+
+**传播核对**：读取文档请求 `279e9bf1c1` 及 HEAD `5c3a3be` 的 `rg -n 'bootstrap|LauncherEnvironment|darwin-x64'`，命中 §1、§4.1、§4.8、§8、§10；本增量用 DOC-NODE-v2 回这些旧 platform/读取假设。视频 `9f438a7bc8` 的 `rg -n 'PinnedFilesEnsure|pending-seam: L1|L1 的具体接纳'` 命中 §4.2 和 §10，VIDEO-L1-v2 对应同一方法、ID-only、路径/进度/取消形状；没有把 L2/D5 写成已接收。消费者文档由各拥有者引用接收提交更新，本次不编辑其它仓或 worktree。
+
+**作者核对回执**：Codex / GPT-6；依据是 v1 合入 `173122a8e9`、上述两个固定请求和本次 delta。已核共享权威、可调用符号/决定 raise、身份与调用归属、环境边界；结论为两项接收、v2 frozen-pending-review。没有本增量独立审查，review.rounds=0；v1 的独立 R1 收据保留在 frontmatter 的 review.v1 与原 §10。
+
+**本次小探针**：在 packages/core 执行 Bun CLI，以真实 SDK Client/Server 和 InMemoryTransport 配对；父 tools/call 带本接缝协议关联键，server 在原 handler 内 await 私有 pinned-files.ensure 请求，client handler 从 ctx.mcpReq._meta 核对后回复，原调用继续返回。输出 `PASS: SDK 2.3.1 custom request, metadata correlation and original call continuation over InMemoryTransport`，exit 0。仅取固定 ID，不访问网络或文件资源；没有手编外部系统归档/协议替身。这不是下载、权限边界、打包或进度接线验收。
+
+**文档验证回执**：v1 正文（除版本适用说明）及其 R1 回执逐字保留检查通过；v2 状态、三个新增资产摘要、两项具名接收回执核对通过。ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail），`git diff --check` exit 0；官方文档检查函数对本文 0 finding，仓级 71 errors / 251 warnings 为本次检出的既有范围外结果，未顺修。只同步生成器产出的本设计索引行。
+
+**待 owner 定**：无新增产品取舍或用户步骤。实际 Windows tar 格式、Intel 包/公证、原始 archive 分支、受管 MCP 的嵌套请求/metadata 归属、真实模型冷下载/取消仍未验证；它们是实施/集成证据，不能由本次接收回执冒充通过。

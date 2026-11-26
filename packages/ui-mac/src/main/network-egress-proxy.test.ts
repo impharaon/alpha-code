@@ -728,7 +728,7 @@ test("plugin loopback refused upstream is a named TCP failure with local service
     Effect.scoped,
     Effect.flip,
   ))
-  if (error._tag !== "ConnectError") throw error
+  if (!(error instanceof McpClient.ConnectError)) throw error
   expect(error).toMatchObject({ code: "tcp" })
   expect(mcpFailureReason(error.code, withFailureCode(error.code!, error.message))).toBe("本机地址上没有服务在运行")
   expect(mcpFailureReason("http", "HTTP 502")).not.toBe("本机地址上没有服务在运行")

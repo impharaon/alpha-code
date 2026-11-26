@@ -97,7 +97,7 @@ async function harness(originalPath = "/project/speech.mp4") {
       requests.push(request)
       const id = `job_video_${requests.length}`
       jobs.set(id, { input: JSON.parse(request.envelopeJson).input })
-      request.progress(request.clip.bytes)
+      await request.progress(request.clip.bytes)
       return { ...accepted, kind: "video-understanding", job_id: id }
     },
     // Producer wire fixtures are unchanged except the domain parameters (job/range) of this call.

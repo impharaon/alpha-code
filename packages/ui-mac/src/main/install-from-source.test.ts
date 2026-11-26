@@ -696,3 +696,25 @@ test("source component names preserve logical identity across kind case and defi
   expect(pluginHostName(moved, "claude:codspeed", new Set(), () => true)).toBe(first)
   expect(pluginComponentId("claude:codspeed", moved)).toBe(pluginComponentId("claude:codspeed", entry))
 })
+
+test("allocated plugin host names survive removal of a colliding connector", () => installerHarness(async h => {
+  const { pluginHostName } = await import("./plugin-package-install")
+  const { removeMcp } = await import("./ext-config")
+  const capture = await captureFixture("external_plugins/context7")
+  const converted = await convertPluginTree(capture)
+  const entry = converted.package.entries.find(entry => entry.kind === "mcp")!
+  const occupied = pluginHostName(entry, "claude:context7", new Set(), () => true)
+  expect(persistMcp(occupied, { type: "remote", url: "https://mcp.context7.com/mcp?client=user", oauth: false })).toMatchObject({ ok: true })
+  const candidate = await h.candidate("context7")
+  const installed = await h.install(h.request(candidate, "allocated_name_first"))
+  if (!installed.ok) throw Error(installed.detail)
+  const hostName = installed.installed[0]!.hostName
+  expect(hostName).not.toBe(occupied)
+  expect(removeMcp(occupied)).toMatchObject({ ok: true })
+  const updatedCapture = await captureFixture("external_plugins/context7", { ".mcp.json": new TextDecoder().decode(await capture.readFile(".mcp.json")).replace("claude-code-plugin", "updated-definition") })
+  const updated = await convertPluginTree(updatedCapture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...updated, capture: updatedCapture, runtimeIdentity: undefined })
+  const result = await h.install(h.request(candidate, "allocated_name_update"))
+  expect(result.ok && result.installed[0]!.hostName).toBe(hostName)
+  expect(readMcpLeafStrict(hostName)).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
+}))

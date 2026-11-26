@@ -620,3 +620,5 @@ A9 font render green：原 installer 调用反例不改，renderer 文件 6 PASS
 B1 red：既有 document-host 文件保留真实 pending 落盘，重开时改用真实 createDocumentRuntime（仅 ensureFile/extract/固定验证回执受控）。当前启动及订阅未调 query，target exit 1（B1-red.log），先在同步真实方法边界断言失败，不以任意等待制造超时。下一提交仅对 waiting/admitting 所属 Location 发起既有 query。
 
 B1 green：真实 runtime 通过 pending 启动和订阅 query 进入准备并只 acquire 一次，host 文件 9 PASS（B1-green.log）。只启动实际 waiting/admitting 的文档需要，admitted/其它项目不触发；没有新增队列/引擎接口。ext 检查组件的 runtime fixture 补既有 query 方法以符合私有依赖。
+
+B8 确认：冻结 §4.3:146 明确首次文档 environment 查询才触发准备，普通库/reader 不等待 LO。新 runtime 反例表明只发 Python 投影已调用 query，target exit 1（B8-red.log）。原投影 ready 用例同提交显式调用 query，代表真正文档需要；下一提交移除 Python 投影发布的隐式 query，普通 environment/渲染及 B1 pending 仍走既有显式 query。

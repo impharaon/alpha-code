@@ -118,6 +118,7 @@ test("Python projection is live before state notifications and invalidated befor
   const stop = runtime.subscribe((state) => {
     expect(JSON.parse(readFileSync(environment.CODEPUPPY_DOCUMENT_HOST, "utf8")).runtime).toEqual(state)
   })
+  runtime.query(f.location)
   expect((await ready).phase).toBe("ready")
   stop()
   const final = JSON.parse(readFileSync(environment.CODEPUPPY_DOCUMENT_HOST, "utf8"))
@@ -225,4 +226,17 @@ test("a published runtime that fails verification is re-extracted once and then 
   expect((await result).phase).toBe("ready")
   expect(f.counts.extract).toBe(1)
   expect(f.counts.verify).toBe(2)
+})
+
+test("publishing the Python environment for an enabled connector does not begin LibreOffice preparation", async () => {
+  const f = fixture()
+  const runtime = createDocumentRuntime({ ...f.input, resources: join(import.meta.dir, "../../resources") }); runtimes.push(runtime)
+  runtime.subscribeRuntimeVerify(f.location, f.completed)
+  const query = spyOn(runtime, "query")
+  try {
+    const environment = runtime.pythonEnvironment(f.location)
+    expect(JSON.parse(readFileSync(environment.CODEPUPPY_DOCUMENT_HOST, "utf8")).status).toBe("active")
+    expect(query.mock.calls).toHaveLength(0)
+    expect(f.counts.acquire).toBe(0)
+  } finally { query.mockRestore(); await runtime.dispose() }
 })

@@ -95,12 +95,14 @@ test_layer_map() {
 
 # ui-mac 里起真引擎的文件(integration 与 scenario 两层)串行跑(与别的 worker 抢 CPU 会超时变红,#1740 实测),其余并行 ——
 # 不起引擎的 scenario 文件(子进程套件、计时)照旧并行,串起来只会让夜间变慢;真浏览器文件见 ui_mac_run_group。
-# 判据是**启发式**(文件名含 engine,或文件 / 它引用的 *.cases.ts 里出现引擎沙箱 / 内嵌引擎等字样):
+# 判据是**启发式**:文件名含 engine,或文件 / 它引用的 *.cases.ts 里有起引擎的代码(引擎沙箱 / 内嵌引擎的导入、spawnLocalServer、
+# startEngine)。只看文件名不看目录(src/engine-adapter/ 下多数文件只读录好的样本、用假引擎),只认代码不认散文(注释与标题里的
+# 「真引擎」多半在说别处)—— I-09 实测这两处多判了 27 个不起引擎的文件(74 个串行文件里)。
 # 漏判 = 该文件留在并行组(最坏是回到间歇红,不丢覆盖),多判 = 多一个串行文件(只慢不红)。
-UI_MAC_ENGINE_PAT='engine-sandbox|engine-embed|in-process-engine|spawnLocalServer|startEngine|embedded engine|real engine|真引擎'
+UI_MAC_ENGINE_PAT='engine-sandbox|engine-embed|in-process-engine|spawnLocalServer|startEngine'
 ui_mac_is_engine() { # <相对 packages/ui-mac 的文件>
   local f="$1" c cf
-  case "$f" in *engine*) return 0 ;; esac
+  case "${f##*/}" in *engine*) return 0 ;; esac
   grep -qE "$UI_MAC_ENGINE_PAT" "packages/ui-mac/$f" && return 0
   for c in $(grep -oE '[A-Za-z0-9._-]+\.(cases|live-cases)\.ts' "packages/ui-mac/$f" | sort -u); do
     cf="packages/ui-mac/$(dirname "$f")/$c"

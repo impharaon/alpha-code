@@ -1221,3 +1221,23 @@ stdout 的 CRLF/LF、最后残行经已有流执行器进入原 synthetic/inbox�
 六个移除臂全红：monitor-ready、monitor-invocation、monitor-skill-filter、monitor-once、monitor-notification、monitor-cancel；`python3 /tmp/plugin-standard-r14-monitor-removal.py`，结果 `/tmp/plugin-standard-r14-monitor-removal-results.json`，每臂确认实际注入，源盘未改。加前述 S-04 五臂、S-08 四臂、S-06 六臂，本轮 **21 个移除臂全红**。
 
 **Convex 原命令一次性验收**：ext 包内 `bun test --max-concurrency 2 /tmp/plugin-standard-r14-runtime/plugin-runtime.test.ts -t 'one-time original Convex'` **1 pass / 0 fail**（`/tmp/plugin-standard-r14-convex-original.log`）。原五条 monitor 命令正文保留，仅前置 temp PID 观察；首条 design Invocation 实际启动 runtime-errors / occ-insights 两条原 shell 循环，其余 quickstart 三条不运行。项目无 .env.local，实际走源自保护，无 npx/凭据/云请求；关包后两条原进程树退出，模型请求仍只有真实任务的一次。真实已关联部署的 npx 日志/insights、云权限与业务数据为外部验收边界；主动吐行的受控命令变体另证明宿主通知，不冒称静默原 guard 产生过 SaaS 错误行。
+
+### r14 收口｜PARTIAL，续片 5
+
+本轮去重相关集合 **294 pass / 0 fail**：host 89、native config reload 16、Location port 2、native/manual compaction 两文件 10、summary 具名三例 3、ext process/registry/setup 三文件 9、project trust 两文件 20、takeover/同步/parity 五文件 95、installer 50。具名迭代、初始红、移除臂、一次性实样与重复步骤的整文件不累加；计数清单 `/tmp/plugin-standard-r14-final-counts.json`。core/ext/plugin/ui-mac 包内 typecheck 通过；没有全包/全层、计时/容量 sweep、gate run、bin/check 或 app/Electron/window 启动。21 移除臂与四条已命名实样正向证据如前；Langfuse 的 positive case 来自混合初始 probe 中的 1 pass，整个初始 probe 曾因 telemetry fixture 缺 DATA 为 1 pass/1 fail，已明确区分。
+
+最终 `affected-tests --list` scope：**all tests: scripts/gate-files.tsv changed (gate or declared global input)**，**678 个 PR test files**（`/tmp/plugin-standard-r14-affected{,-scope}.txt`）；仅列出，不执行全清单。docs-contract 单仓 Alpha profile、changed-since 1db6a3bbf5：仍 **71 errors / 250 warnings**（`/tmp/plugin-standard-r14-docs.json`），按派发保留基线。独立 north-star 仍报本轮未改的 generated client types / schema mcp test 两个旧接管登记缺口，去向交编排器，不改它们。`git diff --check` 通过，hooksPath=.githooks。Host aggregate **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7**；20 成员/manifest 相对 r13 均未变，consumer pin/vendor 未动，跨仓 checkpoint 仍归编排器。
+
+| 真样包 | 本轮已实际观察 | 尚未验证/接通，不冒称整包 runtime DONE |
+| --- | --- | --- |
+| code-modernization | 六原 telemetry handlers，七条数值 metrics，含真实普通/工具失败/provider 失败阶段 | in-process UI module 明确排除；不声称运行它 |
+| Langfuse | 原 Stop shell/Python fallback 实际到缺 SDK 的 fail-open 诊断，state 进 DATA；OPTION/default/secret 的 process 判据继承并在相关集覆盖 | uv/SDK 安装与真实 SaaS trace 是外部验收；SessionEnd 尚待 S-03 |
+| Convex | 原 design 两条 monitor shell 循环实际启动、自保护与关包杀树；受控真实声明变体证明输出、残行、scope、首条 invoke/always/关闭迟到结果 | 已关联部署的 npx auth/logs/insights/featureRequests 为外部验收；原 quickstart 三条未单独回放，不声称收到云输出 |
+| Stripe | 原 PostToolBatch.mjs 经真实本地 MCP 调用在下一模型请求前输出反馈，抽样率唯一改成 1 | 未提交 CLI feedback、未连 Stripe SaaS；不把本地 echo 当 Stripe 业务 |
+| dash0 | 固定原声明的 ConfigChange/PreCompact/PostCompact 观察命令变体，经真实 watcher/admission/compaction 发布通过；失败事件继承 r13 | 其原采集脚本整包回放与未接通事件仍未完成 |
+| Claude Security | accepted 原 unanswered/turn/bound 的真实 host 行为由完整 host 继续覆盖 | guard/banner/metrics 的其余整包回放仍未做 |
+| ralph-loop / hookify / PayPal | accepted 原 Stop、Pre/Post、prompt 行为由完整 host 继续覆盖 | 不把这些证明扩大为未接通的其它生命周期 |
+
+**下一轮精确状态**：S-04 已按 r14 ruling 完成；S-06 与 S-08 完成，monitors 原进程/会话 wiring 与本轮范围证据完成。片 5 仍有 **S-03** 的真实 leave/SessionEnd（含 main 在释放前 await）、统一 Notification、FileChanged/CLAUDE_ENV_FILE、完整 SubagentStart/Stop 来源字段；**S-05 InstructionsLoaded** 的真实 source/admission；**S-07 Elicitation/Result** 的 HTTP/SSE 会话与 stdio in-flight 归属；其余获准 prompt 事件与上表剩余原脚本验收。未开始片 7。无新设计裁决/公开合同问题被擅定；所有实现仅消费原 v3.1 与已接受 ruling。
+
+已核 Codex（GPT-6）。本轮 2026-11-26 23:53 至 2026-11-27 00:42（UTC+08）约 49 分钟；截至本收口前 19 文件、868 additions / 84 deletions（含红测、原测试、registry/ADR/docs）。必要表外私部 helper 与 mock 同步原因已逐步记录；无新依赖/迁移/仓外写。遗留去向：剩余片 5 fix now 续本车道；两个旧 north-star 登记缺口与 host checkpoint 交编排器；docs 基线/三条旧 command-subagent 断言仍归原处置。无新增 OPTIONAL；本轮状态 **PARTIAL**，不将片 3/4 的 accepted 或本轮局部证明标作片 5 全部完成。

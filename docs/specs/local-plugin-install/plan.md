@@ -456,3 +456,11 @@ HTTP 新具名两例 2 pass，覆盖无凭据/跨路径/跨 CONNECT 目标的拒
 r2 HTTP 静态收口：core `bun typecheck` exit 0（2,053 files / 2 projects），ui-mac `bun typecheck` exit 0，ext `authority-registry.test.ts` 5 pass / 0 fail。非 darwin 也启动同一个私有 MCP 代理，但不更改其普通代理环境；darwin 的 NO_PROXY/围栏端口沿原值。
 
 r2 AC-04 补红：`connector version selection preserves the source argv when pinned or cleared` 从 standard 的真实 Codex build-ios-apps 取 XcodeBuildMCP，具名命令 exit 1，0 pass / 1 fail（版本字段缺席），日志 `/tmp/plugin-standard-r2-version-red.log`；后续只补实现，不改此正确断言。
+
+r2 AC-04 与服务窗收口：来源模块沿唯一 npm registry/既有 source deadline 读取真实 metadata 作为可用建议，不下载或执行程序；建议不可取得时仍提供空的选填字段。MCP 版本覆盖保存于同一私有设置文件，只在原 floatingVersion.commandIndex 替换该 token，其他 argv 保持；显式清空保留用户选择并恢复源命令。该具名红测已转绿，`install-from-source.test.ts plugin-sources.test.ts` 两文件完整 89 pass / 0 fail；metadata 来源用既有真实 npm /latest 夹具正反验证。新增 ordinary/secret/版本 DTO 往返与过滤检查；服务小窗两条 DOM 用例覆盖源标题/描述、false/0/空串、瞬时密码、建议预填/清空且无 required 限制，`test-component/package-account-dialog.cases.ts` 完整 7 pass / 0 fail。`PluginMcpBindingError` 只携带缺失选项/环境依赖的公开名字，收敛不把配置错误吞成整包失败，旧服务先断开；敏感值不进入错误。版本/设置消费均为本节初始文件链；`plugin-sources.ts` 的 metadata helper 留唯一 registry 常量拥有者，没有新增依赖或其他来源配方。
+
+S-09 main→sidecar update 另加生产 fork 消息的 ack 行为用例：`server.test.ts -t 'plugin MCP proxy publication waits'` 1 pass / 0 fail（51 filtered），证明 main 在 ack 前不返回、exit 撤销能力。不是只静态断言消息名称。
+
+r2 别名权限补红：真实 core 的 ModelRequest 已验证同一对象别名执行原注册 executor（1 pass）；进一步把原 MCP canonical identity 的停用记录写进既有 policy store，真实 ext 宿主却在 `execute.before` 报 unknown-tool-identity，未读到原规则。恢复 HEAD 的三个别名生产模块后，具名 `long plugin MCP names...` exit 1，0 pass / 1 fail，日志 `/tmp/plugin-standard-r2-alias-policy-red.log`；正确断言要求拒绝消息使用原 MCP identity。先提交该回归，再让同一 awaited context 产出的映射被唯一 policy facts 查询消费，保持实际执行/权限/MCP 身份不变。
+
+必要文件增量：`packages/ext/src/policy/index.ts` 超出初始文件列表，是上述回归的同调用链唯一 factsFor 拥有者；engine 的 execute.before 使用模型别名，不能另造权限 evaluator 或在后置 hook 事后改名。这里只登记本 Location 的已验证 MCP 名字映射并回查现有 allFacts，没有新增权限策略、公开端口或 engine 接管。

@@ -1617,7 +1617,8 @@ itWithPermission.live("D3/I-10 installing the user's own plugin asks once in eve
 }))
 
 it.live("long plugin MCP names are aliased by the awaited context hook without copying definitions", () => Effect.gen(function* () {
-  env({})
+  const account = "acct:" + createHash("sha256").update("long-alias").digest("hex")
+  env({}, { policyAccount: account })
   const { captureStandardFixture } = yield* Effect.promise(() => import("../../ui-mac/test-fixtures/plugin-helper/fixture"))
   const { mcpToolMark } = yield* Effect.promise(() => import("../../core/src/tool/codepuppy-mcp-tool-mint"))
   const converted = yield* Effect.promise(() => captureStandardFixture("claude:cloudinary").then(convertPluginTree))
@@ -1630,18 +1631,26 @@ it.live("long plugin MCP names are aliased by the awaited context hook without c
   const server = hostNames[source.id]!
   writeFileSync(join(live, "plugin-package.json"), JSON.stringify({ description: converted.package, hostNames }))
   writeFileSync(join(root, "ext-store", key, "current.json"), JSON.stringify({ generation: "gen-000001-abcdef" }))
-  writeFileSync(join(root, "ext-store", key, "package-settings.json"), JSON.stringify({ packageId: "claude:cloudinary", dataHome: join(scratch, "data"), values: {}, secretRefs: {}, versions: {} }))
+  writeFileSync(join(root, "ext-store", key, "package-settings.json"), JSON.stringify({ packageId: "claude:cloudinary", dataHome: join(scratch, "data"), values: {}, secretRefs: {}, versions: {}, mcpVersions: {} }))
   const name = "get_asset_" + "details_".repeat(8)
   const effective = server + "_" + name
   yield* activate({ id: "mcp-alias-registered-tool" as never, async setup(context) {
     await context.tool.transform(editor => editor.add({ name, options: { namespace: server, codemode: false }, ...mcpToolMark(server, name), description: "asset details", input: { type: "object" }, execute: async () => ({ content: "original tool" }) }))
   } })
   const definition = { description: "asset details", input: { type: "object" } }
-  yield* activate(CodePuppyExt)
+  writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [{ name: server, enabled: true }] }))
+  yield* activate(CodePuppyExt, { mcp: recordingMcp({ [server]: { type: "remote", url: "https://example.test/mcp" } }) })
   const hooks = yield* PluginHooks.Service
   const shaped = yield* hooks.trigger("session", "context", { ...contextEvent([]), tools: { [effective]: definition } })
   expect(Object.keys(shaped.tools)).toHaveLength(1)
   expect(Object.keys(shaped.tools)[0]!.length).toBe(64)
   expect(shaped.tools[effective]).toBeUndefined()
   expect(Object.values(shaped.tools)[0]).toBe(definition)
+  const location = yield* Location.Service
+  const store = createToolPolicyStore({ baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")), account: () => account, workspace: () => policyWorkspace(location as never) })
+  const canonical = canonicalToolIdentity({ source: "mcp", origin: server, name })
+  yield* Effect.promise(() => store.setRecord({ selector: { level: "tool", canonical }, state: "disabled" }))
+  const refused = yield* hooks.trigger("tool", "execute.before", { tool: Object.keys(shaped.tools)[0]!, ...ids, id: "call_long_alias" as never, input: {} }).pipe(Effect.exit)
+  expect(Exit.isFailure(refused)).toBe(true)
+  expect(JSON.stringify(refused)).toContain("Code Puppy tool policy denied " + canonical)
 }))

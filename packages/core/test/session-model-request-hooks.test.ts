@@ -238,3 +238,24 @@ describe("SessionModelRequest HTTP hooks", () => {
     }),
   )
 })
+
+it.effect("long plugin MCP aliases execute the original registered tool after model request shaping", () => Effect.gen(function* () {
+  const { Tool } = yield* Effect.promise(() => import("../src/tool"))
+  const { mcpToolMark } = yield* Effect.promise(() => import("../src/tool/codepuppy-mcp-tool-mint"))
+  const { aliasPluginMcpTools } = yield* Effect.promise(() => import("../../ext/src/plugin-package-tools"))
+  const registry = yield* Tool.Service
+  const hooks = yield* PluginHooks.Service
+  const server = { hostName: "cloudinary-a123456789", sourceName: "Cloudinary", packageId: "claude:cloudinary" }
+  const name = "get_asset_" + "details_".repeat(8)
+  let executions = 0
+  yield* registry.transform(editor => editor.add({ name, description: "asset details", input: { type: "object", properties: {} }, options: { namespace: server.hostName, codemode: false }, ...mcpToolMark(server.hostName, name), execute: () => Effect.sync(() => { executions++; return { content: "original MCP executor" } }) }))
+  const registered = yield* registry.list()
+  yield* hooks.register("session", "context", event => Effect.sync(() => aliasPluginMcpTools(event.tools, registered, [server])))
+  const requests = yield* SessionModelRequest.Service.pipe(Effect.provide(SessionModelRequest.layer))
+  const prepared = yield* requests.primary({ session, agent: Agent.ID.make("build"), model, system: [], messages: [], tools: yield* registry.snapshot() })
+  const alias = prepared.request.tools.find(tool => tool.name.startsWith(server.hostName + "_"))!.name
+  expect(alias.length).toBe(64)
+  const result = yield* prepared.executeTool({ sessionID: session.id, agent: Agent.ID.make("build"), messageID: "msg_alias" as never, call: { type: "tool-call", id: "call_alias", name: alias, input: {} } })
+  expect(result.content).toEqual([{ type: "text", text: "original MCP executor" }])
+  expect(executions).toBe(1)
+}).pipe(Effect.provideService(SessionModelTransport.Service, transport)))

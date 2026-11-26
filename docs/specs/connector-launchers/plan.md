@@ -474,3 +474,17 @@ Boolean case 曾在 VM 新 realm 下使官方 definitions 的 Boolean 与 CLI �
 边界：这一阶段还没有 npm 默认/显式 bin 选择、uv 全语法适配、非秘密 key、包安装/持久入口与完整 prepareConnectorLaunch，不能称 AC-04 或 AC-10 全部通过。Node boot 重锚、mandatory bootstrap.launchers、Host/controller/index/root/窄消息与真实 installed runtimeDep/secret/egress producer 的 production composition 仍按 #1759 接口表等待；本轮准备好的 localLaunch 接口消除了连接层重复装配工作，但不会自动完成这些缺口。
 
 r5 v2 接线证据：将既有 `codepuppy-mcp-runtime.test.ts` 的 managed production client 例提升为真实 McpConnection→stdio→SDK→同一已发布 Host；仍是此文件唯一的 Host publisher，不添加 reset 或第二个全局注册。原来「初始化/列工具不请求文件、只有 active call 才请求、绑定一致、进度回原 invocation」的断言全部保留，binding 改由真实 connection 构造，1 PASS / 8 assertions（`bun test test/codepuppy-mcp-runtime.test.ts -t 'production MCP connection registers pinned'`，`/tmp/connector-r5-managed-connection.log`）。自有 stdio fixture 只增 echo 参数触发已冻结 ensure 方法，协议由真实 SDK 编解码，没有实现另一套 handler。此测试不代替未装配的 main/sidecar root 或真实下载验收。
+
+### r5 Node 重锚的待裁定接缝（不改权限契约）
+
+`design.md:769` 要求确认 Node 重锚不会使按摘要持久化的状态失效。逐链核对后的精确事实是：MCP 的 authority.evidenceDigest 含展开 command（`ext/policy/identity.ts:142`），但 MCP 的工具/服务用户记录实际保存的是另一份 mcpBindingDigest（`identity.ts:174`、`rpc.ts:57,77`），其 mcpBindingEvidence 也含原样 command（`resolver.ts:43-46`）。record enabled 的非 class 规则在 digest 不等时回 ask（`resolver.ts:139`），不是连接状态字段自行重置。
+
+一次性真实纯函数/磁盘证明：`bun /tmp/connector-r5-npm-proof/reanchor-policy.ts` exit 0（`/tmp/connector-r5-reanchor-policy.log`）。在临时目录建立自己的受保护 Node 声明，分别以 old-pin/new-pin 描述调用同一 expander 和 authorityForMcp，两者都严格核验为 codepuppy-bundled；用生产 save/load 保存/重读 tool enabled 记录，再喂生产 resolveToolPolicy，得到 before=enabled/allow，after=ask/binding-changed；authorityDigestChanged=true、bindingDigestChanged=true。cache root/服务代码/其它 argv 均未变。最初探针误用 load.document（实际字段 doc）已修正，没有修改产品代码。
+
+SEAM-CHANGE-NEEDED：首方 Node boot re-anchor / 持久 tool-service binding —— 上述真实状态后果不能靠放宽当前 Node 的精确匹配或改其它冻结权限规格绕过。最小需要编排器在 §10 冻结「经完整首方核验的宿主 Node 槽在策略 binding 中如何稳定表示」以及与现有策略摘要的关系；推荐只稳定这个宿主位置，保留代码/声明、业务 argv/cwd 与第三方绑定语义。未验证前提是 §10 是否同时要求 tool/service enabled 跨 Node pin 保留，而不只是 MCP 连接上线；若只要求连接，本后果应由编排器明确记为现有重绑语义。没有 owner 新决定、没有记录迁移、没有改策略或引入确认步骤。本接缝阻止本轮把 Node boot 重锚报告为完成；#1759 production assembly 等待仍独立存在。
+
+### r5 uv 只读地面证据（不是新实现）
+
+`gate slot -- python3 /tmp/connector-r5-uv-proof/settings.py` exit 0；固定 uv 0.13.10 在 HOME/UV/TMP/XDG 全部隔离的临时目录，以 `--no-config --offline --show-settings tool run --from codepuppy-probe-nonexistent-package==0 --with packaging==24.0 probe-command --business <temp workspace>` 返回 4824 bytes stdout、0 stderr，未执行服务或解析不存在包。原样输出 `/tmp/connector-r5-uv-proof/case-z2opj_os/stdout` 有 ToolRunSettings 的 command/from/with/constraints 与有效 resolver 设置；同时含 refresh/SystemTime，因此不能把整份调试输出当 key。没有读取用户 .env/config，没有把这个调试格式或半套语法解析器加入产品；完整 uv 适配、配置内容指纹与安装/bin 捕获仍未完成。
+
+移除臂首次发现许可用例的断言在内部 Effect 中先失败，主纤维还等 preparing 屏障，只得到 timeout；这不是合格反例。用例改为把「当时能否立即取得许可」经 Deferred 交父纤维断言，不改产品许可/预算，也不加墙钟断言。重做此一臂，最终结果见下文收据；其余臂无需重跑。

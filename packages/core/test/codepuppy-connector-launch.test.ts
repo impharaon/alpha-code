@@ -718,7 +718,7 @@ test("connector preparation runs before permits and publishes progress before th
     Effect.scoped(
       Effect.gen(function* () {
         const ready = yield* Deferred.make<void>()
-        const preparing = yield* Deferred.make<void>()
+        const preparing = yield* Deferred.make<boolean>()
         const current = yield* launchConnection({
           root,
           snapshots,
@@ -727,11 +727,9 @@ test("connector preparation runs before permits and publishes progress before th
           prepare: ({ preparing: report, runtimeDep }) =>
             Effect.gen(function* () {
               expect(runtimeDep.missing).toEqual([])
-              expect(Option.isSome(yield* startPermits.withPermitsIfAvailable(START_CONCURRENCY)(Effect.void))).toBe(
-                true,
-              )
+              const available = Option.isSome(yield* startPermits.withPermitsIfAvailable(START_CONCURRENCY)(Effect.void))
               report("python", { unit: "bytes", completed: 42, total: 100 })
-              yield* Deferred.succeed(preparing, undefined)
+              yield* Deferred.succeed(preparing, available)
               yield* Deferred.await(ready)
               return {
                 runner: "uv-tool" as const,
@@ -746,7 +744,7 @@ test("connector preparation runs before permits and publishes progress before th
             }),
         })
         const fiber = yield* Effect.forkScoped(current.connection.start)
-        yield* Deferred.await(preparing)
+        expect(yield* Deferred.await(preparing)).toBe(true)
         expect(spawns).toHaveLength(0)
         expect(snapshots.map((row) => row.state.phase)).toEqual(["preparing", "preparing"])
         expect(snapshots[1].state).toEqual({
@@ -843,7 +841,7 @@ test("connector cancellation during preparation prevents a late result from spaw
         expect(snapshots).toHaveLength(length)
         expect(snapshots.at(-1)?.state.phase).toBe("disabled")
         expect(snapshots.some((row) => row.state.phase === "failed")).toBe(false)
-    expect(current.failures).toEqual([])
+        expect(current.failures).toEqual([])
       }),
     ).pipe(Effect.provide(hostEnvironmentLayer)),
   )

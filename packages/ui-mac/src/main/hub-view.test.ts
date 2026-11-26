@@ -614,3 +614,39 @@ test("A3 main accepts before a slow install finishes and owns the submitted/comm
   expect(requests.get("request_a3")).toMatchObject({ stage: "committed", packageId: "claude:playwright", outcome: { ok: true } })
   expect(changes).toHaveLength(2)
 })
+
+test("plugin SessionEnd requester awaits the real receiver reply and rejects a dead generation", async () => {
+  const { createPluginSessionRequester } = await import("./plugin-session-lifecycle")
+  const sent: unknown[] = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  let done = false
+  const leave = requester.request({ sessionId: "ses_leave", action: "leave", reason: "resume" }).then(() => { done = true })
+  await Promise.resolve()
+  expect(done).toBe(false)
+  expect(sent).toEqual([{ type: "codepuppy.plugin.session", id: expect.any(Number), sessionId: "ses_leave", action: "leave", reason: "resume" }])
+  const id = (sent[0] as { id: number }).id
+  expect(requester.receive({ type: "unrelated", id, ok: true })).toBe(false)
+  expect(requester.receive({ id, ok: true })).toBe(true)
+  await leave
+  expect(done).toBe(true)
+  const pending = requester.request({ sessionId: "ses_other", action: "leave", reason: "other" })
+  requester.close()
+  await expect(pending).rejects.toThrow("runtime-failed")
+})
+
+test("main settles every actually viewed Session before stopping without inventing a Session", async () => {
+  const { createPluginSessionRequester, notePluginSessionViewed, endViewedPluginSessions } = await import("./plugin-session-lifecycle")
+  const sent: Array<{ id: number; sessionId: string }> = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  notePluginSessionViewed(1776, "ses_left")
+  notePluginSessionViewed(1777, "ses_right")
+  notePluginSessionViewed(1778, "ses_left")
+  const end = endViewedPluginSessions("logout")
+  expect(sent.map(message => message.sessionId).toSorted()).toEqual(["ses_left", "ses_right"])
+  for (const message of sent) requester.receive({ id: message.id, ok: true })
+  await end
+  notePluginSessionViewed(1776, undefined)
+  notePluginSessionViewed(1777, undefined)
+  notePluginSessionViewed(1778, undefined)
+  requester.close()
+})

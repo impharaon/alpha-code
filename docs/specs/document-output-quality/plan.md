@@ -436,3 +436,5 @@ r8 已完成组件与必要偏离：按 §4.10 追加 `main/document-python.ts`�
 其余 pending 去向不变：#1760 生产接线/许可资产与 relay、Windows 实机、正式围栏/退出/出网、共享/数组公式及真实 Excel-made 对象的补充实际样本、片 8 默认模型三次旅程；本次 controlled can_rebuild=false 用例不假称 Excel 实物。`affected-tests --list` 仍 exit 2（缺 `.gate-tests`），没有 scope line，输出 `/tmp/alpha-1761-r8/affected.scope`，交调度方/gate 配置拥有者，不改 gate 或全量兜底。已核 Codex / GPT-6，依据 `7ef8b89b30`；冻结决定未变。结束前工作均提交、前台排空，hooksPath `.githooks`。
 
 最终文档检查：本节 12 links PASS、`git diff --check` exit 0；alpha profile 文档契约本文件 findings=0（全仓既有 322 findings 不扩修），`/tmp/alpha-1761-r8/docs-contract.json`。工作时间约 09:25–10:20 UTC，包含共享 slot 等待和首次既定 180 s 超时；本轮未启动 app/Electron/任何窗口，未 push/PR/merge、上传、发布或部署。
+
+保存前新增直接接线回归：真实 `Plugin.Context.location` 是 `Location.Info`（`packages/plugin/src/promise/plugin.ts:29`、`packages/schema/src/location.ts:19-25`），含 project；文件契约是 Location.Ref。当前 writer 直接序列化 Info 会被 Python 的严格投影 schema 拒绝。既有 `Python projection...` 用例补真实形状及 Ref-only 断言，target 命令 exit 1，`location-ref-red.log`。先提交该正确断言，再仅在 main 写文件时投影 directory/workspaceID；不修改仍待处置的缓存错误断言。

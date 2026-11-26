@@ -104,12 +104,15 @@ describe("document runtime", () => {
 
 test("Python projection is live before state notifications and invalidated before registration cleanup", async () => {
   const f = fixture()
+  // Actual Plugin.Context.location is Location.Info and includes project; the file contract is only Location.Ref.
+  Object.assign(f.location, { project: { id: "global", directory: f.location.directory, canonical: f.location.directory } })
   const runtime = createDocumentRuntime({ ...f.input, resources: join(import.meta.dir, "../../resources") })
   runtimes.push(runtime)
   const unregister = runtime.subscribeRuntimeVerify(f.location, f.completed, "python-registration")
   const environment = runtime.pythonEnvironment(f.location)
   const first = JSON.parse(readFileSync(environment.CODEPUPPY_DOCUMENT_HOST, "utf8"))
   expect(first).toMatchObject({ status: "active", registrationId: "python-registration", sidecarGeneration: 3, pinSha256: pin.sha256 })
+  expect(first.location).toEqual({ directory: f.location.directory })
   expect(readFileSync(first.jobs.fontconfigTemplate, "utf8")).toContain("{{JOB_FONT_CACHE}}")
   const ready = until(runtime, (state) => state.phase === "ready" || state.phase === "failed")
   const stop = runtime.subscribe((state) => {

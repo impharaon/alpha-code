@@ -14,6 +14,11 @@ packages/ext/src/policy/store.ts	mkdirSync	path.dirname(file)	main-only
 packages/ext/src/policy/store.ts	renameSync	file	main-only
 packages/ext/src/policy/store.ts	renameSync	tmp	main-only
 packages/ext/src/policy/store.ts	writeFileSync	tmp	main-only
+# #1758 SC-01: safe staging 与 AES-GCM spool 都与 Core shell capture 同目录;packages/core/src/shell.ts 的 outputDir = <XDG_DATA_HOME>/opencode/shell/<project>，属于既有 W4，不增加可写根。
+packages/ext/src/secret-mask.ts	open	staging	W4
+packages/ext/src/secret-mask.ts	unlink	staging	W4
+packages/ext/src/secret-spool.ts	open	file	W4
+packages/ext/src/secret-spool.ts	unlink	file	W4
 packages/ui-mac/src/main/codepuppy-config-injection.ts	mkdirSync	userDataPath	W3
 packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	file	W3
 packages/ui-mac/src/main/codepuppy-environment.ts	mkdirSync	directory	main-only

@@ -1028,3 +1028,5 @@ A9-layer：将原 core runtime 的私有 HTTP 代理用例移到 ui-mac 原 plug
 B3：b396ce1cab 原位真实 host 回归先红（未知 hint 拒绝 command，0 pass / 1 fail，`/tmp/plugin-standard-r11-B3-red.log`）。model-facts 未匹配时复用调用链 log 记录具体 hint 并返回 undefined；command 与 delegation 保留当前/default 模型，不引入新的模型要求。具名绿 1 pass，原 host 文件 67 pass / 0 fail（`/tmp/plugin-standard-r11-B3-complete.log`），同例实际走 command 和子助手；两次日志均点名 missing-model-hint。gate-files 精确 66→67。变更仅 ext 私有解析与现有消费者，无新增 engine 接管。
 
 B4：788cd8c518 原位真实 hookify writing-rules 回归先红（0 pass / 1 fail，`/tmp/plugin-standard-r11-B4-red.log`），比较真正 skill tool 输出文本与原正文（仅 ROOT 绑定）。replace 改为函数返回正文，使 `$` 替换模式保持数据。具名绿 1 pass，原 host 文件 68 pass / 0 fail（`/tmp/plugin-standard-r11-B4-complete.log`）；gate-files 精确 67→68。未新增模板/转义权威。
+
+B6：ea9c142a7e 原位 host 回归先红（tool delegation 多出一次无 source 的 assert，0 pass / 1 fail，`/tmp/plugin-standard-r11-B6-red.log`）。私有 delegate 明确消费 command/tool 调用域，只为无 tool-call 的 command 入口做该 assert；tool 入口保留原 execute.before 与 native executor 的 sourced 权限链。真实 permission evaluate 观察正/反域，无 mock、无放宽策略。具名绿 1 pass，原 host 文件 69 pass / 0 fail（`/tmp/plugin-standard-r11-B6-complete.log`），command 的独立检查仍 1 次，gate-files 68→69。

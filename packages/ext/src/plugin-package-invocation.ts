@@ -223,6 +223,7 @@ export async function registerPackageInvocations(
     rawArguments: string,
     prompt: string,
     toolContext: ToolContext,
+    via: "command" | "tool",
     incoming: Record<string, unknown> = {},
   ) => {
     requireActive(item)
@@ -241,7 +242,7 @@ export async function registerPackageInvocations(
                 candidate.entry.sourceName === named,
             )?.name ?? named)
           : "general"
-    await context.permission.assert({
+    if (via === "command") await context.permission.assert({
       sessionID: parent.id,
       agent: toolContext.agent,
       action: "subagent",
@@ -333,7 +334,7 @@ export async function registerPackageInvocations(
           requireActive(item)
           const frame = await manualContext(invocation.sessionID)
           if (item.entry.invocation.fork || item.entry.invocation.agent) {
-            await delegate(item, invocation.prompt.text, "", frame)
+            await delegate(item, invocation.prompt.text, "", frame, "command")
             return
           }
           const text = await prepared(item, invocation.prompt.text)
@@ -397,7 +398,7 @@ export async function registerPackageInvocations(
           requireActive(item)
           const rawArguments = typeof data.arguments === "string" ? data.arguments : ""
           if (name === "subagent")
-            return delegate(item, rawArguments, typeof data.prompt === "string" ? data.prompt : "", frame, data)
+            return delegate(item, rawArguments, typeof data.prompt === "string" ? data.prompt : "", frame, "tool", data)
           if (
             !item.entry.invocation.implicitInvocation &&
             ![...(scopes.get(frame.sessionID)?.values() ?? [])].some(
@@ -409,7 +410,7 @@ export async function registerPackageInvocations(
           )
             throw new Error("runtime-failed: skill requires an explicit invocation: " + item.entry.sourceName)
           const loaded = await original({ ...data, id: selected?.id ?? "skill--" + item.name }, frame)
-          if (item.entry.invocation.fork || item.entry.invocation.agent) return delegate(item, rawArguments, "", frame)
+          if (item.entry.invocation.fork || item.entry.invocation.agent) return delegate(item, rawArguments, "", frame, "tool")
           const text = await prepared(item, rawArguments)
           bind(frame.sessionID, item, text, "tool")
           const body = selected?.content.trim()

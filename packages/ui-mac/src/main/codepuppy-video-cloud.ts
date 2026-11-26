@@ -483,7 +483,6 @@ export function createMainVideoService(deps: {
                 const decoded = decodeContract("VideoUnderstandingResultV1", value, "cloud-http")
                 if (
                   decoded.model !== record.model.key ||
-                  decoded.model_revision !== record.model.revision ||
                   !sameRange(decoded.source_range, range)
                 )
                   throw new Error("contract-incompatible")
@@ -526,7 +525,7 @@ export function createMainVideoService(deps: {
             {
               schema_version: 1,
               model: record.model.key,
-              model_revision: record.model.revision,
+              model_revision: answers[0]!.model_revision,
               source_range: record.input.source_range,
               usage,
               text: answers
@@ -538,13 +537,14 @@ export function createMainVideoService(deps: {
             },
             "cloud-http",
           )
-          record.result = {
+          const result = {
             ...answer,
             jobIds: [...new Set(record.attempts.flatMap((a) => (a.jobId ? [a.jobId] : [])))],
             cached: false,
           }
+          if(answers.every(answer=>answer.model_revision === record.model.revision))record.result=result
           await persist()
-          current.state = { result: record.result }
+          current.state = { result }
         } catch (error) {
           if (signal.aborted || (error instanceof Error && error.message === "cancelled")) {
             record.cancelled = true

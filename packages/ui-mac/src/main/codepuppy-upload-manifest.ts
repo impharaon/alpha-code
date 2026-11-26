@@ -250,11 +250,9 @@ export async function createVideoUploadSnapshot(
   tenantId: string,
   manifestJson?: string,
 ): Promise<VideoUploadSnapshot> {
-  const name = input.originalPath
-    .replace(/\\/g, "/")
-    .replace(/^[A-Za-z]:/, "")
-    .replace(/^\/+/, "")
-  const sensitivity = classifyUploadContent({ path: name, content: "" })
+  const relative=path.relative(input.directory,input.originalPath)
+  const name=(path.isAbsolute(relative) || relative.split(path.sep).includes("..") ? path.basename(input.originalPath) : relative).split(path.sep).join("/")
+  const sensitivity=classifyUploadContent({path:input.originalPath,content:""})
   const manifest = manifestJson
     ? decodeContract("UploadManifestV1", JSON.parse(manifestJson), "cloud-http")
     : decodeContract(

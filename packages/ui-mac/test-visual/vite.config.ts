@@ -8,6 +8,8 @@ import { UPSTREAM_LOGO_ALIAS } from "../scripts/upstream-logo-alias.ts"
 const providersStub = fileURLToPath(new URL("./providers-stub.ts", import.meta.url))
 
 export default defineConfig({
+  // Concurrent browser workers must not invalidate each other's optimized dependencies.
+  cacheDir: fileURLToPath(new URL(`../node_modules/.vite-browser/${process.pid}`, import.meta.url)),
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [
     {

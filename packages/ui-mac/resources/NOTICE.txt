@@ -40,6 +40,19 @@ text ships alongside it (resources/skills/skill-creator/LICENSE.txt). Source:
 Anthropic's official Claude plugins/skills.
 
 --------------------------------------------------------------------------------
+Bundled document and design skills
+--------------------------------------------------------------------------------
+The seven Anthropic skills docx, xlsx, pptx, pdf, frontend-design, canvas-design
+and theme-factory are adapted under factory-skills/office-docs/ and licensed
+under Apache-2.0. Each directory retains its complete LICENSE.txt. Upstream:
+https://github.com/anthropics/skills/tree/e4bb5d960d87126ff3b3a8af1a104b7db67560ba/skills
+Adapted by Code Puppy, 2026-11-26: local runtime paths, Chinese typography,
+template priority, local rendering and one-round visual review. The accompanying
+factory-skills/office-docs/document-skills.lock.json records every source hash,
+shipped hash, modification and exclusion. External standards XSDs, upstream
+canvas-fonts and theme-showcase.pdf are not distributed.
+
+--------------------------------------------------------------------------------
 Bundled ripgrep (search tools)
 --------------------------------------------------------------------------------
 The "rg" executable bundled under ripgrep/ is ripgrep by Andrew Gallant

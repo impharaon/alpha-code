@@ -43,7 +43,7 @@ AC-01..03 的九次默认模型测量沿 spec「待决」中已有的总额 50 �
 ## 切片一：固定技能快照与许可资产
 
 - 依据：[spec v1](spec.md) @ `31cd182e09710b603721c6f44d471b01289dd951`，AC-01..04 的技能来源与 AC-14 的 Anthropic 许可/排除部分；[design](design.md) @ `7d1c4fdb55cc388af1fc7069249ec3d449641a60` §4.1、§6 R1/R6、§10 R1-5 及许可处置；Issue #1761。其余字体、npm/Python、PDFium、社区 Excel 和 LO 的许可随各自资产片补齐。
-- 核对：待调度方核对本 PLAN 提交；收到恢复 brief 的 `Phase:` 回执后，在首个实施提交填写提交号、核对者/模型与结论。本轮作者核对不充作调度方通过。
+- 核对：`439a730bcc` · Claude Opus 5.5（orchestrator）· 通过。恢复 brief `Phase: IMPLEMENT` 接受八片及其 AC/外部依赖，首片以真实打包路径发现、许可/排除材料及删除后变红证明；冻结决定未变。ADR-014 决策 5 修订仍归调度方。
 
 ### 改动
 
@@ -53,6 +53,7 @@ AC-01..03 的九次默认模型测量沿 spec「待决」中已有的总额 50 �
 | --- | --- |
 | `packages/ui-mac/resources/factory-skills/office-docs/<skill>/SKILL.md`（新增） | 从固定源逐份适配制作指导及相互引用；保留制作知识，按设计接到 DocumentEnvironment、OfficeExcel、document.render/check 与现有 Read/识图，去掉不适用的安装/运行假设。正文按仓库 agent-facing 约定用英文，用户说明沿现有中文文案 |
 | `packages/ui-mac/resources/factory-skills/office-docs/<skill>/**`（新增的参考、必要脚本及 `LICENSE.txt`/已有 NOTICE） | 仅纳入实际制作/编辑路径需要且许可明确的文件；关联脚本同步适配。被排除的 XSD、字体和演示文件不进入任何随包副本；保留的检查入口做实际支持的结构检查，不误报 XSD 校验成功。所有改编文件注明来源、日期及修改 |
+| `packages/ui-mac/resources/factory-skills/office-docs/WORKFLOW.md`（新增） | 七份技能共同引用的应用执行指引；集中记录冻结入口的使用方法，避免七份正文各维护一套运行/自检说明 |
 | `packages/ui-mac/resources/factory-skills/office-docs/document-skills.lock.json`（新增） | 本组固定材料的来源记录：源 SHA、源路径/摘要、产出路径/摘要、适配说明及排除原因。由固定 Git tree 与实际文件计算，不从工作目录的未跟踪缓存取样，不生成虚构摘要；它不是另一套技能发现表 |
 | `packages/ui-mac/resources/NOTICE.txt` | 在既有随包署名清单中增加这七份技能的来源、Apache-2.0 许可位置和适配说明 |
 | `packages/ui-mac/src/main/factory-skills.test.ts` | 在已有真实 SkillScan 和打包资源复制用例旁补本组嵌套技能的 dev/packaged 发现、名称唯一性、来源摘要与许可/排除文件的资产验证；复用 setup，不新建票号测试文件 |
@@ -95,4 +96,4 @@ bun test src/main/codepuppy-factory-skill-hygiene.test.ts src/main/codepuppy-ski
 
 ### 偏离记录
 
-暂无。
+2026-11-26 · 步骤 1/2 的材料与适配合为首个资产提交，再提交发现/分发验证；避免把原名冲突、安装假设或悬空 helper 引用的原稿暴露给嵌套发现。新增同目录 `WORKFLOW.md` 集中七技能的共用执行指引；保留脚本仅为适配后的 `pptx/scripts/apply_theme.cjs`，其余按实际未使用路径逐文件记录排除。无冻结契约变更。

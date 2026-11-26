@@ -43,3 +43,17 @@ test("a real failing probe distinguishes truncated known media from a plain text
   expect(mediaFailure(error)).toMatchObject({code,action:expect.stringContaining(action!)})
  }
 })
+
+test("source read-modify-write serializes concurrent alias updates",async()=>{
+ const {updateSource}=await import("../../resources/video-mcp/source")
+ const source=await sourceOf({kind:"path",path:path.join(import.meta.dir,"fixtures/video/speech-en.wav")},runtime)
+ const count=source.aliases.length,gate=Promise.withResolvers<void>(),entered=Promise.withResolvers<void>()
+ const first=updateSource(source.sourceId,runtime,async current=>{entered.resolve();await gate.promise;return {...current!,aliases:[...current!.aliases,{path:"first-alias",identity:"first"}]}})
+ await entered.promise
+ const timer=setTimeout(()=>gate.resolve(),20)
+ try{
+  const second=updateSource(source.sourceId,runtime,async current=>{gate.resolve();return {...current!,aliases:[...current!.aliases,{path:"second-alias",identity:"second"}]}})
+  await Promise.all([first,second])
+  expect((await sourceOf({kind:"id",id:source.sourceId},runtime)).aliases).toHaveLength(count+2)
+ }finally{clearTimeout(timer);gate.resolve()}
+})

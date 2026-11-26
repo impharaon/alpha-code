@@ -2303,7 +2303,7 @@
     },
     {
       "id": "plugin-hook-lifecycle",
-      "decision": "DESIGN-local-plugin-install v3.1 §4.4/4.12 S-03: the ext runner consumes actual session lifecycle and existing idle/synthetic primitives. Package command SessionStart/UserPromptSubmit and Stop are active; Stop block/reason continues the same Session via its native idle drain, never a second inference loop. Other lifecycle domains are registered only as their consumers land.",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.4/4.12 S-03: the ext runner consumes actual session lifecycle and existing idle/synthetic primitives. Package command SessionStart/UserPromptSubmit, Stop and PreToolUse are active; Stop block/reason continues the same Session via its native idle drain, never a second inference loop. PreToolUse runs between policy deny and confirm/pin; the existing identity owner converts source tool fields. Final input, live generation and service digest bind a same-call decision in the existing policy authority; ask wins over allow and native hard deny remains authoritative. Other lifecycle domains are registered only as their consumers land.",
       "adr": [
         "ADR-029",
         "ADR-047"
@@ -2312,9 +2312,17 @@
       "takeovers": [],
       "mechanism": {
         "file": "packages/ext/src/plugin-package-hooks.ts",
-        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, same-session synthetic and AppProcess; no engine takeover."
+        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover."
       },
       "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "real hookify PreToolUse blocks the matching native write using source tool fields"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the real Convex hook allow is scoped to one call and never overrides a native deny"
+        },
         {
           "file": "packages/ext/src/plugin-host.test.ts",
           "name": "the real ralph-loop Stop hook continues the same task and stops at its completion promise"

@@ -2248,7 +2248,8 @@ packageIt.live("the real Convex hook allow is scoped to one call and never overr
   expect(allowed.asks).toBe(0)
   const deniedSession = yield* sessions.create({ location: { directory: location.directory }, title: "Native deny", agent: "build", model: { providerID: "test", id: "picked" }, permissions: [{ action: "edit", resource: "*", effect: "deny" }] } as never)
   expect(Exit.isFailure((yield* write("denied", deniedSession.id)).exit)).toBe(true)
-  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  // Toggle the bundle only: the native write also activated Convex's path-scoped skill.
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify(membership))
   const ordinary = yield* write("ordinary")
   expect(Exit.isSuccess(ordinary.exit)).toBe(true)
   expect(ordinary.asks).toBeGreaterThan(0)

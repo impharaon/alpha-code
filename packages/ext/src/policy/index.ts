@@ -1,5 +1,7 @@
 import { PACKAGE_TOOL_DEPENDENCY_ID, renderWrapper } from "../context-injection"
-import { packageToolRule } from "./identity"
+import { canonicalJsonDigest } from "./store"
+import { subjectBindingDigest } from "./resolver"
+import { packageToolRule, packageToolCall } from "./identity"
 import type { Invocation } from "../../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 import { ShellScan } from "../../../core/src/shell/scan"
 import { match } from "../../../core/src/util/wildcard"
@@ -25,7 +27,7 @@ import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
 import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, attachWriteDenied, displaySnapshot, wrapForDisplay } from "./display"
-import { PACKAGE_INVOCATION_ALLOW, confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
+import { PACKAGE_INVOCATION_ALLOW, PACKAGE_HOOK_DECISION, packageCallAllows, confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
 import {
   codeModeFacts,
   CODE_MODE_TOOL,
@@ -45,6 +47,8 @@ import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
 
 export interface PolicyRegistration {
+  bindPackageHook(call: GateCall, decision: "allow" | "ask", active: () => boolean): Promise<void>
+  packageToolCall(tool: string, input: unknown, bindings: Readonly<Record<string, string>>, format: "claude" | "runtime"): Promise<ReturnType<typeof packageToolCall>>
   bindPackageAgent(agent: string, invocation: Pick<Invocation, "availableTools" | "deniedTools">, bindings: Readonly<Record<string, string>>): void
   bindPackageInvocation(sessionID: string, invocation: Pick<Invocation, "allowedTools" | "deniedTools" | "availableTools">, bindings: Readonly<Record<string, string>>, active: () => boolean): () => void
   clearPackageInvocation(sessionID: string): void
@@ -61,7 +65,7 @@ export interface PolicyRegistration {
 
 /** One tool call: provider call IDs repeat across sessions and messages, so all three identify it. */
 export type InstallCall = { readonly sessionID: string; readonly messageID: string; readonly id: string }
-const installCallKey = (call: InstallCall) => JSON.stringify([call.sessionID, call.messageID, call.id])
+const toolCallKey = (call: InstallCall) => JSON.stringify([call.sessionID, call.messageID, call.id])
 
 /** MCP argv placeholder replaced with the Location directory at spawn time (#1011, REQ-134). */
 export const WORKSPACE_PLACEHOLDER = "{workspace}"
@@ -173,7 +177,14 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     log: (message) => console.info(`[codepuppy-policy] ${message}`),
   })
 
-  const ruleset = async (sessionID: string, agent: string, selected?: UnattendedProfile, call?: Pick<GateCall, "tool" | "input">): Promise<readonly PermissionRule[]> => {
+  const packageHooks = new Map<string, { call: GateCall; decision: "allow" | "ask"; active: () => boolean; input: string; binding: string | undefined; phase: "prepared" | "confirmed" }>()
+  const packageHook = (call: GateCall, facts: ToolFacts) => {
+    const bound = packageHooks.get(toolCallKey(call))
+    return bound && bound.active() && bound.input === canonicalJsonDigest([call.tool, call.input]) && bound.binding === subjectBindingDigest({ identity: facts.identity, authority: facts.authority, bindingDigest: facts.bindingDigest }) ? bound : undefined
+  }
+  const packageHookRules = (bound: NonNullable<ReturnType<typeof packageHook>>, facts: ToolFacts): PermissionRule[] => [{ action: PACKAGE_HOOK_DECISION, resource: canonicalToolIdentity(facts.identity), effect: bound.decision }]
+
+  const ruleset = async (sessionID: string, agent: string, selected?: UnattendedProfile, call?: Pick<GateCall, "tool" | "input"> & Partial<Pick<GateCall, "messageID" | "id">>): Promise<readonly PermissionRule[]> => {
     const configured =
       catalog.configured(agent) ??
       (await context.agent.get({ agentID: agent } as never)).data.permissions ?? []
@@ -186,7 +197,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     // take part, on both branches. The row lives in the engine database, which a fenced process can write, and an unattended
     // call the gate allows never reaches the engine's own decision. Code Puppy writes only deny there.
     const facts = call && await factsFor(call.tool)
-    return [...configured, ...(permissions ?? []).filter((rule) => rule.effect === "deny"), ...(facts ? invocationRules(sessionID, facts, call?.input) : [])]
+    const hook = facts && call?.messageID && call.id ? packageHook({ ...call, sessionID, agent, messageID: call.messageID, id: call.id }, facts) : undefined
+    return [...configured, ...(permissions ?? []).filter((rule) => rule.effect === "deny"), ...(facts ? invocationRules(sessionID, facts, call?.input) : []), ...(hook && facts ? packageHookRules(hook, facts) : [])]
   }
 
   const deps: GateDeps = {
@@ -267,8 +279,11 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     const sourceFacts = (await allFacts()).find(item => item.permission === event.action || canonicalToolIdentity(item.identity) === event.action)
     if (sourceFacts) {
       const rules = invocationRules(event.sessionID, sourceFacts, undefined, event.resources)
+      const bound = event.source?.type === "tool" ? packageHooks.get(toolCallKey({ sessionID: event.sessionID, messageID: event.source.messageID, id: event.source.id })) : undefined
+      const facts = bound && await factsFor(bound.call.tool)
+      const hook = bound?.phase === "confirmed" && facts ? packageHook(bound.call, facts) : undefined
       if (rules.some(rule => rule.effect === "deny")) event.effect = "deny"
-      else if (event.effect === "ask" && rules.some(rule => rule.action === PACKAGE_INVOCATION_ALLOW && rule.effect === "allow")) event.effect = "allow"
+      else if (event.effect === "ask" && (packageCallAllows(canonicalToolIdentity(sourceFacts.identity), rules) || hook !== undefined)) event.effect = "allow"
     }
     if (event.effect !== "ask" || !event.metadata) return
     ;(event.metadata as Record<string, unknown>)[RISK_METADATA_KEY] = classifyPermissionRequest({
@@ -290,6 +305,16 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }) as never)
 
   return {
+    bindPackageHook: async (call, decision, active) => {
+      const facts = await factsFor(call.tool)
+      if (!facts) throw Error("dependency-missing: tool identity " + call.tool)
+      packageHooks.set(toolCallKey(call), { call: { ...call, input: structuredClone(call.input) }, decision, active, input: canonicalJsonDigest([call.tool, call.input]), binding: subjectBindingDigest({ identity: facts.identity, authority: facts.authority, bindingDigest: facts.bindingDigest }), phase: "prepared" })
+    },
+    packageToolCall: async (tool, input, bindings, format) => {
+      const facts = await factsFor(tool)
+      if (!facts) throw Error("dependency-missing: tool identity " + tool)
+      return packageToolCall(facts, input, bindings, format)
+    },
     bindPackageAgent: (agent, invocation, bindings) => { packageAgents.set(agent, { invocation, bindings }) },
     bindPackageInvocation: (sessionID, invocation, bindings, active) => {
       const entries = invocationScopes.get(sessionID) ?? new Set()
@@ -301,7 +326,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     clearPackageInvocation: sessionID => { invocationScopes.delete(sessionID) },
     registerModelToolAliases: (aliases: ReadonlyMap<string, string>) => { for (const [alias, original] of aliases) modelToolAliases.set(alias, original) },
     askInstall: async (call) => {
-      const key = installCallKey(call)
+      const key = toolCallKey(call)
       const prepared = installAsks.get(key)
       if (!prepared) throw Error("not installed: this install has no prepared approval")
       installAsks.delete(key)
@@ -324,15 +349,24 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           const facts = decision.facts
           const install = facts.identity.source === "plugin" ? hubInstallAsk(event, facts.authority.kind === "codepuppy-bundled", installSubject) : undefined
           // BR-10: the verified install tool asks from its own call (`askInstall`), once it has recorded what it installs.
-          if (install?.subject) installAsks.set(installCallKey(event), { decision, call: { tool: event.tool, sessionID: event.sessionID, agent: event.agent, messageID: event.messageID, id: event.id, input: event.input }, install })
+          if (install?.subject) installAsks.set(toolCallKey(event), { decision, call: { tool: event.tool, sessionID: event.sessionID, agent: event.agent, messageID: event.messageID, id: event.id, input: event.input }, install })
           else await confirm(deps, decision, event, install)
-          if (install && !install.subject) installAsks.set(installCallKey(event), "asked")
+          if (install && !install.subject) installAsks.set(toolCallKey(event), "asked")
+          const hook = packageHook(event, decision.facts)
+          if (hook) {
+            const final = await decide(deps, event)
+            if (packageHook(event, final.facts) !== hook) {
+              packageHooks.delete(toolCallKey(event))
+              await confirm(deps, final, event, install)
+            } else hook.phase = "confirmed"
+          }
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
           if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)
         } catch (error) {
           displays.delete(event.id)
-          installAsks.delete(installCallKey(event))
+          packageHooks.delete(toolCallKey(event))
+          installAsks.delete(toolCallKey(event))
           throw error
         }
       })
@@ -341,6 +375,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         wrapForDisplay(editor as never, (callID) => displays.get(callID), network ? (tool, call, execute) => network.run(context.location.directory, tool, call, execute) : undefined),
       )
       await context.tool.hook("execute.after", (event) => {
+        packageHooks.delete(toolCallKey(event))
         const networkNotice = network?.attachResult(event as never)
         if (event.tool === CODE_MODE_TOOL) {
           attachUnattendedDenial(event as never, codeModeDenials.get(event.id))
@@ -351,7 +386,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         attachDirectoryDisplay(event as never)
         attachTerminal(event as never, displays.get(event.id))
         displays.delete(event.id)
-        installAsks.delete(installCallKey(event))
+        installAsks.delete(toolCallKey(event))
       })
 
       await catalog.refresh()

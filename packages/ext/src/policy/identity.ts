@@ -35,15 +35,26 @@ import { mcpBindingDigest, type McpEntry } from "./resolver"
 import type { ToolTransportFact } from "./risk"
 import type { ToolRule } from "../../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 
+const aliases: Readonly<Record<string, string>> = { Bash: "shell", Read: "read", Write: "write", Edit: "edit", MultiEdit: "edit", Glob: "glob", Grep: "grep", LS: "list", NotebookRead: "read", NotebookEdit: "edit", WebFetch: "webfetch", WebSearch: "websearch", TodoWrite: "todo", AskUserQuestion: "question", Agent: "subagent", Task: "subagent", Skill: "skill", KillShell: "shell_cancel", BashOutput: "shell_read" }
+
 /** Source spellings resolve against verified runtime facts, including this package's MCP bindings. */
 export function packageToolRule(rule: ToolRule, facts: ToolFacts, bindings: Readonly<Record<string, string>>): ToolRule | undefined {
-  const aliases: Readonly<Record<string, string>> = { Bash: "shell", Read: "read", Write: "write", Edit: "edit", MultiEdit: "edit", Glob: "glob", Grep: "grep", LS: "list", NotebookRead: "read", NotebookEdit: "edit", WebFetch: "webfetch", WebSearch: "websearch", TodoWrite: "todo", AskUserQuestion: "question", Task: "subagent", Agent: "subagent", Skill: "skill", KillShell: "shell_cancel", BashOutput: "shell_read" }
   const mcp = rule.tool.match(/^mcp__(.+?)__(.+)$/)
   const matches = mcp
     ? facts.identity.source === "mcp" && facts.identity.origin === (bindings["mcp::" + mcp[1]] ?? mcp[1]) && (mcp[2] === "*" || facts.identity.name === mcp[2])
     : rule.tool === "*" || (aliases[rule.tool] ? facts.identity.source === "builtin" && facts.identity.name === aliases[rule.tool] : facts.technicalId === rule.tool || facts.identity.name === rule.tool)
   if (!matches) return
   return { tool: facts.technicalId, ...(rule.pattern === undefined ? {} : { pattern: bindings[(facts.identity.name === "subagent" ? "agent" : facts.identity.name) + "::" + rule.pattern] ?? rule.pattern }) }
+}
+
+/** Source hooks and invocation rules consume this same verified identity/field authority. */
+export function packageToolCall(facts: ToolFacts, input: unknown, bindings: Readonly<Record<string, string>>, format: "claude" | "runtime") {
+  const name = facts.identity.source === "mcp"
+    ? "mcp__" + (Object.entries(bindings).find(([key, value]) => key.startsWith("mcp::") && value === facts.identity.origin)?.[0].slice(5) ?? facts.identity.origin) + "__" + facts.identity.name
+    : facts.identity.source === "builtin" ? Object.entries(aliases).find(([, value]) => value === facts.identity.name)?.[0] ?? facts.identity.name : facts.technicalId
+  const fields: Readonly<Record<string, string>> = facts.identity.source === "builtin" && ["read", "write", "edit"].includes(facts.identity.name) ? { path: "file_path", oldString: "old_string", newString: "new_string", replaceAll: "replace_all" } : {}
+  const mapping = format === "claude" ? fields : Object.fromEntries(Object.entries(fields).map(([runtime, source]) => [source, runtime]))
+  return { name, input: input && typeof input === "object" && !Array.isArray(input) ? Object.fromEntries(Object.entries(input).map(([key, value]) => [mapping[key] ?? key, value])) : input }
 }
 
 /** Registry entry as the promise plugin API lists it. */

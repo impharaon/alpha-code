@@ -32,7 +32,7 @@ export function createPackageProcesses(location: RuntimeLocation) {
       bound.argv.map((value) =>
         [...config.secretValues].some((secret) => value.includes(secret)) ? Redacted.make(value) : value,
       ),
-      { cwd: input.source.projectDir, env: { ...config.environment(), ...input.environment, ...bound.env } },
+      { cwd: input.source.projectDir, extendEnv: true, env: { ...config.environment(), ...input.environment, ...bound.env } },
     )
     const redact = (text: string) =>
       [...config.secretValues]

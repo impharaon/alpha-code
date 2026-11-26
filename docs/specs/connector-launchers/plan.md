@@ -357,3 +357,5 @@ UI：`connector-launch-presentation.ts` 为行和 BackgroundProblemWatcher 的�
 r4 安装步骤基线：先落当前 Location spawner 的固定 uv python install 命令与有工具时保持原 PATH 的正例；下一个提交单独保留无工具 marker 红例，再收敛该步骤 PATH。无生产 root 调用者，未把缺工具策略记为完成。
 
 r4 red-first：`bun test test/codepuppy-connector-launch.test.ts -t "excludes system tools"` 在安装步骤基线 616d06524b 上，absent / missing-directory 均因 marker 为 true 而失败（0 PASS / 2 FAIL；`/tmp/connector-r4-python-red.log`）。下一提交不改这两个断言。
+
+r4 guard green：原 absent/missing-directory 两个断言不改，生产步骤从 Environment.spawner 取得安全探测结果、用同一 Environment.files 检查目录。仅 uv python install 在缺工具时改为 uv/Node 两个随包目录 PATH，后续安装/服务及调用方原环境保持正常 PATH。前一轮首次 green 误用 Stream.drain（返回 Stream）导致 Not a valid effect，已按当前 Effect API 改 runDrain；随后文件 3 PASS / 11 assertions（`/tmp/connector-r4-python-green.log`），不是反复重跑不明红例。

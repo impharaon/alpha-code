@@ -2024,3 +2024,24 @@ for (const mode of ["user", "local"] as const) packageIt.live("package agent rea
   expect(Exit.isFailure(denied)).toBe(true)
   expect(yield* (yield* TestLLM.Test).requests()).toHaveLength(1)
 })))
+
+packageIt.live("package SessionStart hooks run before the first model request and follow bundle activity", () => packageJourney(Effect.gen(function* () {
+  const sample = yield* invocationSample("claude:learning-output-style")
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [sample.key], scoped: [], mcp: [] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const llm = yield* TestLLM.Test
+  const location = yield* Location.Service
+  const first = yield* sessions.create({ location: { directory: location.directory }, title: "Package hook", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* llm.push(TestLLM.text("First answer", "learning-first"))
+  yield* sessions.prompt({ sessionID: first.id, text: "Learn the project" })
+  yield* sessions.wait(first.id)
+  expect(JSON.stringify((yield* llm.requests())[0])).toContain("You are in 'learning' output style mode")
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  const second = yield* sessions.create({ location: { directory: location.directory }, title: "Disabled package hook", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* llm.push(TestLLM.text("Second answer", "learning-second"))
+  yield* sessions.prompt({ sessionID: second.id, text: "Package is disabled" })
+  yield* sessions.wait(second.id)
+  expect(JSON.stringify((yield* llm.requests())[1])).not.toContain("You are in 'learning' output style mode")
+})))

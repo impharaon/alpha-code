@@ -630,3 +630,5 @@ B2 一次实物确认：共享 gate slot 运行 5 个公式的小工作簿，实
 B2 green：同一三项实物规范化及字符串/数值负对照不改，office-excel 文件 12 PASS（B2-green.log）。只规范 token 语义，Decimal 不引入浮点误差，原 XML 公式与非目标 parts 的真实 fixture 断言仍通过。
 
 B3 red：真实插件宿主里成功合并 cloud + 合法项目 Office 声明，但文档 provider 尚未发布，当前异常把 cloud 也降为 UNVERIFIED，既有 sovereignty 路径出现第三方 by-name 原因；target exit 1（B3-red.log）。下一提交仅隔离文档环境获取错误，原配置/身份检查继续沿原责任。
+
+B3 green：provider 获取仅单独 log，MCP merge/ownership 不再全局降级；同一真宿主断言未改，plugin-host 文件 55 PASS（B3-green.log）。首方文档仍须真实绑定，未添加伪成功 provider。

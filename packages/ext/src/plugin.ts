@@ -395,8 +395,12 @@ export const CodePuppyExt: Plugin.Plugin = {
             if (!declaredFirstPartyTools(name, config, bootstrap.paths.officeMcpManifest, readFileSync, previous)) continue
             const resources = dirname(dirname(bootstrap.paths.officeMcpManifest))
             if (!checkCodePuppyOfficeMcpSafety(name, config as unknown as Record<string, unknown>, context.location.directory, resources, previous).ok) continue
-            const environment = await documentHost().pythonEnvironment(context.location)
-            editor.update(name, (entry) => { if (entry.type === "local") entry.environment = { ...entry.environment, ...environment } })
+            try {
+              const environment = await documentHost().pythonEnvironment(context.location)
+              editor.update(name, (entry) => { if (entry.type === "local") entry.environment = { ...entry.environment, ...environment } })
+            } catch (cause) {
+              error(`[@codepuppy/ext] document Python environment unavailable: ${describe(cause)}`)
+            }
           }
         } catch (cause) {
           merged = false

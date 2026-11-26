@@ -21,7 +21,45 @@
     "sha256": {
       "frame-source.mp4": "d89a4d97c877aaf0965ceccdf1b1a409af56a864838a928b575adcea96a7d9b6",
       "frame-sample.jpg": "f7f9de98fa8e4f23424a2aae1065711593afeb8fa7b4647d9a56c0a5409f9ab5",
-      "frame-control.json": "c6183c742b3bf62a1feb9e93646ea2d9404262501ed733a09fe1f6467af9a5ee"
-    }
+      "frame-control.json": "6f191884cd6bc4c1238ba830e4c165ed73fb31a91c40b4d2cd9330d91a9bddd6"
+    },
+    "scene_operations": [
+      [
+        "-nostdin",
+        "-copyts",
+        "-progress",
+        "pipe:2",
+        "-nostats",
+        "-v",
+        "info",
+        "-i",
+        "packages/ui-mac/src/main/fixtures/video/frame-source.mp4",
+        "-vf",
+        "select='gt(scene,0.3)',showinfo",
+        "-an",
+        "-f",
+        "null",
+        "-"
+      ],
+      [
+        "-nostdin",
+        "-copyts",
+        "-progress",
+        "pipe:2",
+        "-nostats",
+        "-v",
+        "info",
+        "-i",
+        "packages/ui-mac/src/main/fixtures/video/frame-source.mp4",
+        "-filter_complex",
+        "[0:v]split[scenes][timeline];[scenes]select='gt(scene,0.3)',showinfo,nullsink;[timeline]null[progress]",
+        "-map",
+        "[progress]",
+        "-an",
+        "-f",
+        "null",
+        "-"
+      ]
+    ]
   }
 }

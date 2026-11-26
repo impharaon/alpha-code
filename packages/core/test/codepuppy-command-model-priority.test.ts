@@ -119,6 +119,19 @@ it.live("shell argument lists preserve each parsed word while text retains the r
   expect(yield* render("$ARGUMENTS", "claude")).toBe('\"first value\" \"x;id\" \"\"')
 }))
 
+it.live("shell runtime values stay data in command substitutions and unquoted heredocs", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const cases = [
+    { source: `!\`printf '<%s>' "$(printf '%s' "$0")"\``, value: 'x"; printf INJECTED; printf "', expected: '<x"; printf INJECTED; printf ">' },
+    { source: "!`cat <<EOF\n$0\nEOF\n`", value: "x;$(printf INJECTED)", expected: "x;$(printf INJECTED)" },
+    { source: `!\`printf '<%s>' "$(printf '%s' "$0")"\``, value: "two words *", expected: "<two words *>" },
+  ]
+  const actual: string[] = []
+  for (const item of cases) actual.push(yield* Effect.promise(() => renderPackageInstruction(location, { parts: [item.source], rawArguments: "'" + item.value + "'", arguments: [], syntax: "claude", cwd: location.directory })))
+  expect(actual).toEqual(cases.map(item => item.expected))
+}))
+
 /** Runs one configured command through the production plugin and Command service; records what it asked the session to do. */
 const runCommand = (command: Record<string, unknown>, session: { model?: typeof PICKED }, document?: Document) =>
   Effect.gen(function* () {

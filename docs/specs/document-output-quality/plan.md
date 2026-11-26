@@ -756,3 +756,5 @@ r14 websearch 消费者（b）：red-8.log 的同步 transform 字面锚与 §4.
 r14 attachment 临时模块（b）：red-11.log 为拷平 office-advisories 后找不到新增 util/document 依赖。测试只想变更 PROJECT_HIDDEN_DIR，故复制的真实 attachment 模块仍 import 实际 advisories owner，只有隐藏目录常量保留本地替换。原路径正反断言不改，避免复制第二套运行时依赖（§4.10/R13 的唯一宿主环境校验）。
 
 r14 旧名登记（c）：red-5.log 唯一 stale 行为 office-docs 的 /code-puppy，片 7 重写根路由后已无此命中，删除该精确失效行；其余 0/new-hit、计数、类别规则均不改。
+
+r14 围栏消费者（b）：red-6.log 四项失败均来自现 server 已移除 writer/旧 Excel 不能在 uv-only 环境使用共享模块。按片 7 / §4.1/4.8，四种成品由随包库制作而 reader 只读；原 #1564 用例在同一生产 sandbox-exec/env 中运行共用真实样本脚本，再逐格式用原四条生产命令读回，依旧 PATH 无 uv、代理零出网、uv cache 未创建。三条通用 uv-cache 判据以仍受支持的真实 Word reader 为消费者，保留冷下载、W3 缓存/默认缓存拒绝及所有安装命令/receipt 字节不变断言；不声称旧 Excel uv 命令仍是产品能力，不删测试用例。样本脚本从原 builder 单一函数原样提为同模块常量供两处执行，无复制脚本或第二安装器。

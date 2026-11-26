@@ -298,8 +298,7 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
 }
 
 /** Real samples for the bundled reader/build probes; authoring remains in the format skills. */
-export function createOfficeReaderSamples(python: string, workspace: string, formats: CodePuppyOfficeFormat[], env: Record<string, string>) {
-  const script = `
+export const OFFICE_READER_SAMPLE_SCRIPT = `
 import json,sys
 from pathlib import Path
 root=Path(sys.argv[1]);formats=json.loads(sys.argv[2])
@@ -319,7 +318,9 @@ if 'pdf' in formats:
     from reportlab.pdfgen import canvas
     document=canvas.Canvas(str(root/'sample.pdf'));document.drawString(54,780,'Runtime check page');document.save()
 `
-  run(python, ["-I", "-B", "-c", script, workspace, JSON.stringify(formats)], { env, cwd: workspace })
+
+export function createOfficeReaderSamples(python: string, workspace: string, formats: CodePuppyOfficeFormat[], env: Record<string, string>) {
+  run(python, ["-I", "-B", "-c", OFFICE_READER_SAMPLE_SCRIPT, workspace, JSON.stringify(formats)], { env, cwd: workspace })
 }
 
 function roundTrips(workspace: string) {

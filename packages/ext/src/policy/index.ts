@@ -305,7 +305,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         secrets.wrap(editor, { facts: factsFor, profile, protect: externalRead.protect })
       })
       await context.tool.hook("execute.progress", async (event) => {
-        const safe = deepFreeze(await secrets.progress({ call: event, update: event.metadata }))
+        const safe = deepFreeze(await secrets.progress({ call: event, facts: await factsFor(event.tool), update: event.metadata }))
         Object.defineProperty(event, "metadata", { value: safe, enumerable: true, configurable: false, writable: false })
       })
       await context.tool.hook("execute.after", async (event) => {
@@ -319,7 +319,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           attachDirectoryDisplay(event as never)
           attachTerminal(event as never, displays.get(event.id))
           if (event.status === "completed" && event.tool === "read" && externalRead.file(event)) event.result = await secrets.read({ call: event, file: externalRead.file(event)!, result: event.result })
-          if (event.status === "completed") event.result = await secrets.result({ call: event, tool: event.tool, result: event.result })
+          if (event.status === "completed") event.result = await secrets.result({ call: event, tool: event.tool, facts: await factsFor(event.tool), result: event.result })
           else event.error = await secrets.error({ call: event, tool: event.tool, error: event.error })
           displays.delete(event.id)
           installAsks.delete(installCallKey(event))

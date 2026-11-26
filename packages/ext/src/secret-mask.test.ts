@@ -85,7 +85,7 @@ test("terminal masking replaces every dynamic payload", async () => {
     values: [value],
   } = await setup()
   await mask.begin({ call, kind: "tool" })
-  const result = await mask.result({
+  const result = await mask.result({ facts: undefined,
     call,
     tool: "probe",
     result: { content: `before ${value}`, output: { nested: [{ [value]: value }] }, metadata: { body: value } },
@@ -100,7 +100,7 @@ test("terminal masking replaces every dynamic payload", async () => {
   expect(JSON.stringify(error).includes(value)).toBe(false)
   expect(error.error).toBeUndefined()
   const numeric = await setup(["1234", "false"])
-  const projected = await numeric.mask.result({
+  const projected = await numeric.mask.result({ facts: undefined,
     call,
     tool: "probe",
     result: { output: { value: 1234, enabled: false, plain: 3000 } },
@@ -122,7 +122,7 @@ test("overlapping values and dynamic key collisions never rescan replacements", 
     mask,
     values: [first, second],
   } = await setup([randomUUID(), randomUUID()])
-  const result = await mask.result({
+  const result = await mask.result({ facts: undefined,
     call,
     tool: "probe",
     result: { output: { [first]: 1, [second]: 2 }, content: `${first.slice(0, 3)}\x1b]0;title\x07${first.slice(3)}` },
@@ -144,7 +144,7 @@ test("attachments are checked as decoded bytes", async () => {
   )
   const alias = path.join(roots.project, "public.txt")
   await symlink(path.join(roots.home, ".ssh", "fixture"), alias)
-  const result = await mask.result({
+  const result = await mask.result({ facts: undefined,
     call,
     tool: "probe",
     result: {
@@ -187,7 +187,7 @@ test("masking failure hides payload without stopping execution", async () => {
   await mask.begin({ call, kind: "tool" })
   let executed = 0
   executed++
-  const result = await mask.result({ call, tool: "probe", result: { content: value, output: { body: value } } })
+  const result = await mask.result({ facts: undefined, call, tool: "probe", result: { content: value, output: { body: value } } })
   expect(executed).toBe(1)
   expect(result.content).toEqual([{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }])
   expect(result.output).toBeUndefined()
@@ -207,21 +207,21 @@ test("locations and root failures stay independent", async () => {
   await rm(bad)
   for (let index = 0; index < 2; index++) {
     await mask.begin({ call, kind: "tool" })
-    const child = await mask.result({ call, tool: `child${index}`, result: { content: value } })
+    const child = await mask.result({ facts: undefined, call, tool: `child${index}`, result: { content: value } })
     expect(child.content).toBe(ProtectedFiles.REDACTED)
   }
   const other = { ...call, sessionID: "other" }
   await mask.begin({ call: other, kind: "tool" })
-  expect((await mask.result({ call: other, tool: "probe", result: { content: "ordinary output" } })).content).toBe(
+  expect((await mask.result({ facts: undefined, call: other, tool: "probe", result: { content: "ordinary output" } })).content).toBe(
     "ordinary output",
   )
-  expect((await mask.result({ call, tool: "execute", result: { content: "ordinary output" } })).content).toEqual([
+  expect((await mask.result({ facts: undefined, call, tool: "execute", result: { content: "ordinary output" } })).content).toEqual([
     { type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT },
   ])
   const independent = await setup([])
-  expect((await independent.mask.result({ call, tool: "probe", result: { content: value } })).content).toBe(value)
+  expect((await independent.mask.result({ facts: undefined, call, tool: "probe", result: { content: value } })).content).toBe(value)
   mask.dispose()
-  expect((await mask.result({ call, tool: "probe", result: { content: value } })).content).toEqual([
+  expect((await mask.result({ facts: undefined, call, tool: "probe", result: { content: value } })).content).toEqual([
     { type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT },
   ])
 })
@@ -230,13 +230,13 @@ test("masking failure drops previous and current dynamic key names", async () =>
   const { mask, roots } = await setup()
   const key = randomUUID()
   await mask.begin({ call, kind: "tool" })
-  const live = await mask.progress({ call, update: { [key]: "live before the value is known" } })
+  const live = await mask.progress({ facts: undefined, call, update: { [key]: "live before the value is known" } })
   expect(Object.hasOwn(live, key)).toBe(true)
   await writeFile(path.join(roots.project, "credentials.json"), "{")
-  const failed = await mask.progress({ call, update: { [key]: "hidden" } })
+  const failed = await mask.progress({ facts: undefined, call, update: { [key]: "hidden" } })
   expect(JSON.stringify(failed).includes(key)).toBe(false)
   expect(failed.output).toBe(ProtectedFiles.MASKING_FAILED_TEXT)
-  const terminal = await mask.result({ call, tool: "fixture", result: { content: "ordinary prefix" } })
+  const terminal = await mask.result({ facts: undefined, call, tool: "fixture", result: { content: "ordinary prefix" } })
   expect(JSON.stringify(terminal).includes(key)).toBe(false)
   expect(terminal.content).toEqual([{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }])
 })

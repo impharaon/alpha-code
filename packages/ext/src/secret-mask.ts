@@ -1,4 +1,5 @@
 import { restoreEnvMutation, type EnvMutation, type EnvSnapshot } from "./secret-mutations"
+import { ShellResult } from "../../core/src/shell/result"
 import { projectEnvDiff } from "./secret-diff"
 import { constants } from "node:fs"
 import { access, open, readFile, stat, unlink } from "node:fs/promises"
@@ -29,6 +30,7 @@ type CallState = {
   last?: Tool.Metadata
   published?: Tool.Metadata
   publish?: ToolContext["progress"]
+  runtime?: Record<string, unknown>
   mutations?: EnvSnapshot[]
   read?: { before?: string; requested: string; target: string }
 }
@@ -152,7 +154,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
   }
   const finishProgress = async (state: CallState | undefined, failed: boolean) => {
     if (!state?.publish) return
-    const safe = failed ? hiddenMetadata(state) : metadata(state.last)
+    const safe = failed ? hiddenMetadata(state) : { ...metadata(state.last), ...state.runtime }
     await state.publish(safe)
     state.published = safe
   }
@@ -237,22 +239,24 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         state.failed = true
       }
     },
-    result: async (input: { call: MaskCall; tool: string; result: Tool.Result }): Promise<Tool.Result> => {
+    result: async (input: { call: MaskCall; tool: string; facts: ToolFacts | undefined; result: Tool.Result }): Promise<Tool.Result> => {
       const state = stateOf(input.call, input.tool)
       try {
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
         const view = views.get(input.result)?.()
         const payload = view ?? await mutationProjection(input.result, state) as Tool.Result
+        const output = view ? view.output : payload.output === undefined ? undefined : project(payload.output)
+        const runtime = shellRuntime(payload.output, input.facts)
         const result: Tool.Result = {
-          ...(view ? { output: view.output } : payload.output === undefined ? {} : { output: project(payload.output) }),
+          ...(output === undefined ? {} : { output: Object.keys(runtime.fields).length ? { ...(typeof output === "object" && output !== null ? output : {}), ...runtime.fields } : output }),
           content: view ? view.content :
             typeof input.result.content === "string"
               ? text(input.result.content)
               : input.result.content === undefined
                 ? undefined
-                : await Promise.all(input.result.content.map(content)),
-          metadata: { ...metadata(payload.metadata), ...(view ? { truncated: payload.metadata?.truncated } : {}) },
+                : await Promise.all(input.result.content.map((item, index) => item.type === "text" && index === input.result.content!.length - 1 && item.text === runtime.notice ? Promise.resolve(item) : content(item))),
+          metadata: { ...metadata(payload.metadata), ...shellRuntime(payload.metadata, input.facts).fields, ...(view ? { truncated: payload.metadata?.truncated } : {}) },
         }
         await finishProgress(state, false)
         return result
@@ -296,13 +300,14 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         if (state) calls.delete(toolCallKey(input.call))
       }
     },
-    progress: async (input: { call: MaskCall; update: Tool.Metadata }): Promise<Tool.Metadata> => {
+    progress: async (input: { call: MaskCall; facts: ToolFacts | undefined; update: Tool.Metadata }): Promise<Tool.Metadata> => {
       const state = calls.get(toolCallKey(input.call))
       try {
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
-        if (state) state.last = input.update
-        const safe = metadata(input.update)
+        const runtime = shellRuntime(input.update, input.facts).fields
+        if (state) { state.last = input.update; state.runtime = runtime }
+        const safe = { ...metadata(input.update), ...runtime }
         if (state) state.published = safe
         return safe
       } catch {
@@ -411,4 +416,14 @@ export function replaceSecretBytes(bytes: Uint8Array, values: readonly Uint8Arra
     cursor = position + length
   }
   return Buffer.concat(pieces)
+}
+
+/** Only the verified engine shell's runtime envelope is authoritative; arbitrary tool fields remain dynamic. */
+function shellRuntime(value: unknown, facts: ToolFacts | undefined) {
+  if (facts?.identity.source !== "builtin" || facts.identity.name !== "shell" || typeof value !== "object" || value === null) return { fields: {}, notice: undefined }
+  const output = value as Parameters<typeof ShellResult.metadata>[0] & { status?: string; shellID?: string }
+  return {
+    fields: Object.fromEntries(Object.entries({ ...ShellResult.metadata(output), status: output.status, shellID: output.shellID }).filter(([, value]) => value !== undefined)),
+    notice: ShellResult.notice(output),
+  }
 }

@@ -1841,6 +1841,17 @@ describe("env write-back", () => {
 })
 
 describe("secret result boundaries", () => {
+  it.live("foreign tools named shell retain dynamic status masking", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=7\n")
+    const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {
+      await ctx.tool.transform((editor) => editor.add({ name: "shell", description: "foreign fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async () => ({ content: [{ type: "text", text: "Exited with code 7" }], metadata: { exit: 7 } }) }))
+    } })
+    const result = yield* callRaw(session.id, "shell")
+    expect(Exit.isSuccess(result)).toBe(true)
+    expect((result as { value: { metadata?: unknown } }).value.metadata).toMatchObject({ exit: "[REDACTED]", codepuppyDisplay: { identity: { source: "plugin" } } })
+    expect(JSON.stringify((result as { value: { content: unknown } }).value.content)).not.toContain("code 7")
+  }))
   it.live("shell runtime notices remain visible without trusting foreign status fields", () => Effect.gen(function* () {
     const location = yield* Location.Service
     fs.writeFileSync(path.join(location.directory, ".env"), "PASSWORD=7\n")

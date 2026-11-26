@@ -4,11 +4,13 @@
 // 试编译丢尾、原生模块缺失即拒、默认工作区不在盘上即拒。真编译器与真 profile 的判据在别的文件。
 
 import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { planConfigFence, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
 import { writableLocationTruthPath } from "./process-fence-workspaces"
+import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
 import { processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
 import { credentialStores } from "./codepuppy-secret-files"
@@ -146,6 +148,51 @@ describe("planWritableLocations", () => {
       expect(() => planWritableLocations({ ...input, truthPath: disk.state })).toThrow("writable location truth")
       expect(existsSync(sourcePath)).toBe(false)
     })
+  })
+})
+
+test.skipIf(process.platform !== "darwin")("writable location truth stays fenced: production planner denies overwrite and rename; unfenced controls land", () => {
+  withLocationDisk((disk) => {
+    const project = join(disk.root, "project")
+    const userData = join(disk.root, "userData")
+    mkdirSync(project)
+    const bound = planWritableLocations({ candidates: [{ sourcePath: join(disk.home, ".bun", "bin"), kind: "directory" }], truthPath: disk.truthPath, eligibility: disk.eligibility })
+    expect(bound.locations).toHaveLength(1)
+    const before = readFileSync(disk.truthPath, "utf8")
+    const plan = planProcessFence({
+      userDataPath: userData, sidecarEnv: { HOME: disk.home },
+      addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../../out/main"), exists: existsSync },
+      egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: disk.protected, credentialStores: [],
+    }, {
+      homeDir: () => disk.home, codepuppyGlobalRoot: () => join(disk.state, "env", "dev"), appStateRoot: () => disk.state,
+      realpath: realpathSync.native, defaultWorkspace: () => project, readWorkspaces: () => [],
+      isDirectory: (path) => statSync(path).isDirectory(), stat: (path) => statSync(path, { bigint: true }), lstat: (path) => lstatSync(path, { bigint: true }),
+      mkdirp: (path) => void mkdirSync(path, { recursive: true }), compile: trialCompileProfile, log: () => {},
+    })
+    const attempt = (fenced: boolean, command: string, args: string[]) => spawnSync(fenced ? SANDBOX_EXEC : command, fenced ? ["-p", plan.profile, command, ...args] : args, {
+      encoding: "utf8", env: { HOME: disk.home, PATH: "/usr/bin:/bin" }, timeout: 10_000,
+    })
+    const overwrite = ["-c", 'printf compromised > "$1"', "truth-write", disk.truthPath]
+    const moved = join(project, "stolen-truth.json")
+    const rename = [disk.truthPath, moved]
+    for (const [command, args] of [["/bin/sh", overwrite], ["/bin/mv", rename]] as const) {
+      const denied = attempt(true, command, args)
+      expect(denied.error).toBeUndefined()
+      expect(denied.status).not.toBeNull()
+      expect(denied.status).toBeGreaterThan(0)
+      expect(denied.stderr.toLowerCase()).toContain("permitted")
+      expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+      expect(existsSync(moved)).toBe(false)
+    }
+    const marker = join(project, "marker")
+    expect(attempt(true, "/bin/sh", ["-c", 'printf project > "$1"', "project-write", marker]).status).toBe(0)
+    expect(readFileSync(marker, "utf8")).toBe("project")
+    expect(attempt(false, "/bin/sh", overwrite).status).toBe(0)
+    expect(readFileSync(disk.truthPath, "utf8")).toBe("compromised")
+    writeFileSync(disk.truthPath, before)
+    expect(attempt(false, "/bin/mv", rename).status).toBe(0)
+    expect(existsSync(disk.truthPath)).toBe(false)
+    expect(readFileSync(moved, "utf8")).toBe(before)
   })
 })
 

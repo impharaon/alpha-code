@@ -1472,3 +1472,7 @@ Host 检查：`bun src/shared/host-extension-package-contract/generate-artifact.
 ### r21｜B3 观察修正与 B4–B9 收口
 
 核对：IMPLEMENT — r21，orchestrator / Claude Opus 5.5，2026-11-27；r20 A1–A5/B1/B2 与 67fbda8e16 accepted。本轮只续 B3–B9，不开始片 7。偏离记录（orchestrator ruling 2026-11-27）：B3 新测限定真实 child session ID，父 SessionStart 合法；本轮新增而非守旧回归的错误观察允许独立提交纠正、注明原因并用一个移除臂证明；既有回归断言仍按 BLOCKED 规则。该增量不修改设计/公共 DTO。B3 先单独纠正 422a3019cd 的观察谓词，其他断言不变；随后在未实现上验证红，再应用已保全候选补丁。
+
+B3：观察修正独立提交 `e6cc55cdcf`；未修实现上真实 child Start/Submit 仍触发，**0 pass / 1 fail**（`/tmp/plugin-standard-r21-B3-red.log`）。应用已保全候选后同例 **1 pass / 18 expects**（`B3-green.log`），验证完成/父 leave 两条真实 Session-owned HTTP transport 的关闭路径、无 child always monitor、SubagentStart/Stop 保留且四次真实模型请求不增。移除 child SessionStart guard 的 child-only loader 臂 **0 pass / 1 fail**，标记 REMOVAL_ARM_APPLIED（`B3-removal.log`），纠正后的断言能检测生产行为缺失；未改磁盘源码。原完整 host 文件结果见本步收口；原 lifecycle registry 同提交登记 L0 child 归属，无新端口。
+
+B3 完整原 host **113 pass / 0 fail**（`/tmp/plugin-standard-r21-B3-host-file.log`）。沿 r20 已验证的测试进程 `env -u CLAUDE_CODE_SESSION_ID` 隔离外部 Claude host ID；保留其他进程环境，不改旧断言或生产环境绑定。当前 B3 红测已收绿。

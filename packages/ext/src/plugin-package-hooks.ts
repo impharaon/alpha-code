@@ -630,6 +630,7 @@ export async function registerPackageHooks(
     }
   }
   const startSession = async (sessionID: string, messageID?: string) => {
+    if (children.has(sessionID)) return
     if (!sessionEpoch.has(sessionID)) sessionEpoch.set(sessionID, {})
     if (!starts.has(sessionID)) starts.set(sessionID,
       run("SessionStart", sessionID, {
@@ -656,6 +657,7 @@ export async function registerPackageHooks(
       try {
         if (sessionEpoch.has(sessionID)) await run("SessionEnd", sessionID, { reason })
       } finally {
+        await Promise.all([...children].filter(([, child]) => child.parentID === sessionID).map(([childID]) => endSession(childID, reason)))
         closeFileWatches(sessionID)
         for (const [controller, owner] of running)
           if (owner.sessionID === sessionID && (owner.kind === "monitor" || owner.kind === "watcher")) controller.abort()
@@ -675,7 +677,7 @@ export async function registerPackageHooks(
       for (const entry of installed.description.entries) {
         if (entry.kind !== "monitor" || !pluginEntryRuntimeAvailable(entry)) continue
         if (entry.when.kind === "skill" && (!invocation || invocation.item.installed.key !== installed.key || invocation.item.entry.kind !== "skill" || invocation.item.entry.sourceName !== entry.when.sourceName)) continue
-        if (entry.when.kind === "always" && invocation) continue
+        if (entry.when.kind === "always" && (invocation || children.has(sessionID))) continue
         const key = JSON.stringify([installed.settings?.packageId, entry.id, sessionID])
         const previous = monitors.get(key)
         if (previous?.valid()) continue
@@ -821,10 +823,12 @@ export async function registerPackageHooks(
       else if (event.type === "session.execution.started") tasks.add(event.data.sessionID)
       else if (event.type === "session.execution.succeeded" || event.type === "session.execution.interrupted") {
         tasks.delete(event.data.sessionID)
+        if (children.has(event.data.sessionID)) departed.add(event.data.sessionID)
         void Promise.resolve(endings.get(event.data.sessionID)).then(() => finishDeparted(event.data.sessionID)).catch(error => input.log("runtime-failed: package idle cleanup: " + String(error)))
       }
       else if (event.type === "session.execution.failed") {
         tasks.delete(event.data.sessionID)
+        if (children.has(event.data.sessionID)) departed.add(event.data.sessionID)
         void run("StopFailure", event.data.sessionID, {
           error: event.data.error.type,
           error_details: event.data.error.message,
@@ -916,7 +920,7 @@ export async function registerPackageHooks(
       reconcileFileWatches(event.sessionID)
       await startSession(event.sessionID, event.messageID)
       startMonitors(event.sessionID)
-      const contexts = await run("UserPromptSubmit", event.sessionID, {
+      const contexts = children.has(event.sessionID) ? [] : await run("UserPromptSubmit", event.sessionID, {
         prompt: event.prompt.text ?? "",
         prompt_id: event.messageID,
       })

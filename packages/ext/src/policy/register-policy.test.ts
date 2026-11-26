@@ -1700,3 +1700,33 @@ it.live("package Bash prefix grants cover every parsed command and preserve quot
   yield* permission.reply({ requestID: request!.id, reply: "reject" })
   expect(Exit.isFailure(yield* E.Fiber.join(blocked))).toBe(true)
 }))
+
+
+for (const variant of ["ask", "changed-input", "revoked"] as const) {
+  it.live(`package hook ${variant} requires approval without persisting a grant`, () => Effect.gen(function* () {
+    let policy: PolicyRegistration
+    let active = true
+    const { session, registration } = yield* setup({
+      rules: [ALLOW_ALL, { action: ID_BUILTIN_WRITE, resource: "*", effect: "ask" }],
+      inside: async context => {
+        await context.tool.hook("execute.before", async event => {
+          await policy.bindPackageHook(event, variant === "ask" ? "ask" : "allow", () => active)
+          if (variant === "changed-input") event.input = { note: "changed after the hook decision" }
+          if (variant === "revoked") active = false
+        })
+      },
+    })
+    policy = registration!
+    if (variant === "ask") policy.bindPackageInvocation(session.id, { allowedTools: [{ tool: ALIAS_WRITE }], deniedTools: [] }, {}, () => true)
+    const running = yield* Effect.forkChild(callRaw(session.id, ALIAS_WRITE, { note: "original" }))
+    const [request] = yield* pending
+    expect(request).toBeDefined()
+    expect(counts.write).toBe(0)
+    if (variant === "changed-input") expect(request!.metadata?.args).toEqual({ note: "changed after the hook decision" })
+    const permission = yield* Permission.Service
+    yield* permission.reply({ requestID: request!.id, reply: "once" })
+    expect(Exit.isSuccess(yield* E.Fiber.join(running))).toBe(true)
+    expect(counts.write).toBe(1)
+    expect(yield* permission.list()).toEqual([])
+  }))
+}

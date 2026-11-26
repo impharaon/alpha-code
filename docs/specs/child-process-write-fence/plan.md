@@ -374,3 +374,84 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - IPC 桩同步：自动 `failed` 回复补上真实 sidecar 的 `consume errno=1`（此前无 detail，会被判为不确定）。
 - 计数 / 登记：IPC 宿主 16→17；gate-files.tsv 一行同步。
 - 签名宿主（本轮一次，R4 修正之后）：`CODEPUPPY_TEST_SIGNED_FENCE=1 bun test --max-concurrency 2 src/main/process-fence-extension-packaged.test.ts`，本地构建签名、`--publish never`、关闭公证：host **1/0**、inner **3/0**、exit 0、**704 s**（review/r12-signed.log；results/signed-fence-XNZiwp-*）。G0 与窗口均 passed（窗口 planFence 现带计划自己的 `workspaces`）：M1/R1–R5、Data 拼写 HOME 一句、原生 / 超时两种 grant-failed（超时那次按本轮语义记为本代可能已消费）、AC-08 软链恢复选中前 0 文件、选中后同 engine **64174** / renderer **64211**、loads **5→5** 落盘。临时树与 app 副本已清理，无残留进程。
+
+## #1759：位置权威与固定位置身份真源（首片）
+
+- 依据：[SPEC-child-process-write-fence v5 / AC-09 至 AC-12](spec.md)（`834e269da977f6b4888c3b7a6a268bfe835d9cf5`）；[冻结设计](design.md)（`d4a849e5247e7a149457a1b03bbcfc70bbbb389f`，#1771）的 v4 §4.1–4.3.1、§5、§6、§10 R1 处置，以及 v5 §4、§6、§10 R1 处置；本片实现 R1/R3/R7，消费其余冻结结论。读码基线同该提交；[任务 #1759](https://github.com/impharaon/alpha%2Dcode/issues/1759)。
+- 核对：待编排者核对；首个 IMPLEMENT 提交从续接 brief 的 `Phase:` 行原样补入计划提交、检查方/模型与结论。
+
+文档影响为 architecture/decision，唯一落点为本节。本次 PLAN 只追加本节并提交；下文是实施安排，尚无产品验收结论。前面的历史切片与证据保持原文。
+
+**全部交付切片。** 下表只分配范围、先后与验据，后续切片各自在实施前追加自己的计划节。本片交付可调用的位置权威及身份规划端口；生产启动链在后续切片消费它们。#1760 在本票位置/环境生产接线完成后集成，不在本票实现 launcher。
+
+| 顺序 / 切片名 | 覆盖与依赖 |
+| --- | --- |
+| 1. 位置权威与固定位置身份真源（本节） | R1/R3/R7；AC-09/11/12 的共同基础。交付候选清单、环境投影及真实文件系统的首次目标绑定。 |
+| 2. 包管理器缓存与受围栏环境探针 | 消费首片，接 R2/R8、Cargo 读取桥及生产启动/派生环境；完成 AC-09 与 v4 U1/U2 的真实工具证据。 |
+| 3. 本人批准项目外目录 | 消费首片及可信根，接 R4/R5/R6、原审批卡与 tracker；完成 AC-10。 |
+| 4. 全局安装与用户级配置 | 消费前述位置、环境和只读 scope 接缝；完成 AC-11 非 brew、AC-12。启用全局 bin allow 的同一提交先接 v5 H1 安装身份/HB 拒写，保持其与后续 brew 执行的依赖顺序。 |
+| 5. Homebrew 由应用在围栏外执行 | 消费 H1 身份和普通工具环境，完成 H1 源码规划及 H2–H4、AC-11 brew；保留原 Shell/Job/审批/取消。 |
+
+### 改动
+
+路径 `main/` 均相对于 `packages/ui-mac/src/`。首片的生产调用边界止于 R1/R3/R7；新清单的运行期启用随切片 2/4 接线提交，避免尚未有 R8 或 HB 时扩大生产写集合。
+
+| 文件 | 改什么 |
+| --- | --- |
+| `main/process-fence-profile.ts` | 在现有清单权威内实现冻结的 `resolvePackageManagerLocations`、`userConfigurationLocations` 及其导出类型；保留 `ProcessFenceWriteRule` / `ConfigFenceRule` 的所有者。缓存与安装规则、版本管理器模板和精确用户文件均从这里产出。现有 profile 渲染、W 行和 `processFenceRulesCover` 本片不改。 |
+| `main/process-fence-plan.ts` | 实现冻结的 `planWritableLocations`，通过现有 `WorkspaceDirectoryInput` 与 `checkWorkspaceDirectory` 核验具体候选并返回绑定结果/排除项；复用 planner 的路径、父级准备和失败处理边界。本片不在 `planProcessFence` 自动消费新 allow；C 的可信应用锚、具体 regex 根枚举及 probe/fork 先后在切片 2/4 的真实调用处接入。 |
+| `main/process-fence-workspaces.ts` | 在既有 main 真源所有者内增加 R7 独立文件的路径、严格读和原子写支持，复用现有临时文件+rename 写法；保持 workspace 文件 schema、登记来源和 tracker 行为。 |
+| `main/process-fence-profile.test.ts` | 在原文件增加位置解析/用户配置用例；覆盖工具和 purpose、固定环境键、精确文件及伴随名、pnpm 一级 shim/`.tools`、版本管理器模板与路径转义。继续用既有 profile 断言确认首片未激活新 allow。 |
+| `main/process-fence-plan.test.ts` | 增 R7 真文件系统用例：首次规划/再次规划、合法软链、缺失文件、原子替换、重指及受保护目标；用生产 profile 和真 `sandbox-exec` 校验新真源在 CF-1 下仍不可写。 |
+| `main/process-fence-workspaces.test.ts` | 增独立真源的读写/原子失败证据，保留旧 workspace 往返、登记及运行内历史断言；检查新写者不进入 sidecar import 闭包。 |
+| 本文件本节 | 首个 IMPLEMENT 提交填核对行；任何实际偏离在对应提交更新本节。 |
+
+首片不新增依赖、配置选项、IPC 或原生接口，不改 gate。若实际导入闭包变化要求同步写入点登记，仅同步命中的签名及既有闭包判据，并在本节说明文件和原因；不能用 `main-only` 掩盖可由 sidecar 调用的写者。
+
+### 顺序
+
+1. **R1/R3 位置权威，独立提交单元。** 在现有 profile 测试添加名为 `package manager locations`、`user configuration locations` 的表驱动用例，按被冻结清单的实际边界断言后实现。逐 case 迭代，结束跑该测试文件一次。输入是纯路径与平台合同；这里不执行包管理器、不预建真实用户目录，不把测试做成另一份路径解析实现。
+2. **R7 身份真源与 planner，独立提交单元。** 在 workspaces/plan 现有文件添加 `writable location truth`、`planWritableLocations` 用例，实现独立 schema 读写与规划，再连两者。真实临时盘上验证：首次合法软链可以绑定；再次规划仍指原目标；改指 HOME、状态根、受保护位置或另一个普通目标均不会采信新目标；缺失目录只在核验过的父级下准备，缺失文件只规划不创建；文件原子替换仍可用。坏 JSON、读失败、写/rename 失败保持失败结果，不覆盖已有真源，不从当前磁盘重建首次身份。若发现既有缺陷，按 red-first 单独提交失败回归再修复。
+3. **真实拒写与首片收口。** 在 `process-fence-plan.test.ts` 添加 `writable location truth stays fenced`：调用本片 R7 落出真源，再以生产 `planProcessFence` 生成并试编译策略，用 `/usr/bin/sandbox-exec` 派生无窗口进程尝试覆盖/改名真源；围栏外重读确认未变。相同命令的无围栏对照确实改得动，项目内 marker 正常落盘。结束跑 plan/workspaces 两个变动文件各一次；一次性跑下面的较宽相关集合、包检查、文档契约及旧名扫描，提交后交编排者。
+
+### 风险
+
+- **把候选误当授权。** 首片只提供 R1/R3 候选与 R7 绑定端口。后续调用者在同一 planner 接 C 锚校验、具体版本目录和 alias 节点，再交 profile；不能跳过 R7，也不能把 regex 直接对新 realpath 展开。生产启用点与其 R8/HB 依赖同片提交。
+- **文件与目录身份混用。** R7 的 file 分支必须保留合法 HOME 下 literal 文件能力；目录复用既有排除，不能为 `.zshrc` 授予 HOME，也不能把正常原子替换误判为重指。通过实际 symlink/rename/stat 的盘上事实判定。
+- **夹具被既有 W11/W12 意外放行。** OS 用例的 canonical 隔离树放包内 `node_modules/.cache`，与模拟 HOME、工作区、userData、状态根分别隔离；先实写校准拒绝，不能拿 `/tmp` 下的成功当围栏证据。
+- **候选清单的证明边界。** 纯 resolver 绿不代表工具安装成功。Cargo config/credentials/provider 与相对路径、现代 Yarn、pnpm 钉版、npm 三条警告、版本管理器的真实布局沿 v4 §10 留给指定后续切片；不另开调查或重审冻结裁决。
+- Windows 在本次 brief 的排除范围；不新增 Windows 围栏或声称 Windows 实机通过。正式签名产物的 R8/brew 证明仍归后续验收安排，本 PLAN 及首片不启动应用、Electron、窗口或系统对话框。
+
+### 证明
+
+**首片直接证据。** 这里只验可复用端口和真源保护，不把共同基础标成 AC 全部完成；最终行为证据分配在下一表。
+
+| AC | 测试/证据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-09（位置基础） | `process-fence-profile.test.ts -t "package manager locations"`；R1 的八种工具、固定 env 与 cache/global 区分。 | 去掉任一工具所需键、将缓存指回 HOME、把全局安装重定向为缓存或放开 pnpm store，会违反具体落点/边界断言。工具真正读取这些键另由切片 2 的 scenario 证明。 |
+| AC-11（非 brew 清单基础） | 同文件 `package manager locations`；安装子树、pnpm shim 一级边界/`.tools`、版本模板和 cache 排除；`process-fence-plan.test.ts -t "planWritableLocations"` 的具体安装根真实盘用例。 | 少一个安装位置会漏规则；把 prefix/HOME 整根加入会命中反例；重指后的新目标被接受会使返回集合与持久真源断言失败。brew 的 H1–H4 不在本片实现。 |
+| AC-12（文件清单基础） | `process-fence-profile.test.ts -t "user configuration locations"`；`process-fence-plan.test.ts -t "planWritableLocations"` 的 literal、Git `.lock`、软链文件及原子替换。 | 少锁文件、误给父目录写权限、把引擎配置加入普通清单、重指后放行新目标，或把原子替换误拒，都会使对应正反断言失败。 |
+| AC-09/11/12（身份基础） | `process-fence-workspaces.test.ts -t "writable location truth"`；`process-fence-plan.test.ts -t "writable location truth stays fenced"`，真实生产 planner/profile + `sandbox-exec` + 围栏外读盘。 | 缺首次绑定/严格读/原子写会采信新目标或损坏旧记录；真源被置于可写根时覆盖/改名会成功；无围栏对照不成功则判官无效。 |
+
+**全票验据归属（仅命名，后续切片细化）。** 各 AC 的最终场景必须包含生产 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence` 的最终环境及真实引擎入口；现有 Bun 嵌入式 harness 的 transport 替身证据与签名 utilityProcess 证据分别报告。最低层测试先抓接线回归，真工具安装/对照按本 brief 只跑一次，留命令、版本、来源与落盘输出，不在每一步重复，也不增加 PR 全量测试。
+
+| AC / 切片 | 最便宜的持续检查及真实入口验据 | 缺少行为为什么会失败 |
+| --- | --- | --- |
+| AC-09 / 2 | 现有 `sidecar-env.test.ts`、`shell-env.fast.test.ts`、`shell-env-cache.test.ts`、`process-fence-wiring.test.ts` 的环境/启动检查；`process-fence-engine` 模块的新增 scenario 层用例 `package manager cache isolation`：bun/pnpm/Yarn/npm/venv pip/uv/cargo/go 各一次真实安装，覆盖助手 shell 与 PTY，核对项目产物、应用缓存及 HOME 缓存前后清单/摘要。 | 撤 env 的 bun/go/cargo 同命令失败；恢复旧缓存 allow 或漏最终 spawn 环境会改 HOME 缓存/使安装失败；R8 撤围栏/撤根固定分别暴露 rc 越界写/根漂移。 |
+| AC-10 / 3 | 现有 `project-writable-ipc.test.ts` 与审批卡/receipt 测试检查顺序和身份；`project-writable.engine.scenario.test.ts` 新 `approved external directory`，原挂起工具及已有/新子进程真写，同引擎 PID；拒绝、非本人和无 grant 对照。 | 去 pre-reply grant 后原请求失败；伪造、普通 reply、重放、深链或 sidecar 消息能登记时反例落盘；显示后换目标须 conflict，合法未变软链仍可成功。 |
+| AC-11 / 4、5 | 同一包管理器 scenario 层的 `global package installations` 和 `delegated homebrew execution`：清单工具各一次全局安装/命令可调用，三档与拒绝；brew 用来源可追溯、确实触发内部 Sandbox 的真实 formula，隔离 HOME/prefix；另以低层 H1–H4 测试钉身份、单节点一次、叶能力、输出和取消。 | 去固定清单则非 brew 安装失败；撤 brew 分流则嵌套围栏失败；拒绝/只读/伪造 lease 必须 0 main spawn。普通非 brew 叶仍围栏内，HB 拒写负例与普通 npm bin 安装正例同时成立；表外 HOME 写仍失败。 |
+| AC-12 / 4 | 现有 policy/receipt 检查档位与按文件 scope；`engine-config-fence.engine.scenario.test.ts` 新 `ordinary user configuration`：真实 `git config --global` 与改文件工具编辑模拟 HOME 的 shell 文件，三档/拒绝、CF/C1 与两处 shell 缓存反例。 | 撤用户文件清单（Git 单撤 `.lock` 另对照）会失败；误按父目录查询会问 HOME/无法编辑；跳过审批则拒绝臂文件变化；保护顺序错则 Code Puppy/引擎配置被改。 |
+
+夹具来源：本片只消费自有路径合同与实际创建/采集的文件系统对象。后续工具语料沿设计 v4 P07/P10/P11、v5 §6 的来源要求，从真实 CLI/registry 发布归档、真实 Cargo/Go 项目与真实 Homebrew formula 采集，记录版本/摘要；不手写另一系统格式，不使用开发机真实配置、凭据或全局安装位置。rc 事后覆盖与 brew 崩溃残留按冻结 §10 诚实报告；子命令收窄提议 I-47 不变成过滤要求。
+
+**首片检查命令。** 均从 `packages/ui-mac` 执行；迭代只用上述 `-t` 名称，步骤末只跑变动行为的文件；下列相关集合在首片返回前各跑一次。本 PLAN 不运行这些实施检查。
+
+- 步骤 1：`bun test src/main/process-fence-profile.test.ts`。
+- 步骤 2/3：`bun test src/main/process-fence-plan.test.ts src/main/process-fence-workspaces.test.ts`。
+- 较宽相关集合：`bun test src/main/process-fence-write-sites.test.ts src/main/process-fence-wiring.test.ts src/main/process-fence-credential-stores.test.ts`；返回前用 `rg` 找上述三个生产模块的新增导出 mocks 与规则枚举者，只有确实受改动影响的测试才补跑并列出。真实工具 scenario 留所属切片一次验据，不随本组运行；首片不变动生产 profile，编译容量用例留到实际启用规则的切片。
+- 包检查：`bun typecheck`；提交前 `bun test src/main/old-name-scan.test.ts`。存在机器 gate 时并发上限 2；不运行全包 suite、`bin/check` 或 `gate run`。
+- 文档：使用 Alpha profile 对本 worktree 运行只读 `check-docs-contract --changed-since origin/alpha`，与输入基线比较；`git diff --check` 并人工检查仅追加本节。保持 frontmatter/index 既有值，故本次不产生索引改动。
+
+### 偏离记录
+
+暂无。

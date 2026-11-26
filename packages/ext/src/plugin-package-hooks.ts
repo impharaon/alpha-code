@@ -69,6 +69,12 @@ export async function registerPackageHooks(
   const configResults = new Map<string, Map<string, { valid(): boolean; result: Promise<HookResult | undefined> }>>()
   const batches = new Map<string, { complete: Set<string>; pending: Map<string, Promise<Contribution[]>> }>()
   const children = new Map<string, { parentID: string; agentType: string }>()
+  const sourceAgentType = (agent: string | undefined) => {
+    const source = allInstalledPluginInstructions(input.root).find(item => item.entry.kind === "agent" && item.name === agent)
+    return source
+      ? source.installed.description.provider === "claude-code" ? source.installed.description.name + ":" + source.entry.sourceName : source.entry.sourceName
+      : agent
+  }
   let disposed = false
   const active = (installed: Installed) => {
     if (disposed) return false
@@ -235,12 +241,15 @@ export async function registerPackageHooks(
     let session = currentSession
     while (session.parentID) session = await context.session.get({ sessionID: session.parentID })
     const { transcript, history } = await transcriptFor(sessionID)
-    const subagent = ["SubagentStart", "SubagentStop"].includes(event) ? children.get(sessionID) : undefined
-    const subagentFields = subagent ? { agent_id: sessionID, agent_type: subagent.agentType } : {}
+    const child = children.get(sessionID)
+    const subagent = ["SubagentStart", "SubagentStop"].includes(event) ? child : undefined
+    const agentType = child?.agentType ?? sourceAgentType(call?.agent ?? currentSession.agent)
+    const subagentFields = { ...(agentType ? { agent_type: agentType } : {}), ...(child ? { agent_id: sessionID } : {}) }
     const payload = {
       session_id: subagent?.parentID ?? sessionID,
       transcript_path: subagent ? (await transcriptFor(subagent.parentID)).transcript : transcript,
-      ...(subagent ? { agent_transcript_path: transcript, ...subagentFields } : {}),
+      ...(subagent ? { agent_transcript_path: transcript } : {}),
+      ...subagentFields,
       cwd: context.location.directory,
       permission_mode:
         session.agent === READONLY_AGENT ? "plan" : session.agent === ASK_AGENT ? "default" : "bypassPermissions",
@@ -602,8 +611,7 @@ export async function registerPackageHooks(
           if (started || typeof update.sessionID !== "string") return
           started = true
           const child = await context.session.get({ sessionID: update.sessionID })
-          const source = allInstalledPluginInstructions(input.root).find(item => item.entry.kind === "agent" && item.name === child.agent)
-          children.set(child.id, { parentID: frame.sessionID, agentType: source?.entry.sourceName ?? child.agent ?? "" })
+          children.set(child.id, { parentID: frame.sessionID, agentType: sourceAgentType(child.agent)! })
           const contexts = await run("SubagentStart", child.id, {})
           sessionContexts.set(child.id, [...(sessionContexts.get(child.id) ?? []), ...contexts])
         },

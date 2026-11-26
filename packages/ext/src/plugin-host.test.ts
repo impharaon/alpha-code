@@ -2878,7 +2878,7 @@ const subagentHookSample = (matcher?: string) => Effect.gen(function* () {
 })
 
 packageIt.live("subagent hooks bind real child identity before its first model and continue only that child", () => packageJourney(Effect.gen(function* () {
-  const agent = yield* subagentHookSample("^code-reviewer$")
+  const agent = yield* subagentHookSample("^feature-dev:code-reviewer$")
   yield* invocationNativeServices
   const ext = yield* activateExtUntilFinished
   const target = agent.hostNames["agent:agents/code-reviewer.md"]!
@@ -2898,7 +2898,7 @@ packageIt.live("subagent hooks bind real child identity before its first model a
   const rows = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
   expect(rows.map(row => row.hook_event_name)).toEqual(["SubagentStart", "SubagentStop", "SubagentStop"])
   for (const row of rows) {
-    expect(row).toMatchObject({ session_id: parent.id, agent_id: children[0]!.id, agent_type: "code-reviewer" })
+    expect(row).toMatchObject({ session_id: parent.id, agent_id: children[0]!.id, agent_type: "feature-dev:code-reviewer" })
     expect(row.transcript_path).not.toBe(row.agent_transcript_path)
     expect(row.parent_projection).toContain("Parent recorded")
   }

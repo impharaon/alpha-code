@@ -592,3 +592,5 @@ A5 red：既有 runtime 文件在真实 rename 边界观察 candidate 的 marker
 A5 探针修正：Bun 的 fs.promises 对象 spy 没有截住 node:fs/promises 的命名导出，首次 red 不能作为顺序证据。一次标准库探针确认直接 spy 模块命名导出会被命中；测试只改观察接线，marker 断言保持不变，并新增必须实际命中边界的前提断言。恢复原生产顺序后 target 仍 exit 1，命中 rename 而 marker=null（A5-real-red.log）。此提交只改测试接线，随后应用同一 marker-before-rename 修正。
 
 A5 green：正确模块导出探针实际命中 rename，marker 在候选内已完整，runtime 文件 16 PASS（A5-real-green.log）。生产实现没有为测试增加新端口。
+
+A8：新增原 runtime 文件的 ready→dispose→同 userData 新 runtime 实例用例，current 直接通过 extract=0/verify=1（A8-green.log）；这是原有行为的补证，无需为了制造 red 改坏代码。

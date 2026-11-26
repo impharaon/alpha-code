@@ -188,3 +188,17 @@ test("runtime marker is complete inside the candidate before the real publicatio
     expect(marker).toMatchObject({ pinId: pin.id, pinSha256: pin.sha256, version: pin.version })
   } finally { observed.mockRestore() }
 })
+
+test("restart reuses the published runtime with zero extraction and one fresh verification", async () => {
+  const f = fixture()
+  const first = createDocumentRuntime(f.input); runtimes.push(first)
+  first.subscribeRuntimeVerify(f.location, f.completed)
+  const initial = until(first, (state) => state.phase === "ready"); first.query(f.location); await initial
+  await first.dispose()
+  f.counts.extract = 0; f.counts.verify = 0
+  const next = createDocumentRuntime(f.input); runtimes.push(next)
+  next.subscribeRuntimeVerify(f.location, f.completed)
+  const ready = until(next, (state) => state.phase === "ready"); next.query(f.location); await ready
+  expect(f.counts.extract).toBe(0)
+  expect(f.counts.verify).toBe(1)
+})

@@ -1,7 +1,32 @@
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import { createNetworkEgressActivity } from "./network-egress-activity"
 import { createNetworkEgressApproval } from "./network-egress-approval"
 import type { EgressApproval, NetworkActivity, NetworkOutbound, RememberedSite, SessionRef } from "../shared/network-egress-wire"
+
+test("通放只取非空完整的全 allow 快照，等待窗口恢复后无用户点击也能继续", async () => {
+  const f = await approvalFixture()
+  try {
+    expect(await f.service.pass()).toBeUndefined()
+    await f.setActivities([])
+    const waiting = f.service.request("recover.example.com", 443)
+    await f.service.api.setTier({ session: f.session(), tier: "allow" })
+    expect(await f.service.pass()).toBeUndefined()
+    await f.setActivities(["ses_a"])
+    expect(await waiting).toBe("granted")
+    expect(await f.cards()).toEqual([])
+    expect(f.service.authorized("recover.example.com", 443)).toBe(false)
+    await f.setActivities(["ses_a", "ses_b"])
+    expect(await f.service.pass()).toBeUndefined()
+    for (const tier of ["ask", "readonly"] as const) {
+      await f.service.api.setTier({ session: f.session("ses_b"), tier })
+      expect(await f.service.pass()).toBeUndefined()
+    }
+    await f.service.api.setTier({ session: f.session("ses_b"), tier: "allow" })
+    expect((await f.service.pass())?.sessions).toHaveLength(2)
+    f.activity.attach(2, () => {}, { session: async () => ({}), shell: async () => true })
+    expect(await f.service.pass()).toBeUndefined()
+  } finally { f.service.close() }
+})
 
 async function approvalFixture(options: { timeoutMs?: number; unreadable?: boolean } = {}) {
   const activity = createNetworkEgressActivity()
@@ -32,6 +57,47 @@ async function approvalFixture(options: { timeoutMs?: number; unreadable?: boole
   await setActivities(["ses_a"])
   return { activity, service, store, cards, session, setActivities, messages, failWrite: (value: boolean) => { failWrite = value } }
 }
+
+test("档位查询期间活动换版时重读到稳定快照；新增非 allow 仍回审批", async () => {
+  const f = await approvalFixture()
+  try {
+    await f.service.api.setTier({ session: f.session(), tier: "allow" })
+    const original = f.activity.tier.bind(f.activity)
+    const tier = spyOn(f.activity, "tier")
+    let waiting!: () => void
+    let release!: () => void
+    const entered = new Promise<void>((resolve) => { waiting = resolve })
+    const blocked = new Promise<void>((resolve) => { release = resolve })
+    tier.mockImplementationOnce(async (session) => { waiting(); await blocked; return original(session) })
+    const pending = f.service.pass()
+    await entered
+    await f.setActivities(["ses_a", "ses_a"])
+    release()
+    expect(await pending).toMatchObject({ sessions: [{ session: f.session(), tier: "allow" }], tierRevision: f.activity.snapshot().revision })
+    await f.setActivities(["ses_a", "ses_b"])
+    expect(await f.service.pass()).toBeUndefined()
+    tier.mockRestore()
+  } finally { f.service.close() }
+})
+
+test("未完成的档位查询随既有拨号 signal 取消", async () => {
+  const f = await approvalFixture()
+  await f.service.api.setTier({ session: f.session(), tier: "allow" })
+  let entered!: () => void
+  let release!: () => void
+  const waiting = new Promise<void>((resolve) => { entered = resolve })
+  const blocked = new Promise<void>((resolve) => { release = resolve })
+  const tier = spyOn(f.activity, "tier").mockImplementation(async () => { entered(); await blocked; return "allow" })
+  const controller = new AbortController()
+  const reason = Object.assign(new Error("dial deadline"), { code: "ETIMEDOUT" })
+  try {
+    const pending = f.service.pass(controller.signal)
+    await waiting
+    controller.abort(reason)
+    release()
+    await expect(pending).rejects.toBe(reason)
+  } finally { release(); tier.mockRestore(); f.service.close() }
+})
 
 test("同地址合并、收件人取并集、相反点击只结算一次，无拒绝冷却或目的地上限", async () => {
   const f = await approvalFixture()

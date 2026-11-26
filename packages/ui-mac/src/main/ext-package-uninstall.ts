@@ -111,7 +111,24 @@ export function removePackageChildArtifactsV1(
   const removed: string[] = []
   const warnings: string[] = []
   for (const child of children) {
+    if (child.kind === "bundle") {
+      const store = removeOwnedGenerationStoreInLock(root, packageChildTxKeyV1("bundle", child.name))
+      removed.push(...store.removed)
+      warnings.push(...store.warnings)
+      if (!store.ok) return { ok: false, reason: store.reason, removed, warnings }
+      const grants = installers.removeInstallGrants(root, [packageChildTxKeyV1("bundle", child.name)])
+      if (!grants.ok) return { ok: false, reason: grants.reason, removed, warnings }
+      removed.push(...grants.removed)
+      continue
+    }
     if (child.kind === "skill") {
+      const state = readPackageLedgerStateV1(root, { sideEffectFree: true })
+      if (state.ok && state.packageGraphs.some(graph => graph.pluginTree && graph.children.some(node => node.kind === "skill" && node.name === child.name))) {
+        const grants = installers.removeInstallGrants(root, [skillGenerationKey(child.name)])
+        if (!grants.ok) return { ok: false, reason: grants.reason, removed, warnings }
+        removed.push(...grants.removed)
+        continue
+      }
       // generation-backed skill:受控 ext-store 是真源(`uninstallByKey` 同判据)。
       if (fs.existsSync(skillStorePaths(root, child.name).store)) {
         const store = removeOwnedGenerationStoreInLock(root, skillGenerationKey(child.name))

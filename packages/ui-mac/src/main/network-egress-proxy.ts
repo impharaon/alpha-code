@@ -40,12 +40,17 @@
 // electron-free:日志、授权、拨号都可注入,默认值才是生产接线(authorize = 注册表,dial = net.connect)。
 // 这样 network-egress-proxy.test.ts 能在 bun 里对真 TCP 靶站跑正反两臂,并证明「换成恒答允许的替身,判据会红」。
 
+import { randomUUID } from "node:crypto"
+import dns from "node:dns/promises"
 import * as http from "node:http"
 import * as net from "node:net"
 import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode/schema/codepuppy-net-failure"
 import { egressDenialLine, egressDenialDescription, type EgressDenialDetail } from "../shared/egress-denial"
 import { isEgressAuthorizedForSidecar } from "./network-egress-derived"
-import { requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"
+import { canonicalEgressHost, admitUserEgressGrant, currentEgressPass, recordEgressPass, denyEgressPass, type EgressPassBasis, requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"
+import { isLoopbackHost } from "./network-egress-registry"
+import type { EgressPass } from "../shared/network-egress-wire"
+import { dialEgressUpstream, resolveEgressRoutes } from "./network-egress-upstream"
 
 // 拒绝正文的格式住在 `shared/egress-denial.ts`,因为 `#1382` 起它**有读者**了(renderer 的
 // 时间线要据此说「是这台电脑上的网络策略拦的」)。写的人和读的人共用同一个拼串函数,
@@ -55,13 +60,14 @@ export { EGRESS_DENIED_BODY_PREFIX } from "../shared/egress-denial"
 export type EgressDenyReason = "unregistered" | "bad-authority" | "method-not-connect" | "dial-failed"
 
 export type EgressLogRecord =
+  | EgressPass
   | {
       /**
        * `#1412`:一条未登记的目的地被交给用户裁决之后的结局。它与 `egress.connect` 分开记,
        * 因为它回答的是另一个问题 ——「这一代里,用户放行过哪些原本不在名单上的地址」。
        */
       event: "egress.grant"
-      id: number
+      id: string
       at: string
       host: string
       port: number
@@ -69,7 +75,7 @@ export type EgressLogRecord =
     }
   | {
       event: "egress.connect"
-      id: number
+      id: string
       at: string
       method: string
       /** 请求行里的原文(CONNECT 的 authority,或非 CONNECT 的 url)。 */
@@ -89,7 +95,7 @@ export type EgressLogRecord =
     }
   | {
       event: "egress.tunnel-closed"
-      id: number
+      id: string
       at: string
       host: string
       port: number
@@ -103,7 +109,7 @@ export type EgressLogRecord =
   | {
       /** `#1572`:客户端以 TLS 记录头开口、上游 tlsSilentMs 内零字节 ⇒ 代理关掉两端(产品期限)。 */
       event: "egress.tunnel-silent"
-      id: number
+      id: string
       at: string
       host: string
       port: number
@@ -118,7 +124,8 @@ export type EgressProxyDeps = {
   /** 默认 = 静态表 ∪ 本代派生的动态半场。**只有测试**该传这个 —— 生产传别的东西就等于绕开 AC2。 */
   authorize?: (host: string, port: number) => boolean
   /** 默认 = `net.connect({ host, port })`(DNS 在本进程)。测试用它做零拨号断言。 */
-  dial?: (host: string, port: number) => net.Socket
+  dial?: typeof dialEgressUpstream
+  resolveEgressRoutes?: typeof resolveEgressRoutes
   /**
    * `#1412` —— 未登记目的地的**唯一出口**:问用户。默认 = network-egress-grants.ts 的编排,
    * 而它在**没有接上询问通道时恒答 `not-asked`** ⇒ 不接线的行为与本票之前逐字相同(403 unregistered,零额外记录)。
@@ -169,11 +176,6 @@ export function parseConnectAuthority(authority: string | undefined): { host: st
   const port = Number(portPart)
   if (port < 1 || port > 65535) return undefined
   return { host: hostPart, port }
-}
-
-function defaultDial(host: string, port: number): net.Socket {
-  // autoSelectFamily(Happy Eyeballs):`localhost` 在 macOS 上先解到 ::1;靶站只听 v4 时不能停在第一个地址。
-  return net.connect({ host, port, autoSelectFamily: true })
 }
 
 function denialBody(reason: EgressDenyReason, authority: string, detail?: string): string {
@@ -228,10 +230,12 @@ function writeDenial(socket: net.Socket, status: number, body: string): void {
 export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<EgressProxyHandle> {
   const authorize = deps.authorize ?? isEgressAuthorizedForSidecar
   const requestGrant = deps.requestGrant ?? requestUserEgressGrant
-  const dial = deps.dial ?? defaultDial
+  const dial = deps.dial ?? dialEgressUpstream
+  const resolveRoutes = deps.resolveEgressRoutes ?? resolveEgressRoutes
   const dialTimeoutMs = deps.dialTimeoutMs ?? 10_000
   const tlsSilentMs = deps.tlsSilentMs ?? 15_000
   const log = deps.log
+  const runID = randomUUID()
   let seq = 0
   const live = new Set<net.Socket>()
   const track = (s: net.Socket) => {
@@ -241,7 +245,7 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
 
   const server = http.createServer((req, res) => {
     // 明文 HTTP 的绝对 URI 形式(`GET http://host/ …`)—— 本代理不做明文转发,fail-closed。
-    log({ event: "egress.connect", id: ++seq, at: new Date().toISOString(), method: req.method ?? "", authority: req.url ?? "", verdict: "deny", reason: "method-not-connect", status: 405 })
+    log({ event: "egress.connect", id: `${runID}:${++seq}`, at: new Date().toISOString(), method: req.method ?? "", authority: req.url ?? "", verdict: "deny", reason: "method-not-connect", status: 405 })
     const body = denialBody("method-not-connect", `${req.method ?? ""} ${req.url ?? ""}`)
     res.writeHead(405, { "Content-Type": "text/plain; charset=utf-8", "Content-Length": Buffer.byteLength(body), Connection: "close", Allow: "CONNECT", "Proxy-Agent": "codepuppy-egress-policy" })
     // `Connection: close` 是给客户端看的;实际把连接收掉这件事不交给运行时的 keep-alive 策略(bun 实测不关)。
@@ -249,134 +253,163 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   })
 
   server.on("connect", (req, duplex, head) => {
-    const id = ++seq
+    const id = `${runID}:${++seq}`
     const authority = req.url ?? ""
     // @types/node 把它标成 Duplex;运行时是 net.Socket(http.Server 的连接就是 TCP socket)。
     const clientSocket = duplex as net.Socket
     track(clientSocket)
     clientSocket.on("error", () => {})
+    const controller = new AbortController()
+    let settled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let remaining = dialTimeoutMs
+    let budgetAt = 0
+    const stopped = () => settled || controller.signal.aborted || clientSocket.destroyed
+    const pause = () => { clearTimeout(timer); remaining -= Date.now() - budgetAt }
+    const resume = () => {
+      budgetAt = Date.now()
+      timer = setTimeout(() => controller.abort(Object.assign(new Error("dial timeout"), { code: "ETIMEDOUT" })), remaining)
+    }
     const deny = (status: number, reason: EgressDenyReason, parsed?: { host: string; port: number }, detail?: string) => {
+      if (settled || clientSocket.destroyed) return
+      settled = true
+      clearTimeout(timer)
       log({ event: "egress.connect", id, at: new Date().toISOString(), method: "CONNECT", authority, host: parsed?.host, port: parsed?.port, verdict: "deny", reason, status, detail })
       writeDenial(clientSocket, status, denialBody(reason, authority, detail))
     }
 
     const parsed = parseConnectAuthority(authority)
     if (!parsed) return deny(400, "bad-authority")
-    if (authorize(parsed.host, parsed.port)) return openTunnel(parsed)
-
-    // `#1412` —— 未登记 ⇒ 在拒绝之前走唯一的出口:问用户。答复到达之前**一次 DNS 都不发、
-    // 一次拨号都不做**(与原来的顺序逐字相同);没接询问通道时 requestGrant 恒答 `not-asked`(三态里的那一支,
-    // 于是这一整段的行为就是原来那一行 `return deny(403, "unregistered", parsed)`(连记录都不多一条)。
-    // **尽力而为,不是保证**:CONNECT 的 socket 从 http 服务器上摘下来之后没有人在读它,
-    // 于是对端 RST 在本进程里观察不到 —— 实测(bun 1.3.14):客户端 `destroy()` 200 ms 后
-    // 服务端这一侧仍然 `destroyed=false writable=true`,`close` 一次都没发。要观察到它只能
-    // `resume()`,而那会吞掉客户端在 200 之前抢跑的字节(TLS ClientHello),比它治的病更坏。
-    // 所以这个判断只在优雅关闭时命中;没命中的代价是对着一个死 socket 建一次隧道,它下一拍就自己收掉。
-    let clientGone = false
-    const approval = new AbortController()
-    clientSocket.once("close", () => { clientGone = true; approval.abort() })
-    void requestGrant(parsed.host, parsed.port, approval.signal).then(
-      (outcome) => {
-        // `not-asked`(没接通道 / 准入不过)不写记录:那一行会假装有人裁决过。
-        if (outcome !== "not-asked") log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: outcome === "granted" ? "granted" : "refused" })
-        if (outcome !== "granted") return deny(403, "unregistered", parsed, outcome === "not-asked" ? undefined : outcome)
-        // 人答得比客户端的超时慢是常态(`webfetch` 30 s)。批准已经落账,这条连接却已经走了 ——
-        // 不要对着一个死 socket 拨号,让调用方重试即可(方案基线 I7)。
-        if (clientGone || clientSocket.destroyed) return
-        if (!authorize(parsed.host, parsed.port)) return deny(403, "unregistered", parsed, "approval-unavailable")
-        openTunnel(parsed)
-      },
-      // 询问通道自己坏了也只能是拒:降级方向永远朝 fail-closed。
-      () => deny(403, "unregistered", parsed, "approval-unavailable"),
-    )
+    if (!authorize(parsed.host, parsed.port) && !admitUserEgressGrant(parsed.host, parsed.port)) return deny(403, "unregistered", parsed)
+    void openTunnel(parsed)
     return
 
-    function openTunnel(parsed: { host: string; port: number }): void {
-      const upstream = dial(parsed.host, parsed.port)
-      track(upstream)
-      let settled = false
-      const timer = setTimeout(() => {
-        if (!settled) upstream.destroy(Object.assign(new Error("dial timeout"), { code: "ETIMEDOUT" }))
-      }, dialTimeoutMs)
-
-      upstream.once("connect", () => {
-        settled = true
-        clearTimeout(timer)
-        const remote = upstream.remoteAddress
-        const fakeIp = isFakeIp(remote)
-        log({ event: "egress.connect", id, at: new Date().toISOString(), method: "CONNECT", authority, host: parsed.host, port: parsed.port, verdict: "allow", status: 200, remote, fakeIp })
-        clientSocket.write("HTTP/1.1 200 Connection Established\r\nProxy-Agent: codepuppy-egress-policy\r\n\r\n")
-        const openedAt = Date.now()
-        // 字节计数自己数(bun 的 http 连接 socket 上 bytesRead/bytesWritten 实测恒 0)。
-        let bytesUp = head.length
-        let bytesDown = 0
-        let firstDownAt: number | undefined
-        // `#1572` 静默兜底:head 与之后的客户端 data 当一条连续字节流,前两个字节是 TLS 记录头(0x16 0x03,
-        // 允许跨块到达)才起计时;上游第一个字节、任一端关闭都清掉它。
-        const prefix: number[] = []
-        let silentTimer: ReturnType<typeof setTimeout> | undefined
-        const watchTlsHead = (chunk: Buffer) => {
-          if (prefix.length >= 2) return
-          prefix.push(...chunk.subarray(0, 2 - prefix.length))
-          if (prefix.length < 2 || prefix[0] !== 0x16 || prefix[1] !== 0x03) return
-          if (tlsSilentMs <= 0 || firstDownAt !== undefined) return
-          silentTimer = setTimeout(() => {
-            log({ event: "egress.tunnel-silent", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, remote, fakeIp, bytesUp })
-            clientSocket.destroy()
-            upstream.destroy()
-          }, tlsSilentMs)
-        }
-        watchTlsHead(head)
-        clientSocket.on("data", (chunk: Buffer) => {
-          bytesUp += chunk.length
-          watchTlsHead(chunk)
-        })
-        upstream.on("data", (chunk: Buffer) => {
-          if (firstDownAt === undefined) {
-            firstDownAt = Date.now()
-            clearTimeout(silentTimer)
+    async function openTunnel(parsed: { host: string; port: number }): Promise<void> {
+      let basis: EgressPassBasis | undefined
+      const fail = (err: NodeJS.ErrnoException) => {
+        if (settled || clientSocket.destroyed) return
+        // Abort owns the timeout result; subsequent async completions cannot settle again.
+        if (controller.signal.aborted && err !== controller.signal.reason) return
+        if (err.code === "ENONPUBLIC" && basis) denyEgressPass(id, parsed, basis)
+        deny(err.code === "ENONPUBLIC" ? 403 : dialFailureStatus(err), err.code === "ENONPUBLIC" ? "unregistered" : "dial-failed", parsed, err.code === "ENONPUBLIC" ? "non-public" : err.code ?? err.message)
+      }
+      controller.signal.addEventListener("abort", () => fail(controller.signal.reason), { once: true })
+      clientSocket.once("close", () => { if (!settled) { settled = true; controller.abort() } })
+      resume()
+      try {
+        for (;;) {
+          basis = authorize(parsed.host, parsed.port) ? undefined : await currentEgressPass(controller.signal)
+          if (stopped()) return
+          if (!basis && !authorize(parsed.host, parsed.port)) {
+            // Human decision time is outside the existing dial budget. Reuse the same
+            // card path both initially and when a route lookup invalidates allow-all.
+            pause()
+            let outcome: EgressGrantOutcome
+            try { outcome = await requestGrant(parsed.host, parsed.port, controller.signal) }
+            catch { if (!stopped()) deny(403, "unregistered", parsed, "approval-unavailable"); return }
+            if (stopped()) return
+            if (outcome !== "granted") {
+              if (outcome !== "not-asked") log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: "refused" })
+              deny(403, "unregistered", parsed, outcome === "not-asked" ? undefined : outcome)
+              return
+            }
+            resume()
+            basis = authorize(parsed.host, parsed.port) ? undefined : await currentEgressPass(controller.signal)
+            if (stopped()) return
+            if (authorize(parsed.host, parsed.port)) log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: "granted" })
+            else if (!basis) { deny(403, "unregistered", parsed, "approval-unavailable"); return }
           }
-          bytesDown += chunk.length
-        })
-        if (head.length > 0) upstream.write(head)
-        clientSocket.pipe(upstream)
-        upstream.pipe(clientSocket)
-        let closed = false
-        const onClose = () => {
-          if (closed) return
-          closed = true
-          clearTimeout(silentTimer)
-          const closedAt = Date.now()
-          log({
-            event: "egress.tunnel-closed",
-            id,
-            at: new Date(closedAt).toISOString(),
-            host: parsed.host,
-            port: parsed.port,
-            bytesUp,
-            bytesDown,
-            ...(firstDownAt === undefined ? {} : { firstDownMs: firstDownAt - openedAt }),
-            durationMs: closedAt - openedAt,
-          })
-          clientSocket.destroy()
-          upstream.destroy()
-        }
-        clientSocket.once("close", onClose)
-        upstream.once("close", onClose)
-      })
-      upstream.once("error", (err: NodeJS.ErrnoException) => {
-        if (settled) return clientSocket.destroy()
-        settled = true
-        clearTimeout(timer)
-        deny(dialFailureStatus(err), "dial-failed", parsed, err.code ?? err.message)
-      })
-      clientSocket.once("close", () => {
-        if (!settled) {
+          const routes = await resolveRoutes(parsed, controller.signal)
+          if (stopped()) return
+          basis = authorize(parsed.host, parsed.port) ? undefined : await currentEgressPass(controller.signal)
+          if (stopped()) return
+          if (!authorize(parsed.host, parsed.port) && !basis) continue
+          const address = server.address()
+          const filtered = (await Promise.all(routes.map(async (route) => {
+            if (route.kind === "direct" || !address || typeof address === "string" || route.port !== address.port) return route
+            const host = canonicalEgressHost(route.host) ?? route.host
+            if (isLoopbackHost(host)) return
+            const addresses = net.isIP(host) ? [host] : (await dns.lookup(host, { all: true }).catch(() => [])).map((entry) => entry.address)
+            return addresses.some((entry) => isLoopbackHost(canonicalEgressHost(entry) ?? entry)) ? undefined : route
+          }))).filter((route): route is NonNullable<typeof route> => route !== undefined)
+          if (stopped()) return
+          if (!filtered.length && routes.length) throw Object.assign(new Error("proxy loop"), { code: "EPROXYLOOP" })
+          const passBasis = basis
+          const { socket: upstream } = await dial(parsed, filtered, passBasis ? { kind: "allow-all", onPass: () => {
+            const record: EgressPass = { event: "egress.policy-pass", id, at: new Date().toISOString(), destination: parsed, basis: "allow-all", attribution: { kind: "unknown" }, ...passBasis }
+            log(record)
+            recordEgressPass(record)
+          } } : { kind: "existing-authorization" }, controller.signal)
+          if (stopped()) { upstream.destroy(); return }
+          track(upstream)
           settled = true
           clearTimeout(timer)
-          upstream.destroy()
+          const remote = upstream.remoteAddress
+          const fakeIp = isFakeIp(remote)
+          log({ event: "egress.connect", id, at: new Date().toISOString(), method: "CONNECT", authority, host: parsed.host, port: parsed.port, verdict: "allow", status: 200, remote, fakeIp })
+          clientSocket.write("HTTP/1.1 200 Connection Established\r\nProxy-Agent: codepuppy-egress-policy\r\n\r\n")
+          const openedAt = Date.now()
+          // 字节计数自己数(bun 的 http 连接 socket 上 bytesRead/bytesWritten 实测恒 0)。
+          let bytesUp = head.length
+          let bytesDown = 0
+          let firstDownAt: number | undefined
+          // `#1572` 静默兜底:head 与之后的客户端 data 当一条连续字节流,前两个字节是 TLS 记录头(0x16 0x03,
+          // 允许跨块到达)才起计时;上游第一个字节、任一端关闭都清掉它。
+          const prefix: number[] = []
+          let silentTimer: ReturnType<typeof setTimeout> | undefined
+          const watchTlsHead = (chunk: Buffer) => {
+            if (prefix.length >= 2) return
+            prefix.push(...chunk.subarray(0, 2 - prefix.length))
+            if (prefix.length < 2 || prefix[0] !== 0x16 || prefix[1] !== 0x03) return
+            if (tlsSilentMs <= 0 || firstDownAt !== undefined) return
+            silentTimer = setTimeout(() => {
+              log({ event: "egress.tunnel-silent", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, remote, fakeIp, bytesUp })
+              clientSocket.destroy()
+              upstream.destroy()
+            }, tlsSilentMs)
+          }
+          watchTlsHead(head)
+          clientSocket.on("data", (chunk: Buffer) => {
+            bytesUp += chunk.length
+            watchTlsHead(chunk)
+          })
+          upstream.on("data", (chunk: Buffer) => {
+            if (firstDownAt === undefined) {
+              firstDownAt = Date.now()
+              clearTimeout(silentTimer)
+            }
+            bytesDown += chunk.length
+          })
+          if (head.length > 0) upstream.write(head)
+          clientSocket.pipe(upstream)
+          upstream.pipe(clientSocket)
+          let closed = false
+          const onClose = () => {
+            if (closed) return
+            closed = true
+            clearTimeout(silentTimer)
+            const closedAt = Date.now()
+            log({
+              event: "egress.tunnel-closed",
+              id,
+              at: new Date(closedAt).toISOString(),
+              host: parsed.host,
+              port: parsed.port,
+              bytesUp,
+              bytesDown,
+              ...(firstDownAt === undefined ? {} : { firstDownMs: firstDownAt - openedAt }),
+              durationMs: closedAt - openedAt,
+            })
+            clientSocket.destroy()
+            upstream.destroy()
+          }
+          clientSocket.once("close", onClose)
+          upstream.once("close", onClose)
+          upstream.on("error", () => clientSocket.destroy())
+          return
         }
-      })
+      } catch (error) { fail(error as NodeJS.ErrnoException) }
+      finally { clearTimeout(timer) }
     }
   })
 

@@ -1,3 +1,4 @@
+import { testEgressDial } from "../../test-component/egress-upstream-fixture"
 import { expect, mock, test } from "bun:test"
 import { EventEmitter } from "node:events"
 import fs from "node:fs"
@@ -47,11 +48,11 @@ mock.module("./store", () => ({ getStore: () => ({ get: () => null, set: () => {
 mock.module("./codepuppy-keychain-backend", () => ({ keychainBackend: () => ({ isEncryptionAvailable: () => true, encryptString: (value: string) => Buffer.from(value), decryptString: (value: Buffer) => value.toString() }) }))
 const { startEgressPolicyProxy } = await import("./network-egress-proxy")
 mock.module("./network-egress-proxy", () => ({ startEgressPolicyProxy: async (deps: Parameters<typeof startEgressPolicyProxy>[0]) => {
-  proxy = await startEgressPolicyProxy({ ...deps, log: (record) => { proxyRecords.push(record); deps.log(record) }, dial: (host) => {
+  proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }], ...deps, log: (record) => { proxyRecords.push(record); deps.log(record) }, dial: testEgressDial((host) => {
     const port = dialPorts.get(host)
     if (!port) throw new Error("nonfixture proxy destination refused")
     return net.connect({ host: "127.0.0.1", port })
-  } })
+  }) })
   return proxy
 } }))
 const { initCodePuppyEnvironment } = await import("./codepuppy-environment")

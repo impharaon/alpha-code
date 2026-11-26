@@ -18,6 +18,9 @@
 
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { INSTALLED_PLUGIN_PACKAGE_FILE, PLUGIN_TREE_DIRECTORY, validInstalledPluginPackage } from "../shared/installed-plugin-package"
+import { verifyPluginTreeOnDisk } from "./ext-cas"
 import { isExtensionName } from "../shared/extension-name"
 import { agentFileProbe } from "./ext-agent-install"
 import { skillGenerationProbe } from "./ext-skill-generations"
@@ -61,6 +64,14 @@ export function extensionHealthProbeRouter(root: string): HealthProbe {
   const agentProbe = agentFileProbe(root)
   const pluginProbe = seedPluginFileProbe()
   return async (input) => {
+    if (input.action === "generation" && input.key.startsWith("bundle--")) {
+      try {
+        const installed: unknown = JSON.parse(readFileSync(join(input.generationDir, INSTALLED_PLUGIN_PACKAGE_FILE), "utf8"))
+        if (!validInstalledPluginPackage(installed)) return { healthy: false, reason: "Plugin package metadata is invalid" }
+        const checked = verifyPluginTreeOnDisk(installed.description.tree, join(input.generationDir, PLUGIN_TREE_DIRECTORY))
+        return checked.ok ? { healthy: true } : { healthy: false, reason: checked.reason }
+      } catch { return { healthy: false, reason: "Plugin package tree could not be read" } }
+    }
     const gen = await skillGenerationProbe(input)
     if (!gen.healthy) return gen
     if (input.action !== "file") return { healthy: true }

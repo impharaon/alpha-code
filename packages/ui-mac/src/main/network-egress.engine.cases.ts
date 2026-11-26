@@ -1,3 +1,4 @@
+import { testEgressDial } from "../../test-component/egress-upstream-fixture"
 // Scenario only: real engine, real ext lifecycle, production proxy and native fence. No Electron/window.
 // Model fixture uses HTTPS through the same CONNECT port, so the production network profile is unmodified.
 import { afterAll, beforeAll, expect, test } from "bun:test"
@@ -8,7 +9,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync
 import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
 import { pathToFileURL } from "node:url"
-import { connect } from "node:net"
+import { connect, type Socket } from "node:net"
+import { createServer } from "node:http"
+import { dialEgressUpstream } from "./network-egress-upstream"
+import { configureEgressGrantApproval } from "./network-egress-grants"
+import { egressPassPath } from "./network-egress-passes"
 import { createHash } from "node:crypto"
 import { scriptedModel, textOf } from "../../test-component/codepuppy-engine"
 import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
@@ -21,7 +26,7 @@ import { startEgressPolicyProxy, type EgressLogRecord } from "./network-egress-p
 import { sidecarEgressProxyEnv } from "./sidecar-env"
 import { createNetworkEgressActivity } from "./network-egress-activity"
 import { createNetworkEgressApproval } from "./network-egress-approval"
-import { createEgressSiteStore } from "./egress-grant-records"
+import { createEgressSiteStore, createEgressPassStore } from "./egress-grant-records"
 import { writeEgressGrantTruth } from "./egress-grant-truth-write"
 import { egressGrantTruthPath } from "./egress-grant-truth"
 import { environmentFromMutableRoot } from "./codepuppy-environment"
@@ -47,6 +52,9 @@ let service: ReturnType<typeof createNetworkEgressApproval>
 let proxy: Awaited<ReturnType<typeof startEgressPolicyProxy>>
 let tls: ReturnType<typeof Bun.serve>
 let target: ReturnType<typeof Bun.serve>
+let upstream: ReturnType<typeof createServer>
+const upstreamSockets = new Set<Socket>()
+const upstreamConnects: string[] = []
 let child: ReturnType<typeof Bun.spawn>
 let prepared: { sandbox: EngineSandbox; userData: string; globalRoot: string; project: string; config: string; env: Record<string, string> }
 let runtime: typeof import("../renderer/codepuppy-ui/network-egress-test-runtime")
@@ -56,6 +64,7 @@ let detach: (() => void) | undefined
 let sequence = 0
 let stderr = ""
 let siteFile = ""
+let passFile = ""
 const waiting = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>()
 const disposers: Array<() => void> = []
 const turns = new Set<Promise<unknown>>()
@@ -89,7 +98,7 @@ const attach = (connection: { url: string; authorization: string }) => {
   postToMain = (message) => { activity.receive(message, post) }
 }
 let postToMain: (message: unknown) => void = () => {}
-const renewService = () => { service?.close(); service = createNetworkEgressApproval({ available: true, activity, store: createEgressSiteStore(console.log), log: console.log }) }
+const renewService = () => { service?.close(); service = createNetworkEgressApproval({ available: true, activity, store: createEgressSiteStore(console.log), passes: createEgressPassStore(console.log), log: console.log }); configureEgressGrantApproval(service) }
 const ref = (sessionID: string): SessionRef => ({ generation, sessionID, directory: prepared.project })
 async function session() {
   const info = await call<{ id: string }>("POST", "/api/session", { location: { directory: prepared.project }, agent: "codepuppy-ask", model: { id: "m", providerID: "codepuppy" } })
@@ -140,7 +149,27 @@ beforeAll(async () => {
   expect(generated.exitCode, generated.stderr.toString()).toBe(0)
   target = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("egress-target-ok") })
   tls = Bun.serve({ hostname: "127.0.0.1", port: 0, tls: { key: readFileSync(key), cert: readFileSync(cert) }, fetch: async (request) => nativeFetch(`${model.baseURL.replace(/\/v1$/, "")}${new URL(request.url).pathname}`, { method: request.method, headers: request.headers, body: await request.arrayBuffer() }) })
-  proxy = await startEgressPolicyProxy({ log: (record) => logs.push(record), authorize: (host, port) => host === "model.egress.test" || service?.authorized(host, port) === true, requestGrant: (host, port, signal) => { connects.push(host); return service.request(host, port, signal) }, dial: (host) => connect(host === "model.egress.test" ? tls.port! : target.port!, "127.0.0.1") })
+  upstream = createServer()
+  const trackUpstream = (socket: Socket) => { upstreamSockets.add(socket); socket.on("error", () => {}); socket.once("close", () => upstreamSockets.delete(socket)) }
+  upstream.on("connection", trackUpstream)
+  upstream.on("connect", (request, client, head) => {
+    upstreamConnects.push(request.url!)
+    const destination = connect(target.port!, "127.0.0.1", () => {
+      client.write("HTTP/1.1 200 Connection Established\r\n\r\n")
+      if (head.length) destination.write(head)
+      client.pipe(destination); destination.pipe(client)
+    })
+    trackUpstream(destination)
+    client.once("close", () => destination.destroy()); destination.once("close", () => client.destroy())
+  })
+  await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve))
+  const modelDial = testEgressDial(() => connect(tls.port!, "127.0.0.1"))
+  proxy = await startEgressPolicyProxy({
+    resolveEgressRoutes: async (destination) => destination.host === "model.egress.test" ? [{ kind: "direct" }] : [{ kind: "http", host: "127.0.0.1", port: (upstream.address() as { port: number }).port }],
+    log: (record) => logs.push(record), authorize: (host, port) => host === "model.egress.test" || host === "via-proxy.egress.invalid" || service?.authorized(host, port) === true,
+    requestGrant: (host, port, signal) => { connects.push(host); return service.request(host, port, signal) },
+    dial: (destination, routes, policy, signal) => destination.host === "model.egress.test" ? modelDial(destination, routes, policy, signal) : dialEgressUpstream(destination, routes, policy, signal),
+  })
   let prepare!: () => void
   const preparation = new Promise<void>((resolve) => { prepare = resolve })
   let ready!: (connection: { url: string; authorization: string }) => void
@@ -157,6 +186,7 @@ beforeAll(async () => {
   await preparation
   const base = environmentFromMutableRoot(prepared.globalRoot)!
   siteFile = egressGrantTruthPath(base.casBaseRoot, "dev")
+  passFile = egressPassPath(base.casBaseRoot, "dev")
   mkdirSync(dirname(siteFile), { recursive: true })
   writeEgressGrantTruth(siteFile, [], { mkdirSync, writeFileSync, renameSync, rmSync })
   symlinkSync(siteFile, join(prepared.project, "sites-link"))
@@ -187,7 +217,7 @@ afterAll(async () => {
     const exited = await Promise.race([child.exited, Bun.sleep(10_000).then(() => undefined)])
     if (exited === undefined) { child.kill(); await child.exited }
   }
-  await proxy?.close(); tls?.stop(true); target?.stop(true); model.stop()
+  await proxy?.close(); upstreamSockets.forEach((socket) => socket.destroy()); if (upstream) await new Promise<void>((resolve) => upstream.close(() => resolve())); tls?.stop(true); target?.stop(true); model.stop()
   writeFileSync(join(outside, "evidence.json"), JSON.stringify({ mainPID: process.pid, enginePID, siteText: existsSync(siteFile) ? readFileSync(siteFile, "utf8") : "absent", logs, messages, modelRequests: model.requests, stderr }))
   console.log(`EGRESS-EVIDENCE ${join(outside, "evidence.json")}`)
 }, 20_000)
@@ -307,5 +337,63 @@ test("N2 用户 !command 与后台 shell 的真实事件仍投递对话批准，
   await service.api.decide({ requestID: next.requestID, decision: "deny" })
   await until(() => !activity.snapshot().activities.some((item) => item.kind === "shell" && item.session.sessionID === a), "shell exit cleanup")
 }, 25_000)
+
+
+test("通放与混合档：真引擎真围栏独占 allow 无卡逐次记账，混入 ask 后出卡", async () => {
+  const a = await session()
+  await service.api.setTier({ session: ref(a), tier: "allow" })
+  const from = model.requests.length
+  for (let index = 0; index < 2; index++) {
+    const before = logs.length
+    const running = await begin(a, "shell", { command: command("198.18.0.1") })
+    const observed = await until(async () => {
+      const cards = await service.api.listApprovals({ session: ref(a) })
+      const pending = cards.ok ? cards.value.filter((card) => card.state === "pending") : []
+      return logs.slice(before).some((record) => record.event === "egress.policy-pass") || pending.length ? { pending } : undefined
+    }, "allow-all policy pass or unexpected card")
+    // Settle the known-bad arm promptly; it must fail on the card, without waiting 45 s.
+    for (const card of observed.pending) await service.api.decide({ requestID: card.requestID, decision: "deny" })
+    await running.done
+    expect(observed.pending, "allow-only must not create a card").toEqual([])
+  }
+  expect(modelText(from)).toContain("egress-target-ok")
+  const records = readFileSync(passFile, "utf8").trim().split("\n").map((line) => JSON.parse(line))
+  expect(records.filter((record) => record.destination.host === "198.18.0.1")).toHaveLength(2)
+  expect(await service.api.settings()).toMatchObject({ ok: true, value: { passes: [{ destination: { host: "198.18.0.1", port: 80 }, count: 2 }] } })
+  const b = await session()
+  const holding = await begin(b, "shell", { command: command("hold.approval.test") })
+  const held = await card(b, "hold.approval.test")
+  const mixed = await begin(a, "shell", { command: command("198.18.0.1") })
+  const pending = await card(a, "198.18.0.1")
+  await service.api.decide({ requestID: pending.requestID, decision: "deny" })
+  await mixed.done
+  await service.api.decide({ requestID: held.requestID, decision: "deny" })
+  await holding.done
+  expect(readFileSync(passFile, "utf8").trim().split("\n")).toHaveLength(2)
+}, 30_000)
+
+test("通放拒绝非公网：真实命令发送数字短写、私网与 IANA 保留地址", async () => {
+  const a = await session()
+  await service.api.setTier({ session: ref(a), tier: "allow" })
+  const before = logs.length
+  for (const host of ["127.1", "10.1", "198.51.100.1"]) {
+    const source = `import socket; s=socket.create_connection(("127.0.0.1",${proxy.port})); s.sendall(b"CONNECT ${host}:80 HTTP/1.1\\r\\nHost: ${host}:80\\r\\n\\r\\n"); print(s.recv(4096).decode()); s.close()`
+    const from = model.requests.length
+    await (await begin(a, "shell", { command: `/usr/bin/python3 -c ${shellQuote(source)}` })).done
+    expect(modelText(from), host).toContain("403")
+  }
+  expect(logs.slice(before).filter((record) => record.event === "egress.policy-pass")).toEqual([])
+  expect(logs.slice(before).filter((record) => record.event === "egress.connect" && record.detail === "non-public")).toHaveLength(3)
+}, 30_000)
+
+test("系统路由注入：真实引擎围栏连接仅由本地上游代理承接的目标", async () => {
+  const a = await session()
+  const before = upstreamConnects.length
+  const from = model.requests.length
+  await (await begin(a, "shell", { command: command("via-proxy.egress.invalid") })).done
+  expect(modelText(from)).toContain("egress-target-ok")
+  expect(upstreamConnects.slice(before)).toContain("via-proxy.egress.invalid:80")
+  expect((await service.api.listApprovals({ session: ref(a) }))).toEqual({ ok: true, value: [] })
+}, 20_000)
 
 }

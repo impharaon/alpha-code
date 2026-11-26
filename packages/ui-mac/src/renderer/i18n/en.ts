@@ -1,4 +1,10 @@
 export const dict = {
+  "codepuppy.network.passesTitle": "Allow-all connection records",
+  "codepuppy.network.passesScope": "Connections permitted by the app under Allow all.",
+  "codepuppy.network.noPasses": "No connection records yet.",
+  "codepuppy.network.passCount": "Allowed {{count}} times",
+  "codepuppy.network.firstPass": "First allowed:",
+  "codepuppy.network.lastPass": "Last allowed:",
   "codepuppy.network.title": "Approve connection",
   "codepuppy.network.unknown": "The initiator cannot be determined. Any conversation running tools now can decide.",
   "codepuppy.network.scope": "Remember {{site}} and all its subdomains, on every port.",
@@ -17,7 +23,7 @@ export const dict = {
   "codepuppy.network.settingsScope": "Remembered sites apply to all projects in this app environment.",
   "codepuppy.network.revoke": "Revoke",
   "codepuppy.network.revokeFailed": "Revocation could not be fully saved. Please retry.",
-  "codepuppy.network.storageFailed": "Approval records could not be read or saved. If revocation could not be saved, it may return after restart.",
+  "codepuppy.network.storageFailed": "Connection records could not be read or saved. If revocation could not be saved, it may return after restart.",
   "codepuppy.network.noSites": "No remembered sites.",
 
   "codepuppy.timeline.hub.installFailed": "Installation failed",

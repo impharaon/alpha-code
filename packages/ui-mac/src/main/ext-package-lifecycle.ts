@@ -32,7 +32,7 @@ import {
 import { PROFILE_REGISTRY_V1 } from "../shared/host-extension-package-contract/registry"
 
 /** package 通道装得出来的 child kind —— 恰是下面那张表的值域。 */
-export type PackageChildKindV1 = "skill" | "agent" | "cloud" | "command" | "mcp" | "plugin"
+export type PackageChildKindV1 = "skill" | "agent" | "cloud" | "command" | "mcp" | "plugin" | "bundle"
 
 /**
  * `#809`(REQ-128 Phase 4,基线 §5 第 7 类):**profile → child kind 的唯一一张表。**
@@ -60,6 +60,7 @@ const PACKAGE_CHILD_KIND_BY_PROFILE_V1: Readonly<Record<string, PackageChildKind
   "mcp-local": "mcp",
   "mcp-remote": "mcp",
   skill: "skill",
+  "plugin-package": "bundle",
 }
 
 /** 这张表登记了哪些 profile。**测试断言它等于 `PROFILE_REGISTRY_V1` 的 profileId 集** ——
@@ -84,7 +85,7 @@ export function packageChildKindV1(
 }
 
 export function isPackageChildKindV1(kind: string): kind is PackageChildKindV1 {
-  return kind === "skill" || kind === "agent" || kind === "cloud" || kind === "command" || kind === "mcp" || kind === "plugin"
+  return kind === "skill" || kind === "agent" || kind === "cloud" || kind === "command" || kind === "mcp" || kind === "plugin" || kind === "bundle"
 }
 
 /** 本模块自检:注册表长出第六个 profile 而表没跟上 ⇒ 模块装载即抛。测试另有一条独立的
@@ -114,6 +115,8 @@ export function packageChildTxKeyV1(kind: PackageChildKindV1, name: string): str
       return `command--${name}`
     case "mcp":
       return `mcp--${name}`
+    case "bundle":
+      return `bundle--${name}`
     case "plugin":
       return `plugin--${name}`
   }

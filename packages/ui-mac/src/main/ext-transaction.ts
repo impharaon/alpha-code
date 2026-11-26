@@ -31,6 +31,9 @@
 //     resolveLiveGenerationDir / listGenerations 提供,receipt 的 owned paths 由 planner
 //     按受控根 + generation 重新派生。
 
+import { validPluginTree, pluginRelativePath } from "../shared/host-extension-package-contract/plugin-package"
+import type { TreeNode } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
+import { verifyPluginTreeOnDisk } from "./ext-cas"
 import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -75,7 +78,7 @@ import {
 
 // ── 类型(接缝定义,见文件头 REQ-099 段) ─────────────────────────────────────────────────────
 
-export type TxFileSpec = { path: string; sha256: string; size?: number }
+export type TxFileSpec = { path: string; sha256: string; size?: number; mode?: number }
 
 /** REQ-100 #311:action 判别式。缺省 "generation"(向后兼容:老 plan/journal 无此字段即文件树 generation)。
  *  - generation:文件树装进不可变 generation 目录 + current.json 指针翻转(skill 等)。
@@ -104,6 +107,7 @@ export type TxPlanItem = {
   action?: TxActionKind
   /** generation:期望载荷 = receipt 的 digest 集(结构精确匹配:缺一 / 多一 / 哈希不符均拒)。config/receipt 忽略。 */
   files?: TxFileSpec[]
+  tree?: TreeNode[]
   /** config action 的目标叶变更(action==="config" 必填)。 */
   config?: TxConfigAction
   /** file action 的目标文件变更(action==="file" 必填)。 */
@@ -364,6 +368,7 @@ export type TxJournalItem = {
   genId: string
   /** generation:期望载荷 digest 集。config/receipt 为空数组。 */
   files: TxFileSpec[]
+  tree?: TreeNode[]
   /** config:目标文件 + staging 里 pre/next image 的 digest(内容在受保护 staging,journal 不落值)。 */
   config?: { target: string; slot: number; preDigest: string; nextDigest: string }
   /** file:root 内相对目标 + pre/next digest + 前像缺席标记(缺席 ≠ 零字节,#358;内容在受保护
@@ -650,7 +655,7 @@ function validatePlan(root: string, plan: TxPlan): string | null {
   if (!plan || typeof plan !== "object" || !Array.isArray(plan.items)) return "invalid plan"
   if (plan.txId !== undefined && !TX_ID_RE.test(plan.txId)) return `invalid txId: ${plan.txId}`
   if (plan.items.length === 0) return "plan has no items"
-  if (plan.items.length > 64) return "plan exceeds 64 items"
+  if (plan.items.length > 64 && !plan.items.some(item => item && typeof item === "object" && item.tree !== undefined)) return "plan exceeds 64 items"
   // REQ-128 `#706`(基线 §2.9):**只有 root package item 携带 mutation**。两个就意味着一次
   // 事务里有两个 package 真相,提交顺序会决定谁赢 —— 在写盘之前拒,零副作用。
   const mutationCarriers = plan.items.filter((it) => it && typeof it === "object" && it.packageMutation !== undefined)
@@ -712,11 +717,12 @@ function validatePlan(root: string, plan: TxPlan): string | null {
     } else {
       // generation:期望载荷 digest 集精确匹配。
       if (!Array.isArray(item.files) || item.files.length === 0) return `item "${item.key}" has no expected files`
-      if (item.files.length > 4096) return `item "${item.key}" exceeds 4096 files`
+      if (item.tree !== undefined && (!validPluginTree(item.tree) || item.tree.filter(node => node.kind === "file").length !== item.files.length || item.files.some(file => !file || typeof file !== "object" || !item.tree!.some(node => node.kind === "file" && node.path === file.path && node.digest === "sha256:" + file.sha256 && node.bytes === file.size)))) return `item "${item.key}": invalid plugin tree`
+      if (!item.tree && item.files.length > 4096) return `item "${item.key}" exceeds 4096 files`
       const paths = new Set<string>()
       for (const file of item.files) {
         if (!file || typeof file !== "object") return `item "${item.key}": invalid file spec`
-        if (typeof file.path !== "string" || !isSafeRelPath(file.path))
+        if (typeof file.path !== "string" || !(item.tree ? pluginRelativePath(file.path) : isSafeRelPath(file.path)))
           return `item "${item.key}": unsafe file path: ${String(file.path)}`
         if (paths.has(file.path)) return `item "${item.key}": duplicate file path: ${file.path}`
         paths.add(file.path)
@@ -724,6 +730,8 @@ function validatePlan(root: string, plan: TxPlan): string | null {
           return `item "${item.key}": invalid sha256 for ${file.path}`
         if (file.size !== undefined && (!Number.isInteger(file.size) || file.size < 0))
           return `item "${item.key}": invalid size for ${file.path}`
+        if (file.mode !== undefined && (!Number.isInteger(file.mode) || file.mode < 0 || file.mode > 0o7777))
+          return `item "${item.key}": invalid mode for ${file.path}`
       }
     }
     if (item.capabilities !== undefined) {
@@ -768,8 +776,19 @@ function validatePlan(root: string, plan: TxPlan): string | null {
   return null
 }
 
-/** staging 目录结构精确校验:期望集全在、零多余、零 symlink、sha256/size 全符;顺手 fsync 内容。 */
-function verifyStagedItem(stagingDir: string, files: TxFileSpec[]): { ok: true } | { ok: false; reason: string } {
+/** Exact staging validation: declared plugin links use lstat; ordinary file plans reject links. */
+function verifyStagedItem(stagingDir: string, files: TxFileSpec[], tree?: TreeNode[]): { ok: true } | { ok: false; reason: string } {
+  if (tree) {
+    const checked = verifyPluginTreeOnDisk(tree, stagingDir)
+    if (!checked.ok) return checked
+    try {
+      for (const file of files) fsyncFileSync(path.join(stagingDir, file.path))
+      fsyncDirTreeSync(stagingDir)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : "Plugin staging could not be flushed" }
+    }
+  }
   const expected = new Map(files.map((f) => [f.path, f]))
   const seen = new Set<string>()
   const walk = (relDir: string): string | null => {
@@ -784,6 +803,7 @@ function verifyStagedItem(stagingDir: string, files: TxFileSpec[]): { ok: true }
         const spec = expected.get(rel)
         if (!spec) return `unexpected file in staging: ${rel}`
         const absFile = path.join(stagingDir, rel)
+        if (spec.mode !== undefined && (fs.statSync(absFile).mode & 0o7777) !== spec.mode) return `mode mismatch for ${rel}`
         const size = fs.statSync(absFile).size
         if (spec.size !== undefined && size !== spec.size) return `size mismatch for ${rel}: ${size} ≠ ${spec.size}`
         if (sha256FileSync(absFile) !== spec.sha256) return `sha256 mismatch for ${rel}`
@@ -941,12 +961,21 @@ function removeDirGuarded(root: string, dir: string, warnings: string[]): boolea
     return false
   }
   try {
+    makeDirectoriesRemovable(dir)
     fs.rmSync(dir, { recursive: true, force: true })
     return true
   } catch (error) {
     warnings.push(`removal failed for ${dir}: ${error instanceof Error ? error.message : String(error)}`)
     return false
   }
+}
+
+/** Restore traversal/write access only while deleting an owned tree; never follow its links. */
+function makeDirectoriesRemovable(dir: string): void {
+  const stat = fs.lstatSync(dir)
+  if (!stat.isDirectory()) return
+  fs.chmodSync(dir, stat.mode | 0o700)
+  for (const entry of fs.readdirSync(dir)) makeDirectoriesRemovable(path.join(dir, entry))
 }
 
 // ── GC(有界保留 + 双守卫) ──────────────────────────────────────────────────────────────────
@@ -1186,6 +1215,7 @@ export async function runExtensionTransaction(root: string, plan: TxPlan, hooks:
       // generation 才建代号;config/receipt 用占位(不建目录、不翻指针)。
       genId: actionOf(item) === "generation" ? nextGenId(root, item.key, txId, index) : "gen-000000-000000",
       files: item.files ?? [],
+      ...(item.tree ? { tree: item.tree } : {}),
       ...(actionOf(item) === "config" && configImages.has(item.key)
         ? {
             config: {
@@ -1432,7 +1462,7 @@ export async function runExtensionTransaction(root: string, plan: TxPlan, hooks:
     const item = plan.items[i]!
     const kind = actionOf(item)
     if (kind === "generation") {
-      const verdict = verifyStagedItem(path.join(txStagingDir(root, txId), item.key), item.files ?? [])
+      const verdict = verifyStagedItem(path.join(txStagingDir(root, txId), item.key), item.files ?? [], item.tree)
       if (!verdict.ok) return abortPreSwitch("verify", `"${item.key}" staging verification failed: ${verdict.reason}`)
     } else if (kind === "config") {
       const cfg = journal.items.find((j) => j.key === item.key)!.config!
@@ -2017,6 +2047,7 @@ export function diagnoseTransactionJournal(journal: TxJournalShape): TxJournalDi
     return { verdict: "shape-ok" }
   }
   for (const item of items) {
+    if (isRecShape(item) && item.tree !== undefined && !validPluginTree(item.tree)) return { verdict: "malformed", reason: "malformed journal (plugin tree)" }
     // install/rollback item.key 与 uninstall 同级校验 SAFE_KEY(review r1 Blocker:仅验
     // 字符串会放行 "../.." 类 key,recoverRollback 的 writePointerSync 据此逃逸写盘)。
     // validatePlan 写入时即强制 SAFE_KEY,合法件必过 —— 此判据零回归。

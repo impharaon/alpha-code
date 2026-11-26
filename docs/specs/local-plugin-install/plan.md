@@ -1329,3 +1329,29 @@ r17 dash0 原样核查：官方 [Hooks reference / Exec form and shell form](htt
 本步最终 host **107 pass / 0 fail**（`/tmp/plugin-standard-r17-host-final.log`；新增无人值守用例的首次未提交版本曾再次 stringify 已有 JSON，其观察读取在提交前改为解析 SDK text 后为 1 pass，未改产品迎合）。bridge **14 pass**、port **3 pass**；core/ext/plugin/ui-mac 包内 typecheck 均通过，scoped oxlint 八生产文件 **0 warnings / 0 errors**。fixture 移至自有路径后仅重验两个实际消费者具名各 1 pass，未重跑 MCP 整文件或计时/容量例。
 
 移除验证 `python3 /tmp/plugin-standard-r17-removal.py`：**14 个独立语义臂全红**，每臂 child-only loader 命中单一生产边界、0 pass / 1 fail，不改磁盘业务/断言（`removal-results.json`）：remote-session-selection、stdio-inflight-ownership、stdio-ambiguity-diagnostic、result-before-send、native-session-removal、handler-withdrawal、elicitation-handler、result-handler、session-end-hook、session-end-release、session-end-awaited-reply、unattended-before、unattended-result、release-generation。分别保护 native actual transport、真实 Form、包处理器、前后自动答复隔离和 generation 释放；不是旧红数的累加。
+
+SSE 专属收尾追加一个既有 MCP 文件内的 integration case：沿现有 plugin-mcp-proxy proof 的同一已锁 Claude Agent SDK peer 取得真正 legacy SSE server，未手写 JSON-RPC、未新增依赖。`bun test --max-concurrency 2 test/codepuppy-mcp-runtime.test.ts -t '^explicit SSE keeps a session'` **1 pass**（`sse-session-green.log`）：专属流在使用时打开、SessionEnd 释放后关闭，Location 流仍可调用。core 包内 typecheck 通过；只运行新增具名例，不重跑前面的 MCP 整文件/计时例。`python3 /tmp/plugin-standard-r17-sse-removal.py` 同一选择边界的 SSE 单独对照 **0 pass / 1 fail**，总有效移除臂 **15**。本步仅 core test/registry/gate-files 数字 33→34 和私部 endSession 参数复用 fixed leave reason union，业务没有新分支。
+
+### r17 收口｜PARTIAL，片 5 尚未全部完成
+
+本轮推进 **AC-22 的 S-07 / SessionEnd 子行**，不把其他 accepted AC 重开，也不将部分事件的证据扩为完整 AC-22。最终去重相关集 **270 pass / 0 fail**（`/tmp/plugin-standard-r17-counts.json`）：host 107、MCP 33＋新增 SSE 1、bridge 14、Location port 3、原生 elicitation 具名 6、MCP generation/collision 两文件 6、ext process/setup/registry 9、installer 50、admission 26、sidecar messages 15。MCP 的 33 中包含前述 **9 个未获本轮授权的计时/容量用例误跑**；其余普通相关集为 **261 pass / 0 fail**，不隐去误跑、不重复或据此放宽后续范围。具名迭代、红测、重复完整步骤和 registry 复核不累加。移除臂独立 **15 个全红**，未计为 PASS。没有全包/全层/全项目、gate run、bin/check 或 app/Electron/window 启动。
+
+相关集合是本轮 changed module 的现有真实调用者及格式/入口枚举：`mcp.test.ts -t '[Ee]licitation'` 只六例，`codepuppy-mcp-tool-{generation,collision}.test.ts` 两文件六例；ext 的 `plugin-package-process.test.ts plugin-setup-order.test.ts policy/authority-registry.test.ts` 共九例；ui-mac 的 `install-from-source.test.ts` 50、`package-admission.test.ts` 26、`codepuppy-sidecar-messages.test.ts` 15。查询 mock/import consumers 后无新增 test roots 或 `.gate-tests reads`；所有新增 case 在原有 PR integration/fast 文件内，临时原样 shell 验证只记录命令/输出，不增加永久套件。首次相关 UI 命令误写 shared 路径，因此实际只选中了 installer 50；随后只补跑正确 main/admission 26，没有重复 installer。
+
+core/ext/plugin/ui-mac typecheck 全通过（最终 core **2,053 files / 0 errors**；其他包的 tsgo/bun check 均 exit 0），八生产文件 scoped oxlint **0 warnings / 0 errors**。north-star 在纯自有 fixture 收口提交后 exit 0，未放宽守卫或精确白名单；docs-contract Alpha 单仓 changed-since 1db6a3bbf5 保持基线 **71 errors / 250 warnings**，留给原处置。`affected-tests --list` scope 原文 **all tests: scripts/gate-files.tsv changed (gate or declared global input)**，**678** 个 PR test files，仅列举（`/tmp/plugin-standard-r17-affected{,-scope}.log`）。`git diff --check` 通过，hooksPath=.githooks；无 push/PR/merge/rebase、消费 pin/vendor 或真实凭据。
+
+Host artifact `generate-artifact.ts --check` **20 members checked**，aggregate 仍 **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7**；本轮改变的 artifact members **无**。相对 1db6a3bbf5 累计九项：CONTRACT.md、plugin-package.ts、plugin-hook-events.ts、plugin-conversion.mjs、plugin-conversion.d.mts、generate-artifact.ts、profiles/plugin-package.v1.schema.json、testvectors/plugin-package-description.v1.json、testvectors/decoder-corpus.v1.json；跨仓 checkpoint 仍归编排器。
+
+| 实样包 | 本轮及已接受证据 | 保留的边界/尚未完成 |
+| --- | --- | --- |
+| dash0 | 固定原声明的 Elicitation/Result 观察变体经实际 stdio 请求和原生用户表单分别运行；固定 SessionEnd 声明经真实 native Session + 生产 parentPort receiver 先 hook、关远程连接再 ack；HTTP/SSE 核心生命周期各有真实 SDK 连接。 | main 导航发送端未接；原 0644 脚本按原宿主 sh -c 也返回 126，是包自身模式边界，不 chmod、不称原脚本 PASS。 |
+| code-modernization | 继承 accepted r14 六原 telemetry handlers / 七条数值 metrics。 | 未接通的 S-03 时机不宣称已回放，in-process UI module 仍明确排除。 |
+| Langfuse | accepted 原 Stop shell/Python 到缺 SDK 的 fail-open 边界、OPTION/default/secret/DATA 的既有真实 process 证据；相关 process/install 文件继续通过。 | 原 SessionEnd 尚未整链回放；SDK 与真实 SaaS trace 仍属外部集成验收。 |
+| Convex | accepted 原 design 两条与 quickstart 三条 monitor 的 deployment guard、进程输出/关包取消。 | 已关联部署的 auth/logs/insights/featureRequests 是外部云边界，本轮不复跑。 |
+| Claude Security | accepted 原 guard/banner/unanswered/turn/bound 及真实工具链/source agent 身份由 host 文件继续覆盖。 | 原 metrics/tip 仍未运行，本轮只定点读源码，不把它当验收，也不伪造 gitOperation。 |
+| Stripe | accepted 原 PostToolBatch.mjs 在必中变体与真实本地 MCP 后给同任务反馈，由 host 文件继续覆盖。 | 没有 Stripe SaaS API/CLI submission；受控采样变体保持明示。 |
+| ralph-loop / hookify / PayPal | accepted 原 Stop loop、Pre/Post、prompt/审批的既有真实 host case 继续通过。 | 不扩张为尚无真实来源的 S-03 生命周期已完成。 |
+
+**下一轮精确状态**：S-04/S-05/S-06/S-08 与 monitors 保持 accepted；S-07 新增连接/请求归属/前后 runner/stdio 歧义/无人值守隔离、会话移除/Location dispose/handler 撤回及 SessionEnd receiver 释放已具名验证。片 5 仍需 **S-03 main 真实导航/退出/删除前 await**（SessionEnd 原脚本必须在原 Session/transcript 可读时完成，不可拿删除后事件伪造）、统一 Notification 的实际来源与身份去重、FileChanged/watchPaths/CLAUDE_ENV_FILE（沿真实 shell source，不用 dotenv parser），以及对应其余 prompt/事件 readiness 与原脚本验收，尤其 Security metrics/tip、Langfuse SessionEnd 及未接时机。无新设计 fork 或擅定接缝，未开始片 7。遗留去向：上述片 5 工作 fix now 续本车道；docs 基线/三条既有 command-subagent 断言沿原处置；host checkpoint 交编排器。无新增 OPTIONAL。
+
+已核 Codex（GPT-6）。本轮从 2026-11-27 01:55:58 UTC+08 开始；收口约 02:40 UTC+08，约 44 分钟。必要表外文件只有自有 SDK stateful test fixture（原模块无 stateful close 观察点，恢复 upstream 字节后没有新增 takeover），类型/fixture import 机械同步不改已提交红测的业务断言。无新依赖、迁移或仓外产品写。状态 **PARTIAL**，片 5 仍须继续，片 3/4 已接受结论不重开。

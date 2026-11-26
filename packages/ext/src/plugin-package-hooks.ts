@@ -1,3 +1,4 @@
+import type { PackageSessionMessage } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import type { UnattendedState } from "./policy/unattended"
 import type { PolicyRegistration } from "./policy/index"
 import type { GateCall } from "./policy/gate"
@@ -554,7 +555,7 @@ export async function registerPackageHooks(
         output: "output" in result ? result.output : undefined,
       }))
   }
-  const endSession = (sessionID: string, reason: string) => {
+  const endSession = (sessionID: string, reason: Extract<PackageSessionMessage, { action: "leave" }>["reason"]) => {
     const pending = endings.get(sessionID)
     if (pending) return pending
     const ending = (async () => {
@@ -887,7 +888,7 @@ export async function registerPackageHooks(
     })
   })
   return {
-    async receiveSession(message: import("../../ui-mac/src/main/codepuppy-sidecar-messages").PackageSessionMessage) {
+    async receiveSession(message: PackageSessionMessage) {
       if (message.action !== "leave") return false
       const session = await context.session.get({ sessionID: message.sessionId }).catch(() => undefined)
       if (!session || session.location.directory !== context.location.directory) return false

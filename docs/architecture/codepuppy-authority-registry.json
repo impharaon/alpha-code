@@ -2596,6 +2596,10 @@
         {
           "file": "packages/plugin/test/codepuppy-package-runtime.test.ts",
           "name": "session MCP release shares a Location across bundles and preserves a replacement generation"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "explicit SSE keeps a session-owned stream until SessionEnd without closing its Location stream"
         }
       ]
     }

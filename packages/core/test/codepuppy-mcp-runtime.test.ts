@@ -900,3 +900,50 @@ testEffect(Layer.empty).live("withdrawing the matching package handlers releases
   }).pipe(Effect.provide(mcpLayer({ remote: new ConfigMCP.Remote({ type: "remote", url: server.url.href, oauth: false }) })), Effect.scoped)
   expect(handler.counts).toEqual({ opened: 2, closed: 2 })
 }))
+
+testEffect(Layer.empty).live("explicit SSE keeps a session-owned stream until SessionEnd without closing its Location stream", () => Effect.gen(function* () {
+  // Same real legacy SDK peer as plugin-mcp-proxy.test.ts; no hand-written MCP messages.
+  const { createServer } = yield* Effect.promise(() => import("node:http"))
+  const peer = path.dirname(Bun.resolveSync("@anthropic-ai/claude-agent-sdk", path.resolve(import.meta.dir, "..")))
+  const sdk = yield* Effect.promise(() => import(Bun.resolveSync("@modelcontextprotocol/sdk/server/mcp.js", peer)))
+  const sse = yield* Effect.promise(() => import(Bun.resolveSync("@modelcontextprotocol/sdk/server/sse.js", peer)))
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const { Session } = yield* Effect.promise(() => import("@opencode/schema/session"))
+  const counts = { opened: 0, closed: 0 }
+  const transports = new Map<string, InstanceType<typeof sse.SSEServerTransport>>()
+  const endpoint = createServer(async (request, response) => {
+    if (request.method === "GET" && request.url?.startsWith("/events")) {
+      const server = new sdk.McpServer({ name: "real-session-sse", version: "1" })
+      server.registerTool("probe", { inputSchema: {} }, async () => ({ content: [{ type: "text", text: "sse-owned" }] }))
+      const transport = new sse.SSEServerTransport("/messages", response)
+      transports.set(transport.sessionId, transport)
+      counts.opened++
+      response.once("close", () => { counts.closed++; transports.delete(transport.sessionId) })
+      await server.connect(transport)
+      return
+    }
+    const transport = transports.get(new URL(request.url!, "http://localhost").searchParams.get("sessionId") ?? "")
+    if (request.method === "POST" && transport) { await transport.handlePostMessage(request, response); return }
+    response.writeHead(404); response.end()
+  })
+  yield* Effect.promise(() => new Promise<void>(resolve => endpoint.listen(0, "127.0.0.1", resolve)))
+  yield* Effect.addFinalizer(() => Effect.promise(() => new Promise<void>(resolve => { endpoint.closeAllConnections(); endpoint.close(() => resolve()) })))
+  const address = endpoint.address()
+  if (!address || typeof address === "string") throw Error("SSE fixture has no port")
+  const registration = runtime.registerPackageRuntime({ directory: ROOT }, packageElicitationHandlers({ beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer }))
+  yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+  yield* Effect.gen(function* () {
+    const mcp = yield* Mcp.Service
+    yield* connected("remote")
+    const sessionID = Session.ID.make("ses_explicit_sse_owned")
+    expect(counts).toEqual({ opened: 1, closed: 0 })
+    expect(JSON.stringify(yield* mcp.callTool({ server: "remote", name: "probe", sessionID }))).toContain("sse-owned")
+    expect(counts).toEqual({ opened: 2, closed: 0 })
+    yield* Effect.promise(() => runtime.releasePackageSessionMcp({ directory: ROOT }, sessionID))
+    yield* until(Effect.sync(() => counts.closed === 1 ? true : undefined), "owned SSE stream closed")
+    expect(counts).toEqual({ opened: 2, closed: 1 })
+    expect(JSON.stringify(yield* mcp.callTool({ server: "remote", name: "probe" }))).toContain("sse-owned")
+    yield* mcp.disconnect("remote")
+    yield* until(Effect.sync(() => counts.closed === 2 ? true : undefined), "Location SSE stream closed")
+  }).pipe(Effect.provide(mcpLayer({ remote: new ConfigMCP.Remote({ type: "remote", transport: "sse", url: `http://127.0.0.1:${address.port}/events`, oauth: false }) })))
+}))

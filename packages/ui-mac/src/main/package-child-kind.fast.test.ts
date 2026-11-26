@@ -106,8 +106,8 @@ describe("package child kind 路由表 (#809 · 基线 §5 第 7 类)", () => {
       expect(packageChildPreviewKeyV1(kind, "foo")).toBe(packageChildTxKeyV1(kind, "foo"))
   })
 
-  test("isPackageChildKindV1 恰认这六个", () => {
-    for (const kind of ["skill", "agent", "cloud", "command", "mcp", "plugin"]) expect(isPackageChildKindV1(kind)).toBe(true)
-    for (const kind of ["bundle", "Cloud", "", "Plugin", "Command"]) expect(isPackageChildKindV1(kind)).toBe(false)
+  test("isPackageChildKindV1 恰认这七个", () => {
+    for (const kind of ["skill", "agent", "cloud", "command", "mcp", "plugin", "bundle"]) expect(isPackageChildKindV1(kind)).toBe(true)
+    for (const kind of ["Cloud", "", "Plugin", "Command"]) expect(isPackageChildKindV1(kind)).toBe(false)
   })
 })

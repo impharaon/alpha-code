@@ -42,6 +42,10 @@ import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions, remove
 import { postActivationTail } from "./post-activation-tail"
 import type { AgentEditor } from "@opencode/plugin/promise/agent"
 import type { SkillEditor } from "@opencode/plugin/promise/skill"
+import { allInstalledPluginSkills, installedPluginSkill } from "./plugin-package-skills"
+import { renderPluginText } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
+import { Skill } from "../../schema/src/skill"
+import { AbsolutePath } from "../../schema/src/schema"
 import { readPackageAllowSet } from "./gen-skill-paths"
 import { managedMcpAllowedHere, managedSkillAllowedHere, managedSkillIdentity } from "./package-scope"
 import { modelFacts } from "./model-facts"
@@ -493,7 +497,17 @@ export const CodePuppyExt: Plugin.Plugin = {
       const skillTail = postActivationTail<SkillEditor>({
         transform: (callback) => context.skill.transform(callback),
         apply: (editor) => {
-          for (const skill of editor.list()) if (!skillAllowed(skill)) editor.remove(skill.id)
+          for (const skill of editor.list()) {
+            if (!skillAllowed(skill) || installedPluginSkill(skill.path, bootstrap.paths.globalRoot)) editor.remove(skill.id)
+          }
+          for (const skill of allInstalledPluginSkills(bootstrap.paths.globalRoot)) {
+            if (!skillAllowed(skill)) continue
+            editor.add({ id: Skill.ID.make(skill.name), name: Skill.Name.make(skill.name), path: AbsolutePath.make(skill.path),
+              ...(typeof skill.entry.display.description === "string" ? { description: skill.entry.display.description } : {}),
+              autoinvoke: skill.entry.invocation.implicitInvocation,
+              content: renderPluginText(skill.entry.instruction, { pluginRoot: skill.pluginRoot, skillDir: skill.directory, projectDir: directory }),
+            })
+          }
         },
         activePlugins,
         log,

@@ -420,7 +420,7 @@ describe("REQ-128 #698 —— 顺序与故障", () => {
       root,
       [
         { kind: "skill", name: "a-only" },
-        { kind: "bundle", name: "not-a-package-child" }, // 违规项不放第一个
+        { kind: "unknown-kind", name: "not-a-package-child" }, // 违规项不放第一个
       ],
       installers(calls),
     )

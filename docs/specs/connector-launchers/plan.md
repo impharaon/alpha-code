@@ -425,4 +425,10 @@ Office 前置失败明确交接（继承 r3 事实，不重跑）：在 packages
 
 遗留去向：本票余项→#1760 下一轮；#1759→合入后按接口表消费；Office Python 前置→编排器处理本机/构建前置；docs/README.md 既有 index.stale 等→既有文档治理。官方 docs check_repo 对本 worktree 的 plan 0 finding，仓级 58 errors / 249 warnings 与 r3 相同；不顺修。无迁移、无其它仓修改、无 push/PR/merge，hooksPath=.githooks；OPTIONAL：无。
 
-本轮最终规模：17 files changed, 2351 insertions(+), 79 deletions(-)（含计划、测试与必要格式化）；核对时间 2026-11-26T18:04:04Z，自本轮 16:40:15Z 起用时 83 分 49 秒，原预计约 90 分钟。
+本轮最终规模：17 files changed, 2357 insertions(+), 79 deletions(-)（含计划、测试与必要格式化）；核对时间 2026-11-26T18:04:04Z，自本轮 16:40:15Z 起用时 83 分 49 秒，原预计约 90 分钟。
+
+最终相关命令原文（分别在包目录执行；包含已列出的部分覆盖，不能把各行计数相加当唯一用例数）：
+- core：`bun test test/codepuppy-connector-launch.test.ts test/codepuppy-mcp-tool-collision.test.ts test/codepuppy-mcp-tool-generation.test.ts test/mcp-attach.test.ts test/mcp-instructions.test.ts` → 41 PASS。
+- core runtime：`bun test test/codepuppy-mcp-runtime.test.ts -t 'the command main writes|Office declarations bind|bundled slots bind|bundled declarations reject|launcher download classification|managed pinned|refuted managed|production MCP client registers pinned|ordinary MCP client|video progress follows each real SDK request'` → 12 PASS；投影提取后去掉分类/video 两个不受影响例的定向复核为 10 PASS。
+- ui-mac：`bun test src/main/connector-launchers.test.ts src/main/pinned-files.test.ts src/main/connector-launch-state.test.ts src/main/document-runtime.test.ts src/main/codepuppy-sidecar-wiring.test.ts src/main/video-service.test.ts src/renderer/extensions/connector-launch-presentation.test.ts` → 69 PASS；镜像步骤后的 `bun test src/main/connector-launchers.test.ts` → 22 PASS。
+- ext：`bun test src/policy/identity.test.ts src/policy/resolver.test.ts src/policy/register-policy.test.ts src/policy/tool-policy-rpc.test.ts src/policy/unattended.test.ts` → 136 PASS。

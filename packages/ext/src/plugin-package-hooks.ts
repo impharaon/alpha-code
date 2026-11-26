@@ -1,6 +1,9 @@
+import type { UnattendedState } from "./policy/unattended"
 import type { PolicyRegistration } from "./policy/index"
 import type { GateCall } from "./policy/gate"
 import type { Plugin } from "@opencode/plugin"
+import type { ElicitationAnswer } from "@opencode/plugin/codepuppy-package-runtime"
+import { Schema } from "effect"
 import { registerPackageRuntime } from "@opencode/plugin/codepuppy-package-runtime"
 import type { HookEvent } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 import { pluginToolRules } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
@@ -46,7 +49,7 @@ const record = (value: unknown): value is Record<string, unknown> =>
 
 export async function registerPackageHooks(
   context: Plugin.Context,
-  input: { root: string; projectRoot(): string | undefined; log(line: string): void; policy: PolicyRegistration },
+  input: { root: string; projectRoot(): string | undefined; log(line: string): void; policy: PolicyRegistration; unattended: UnattendedState },
 ) {
   const processes = createPackageProcesses(context.location)
   const instructions = new Map<string, Map<string, InstructionScope>>()
@@ -205,6 +208,24 @@ export async function registerPackageHooks(
     chmodSync(transcript, 0o600)
     return { transcript, history }
   }
+  const sourceServer = (installed: Installed, server: string) => installed.description.entries.find(entry =>
+    entry.kind === "mcp" && installed.hostNames[entry.id] === server,
+  )?.sourceName ?? server
+  const elicitationAnswer = (results: readonly Contribution[]): ElicitationAnswer | undefined => {
+    const answers = results.flatMap(result => {
+      if (result.block) return [{ action: "decline" as const }]
+      const specific = result.output?.hookSpecificOutput
+      if (!record(specific) || specific.action === undefined) return []
+      if (!["accept", "decline", "cancel"].includes(String(specific.action))) {
+        input.log("runtime-failed: invalid elicitation hook action")
+        return []
+      }
+      return [{ action: specific.action as ElicitationAnswer["action"],
+        ...(specific.action === "accept" && specific.content !== undefined ? { content: Schema.decodeUnknownSync(Schema.Json)(specific.content) } : {}),
+      }]
+    })
+    return answers.find(answer => answer.action === "decline") ?? answers[0]
+  }
   const run = async (
     event: HookEvent,
     sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"],
@@ -284,6 +305,7 @@ export async function registerPackageHooks(
             const eventFields: Record<string, unknown> = {
               ...fields,
               ...subagentFields,
+              ...(typeof fields.mcp_server_name === "string" ? { mcp_server_name: sourceServer(handler.installed, fields.mcp_server_name) } : {}),
               ...(source ? {
                 tool_name: source.name, tool_input: source.input, tool_use_id: call!.id,
                 ...("tool_response" in fields ? { tool_response: (await input.policy.packageToolCall(call!.tool, fields.tool_response, {}, "claude")).input } : {}),
@@ -315,8 +337,11 @@ export async function registerPackageHooks(
                 String(
                   eventFields.tool_name ??
                     eventFields.command_name ??
-                    eventFields.agent_type ??
+                    eventFields.mcp_server_name ??
+                    eventFields.memory_type ??
+                    eventFields.notification_type ??
                     eventFields.source ??
+                    eventFields.agent_type ??
                     "",
                 ),
               )
@@ -412,7 +437,7 @@ export async function registerPackageHooks(
               return {
                 installed: handler.installed,
                 valid: handler.valid,
-                block: ["UserPromptSubmit", "PreToolUse", "Stop", "SubagentStop", "ConfigChange", "PostToolBatch", "PreCompact"].includes(event),
+                block: ["UserPromptSubmit", "PreToolUse", "Stop", "SubagentStop", "ConfigChange", "PostToolBatch", "PreCompact", "Elicitation", "ElicitationResult"].includes(event),
                 exitCode: 2,
                 order,
                 text: result.stderr,
@@ -431,8 +456,8 @@ export async function registerPackageHooks(
               installed: handler.installed,
               valid: handler.valid,
               block:
-                output.continue === false ||
-                (["Stop", "SubagentStop", "PreToolUse", "ConfigChange", "PreCompact"].includes(event) && output.decision === "block") ||
+                (!["Elicitation", "ElicitationResult"].includes(event) && output.continue === false) ||
+                (["Stop", "SubagentStop", "PreToolUse", "ConfigChange", "PreCompact", "Elicitation", "ElicitationResult"].includes(event) && output.decision === "block") ||
                 (event === "PreToolUse" && specific?.permissionDecision === "deny") ||
                 (event === "PermissionRequest" && record(specific?.decision) && specific.decision.behavior === "deny"),
               output,
@@ -512,10 +537,10 @@ export async function registerPackageHooks(
     const contributions = results.filter((result): result is NonNullable<typeof result> => !!result && result.valid())
     const blocked = contributions.find((result) => result.block)
     if (blocked?.stopTurn && event !== "StopFailure") stopTurns.set(sessionID, blocked)
-    if (blocked && !["Stop", "SubagentStop", "PostToolUse", "PostToolUseFailure", "StopFailure", "ConfigChange", "PostToolBatch", "PreCompact", "PostCompact"].includes(event))
+    if (blocked && !["Stop", "SubagentStop", "PostToolUse", "PostToolUseFailure", "StopFailure", "ConfigChange", "PostToolBatch", "PreCompact", "PostCompact", "Elicitation", "ElicitationResult"].includes(event))
       throw Error("runtime-failed: package hook blocked " + event + (blocked.text ? ": " + blocked.text : ""))
     return contributions
-      .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest" || event === "ConfigChange" || event === "PostToolBatch" || event === "PreCompact")
+      .filter((result) => result.text || event === "PreToolUse" || event === "PermissionRequest" || event === "ConfigChange" || event === "PostToolBatch" || event === "PreCompact" || event === "Elicitation" || event === "ElicitationResult")
       .map((result) => ({
         installed: result.installed,
         valid: result.valid,
@@ -620,7 +645,12 @@ export async function registerPackageHooks(
     }
   }))
   const runtime = registerPackageRuntime(context.location, {
-    hasElicitationHandlers: () => false,
+    hasElicitationHandlers: server => allInstalledPluginPackages(input.root).filter(active).some(installed =>
+      installed.description.entries.some(entry => entry.kind === "hook" && pluginEntryRuntimeAvailable(entry) &&
+        ["Elicitation", "ElicitationResult"].includes(entry.hook.event) &&
+        (entry.hook.scope.kind === "package" || [...instructions.values()].some(scopes => entry.hook.scope.kind !== "package" && scopes.get(installed.key + ":" + entry.hook.scope.entryId)?.active())) &&
+        (!entry.hook.matcher || new RegExp(entry.hook.matcher).test(sourceServer(installed, server)))),
+    ),
     async beforeConfigChange(change) {
       const results = (await Promise.all([...sessionEpoch.keys()].map(sessionID => run("ConfigChange", sessionID, {
         source: change.source, file_path: change.filePath,
@@ -648,8 +678,24 @@ export async function registerPackageHooks(
     async afterCompaction(input) {
       await run("PostCompact", input.sessionID, { trigger: input.trigger, ...(input.summary === undefined ? {} : { compact_summary: input.summary }) })
     },
-    beforeElicitation: async () => ({ handled: false }),
-    afterElicitationResult: async input => input.answer,
+    async beforeElicitation(event) {
+      if (await input.unattended.unattendedProfile(event.sessionID, undefined, async () => (await context.session.get({ sessionID: event.sessionID })).agent ?? "") !== undefined) return { handled: false }
+      const answer = elicitationAnswer(await run("Elicitation", event.sessionID, {
+        mcp_server_name: event.server, message: event.message, mode: event.mode,
+        ...(event.requestedSchema === undefined ? {} : { requested_schema: event.requestedSchema }),
+        ...(event.elicitationId === undefined ? {} : { elicitation_id: event.elicitationId }),
+        ...(event.url === undefined ? {} : { url: event.url }),
+      }))
+      return answer ? { handled: true, answer } : { handled: false }
+    },
+    async afterElicitationResult(event) {
+      if (await input.unattended.unattendedProfile(event.sessionID, undefined, async () => (await context.session.get({ sessionID: event.sessionID })).agent ?? "") !== undefined) return event.answer
+      return elicitationAnswer(await run("ElicitationResult", event.sessionID, {
+        mcp_server_name: event.server, mode: event.mode, action: event.answer.action,
+        ...(event.elicitationId === undefined ? {} : { elicitation_id: event.elicitationId }),
+        ...(event.answer.content === undefined ? {} : { content: event.answer.content }),
+      })) ?? event.answer
+    },
   })
   const subscription = (async () => {
     for await (const event of context.event.subscribe({

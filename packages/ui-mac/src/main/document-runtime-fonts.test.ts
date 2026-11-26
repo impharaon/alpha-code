@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { prepareDocumentFonts } from "./document-runtime-fonts"
 
 const roots: string[] = []
@@ -44,4 +44,20 @@ describe("document runtime fonts", () => {
     rmSync(join(input.assets, "fonts/NotoSansSC-Regular.ttf"))
     expect(() => prepareDocumentFonts({ ...input, platform: "darwin" })).toThrow()
   })
+})
+
+
+test("the private LO profile disables Writer and Calc external link updates using their actual configuration enums", async () => {
+  const input = fixture()
+  prepareDocumentFonts({ ...input, platform: "darwin" })
+  const registrator = Bun.resolveSync("@happy-dom/global-registrator", join(import.meta.dir, "../.."))
+  const { Window } = await import(Bun.resolveSync("happy-dom", dirname(registrator)))
+  const window = new Window()
+  const parser: DOMParser = new window.DOMParser()
+  const document = parser.parseFromString(readFileSync(join(input.jobRoot, "profile/user/registrymodifications.xcu"), "utf8"), "application/xml")
+  const values = Object.fromEntries(Array.from(document.getElementsByTagName("item")).map((item) => [item.getAttribute("oor:path"), Object.fromEntries(Array.from(item.getElementsByTagName("prop")).map((property) => [property.getAttribute("oor:name"), property.getElementsByTagName("value")[0]?.textContent]))]))
+  // libreoffice-26.8.3.1 Writer.xcs: Never=2; sc/inc/global.hxx: LM_ALWAYS=0, LM_NEVER=1.
+  expect(values["/org.openoffice.Office.Writer/Content/Update"]?.Link).toBe("2")
+  expect(values["/org.openoffice.Office.Calc/Content/Update"]?.Link).toBe("1")
+  await window.happyDOM.close()
 })

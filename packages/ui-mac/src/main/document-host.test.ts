@@ -10,6 +10,7 @@ import type {
   DeferredDocumentCheck,
   DocumentRuntimeState,
 } from "../../../util/src/codepuppy-document"
+import { NotFoundError } from "../../../core/src/session/error"
 import { createDocumentRenderer } from "../../../ext/src/document-render"
 import { subscribeDocumentChecks } from "../../../ext/src/document-check"
 import { createDocumentChecks } from "./document-checks"
@@ -272,7 +273,7 @@ test("synthetic missing-session error and conflicting receipts use the frozen ad
   f.main.dispose()
   let listener!: Parameters<DocumentHost["subscribeReady"]>[1]
   const host = { subscribeReady: (_location: unknown, value: typeof listener) => { listener = value; return () => {} } } as DocumentHost
-  subscribeDocumentChecks({ location: f.caller.location, session: { synthetic: async () => { throw { _tag: "SessionNotFoundError", sessionID: f.caller.sessionID, message: "Session not found" } } } } as never, host)
+  subscribeDocumentChecks({ location: f.caller.location, session: { synthetic: async () => { throw new NotFoundError({ sessionID: f.caller.sessionID }) } } } as never, host)
   expect(await listener(f.saved())).toEqual({ status: "session-missing", checkId: f.saved().id })
   subscribeDocumentChecks({ location: f.caller.location, session: { synthetic: async () => ({ id: "wrong", sessionID: f.caller.sessionID }) } } as never, host)
   expect(await listener(f.saved())).toEqual({ status: "conflict", checkId: f.saved().id })

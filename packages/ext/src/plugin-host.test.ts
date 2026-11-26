@@ -30,6 +30,8 @@ import { WebSearch } from "../../core/src/websearch.ts"
 import { Session } from "../../schema/src/session.ts"
 import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
+import { subscribeDocumentChecks } from "./document-check"
+import type { DeferredDocumentCheck, DocumentHost } from "../../util/src/codepuppy-document"
 import CodePuppyExt, { PROCESS_STATE_KEY } from "./plugin"
 import { codePuppyWebSearchFailureOf } from "./exa-websearch"
 import { buildHubInstallReply, buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
@@ -1567,3 +1569,26 @@ it.effect("shell uses only its Location's document projection and removes inheri
   yield* hooks.trigger("shell", "create.before", event).pipe(Effect.ensuring(Effect.sync(clear)))
   expect(event.env.CODEPUPPY_DOCUMENT_HOST).toBe("/current/host.json")
 }))
+
+it.live("document ready admission uses the real promise plugin Session API and exact queued synthetic retry", () =>
+  Effect.gen(function* () {
+    const sessions = yield* Sessions.Service
+    let listener!: Parameters<DocumentHost["subscribeReady"]>[1]
+    let location!: Plugin.Context["location"]
+    yield* activate({
+      id: "test.document-admission",
+      setup: async (context) => {
+        location = context.location
+        subscribeDocumentChecks(context, { subscribeReady: (_location, receive) => { listener = receive; return () => {} } } as DocumentHost)
+      },
+    })
+    const session = yield* sessions.create({ location })
+    const notificationID = SessionMessage.ID.create()
+    const path = join(location.directory, "report.docx")
+    const check: DeferredDocumentCheck = { id: "check-admission", location, sessionID: session.id, notificationID, request: { kind: "docx", path }, sourceSha256: "a".repeat(64), artifact: { checkId: "check-admission", kind: "docx", sourcePath: path, artifactPath: path, sourceSha256: "a".repeat(64), artifactSha256: "a".repeat(64) }, revision: 0, state: "admitting" }
+    expect(yield* Effect.promise(() => listener(check))).toEqual({ status: "admitted", checkId: check.id, notificationID })
+    expect(yield* Effect.promise(() => listener(check))).toEqual({ status: "admitted", checkId: check.id, notificationID })
+    yield* sessions.remove(session.id)
+    expect(yield* Effect.promise(() => listener({ ...check, notificationID: SessionMessage.ID.create() }))).toEqual({ status: "session-missing", checkId: check.id })
+  }),
+)

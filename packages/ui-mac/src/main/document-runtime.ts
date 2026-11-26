@@ -25,16 +25,15 @@ export function createDocumentRuntime(input: {
   extract?: typeof extractDocumentRuntime
 }) {
   const pin = input.manifest.files.find((file) => file.family === "libreoffice" && file.target === input.platform)
-  if (!pin) throw new Error(`no published LibreOffice pin for ${input.platform}`)
   const selected = pin
   const root = join(input.userData, USER_DATA_LAYOUT.documentRuntime)
-  const projections = createDocumentPythonProjections({ root, generation: input.sidecarGeneration, pin: selected, assets: input.assets, resources: input.resources, platform: input.platform === "darwin-arm64" ? "darwin" : "win32" })
-  const destination = join(root, "libreoffice", input.platform, selected.version)
+  const projections = selected ? createDocumentPythonProjections({ root, generation: input.sidecarGeneration, pin: selected, assets: input.assets, resources: input.resources, platform: input.platform === "darwin-arm64" ? "darwin" : "win32" }) : undefined
+  const destination = selected ? join(root, "libreoffice", input.platform, selected.version) : undefined
   const registrations = new Map<string, { id: string; location: Location.Ref; run: (task: DocumentRuntimeVerifyTask, signal: AbortSignal) => Promise<DocumentRuntimeVerifyReceipt> }>()
   const requests = new Set<string>()
   const listeners = new Set<(state: DocumentRuntimeState, sequence: number) => void>()
   const controller = new AbortController()
-  let state: DocumentRuntimeState = { phase: "preparing", stage: "download" }
+  let state: DocumentRuntimeState = selected ? { phase: "preparing", stage: "download" } : { phase: "failed", failure: { kind: "unknown", detail: `no published LibreOffice pin for ${input.platform}` } }
   let sequence = 0
   let preparation: Promise<void> | undefined
   let candidate: string | undefined
@@ -42,7 +41,7 @@ export function createDocumentRuntime(input: {
   let disposed = false
   const publish = (next: DocumentRuntimeState) => {
     if (disposed) return
-    projections.publish(next)
+    projections?.publish(next)
     state = next
     sequence++
     for (const listener of listeners) listener(state, sequence)
@@ -55,7 +54,7 @@ export function createDocumentRuntime(input: {
   }
   const fail = (error: unknown) => publish({ phase: "failed", failure: { kind: "unknown", detail: error instanceof Error ? error.message : String(error) } })
   const dispatch = () => {
-    if (disposed || active || !candidate || state.phase !== "preparing" || state.stage !== "verify") return
+    if (!selected || !destination || disposed || active || !candidate || state.phase !== "preparing" || state.stage !== "verify") return
     const registration = [...registrations.values()].find((entry) => requests.has(key(entry.location)))
     if (!registration) return
     const task: DocumentRuntimeVerifyTask = { kind: "libreoffice", taskId: randomUUID(), registrationId: registration.id, sidecarGeneration: input.sidecarGeneration, location: registration.location, pinId: selected.id, pinSha256: selected.sha256, runtimeRoot: candidate, jobRoot: join(root, "jobs", randomUUID()) }
@@ -114,6 +113,7 @@ export function createDocumentRuntime(input: {
     })()
   }
   const prepare = async () => {
+    if (!selected || !destination) return
     try {
       await mkdir(root, { recursive: true })
       for (const entry of await readdir(root, { withFileTypes: true })) if (entry.name.startsWith("libreoffice-candidate-")) await rm(join(root, entry.name), { recursive: true, force: true })
@@ -140,15 +140,15 @@ export function createDocumentRuntime(input: {
   }
   return {
     retry() {
-      if (disposed || state.phase !== "failed") return
+      if (disposed || !selected || state.phase !== "failed") return
       preparation = undefined
       publish({ phase: "preparing", stage: "download" })
       preparation = prepare()
     },
-    invalidatePythonEnvironment(location: Location.Ref, registrationId: string, reason: "location-disposed" | "sidecar-stopped") { projections.invalidate(location, registrationId, reason) },
+    invalidatePythonEnvironment(location: Location.Ref, registrationId: string, reason: "location-disposed" | "sidecar-stopped") { projections?.invalidate(location, registrationId, reason) },
     pythonEnvironment(location: Location.Ref) {
       const registration = registrations.get(key(location))
-      if (!registration || disposed) throw Error("document Python environment requires a live Location registration")
+      if (!registration || disposed || !projections) throw Error("document Python environment requires a live Location registration")
       const environment = projections.environment(location, registration.id, state)
       this.query(location)
       return environment
@@ -166,7 +166,7 @@ export function createDocumentRuntime(input: {
       registrations.set(identity, { id: registrationId, location, run })
       dispatch()
       return async () => {
-        projections.invalidate(location, registrationId, "location-disposed")
+        projections?.invalidate(location, registrationId, "location-disposed")
         registrations.delete(identity); requests.delete(identity)
         if (active?.task.registrationId && key(active.task.location) === identity) {
           const attempt = active
@@ -177,7 +177,7 @@ export function createDocumentRuntime(input: {
       }
     },
     async dispose() {
-      projections.dispose()
+      projections?.dispose()
       disposed = true; controller.abort()
       registrations.clear(); requests.clear(); listeners.clear()
       if (active) { active.cancelled = true; active.abort.abort(); await active.settled }

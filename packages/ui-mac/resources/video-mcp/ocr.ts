@@ -5,6 +5,10 @@ import type { Frame } from "./contracts"
 
 type Ocr = Frame["ocr"]
 
+export function ocrBox(left:number,top:number,right:number,bottom:number,width:number,height:number): [number,number,number,number] {
+  return [left/width,top/height,(right-left)/width,(bottom-top)/height]
+}
+
 export function tesseractLines(tsv: string, width: number, height: number): Ocr {
   const lines = new Map<string, { words: string[]; x: number; y: number; right: number; bottom: number }>()
   for (const row of tsv.trim().split(/\r?\n/).slice(1)) {
@@ -28,12 +32,7 @@ export function tesseractLines(tsv: string, width: number, height: number): Ocr 
   }
   const normalized = [...lines.values()].map((line) => ({
     text: line.words.join(" "),
-    box: [line.x / width, line.y / height, (line.right - line.x) / width, (line.bottom - line.y) / height] as [
-      number,
-      number,
-      number,
-      number,
-    ],
+    box: ocrBox(line.x,line.y,line.right,line.bottom,width,height),
   }))
   return { text: normalized.map((line) => line.text).join("\n"), lines: normalized }
 }

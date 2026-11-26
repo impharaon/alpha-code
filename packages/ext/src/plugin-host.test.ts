@@ -19,6 +19,7 @@ import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import { Agent } from "../../core/src/agent.ts"
 import { Location } from "../../core/src/location.ts"
 import { FileMutation } from "../../core/src/file-mutation.ts"
+import { InstructionDiscovery } from "../../core/src/instruction-discovery.ts"
 import { FileWrite } from "../../core/src/file-write.ts"
 import { Formatter } from "../../core/src/formatter.ts"
 import { Plugin as Plugins } from "../../core/src/plugin.ts"
@@ -2819,4 +2820,39 @@ packageIt.live("package prompt PostToolBatch stops the current turn despite cont
   const history = yield* sessions.context(session.id)
   expect(history.flatMap(message => message.type === "assistant" ? message.content : []).some(part => part.type === "text" && part.text.includes('"ok":false'))).toBe(false)
   expect(JSON.stringify(history)).toContain("fixture batch judgment")
+})))
+
+packageIt.live("InstructionsLoaded runs actual package handlers after admission without replaying native AGENTS", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const groups of Object.values(hooks.hooks) as { hooks: { command: string; args?: string[] }[] }[][]) for (const group of groups) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();if(input.hook_event_name==='InstructionsLoaded')fs.appendFileSync('instruction-hook-events.jsonl',JSON.stringify(input)+'\\n')"]
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { InstructionsLoaded: hooks.hooks.InstructionsLoaded } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const discovery = yield* InstructionDiscovery.Service
+  const filePath = join(location.directory, "CLAUDE.md")
+  yield* discovery.transform(editor => {
+    editor.add(new InstructionDiscovery.File({ path: filePath, content: "INSTRUCTION_SOURCE_BOUNDARY", source: { sourcePath: filePath, scope: "Project" } }))
+    editor.add(new InstructionDiscovery.File({ path: join(location.directory, "AGENTS.md"), content: "native instructions" }))
+  })
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Instruction observer", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.always(TestLLM.text("Loaded", "instructions-loaded"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Use these instructions" })
+  yield* sessions.wait(session.id)
+  const log = join(location.directory, "instruction-hook-events.jsonl")
+  expect(yield* Effect.promise(() => Bun.file(log).exists())).toBe(true)
+  const first = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(first).toEqual([expect.objectContaining({ hook_event_name: "InstructionsLoaded", session_id: session.id, file_path: filePath, memory_type: "Project", load_reason: "session_start" })])
+  expect(JSON.stringify((yield* llm.requests())[0]!.system)).toContain("INSTRUCTION_SOURCE_BOUNDARY")
+  yield* sessions.prompt({ sessionID: session.id, text: "Continue" })
+  yield* sessions.wait(session.id)
+  expect(readFileSync(log, "utf8").trim().split("\n")).toHaveLength(1)
 })))

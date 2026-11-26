@@ -660,3 +660,7 @@ B7 layout green：renderer 文件 9 PASS（B7-layout-green.log）。失败/无�
 A1/A10 消费者补齐 red：最终 related 搜索找到现有 mac-target-arch 的全局 Office FileSet 假设，以及原 afterPack 原生资源 fixture 缺新必需 document-assets。具名相关变体 4 PASS/2 FAIL（A10-consumer-red.log），这两处是同调用链必须同步的测试消费者，补进具名文件列表；不改变它们的架构/缺 ripgrep 拒绝断言。
 
 A1/A10 消费者同步：原 mac FileSet 用例消费 global+mac，真实 asar fixture 补随包资产；全文件首轮 39 PASS/1 FAIL 显示另一旧 Win 完全免检断言，改为仍不适用的 Linux，Win 新必检行为由 A1 的真实 afterPack 正反两臂负责（follow-up 1 PASS）。没有删除原生架构/asar/ripgrep 断言。真实完整资产包装补证 `gate slot -- bun /tmp/alpha-1761-r11/package-copy.ts` exit 0：生产 electron-builder copier 从 native build 拷贝 593 份资产（npm 580 份），所有摘要/许可通过，并执行真实 afterPack 的 Windows Resources 路径（package-copy.log）；这是 closest real-copier + afterPack，不是完整 package:mac 目录构建或 Windows 实机包。
+
+最终 related 首轮 UI 272 PASS/6 FAIL，均为 release-source 旧临时包缺新配置直接依赖（Cannot find module src/main/document-resources）；本轮配置消费者同调用链，补列此既有测试文件。其六个 beforePack 原断言保留，只复制两份真实资源模块并把原“无条件放行的 win32”调用改为仍无关的 Linux；Windows 资产核对已有 A1/A10 的专用真实正反臂。其它 17 个文件已绿，不为它们重复全跑。
+
+计数工具范围缺口：依授权对四个实际变更条数的登记行创建临时 scoped view，执行原 bash scripts/assert-gate-files.sh --update；四个文件均绿（12/19/26/55），但脚本 :312 硬性要求至少 25 个文件，exit 1，all-or-nothing 未写回。finally 已恢复原登记簿全部字节。不扩跑 21 个无关文件，也不改冻结脚本/阈值；需要 gate 拥有者提供已有 scoped-update 入口或授权机械 count 同步。core 行另有禁止本轮跑的时序/容量用例（:265 等），新 trusted Python case 已具名通过，不假造全文件 25 PASS。

@@ -492,6 +492,8 @@ async function mountHarness(options?: {
           if (rejectPreview) { rejectPreview = false; throw new Error("package renderer transport failed") }
           if (failPreview) { failPreview = false; const result = { ok: false, reason: "package renderer install unavailable" }; installResults.push(result); return result }
           const result = await installDesktopPackageV1(packageId, admissionDeps)
+          // This renderer boundary models the settled automatic activation; real return ordering is tested through IPC.
+          if (result.ok) await setPackageStateV1({ packageId, state: "enabled" }, { ...admissionDeps, globalRoot: admissionDeps.root })
           const withWarning = injectInstallWarning && result.ok ? { ...result, warning: injectInstallWarning } : result
           installResults.push(withWarning)
           if (result.ok) fixture.complete(packageId)

@@ -82,6 +82,18 @@ it.live("package instruction renders source nodes before bound values and argume
   expect(yield* render(["No placeholders"], "raw input")).toBe("No placeholders\n\nARGUMENTS: raw input")
 }))
 
+it.live("package inline shells receive the invocation environment without reinterpreting its values", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const value = "session value ; $(printf INJECTED)"
+  const result = yield* Effect.promise(() => renderPackageInstruction(location, {
+    parts: ["!`printf '%s|%s|%s' \"$PACKAGE_SESSION_VALUE\" \"$0\" \"${HOME-unset}\"`"],
+    syntax: "claude", rawArguments: "'argument ; literal'", arguments: [], cwd: location.directory,
+    environment: { PACKAGE_SESSION_VALUE: value, HOME: undefined },
+  }))
+  expect(result).toBe(value + "|argument ; literal|unset")
+}))
+
 it.live("declared argument names select their ordered values", () => Effect.gen(function* () {
   yield* runCommand({ template: "Initialize native command services" }, {})
   const location = yield* Location.Service

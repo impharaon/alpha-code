@@ -3228,3 +3228,58 @@ packageIt.live("SessionStart and FileChanged shell environments reach later pack
   expect(rows().filter(row => row.event === "PostToolUse").every(row => row.file === undefined)).toBe(true)
   expect(process.env.R18_HOOK_VALUE).toBeUndefined()
 })))
+
+// Original feature-dev command / Temporal SKILL.md and dash0 groups; only fixture shell bodies observe session exports.
+packageIt.live("first command and attached skill shells wait for SessionStart and read their own live session exports", () => packageJourney(Effect.gen(function* () {
+  const commandTree = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const commandSource = new TextDecoder().decode(yield* Effect.promise(() => commandTree.readFile("commands/feature-dev.md")))
+  const skillTree = yield* Effect.promise(() => captureStandardFixture("codex:temporal"))
+  const skillSource = new TextDecoder().decode(yield* Effect.promise(() => skillTree.readFile("skills/temporal-developer/SKILL.md")))
+  const hooksTree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => hooksTree.readFile("claude/hooks.json"))))
+  for (const event of ["SessionStart", "FileChanged"]) for (const group of hooks.hooks[event]) {
+    if (event === "FileChanged") group.matcher = "session-signal.txt"
+    for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();const value=input.session_id+(input.hook_event_name==='SessionStart'?' start':' changed')+' ; $(printf INJECTED)';fs.appendFileSync(process.env.CLAUDE_ENV_FILE,\"export R19_SESSION_VALUE='\"+value+\"'\\n\");fs.appendFileSync('session-exports.jsonl',JSON.stringify(input)+'\\n')"]
+    }
+  }
+  const shell = "!`printf '%s' \"$R19_SESSION_VALUE\"`"
+  const sample = yield* invocationSample("claude:feature-dev", {
+    "commands/feature-dev.md": commandSource + "\nCOMMAND_SESSION=" + shell + "\n",
+    "skills/temporal-developer/SKILL.md": skillSource + "\nSKILL_SESSION=" + shell + "\n",
+    "hooks/hooks.json": JSON.stringify({ hooks: { SessionStart: hooks.hooks.SessionStart, FileChanged: hooks.hooks.FileChanged } }),
+  })
+  const membership = JSON.parse(readFileSync(join(sample.root,"skills-enabled.json"),"utf8"))
+  writeFileSync(join(sample.root,"skills-enabled.json"),JSON.stringify({...membership,keys:[...membership.keys,sample.key]}))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(items=>items.some(item=>item.name===command))))
+  const skills = yield* (yield* Skill.Service).list()
+  const skill = skills.find(item=>item.name===sample.hostNames["skill:skills/temporal-developer/SKILL.md"])!
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  writeFileSync(join(location.directory,"session-signal.txt"),"initial")
+  const first = yield* sessions.create({location:{directory:location.directory},title:"Command exports",agent:"build",model:{providerID:"test",id:"picked"}} as never)
+  yield* commands.execute({name:command,invocation:{sessionID:first.id,prompt:{text:"Use the exported environment"},delivery:"queue"}})
+  yield* sessions.wait(first.id)
+  const text = (yield* sessions.context(first.id)).filter(item=>item.type==="user").map(item=>item.text).join("\n")
+  expect(text).toContain("COMMAND_SESSION="+first.id+" start ; $(printf INJECTED)")
+  const second = yield* sessions.create({location:{directory:location.directory},title:"Skill exports",agent:"build",model:{providerID:"test",id:"picked"}} as never)
+  yield* sessions.prompt({sessionID:second.id,text:"Use this skill",skills:[{id:skill.id}]})
+  yield* sessions.wait(second.id)
+  const llm = yield* TestLLM.Test
+  expect(JSON.stringify(yield* llm.requests())).toContain("SKILL_SESSION="+second.id+" start ; $(printf INJECTED)")
+  const rows = ()=>readFileSync(join(location.directory,"session-exports.jsonl"),"utf8").trim().split("\n").map(line=>JSON.parse(line))
+  expect(rows().filter(row=>row.hook_event_name==="SessionStart").map(row=>row.session_id).toSorted()).toEqual([first.id,second.id].toSorted())
+  writeFileSync(join(location.directory,"session-signal.txt"),"changed")
+  yield* ext.finish(Effect.sync(()=>rows().filter(row=>row.hook_event_name==="FileChanged").length===2))
+  yield* commands.execute({name:command,invocation:{sessionID:first.id,prompt:{text:"Use updated exports"},delivery:"queue"}})
+  yield* sessions.wait(first.id)
+  const updated = (yield* sessions.context(first.id)).filter(item=>item.type==="user").map(item=>item.text).at(-1)
+  expect(updated).toContain("COMMAND_SESSION="+first.id+" changed ; $(printf INJECTED)")
+  expect(rows().filter(row=>row.hook_event_name==="SessionStart")).toHaveLength(2)
+  expect(process.env.R19_SESSION_VALUE).toBeUndefined()
+})))

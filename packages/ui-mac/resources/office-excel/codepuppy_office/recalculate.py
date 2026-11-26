@@ -20,7 +20,7 @@ _identity = None
 _sequence = -1
 
 
-def read_projection(expected=None):
+def _read_projection(expected=None):
     global _identity,_sequence
     path=os.environ.get('CODEPUPPY_DOCUMENT_HOST')
     if not path or not Path(path).is_absolute():raise RuntimeError('missing absolute CODEPUPPY_DOCUMENT_HOST projection')
@@ -48,7 +48,13 @@ def read_projection(expected=None):
     if runtime['phase']=='failed' and not isinstance(runtime.get('failure'),dict):raise RuntimeError('invalid runtime failure')
     binding=(value['pinId'],value['pinSha256'],jobs['configurationSha256'])
     if expected is not None and binding!=expected:raise RuntimeError('document LO pin/configuration changed during calculation')
+    if expected is not None and runtime['phase']!='ready':raise RuntimeError('verified document runtime is no longer ready')
     return value,binding
+
+
+def read_projection(expected=None):
+    try: return _read_projection(expected)
+    except (KeyError, TypeError, ValueError, OSError) as error: raise RuntimeError('invalid document host projection: '+str(error)) from error
 
 
 def run(command,environment,binding,deadline):
@@ -82,7 +88,8 @@ def recalculate(path):
         if state['phase']=='failed':raise RuntimeError(json.dumps(state['failure'],ensure_ascii=False))
         jobs=projection['jobs']
         root=Path(jobs['root']).resolve(strict=True)
-        job=Path(tempfile.mkdtemp(prefix='recalculate-',dir=root))
+        identifier=str(uuid.uuid4())
+        job=root/('recalculate-'+identifier);job.mkdir()
         profile=job/'profile';shutil.copytree(Path(jobs['profileSeed']).resolve(strict=True),profile)
         snapshot=job/'source.xlsx';shutil.copyfile(source,snapshot)
         environment=os.environ.copy()
@@ -92,9 +99,16 @@ def recalculate(path):
             cache=job/'font-cache';cache.mkdir()
             config=job/'fonts.conf';config.write_text(template.replace('{{JOB_FONT_CACHE}}',escape(str(cache),{'"':'&quot;'})),encoding='utf-8')
             environment['FONTCONFIG_FILE']=str(config)
-        elif jobs['fontconfigTemplate'] is not None:raise RuntimeError('Windows document host must not provide fontconfig')
+        else:
+            environment.pop('FONTCONFIG_FILE',None)
+            if jobs['fontconfigTemplate'] is not None:raise RuntimeError('Windows document host must not provide fontconfig')
         command=[state['executable'],'-env:UserInstallation='+profile.as_uri(),'--headless','--nologo','--nodefault','--norestore','--nofirststartwizard','vnd.sun.star.script:Standard.Module1.RecalculateAndSave?language=Basic&location=application',str(snapshot)]
         deadline=time.monotonic()+jobs['timeoutMs']/1000
+        run(command[:-2]+['--terminate_after_init'],environment,binding,deadline)
+        # LO creates/overwrites its Basic catalogue on first use; restore only our fixed module afterwards.
+        module=profile/'user/basic/Standard/Module1.xba'
+        if not module.is_file():raise RuntimeError('LibreOffice did not initialize its private Basic catalogue')
+        shutil.copyfile(Path(jobs['profileSeed'])/'user/basic/Standard/Module1.xba',module)
         run(command,environment,binding,deadline)
         read_projection(binding)
         content,count,errors=merge_caches(source,snapshot)
@@ -108,7 +122,9 @@ def recalculate(path):
             os.replace(temp_name,source)
         finally:
             if Path(temp_name).exists():Path(temp_name).unlink()
-        return {'status':'recalculated','id':str(uuid.uuid4()),'path':str(source),'sourceSha256':source_hash,'resultSha256':hashlib.sha256(content).hexdigest(),'formulaCount':count,'errors':errors,'diagnostics':[]}
+        result={'status':'recalculated','id':identifier,'path':str(source),'sourceSha256':source_hash,'resultSha256':hashlib.sha256(content).hexdigest(),'formulaCount':count,'errors':errors,'diagnostics':[]}
+        (job/'receipt.json').write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8')
+        return result
     except RuntimeError as error:return {'status':'failed','code':'runtime','detail':str(error)}
     except TimeoutError as error:return {'status':'failed','code':'timeout','detail':str(error)}
     except OSError as error:return {'status':'failed','code':'disk','detail':str(error)}

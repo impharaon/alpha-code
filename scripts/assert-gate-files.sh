@@ -39,7 +39,7 @@ usage() {
            .gate-tests)读每个登记文件的条数,判定与逐个重跑相同 —— 文件不在报告里 = 没跑到 = 红;
            pass 条数与登记精确相等;条件行要求自报 0 条。门用这一档,于是每个测试文件每次门只跑一次。
 
-PR 范围:CODEPUPPY_TEST_FILES 指向共享工具写出的仓库相对路径清单;只判选中的登记文件。
+PR 范围:CODEPUPPY_TEST_FILES 指向共享工具写出的仓库相对路径清单;判选中的登记文件,以及相对 merge-base 改动的登记行;后者未在报告中时按登记条数单独运行。
            未设置时(手动检查、--update、bin/check --full)判全部登记。
 
 --update   从实测**自动写回**登记簿:逐条跑,全部绿之后把每行的登记条数改成实测值
@@ -98,7 +98,15 @@ countfile="$(mktemp)"
 seenfile="$(mktemp)"
 retired="$(mktemp)"
 reported="$(mktemp)"
-trap 'rm -f "$updates" "$countfile" "$seenfile" "$retired" "$reported"' EXIT
+changed_rows="$(mktemp)"
+registry_diff="$(mktemp)"
+trap 'rm -f "$updates" "$countfile" "$seenfile" "$retired" "$reported" "$changed_rows" "$registry_diff"' EXIT
+# PR 的登记行本身也是输入:仅改条数不能等到夜间才发现。包括已提交、暂存和未暂存的行改动。
+if [ -n "${CODEPUPPY_TEST_FILES:-}" ] && [ "$MODE" = check ]; then
+  base="$(git -C "$ROOT" merge-base origin/alpha HEAD 2>/dev/null)" || { echo "::error::无法量出登记簿的 merge-base —— 本次测量作废"; exit 1; }
+  git -C "$ROOT" diff --no-ext-diff --unified=0 "$base" -- scripts/gate-files.tsv > "$registry_diff" || { echo "::error::无法量出登记簿改动行"; exit 1; }
+  awk -F'\t' '/^\+\+\+/{next} /^\+/{sub(/^\+/, ""); if ($0 !~ /^#/ && NF >= 3) print $2 "/" $3}' "$registry_diff" > "$changed_rows"
+fi
 if [ -n "$REPORTS" ]; then
   python3 "$ROOT/scripts/junit-file-counts.py" "$REPORTS" > "$reported" || { echo "::error::读不了测试报告目录 $REPORTS"; exit 1; }
 fi
@@ -239,10 +247,16 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
   esac
 
   registered=$((registered + 1))
+  row_reports="$REPORTS"
   if [ -n "${CODEPUPPY_TEST_FILES:-}" ] && ! grep -Fqx "$workdir/$path" "$CODEPUPPY_TEST_FILES"; then
-    echo "── 本次范围外:$workdir/$path(未被 affected-tests 选中)"
-    out_of_scope=$((out_of_scope + 1))
-    continue
+    if grep -Fqx "$workdir/$path" "$changed_rows"; then
+      echo "── 登记行已改动:$workdir/$path(未被 affected-tests 选中,按登记条数单独运行)"
+      row_reports=""
+    else
+      echo "── 本次范围外:$workdir/$path(未被 affected-tests 选中)"
+      out_of_scope=$((out_of_scope + 1))
+      continue
+    fi
   fi
 
   checked=$((checked + 1))
@@ -252,7 +266,7 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
   # 两个方向都抓:该跑的文件被误标 ⇒ 本平台 >0 条 ⇒ 红;文件被删 ⇒ 匹配 0 个文件 ⇒ 红。
   if { [ -n "$platform" ] && [ "$platform" != "$RUNTIME_PLATFORM" ]; } || { [ -n "$manual" ] && [ "${CODEPUPPY_TEST_SIGNED_FENCE:-}" != "1" ]; }; then
     echo "── [$checked] $workdir/$path (登记 $floor,[平台:$platform],本平台 $RUNTIME_PLATFORM,显式条件 ${manual:-无})"
-    if { [ -n "$REPORTS" ] && report_check "$workdir" "$path" "=0"; } || { [ -z "$REPORTS" ] && bash "$ROOT/scripts/bun-test-floor.sh" "=0" "$workdir" "$path"; }; then
+    if { [ -n "$row_reports" ] && report_check "$workdir" "$path" "=0"; } || { [ -z "$row_reports" ] && bash "$ROOT/scripts/bun-test-floor.sh" "=0" "$workdir" "$path"; }; then
       echo "   ⊘ 本次未验证:文件在位且自报 0 条,与 [平台:$platform] / ${manual:-无额外条件} 相符 —— 该行的保证本次未被验证"
       na_count=$((na_count + 1))
       na_names="${na_names:+$na_names, }$workdir/$path"
@@ -295,7 +309,7 @@ while IFS=$'\t' read -r floor workdir path delegates guarantee || [ -n "${floor:
   call_spec="=$spec"
   [ "$kind" = range ] && call_spec="$spec"
   echo "── [$checked] $workdir/$path (登记 $floor, 委派 ${delegates}) — ${guarantee:-}"
-  if [ -n "$REPORTS" ]; then
+  if [ -n "$row_reports" ]; then
     report_check "$workdir" "$path" "$call_spec" || { echo "::error::闸门文件失守:$workdir/$path — ${guarantee:-}"; failed=1; }
     continue
   fi

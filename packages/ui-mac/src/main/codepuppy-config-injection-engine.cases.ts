@@ -74,23 +74,18 @@ let localModels: ReturnType<typeof Bun.serve> | undefined
 beforeAll(async () => {
   await assertEngineSandboxed(sandbox)
   // Discovery is process-cached: provide the source before even the earlier S6 engines start.
-  try {
-    localModels = Bun.serve({
-      hostname: "127.0.0.1",
-      port: 1234, // Built-in LMStudioPlugin discovery origin; no owner service is required.
-      fetch: (request) => new URL(request.url).pathname === discoveryPath
-        // Same discovery sample as core/test/plugin/provider-lmstudio.test.ts, first language model.
-        ? Response.json({ models: [{
-            type: "llm", key: "google/gemma-4-26b-a4b", display_name: "Gemma 4 26B A4B", architecture: "gemma4",
-            loaded_instances: [{ config: { context_length: 32_768 } }, { config: { context_length: 16_384 } }],
-            max_context_length: 262_144, capabilities: { vision: true, trained_for_tool_use: true },
-          }] })
-        : new Response(null, { status: 404 }),
-    })
-  } catch (error) {
-    // A real local model service can supply the same outside-provider premise. Assertions still run.
-    if (!(error instanceof Error) || !("code" in error) || error.code !== "EADDRINUSE") throw error
-  }
+  localModels = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0, // Each cases process owns its discovery endpoint.
+    fetch: (request) => new URL(request.url).pathname === discoveryPath
+      // Same discovery sample as core/test/plugin/provider-lmstudio.test.ts, first language model.
+      ? Response.json({ models: [{
+          type: "llm", key: "google/gemma-4-26b-a4b", display_name: "Gemma 4 26B A4B", architecture: "gemma4",
+          loaded_instances: [{ config: { context_length: 32_768 } }, { config: { context_length: 16_384 } }],
+          max_context_length: 262_144, capabilities: { vision: true, trained_for_tool_use: true },
+        }] })
+      : new Response(null, { status: 404 }),
+  })
 })
 
 afterAll(async () => {
@@ -151,7 +146,11 @@ async function engineWith(
 ) {
   const { startEngine } = await import("../../engine/engine-embed")
   const slot = engineSlot(sandbox, name)
-  if (opts.globalConfig) fs.writeFileSync(path.join(slot.configDirectory, "opencode.json"), JSON.stringify(opts.globalConfig))
+  // The built-in discovery plugin reads its origin from provider settings; no shared 1234 listener.
+  fs.writeFileSync(path.join(slot.configDirectory, "opencode.json"), JSON.stringify({
+    providers: { lmstudio: { settings: { baseURL: `${localModels!.url.origin}/v1` } } },
+    ...opts.globalConfig,
+  }))
   if (opts.projectConfig) fs.writeFileSync(path.join(slot.projectDirectory, "opencode.json"), JSON.stringify(opts.projectConfig))
   // `#1713`:C7 判的是「已允许项目里写的 allow 也盖不过显式文件」,项目先经生产写端记一条允许
   if (opts.allowProject) allowProject(slot.projectDirectory)

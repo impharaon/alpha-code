@@ -1,5 +1,7 @@
 // REQ-229 / REQ-230 视觉证据 harness(L2):挂载**生产组件** + 真实 CSS,只桩数据与 IPC。
 // 不进 `bun test src`(本目录不在 src 下);运行:`bun test-visual/capture.ts`(见 README)。
+import os from "node:os"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import solidPlugin from "vite-plugin-solid"
 import { defineConfig } from "vite"
@@ -8,6 +10,8 @@ import { UPSTREAM_LOGO_ALIAS } from "../scripts/upstream-logo-alias.ts"
 const providersStub = fileURLToPath(new URL("./providers-stub.ts", import.meta.url))
 
 export default defineConfig({
+  // The test preload gives each process a temporary root and removes it after the run.
+  cacheDir: join(os.tmpdir(), "vite-browser"),
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [
     {

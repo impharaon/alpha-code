@@ -460,3 +460,5 @@
 2	packages/ui-mac	src/main/recovery-wiring.test.ts	-	Recovery 窗口的安全开关(独立 preload、contextIsolation / sandbox 开)与启动 DbSafety 分支无原生弹窗、Recovery 单挂载点(第 ⑤ 层 KEPT)。删掉它没有别的测试会红。
 
 # 2026-11-26 拆分宿主以并行各组(#1792),原用例与层级不变:packages/ui-mac/src/main/engine-cases.scenario.test.ts、packages/ui-mac/src/main/official-connectors.scenario.test.ts、packages/ext/src/policy/session-grant-upstream-reds.scenario.test.ts
+1	packages/ui-mac	src/main/video-contracts.fast.test.ts	-	#1775 AC-16: media tool schema rejects unknown fields and invalid ranges; exact one case guards the local MCP contract.
+3	packages/ui-mac	src/main/video-cache.test.ts	-	#1775 AC-09: persistent published results, independent-process reopen and cancelled lock waiter; source-text scanner sees the explicit subprocess module path (source-text-anchors.ts), actual assertions execute the cache.

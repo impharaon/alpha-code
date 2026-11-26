@@ -683,7 +683,7 @@ test("video upload host reads the active session and uses existing confirm and c
   const identity = { sessionID: "ses_video", directory: "/project" }
   runtime.publishActiveSessionIdentity(identity)
   const values = [{ requestId: "video-consent", preview: { ...preview, pipeline: "video-understanding" as const } }]
-  const routes: unknown[] = [],
+  const uploadRoutes: unknown[] = [],
     confirmed: string[] = [],
     cancelled: string[] = []
   Object.defineProperty(window, "api", {
@@ -691,7 +691,7 @@ test("video upload host reads the active session and uses existing confirm and c
     value: {
       cloud: {
         videoUploads: async (route: unknown) => {
-          routes.push(route)
+          uploadRoutes.push(route)
           return [...values]
         },
         confirmUpload: async (id: string) => {
@@ -709,7 +709,7 @@ test("video upload host reads the active session and uses existing confirm and c
   document.body.append(host)
   disposers.push(runtime.render(() => runtime.createComponent(runtime.VideoUploadDialog, {}), host))
   await flush()
-  expect(routes[0]).toEqual(identity)
+  expect(uploadRoutes[0]).toEqual(identity)
   expect(document.body.textContent).toContain("视频理解")
   document.body.querySelector<HTMLButtonElement>('.a-btn[data-variant="primary"]')!.click()
   await flush()

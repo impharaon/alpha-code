@@ -295,3 +295,20 @@ test("remote MCP truth persists explicit transport without adding it to default 
     expect(readMcpServerTruth(file, { ...fs, log: () => {} })).toEqual({ ok: true, absent: false, servers })
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
+
+test("remote MCP truth retains declared timeout phases across canonical write read and projection", async () => {
+  const { remoteMcpLeaf } = await import("./mcp-server-truth")
+  withTemp(dir => {
+    const path = join(dir, "dev.json")
+    const timeouts = { startupMs: 30000, catalogMs: 10000, executionMs: 60000 }
+    const record = { name: "timed-remote", url: "https://example.com/mcp", timeouts }
+    writeMcpServerTruth(path, [record], fs)
+    expect(JSON.parse(readFileSync(path, "utf8")).servers).toEqual([record])
+    const read = readMcpServerTruth(path, { readFileSync, log: () => {} })
+    expect(read).toEqual({ ok: true, absent: false, servers: [record] })
+    expect(remoteMcpLeaf(record)).toEqual({ type: "remote", url: record.url, timeouts })
+    for (const bad of [{ startupMs: 0 }, { catalogMs: -1 }, { executionMs: 1.5 }, { unknown: 100 }])
+      expect(() => writeMcpServerTruth(path, [{ ...record, timeouts: bad } as McpServerRecord], fs)).toThrow("not a remote MCP leaf")
+    expect(JSON.parse(readFileSync(path, "utf8")).servers).toEqual([record])
+  })
+})

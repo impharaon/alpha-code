@@ -84,7 +84,10 @@ fi
     }
     writeFileSync(go, "#!/bin/sh\nprintf invalid\n")
     expect(await queryGoInstallTarget(context, project, () => {})).toBeNull()
-    expect(await queryGoInstallTarget({ ...context, env: { ...context.env, PATH: "/no-go-here" } }, project, () => {})).toBeNull()
+    // No go on the command PATH: nothing is spawned and nothing is logged; every child spawn asks again.
+    const absent: string[] = []
+    expect(await queryGoInstallTarget({ ...context, env: { ...context.env, PATH: "/no-go-here" } }, project, (reason) => absent.push(reason))).toBeNull()
+    expect(absent).toEqual([])
     const cancellation = new AbortController(); cancellation.abort()
     expect(await queryGoInstallTarget(context, project, () => {}, cancellation.signal)).toBeNull()
   } finally { rmSync(root, { recursive: true, force: true }) }

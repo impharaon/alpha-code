@@ -66,6 +66,8 @@ export function underGenerationFence(command: string, args: readonly string[]): 
 
 /** Native configuration resolution, inside the same tested fence and original command environment. */
 export async function queryGoInstallTarget(context: ShellProbeFenceContext, cwd: string, log: (reason: string) => void, signal?: AbortSignal): Promise<GoInstallTarget | null> {
+  // Without go on the command PATH there is nothing to ask; the caller keeps its current projection.
+  if (!commandOnPath("go", context.env.PATH)) return null
   const query = (args: string[]) => new Promise<string>((resolve, reject) => {
     execFile("/usr/bin/sandbox-exec", fencedArgs(context, "go", args), {
       cwd, env: { ...context.env, GOTOOLCHAIN: "local", GOTELEMETRY: "off" }, timeout: TIMEOUT, signal, windowsHide: true,

@@ -316,3 +316,19 @@ UI：`connector-launch-presentation.ts` 为行和 BackgroundProblemWatcher 的�
 未完成的本票工作（不是全归 #1759）：core PackageRunner 全语法适配、持久准备收据/无解析离线入口；Location spawner 诊断 tee/遮密与落盘、runtimeDep/egress 事实及动作；v2 受管请求 entryFor/配方展开/活跃调用 handler；Node boot 重锚与 prepare-before-permit；生产 controller/DocumentRuntime/Host 发布装配。原生无槽声明在未有 launcher 描述时可核验，Node/cache 槽不行；根装配时把临时 Reflect/可缺 context 读取收敛到冻结的必填 bootstrap.launchers。AC-01/02/03/04/05/09/10 整包实测与 AC-06/07/08 真引擎半条链仍未验收，未运行应用/Electron/窗口或无网计时。
 
 遗留去向：Office Python prerequisite builder 的 compileall exit 1 及完整 snapshot 两条缺失前置失败 → 编排器处理本机/产物前置；docs 索引等旧问题 → 既有文档治理，非本票；本票余项 → 按上面下一片继续。无迁移、无其它仓修改、无推送/PR/合并；OPTIONAL：无。
+
+### r3 新证据：Python 本地镜像可用，但 uv 后处理接缝待裁定
+
+`gate slot -- bun /tmp/connector-r3-managed-python.ts` exit 0：复用 r1 原厂 Darwin Python 实物，经当前 createPinnedFileAuthority.ensureFile 再验为 cache；当前真实随包 uv/Node 资产经 resolveAssets 核验；R1 位置从 #1759 工作树现有 resolvePackageManagerLocations 只读调用，没有复制表或函数。所有进程使用临时 home/userData，本地 file:// mirror 上放固定 build 与解码文件名。显式安装后 `uv python find 3.12.16` 指向 R1 UV_PYTHON_INSTALL_DIR，实际解释器输出 **Python 3.12.16**，拒绝代理计数 **0**。这是独立 CLI/位置候选的子链证明，未调用 planPackageManagerCaches 绑定、未进应用/fence，不能算 AC-01/02/10。首次探针额外加 `--managed-python` 与既有 only-managed 环境互斥而退出，修正的是探针冗余参数，产品代码/冻结环境未改。
+
+**新接缝证据（不是已实测弹窗）**：相同 uv 安装输出 `Failed to patch the install name of the dynamic library ... This may cause issues when building Python native extensions.`。用第二个 gate slot 探针 `/tmp/connector-r3-managed-python-patch.ts` 在临时 PATH 最前放只记标记并退出的 install_name_tool；输出 `invokedInstallNameTool: true`，仍成功运行 Python，0 代理连接，临时 home 仍空。没有执行系统工具或触发任何安装对话框。两个完整结果在 `/tmp/connector-r3-managed-python.log` 与 `/tmp/connector-r3-managed-python-patch.log`；原件/展开树保留于日志 root。
+
+只读读取系统工具字节：`/usr/bin/git` 与 `/usr/bin/install_name_tool` 均 **118880 B**，SHA-256 **a961f78075d8e7621ef4f5d764c64ef8a41bf66c0a98ab5cb6ca39b85ce31c93**，均含 `__xcrun_shim` / `_xcselect_invoke_xcrun`；未执行它们。当前锁 `resources/connector-launchers/lock.json:4-6` 钉住 uv 0.13.10；冻结 design.md:143 的 PATH 保留宿主系统路径，:178 的 uv python install 命令未处理这个后处理，:255 已明确这类 Git shim 不能试跑。uv help python install 只有 no-bin/no-registry/mirror，未找到可禁该后处理的公开选项；不假设有未核实的开关。
+
+**SEAM-CHANGE-NEEDED：v1 §4.3/4.4 的 managed Python 安装策略。** 实物已证明 uv 会执行 PATH 里的 install_name_tool；在干净 Mac 的既定 PATH 下有命中上述系统 shim 的风险。无 CLT 时实际弹框尚未（也不允许在本任务中）触发，因此此处明确是基于调用与相同系统实物的风险推断，不能写成已录到弹窗。需要设计拥有者冻结一个无 CLT 时不执行该 shim、保留固定 Python 及本机模块能力的处理：
+- 选项 A：让 uv 安装侧跳过/内部处理可选的 install-name 后处理；优先推荐，因为不新增用户步骤/工具资产，但是否有可用的上游实现/新 pin 尚未验证，当前 CLI 不能假定支持。
+- 选项 B：随包提供真实所需处理能力，避免落到系统 shim；需要扩大当前资产/签名或第一方实现的明确边界，成本较高，不能偷塞空操作脚本或要求用户装开发工具。
+
+不擅自改 uv pin、PATH 次序、#1759、设计正文或给用户增加安装步骤。已完成独立片保留在本分支；PackageRunner 的生产 Python 安装接线先等待该裁定，其余未完成代码仍归本票，不用这条新接缝掩盖为都已实现。
+
+`affected-tests --list`（3a1cbe185b 代码树）：**affected tests: 379 of 741 test files**，exit 0，无全量 fallback；清单 `/tmp/connector-r3-affected.list`。后续只补本文收据，不改变选集输入。已核：Codex / GPT-6，冻结 DESIGN v2.2 / SPEC v1 + r3；遗留去向：上述 Python 后处理裁定交设计拥有者/编排器；R1/R2 生产装配等待 #1759 合入；本票余下准备/离线/诊断/handler 按上节继续。

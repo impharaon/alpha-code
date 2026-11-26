@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { planConfigFence, planPackageManagerCaches, planUserWritableLocations, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
@@ -210,28 +210,51 @@ describe("package manager cache planning", () => {
       expect(existsSync(input.goInstallBin)).toBe(false)
     })
   })
-  test("rejects an initial cache-root escape before creating anything outside the data anchor", () => {
+  test("an app-owned cache root replaced by a symlink is recreated in place; nothing is created outside", () => {
     withLocationDisk((disk) => {
       const input = inputFor(disk)
       mkdirSync(input.userDataPath)
       const outside = join(disk.root, "outside")
       mkdirSync(outside)
       symlinkSync(outside, join(input.userDataPath, "package-managers"))
-      expect(() => planPackageManagerCaches(input)).toThrow("application data anchor")
-      expect(existsSync(join(outside, "go"))).toBe(false)
-      expect(existsSync(disk.truthPath)).toBe(false)
+      const plan = planPackageManagerCaches(input)
+      expect(lstatSync(join(input.userDataPath, "package-managers")).isSymbolicLink()).toBe(false)
+      expect(plan.cacheEnv.GOCACHE).toBe(join(input.userDataPath, "package-managers", "go", "build"))
+      expect(plan.excluded).toEqual([])
+      expect(readdirSync(outside)).toEqual([])
     })
   })
-  test("a cache child re-point cannot replace its first identity or reach HOME", () => {
+  test("one bad cache entry, plan still succeeds: an app-owned cache re-pointed at HOME keeps its first identity", () => {
     withLocationDisk((disk) => {
       const input = inputFor(disk)
       mkdirSync(input.userDataPath)
       const plan = planPackageManagerCaches(input)
-      const before = readFileSync(disk.truthPath, "utf8")
+      const before = readFileSync(disk.truthPath, "utf8"), homeBefore = readdirSync(disk.home).sort()
       rmSync(plan.cacheEnv.GOCACHE!, { recursive: true })
       symlinkSync(disk.home, plan.cacheEnv.GOCACHE!)
-      expect(() => planPackageManagerCaches(input)).toThrow("application data anchor")
+      expect(planPackageManagerCaches(input)).toEqual(plan)
+      expect(lstatSync(plan.cacheEnv.GOCACHE!).isDirectory()).toBe(true)
       expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+      expect(readdirSync(disk.home).sort()).toEqual(homeBefore)
+    })
+  })
+  test("one unresolvable user path excludes only its own rule; a dangling Cargo configuration excludes only Cargo caches", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const cargo = join(disk.home, ".cargo")
+      mkdirSync(cargo)
+      symlinkSync(join(disk.root, "missing-registry"), join(cargo, "registry"))
+      const plan = planPackageManagerCaches(input)
+      expect(plan.excluded).toEqual([join(cargo, "registry")])
+      expect(plan.rules.some((rule) => rule.value.startsWith(cargo))).toBe(true)
+      expect(plan.cacheEnv.GOCACHE).toBe(join(input.userDataPath, "package-managers", "go", "build"))
+      unlinkSync(join(cargo, "registry"))
+      symlinkSync(join(disk.root, "missing-config"), join(cargo, "config.toml"))
+      const dangling = planPackageManagerCaches(input)
+      expect(dangling.rules.some((rule) => rule.value.startsWith(cargo))).toBe(false)
+      expect(dangling.excluded.length).toBeGreaterThan(0)
+      expect(dangling.cacheEnv.GOCACHE).toBe(join(input.userDataPath, "package-managers", "go", "build"))
     })
   })
   test.skipIf(process.platform !== "darwin")("package manager cache rules deny old HOME caches and preserve CF/C1", () => {
@@ -277,7 +300,11 @@ describe("package manager cache planning", () => {
       expect(existsSync(join(input.userDataPath, "package-managers", "cargo"))).toBe(false)
       unlinkSync(join(cargo, "registry"))
       symlinkSync(join(cargo, "git"), join(cargo, "registry"))
-      expect(() => planPackageManagerCaches(input)).toThrow("writable location truth refused")
+      // The re-pointed link keeps no grant; every other cache is still planned.
+      const repointed = planPackageManagerCaches(input)
+      expect(repointed.excluded).toEqual([join(cargo, "registry")])
+      expect(repointed.rules).not.toContainEqual({ kind: "subpath", value: external })
+      expect(repointed.cacheEnv.GOCACHE).toBe(plan.cacheEnv.GOCACHE)
     })
     for (const name of ["", "bin", "bin/nested", ".crates.toml", ".crates2.json", "config", "config.toml", "credentials", "credentials.toml", "env"]) withLocationDisk((disk) => {
       const input = inputFor(disk)
@@ -287,9 +314,12 @@ describe("package manager cache planning", () => {
       const target = join(cargo, name)
       if (name && !name.includes(".")) mkdirSync(target, { recursive: true })
       else if (name) writeFileSync(target, "own-reserved")
-      symlinkSync(target, join(cargo, name.includes(".") ? ".package-cache" : "registry"))
-      expect(() => planPackageManagerCaches(input), name).toThrow("reserved location")
-      expect(existsSync(disk.truthPath)).toBe(false)
+      const link = join(cargo, name.includes(".") ? ".package-cache" : "registry")
+      symlinkSync(target, link)
+      const plan = planPackageManagerCaches(input)
+      expect(plan.excluded, name).toContain(link)
+      expect(plan.rules.some((rule) => processFenceRulesCover({ allow: [rule], deny: [] }, target, "file")), name).toBe(false)
+      if (name.includes(".")) expect(readFileSync(target, "utf8")).toBe("own-reserved")
     })
   })
 })

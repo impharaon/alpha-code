@@ -390,6 +390,7 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
   if (userEnvironment.bunInstall !== null) input.sidecarEnv.BUN_INSTALL = userEnvironment.bunInstall
   else delete input.sidecarEnv.BUN_INSTALL
   const caches = prepareCaches(null)
+  if (caches.excluded.length) getLogger()?.warn(`process fence: excluded package manager cache locations ${JSON.stringify(caches.excluded)}`)
   const originalEnv = { ...input.sidecarEnv }
   const makePlan = (homebrewFence: Parameters<typeof planProcessFence>[0]["homebrewFence"], userWritableLocations: Parameters<typeof planProcessFence>[0]["userWritableLocations"]) => planProcessFence(
     {

@@ -20,8 +20,8 @@
 // **刻意不建** `~/.opencode`:它整个是受保护配置位置 CF-9,任何进程都不建它(BR-07;W16 已删,计划目录在引擎数据目录下,
 // 这里本来就预建数据目录,`plan` 由写文件工具懒建)。
 
-import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
+import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs"
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
 import {
   assertSeatbeltSafePath,
@@ -92,35 +92,65 @@ export function planPackageManagerCaches(input: PackageManagerLocationInput & { 
   const cachePaths = new Set(caches.map((entry) => entry.rule.value))
   const cargoHome = join(input.home, ".cargo")
   const cargoInstalls = resolved.writable.filter((entry) => entry.manager === "cargo" && entry.purpose === "global-install").map((entry) => entry.rule)
+  // One bad entry excludes only itself. A reserved Cargo path that cannot be resolved leaves Cargo overlap unprovable.
+  let reservedUnresolved = false
   const reserved = [cargoHome, ...cargoInstalls.map((rule) => rule.value),
     ...userConfigurationLocations(input).flatMap((rule) => rule.kind !== "dat-files" && dirname(rule.path) === cargoHome ? [rule.path] : []),
     ...["credentials", "credentials.toml", "env"].map((name) => join(cargoHome, name)),
-  ].flatMap((path) => [path, plannedWritableTarget(path, input.eligibility.realpath).target])
-  const candidates = [{ sourcePath: join(input.userDataPath, PACKAGE_MANAGERS_DIRNAME), kind: "directory" as const },
+  ].flatMap((path) => {
+    try { return [path, plannedWritableTarget(path, input.eligibility.realpath).target] } catch { reservedUnresolved = true; return [path] }
+  })
+  const appRoot = join(input.userDataPath, PACKAGE_MANAGERS_DIRNAME)
+  const candidates = [{ sourcePath: appRoot, kind: "directory" as const },
     ...caches.map((entry) => ({ sourcePath: entry.rule.value, kind: entry.rule.kind === "literal" ? "file" as const : "directory" as const })),
   ]
+  const excluded = new Set<string>()
   for (const candidate of candidates) {
-    const target = plannedWritableTarget(candidate.sourcePath, input.eligibility.realpath).target
+    // App-owned caches: a node replaced by a symlink is removed (never followed) and recreated at the same path.
+    if (candidate.sourcePath === appRoot || insideLexically(appRoot, candidate.sourcePath)) unlinkSymlinkedNodes(input.userDataPath, candidate.sourcePath)
+    let target: string
+    try { target = plannedWritableTarget(candidate.sourcePath, input.eligibility.realpath).target } catch { excluded.add(candidate.sourcePath); continue }
     const cache = caches.find((entry) => entry.rule.value === candidate.sourcePath)
     if (cache?.manager === "cargo") {
       const rule = { ...cache.rule, value: target }
-      if (reserved.some((path) => processFenceRulesCover({ allow: [rule], deny: [] }, path)) ||
-        cargoInstalls.filter((entry) => entry.kind === "subpath").some((entry) =>
-          [entry.value, plannedWritableTarget(entry.value, input.eligibility.realpath).target].some((value) => processFenceRulesCover({ allow: [{ ...entry, value }], deny: [] }, target))))
-        throw new Error("package manager cache: Cargo target overlaps a reserved location")
+      try {
+        if (reservedUnresolved || reserved.some((path) => processFenceRulesCover({ allow: [rule], deny: [] }, path)) ||
+          cargoInstalls.filter((entry) => entry.kind === "subpath").some((entry) =>
+            [entry.value, plannedWritableTarget(entry.value, input.eligibility.realpath).target].some((value) => processFenceRulesCover({ allow: [{ ...entry, value }], deny: [] }, target))))
+          excluded.add(candidate.sourcePath)
+      } catch { excluded.add(candidate.sourcePath) }
       continue
     }
     const inside = relative(anchor.directory, target)
-    if (inside === "" || inside === ".." || inside.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(inside))
-      throw new Error("package manager cache: target is outside the application data anchor")
+    if (inside === "" || inside === ".." || inside.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(inside)) excluded.add(candidate.sourcePath)
   }
-  const plan = planWritableLocations({ candidates, truthPath: input.truthPath, eligibility: input.eligibility })
-  if (plan.excluded.length) throw new Error(`package manager cache: writable location truth refused ${plan.excluded.join(", ")}`)
+  const plan = planWritableLocations({ candidates: candidates.filter((candidate) => !excluded.has(candidate.sourcePath)), truthPath: input.truthPath, eligibility: input.eligibility })
+  for (const path of plan.excluded) excluded.add(path)
   const targets = new Map(plan.locations.map((entry) => [entry.sourcePath, entry.targetPath]))
-  const env = Object.fromEntries(Object.entries(resolved.env).map(([key, value]) => [key, targets.get(value) ?? value]))
-  const cacheEnv = Object.fromEntries(Object.entries(resolved.env).filter(([key, value]) => (cachePaths.has(value) || key === "GOBIN" || key === "BUN_INSTALL")).map(([key, value]) => [key, targets.get(value) ?? value]))
-  const rules: ProcessFenceWriteRule[] = caches.map((entry) => ({ ...entry.rule, value: targets.get(entry.rule.value)! }))
-  return { env, cacheEnv, rules, locations: plan.locations }
+  // An excluded location never reaches the environment, so no tool is pointed at an unplanned path.
+  const projected = Object.entries(resolved.env).filter(([, value]) => !excluded.has(value))
+  const env = Object.fromEntries(projected.map(([key, value]) => [key, targets.get(value) ?? value]))
+  const cacheEnv = Object.fromEntries(projected.filter(([key, value]) => (cachePaths.has(value) || key === "GOBIN" || key === "BUN_INSTALL")).map(([key, value]) => [key, targets.get(value) ?? value]))
+  const rules: ProcessFenceWriteRule[] = caches.filter((entry) => targets.has(entry.rule.value)).map((entry) => ({ ...entry.rule, value: targets.get(entry.rule.value)! }))
+  return { env, cacheEnv, rules, locations: plan.locations, excluded: [...excluded] }
+}
+
+function insideLexically(root: string, path: string) {
+  const inside = relative(root, path)
+  return inside !== "" && inside !== ".." && !inside.startsWith(`..${sep}`) && !isAbsolute(inside)
+}
+
+/** Walk from below `anchor` to `path`; a symlinked node is unlinked so the planner recreates a real directory there. */
+function unlinkSymlinkedNodes(anchor: string, path: string) {
+  let node = anchor
+  for (const part of relative(anchor, path).split(sep)) {
+    node = join(node, part)
+    try {
+      if (lstatSync(node).isSymbolicLink()) unlinkSync(node)
+      else continue
+    } catch { /* missing below here: the planner creates it */ }
+    return
+  }
 }
 
 /** Main-only identity planning. New locations are usable only after the truth is committed. */

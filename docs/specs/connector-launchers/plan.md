@@ -616,7 +616,7 @@ readNpmLaunchDeclaration 新增 transient resolutionOptions：向 Config 传入�
 ## r7｜完整准备函数与独立余项
 
 - 依据：r7 IMPLEMENT；r6 b0f1272cbb..a2f56d8e64 已接受。SPEC v1 AC-02/04/05/06/07/08/10，DESIGN v2.2 §4.3–4.7、§8/§10；不重开既定决策。
-- 核对：Phase IMPLEMENT，Codex / GPT-6；本轮完成已列的独立余项，生产 bootstrap/Host/root/controller、文档 retry 与打包验收仍等 #1759。起始2026-11-26T20:17:28Z，预计90分钟；在每个子链后核对时间。
+- 核对：Phase IMPLEMENT，Codex / GPT-6；本轮目标为完成已列的独立余项，生产 bootstrap/Host/root/controller、文档 retry 与打包验收仍等 #1759。起始2026-11-26T20:17:28Z，预计90分钟；在每个子链后核对时间。
 
 ### 改动与顺序
 1. `core/mcp/codepuppy-npm-launch.ts`：官方 npa/config 的完整需求和来源 facts、当前执行语义；Location 内官方 npm install --prefix 的产品路径。保留真实 npm 对包/别名/目录/git/URL、配置优先级和 bin 的所有权。
@@ -664,3 +664,28 @@ uv 当前执行环境由随包 uv run --offline --no-config --no-project 的应�
 `bun test test/codepuppy-connector-launch.test.ts -t 'uv resolved settings retain|bound package entries use|npm call binding keeps' --max-concurrency=2` →3 PASS /16 assertions；本行为整文件 `bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2` →45 PASS /249 assertions（`/tmp/connector-r7-binding-new.log`、`/tmp/connector-r7-binding-file.log`）。核心 `bun typecheck` 已通过2069 files/2 projects；最终检查与移除臂在本轮收据补记。
 
 **当前未完成边界**：完整 uv PEP508/requirements（Local/Remote/Stdin 与递归包含）、resolved config→content facts、editable 源路径重绑仍未完成；完整 prepareConnectorLaunch 的 Python 定位/准备事务/ready 快路径/失败取消进度组合仍未定义。npm 读侧与产品 installer、执行绑定 primitives 已完成，不将它们等同完整第三方启动或离线应用重启。生产 #1759 接线仍按前表。
+
+### r7 最终收据与准确续接
+
+依据：SPEC v1 / DESIGN v2.2、r7 IMPLEMENT；已核：Codex / GPT-6，结论 **PARTIAL**，不能返回 DONE-INDEPENDENT。计划37da012a1d，npm/content/install 实现fc7b90f81c，当前执行绑定c83146a951。已定勿重开：唯一 pinned authority、r4 无 CLT PATH 裁定、r6 声明槽位摘要裁定、R1/R2 的缓存位置和最终投影所有权。本轮无新设计分叉；没有修改 fence、gate、其它规格/仓或生产数据，没有 push/PR/merge、应用/窗口、全套/计时/容量运行。
+
+**本轮分项 / AC 子链证据**：
+- AC-04/05 准备子链：npm 别名/git/远端、本地 packlist/配置内容 key 与产品 installer；实际随包 npm 装 semver7.8.5，capture 后 bind 直接入口输出1.2.3。真实 Node/npm 命令 `gate slot -- bun /tmp/connector-r5-npm-proof/npm-bind-r7.ts` 安装与捕获 exit0，但探针自身把 INIT_CWD 的 /private/tmp 与 /tmp 当作不同目录而失败；修正为真实路径后仅复用原安装并重跑绑定，`gate slot -- bun /tmp/connector-r5-npm-proof/npm-bind-existing-r7.ts` exit0（`/tmp/connector-r7-npm-bind-existing.log`），没有重装第二遍。这不是本机模块/干净机器整链验收。
+- AC-04/10 执行子链：`gate slot -- bun /tmp/connector-r5-npm-proof/uv-bind-r7.ts` exit0，真实随包 uv0.13.10/Python3.12.16，产品 read→环境读取→capture→bind 保留当前目录、env-file 插值及继承环境优先级，原包入口输出 pip26.3（`/tmp/connector-r7-uv-bind-real.log`）。npm/uv 测试均未通过原包 runner 启动服务；没有将 helper 读回执当作完整 prepare 快路径。
+- AC-06/07/08：继承已接受 producer/单一呈现/诊断的模块证据；本轮只相关调用方回归5例，未新增生产 root 闭环或真引擎整链结论。
+- AC-01/02/03/04/05/06/07/08/09/10 的正式包/干净账户/真围栏/国内节点/限速/Windows/断网应用重启验收仍未做；既有 pinned 实物证据继承 r1/r2/r4，不重新下载。
+
+**唯一计数的相关检查**：core `bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2` →45 PASS /249 assertions；在现有文件新增6例，覆盖模块/组件/stdio集成层（`/tmp/connector-r7-binding-file.log`）。返回前 grep 新 exports 及 mock/枚举消费者：npm/uv/content/key 的直接消费者只有此文件；diagnostic/runner 同链的 `bun test test/codepuppy-mcp-runtime.test.ts -t 'Office declarations bind|bundled slots bind|bundled declarations reject|the failed status the desktop reads|a local server that writes a secret to stderr and exits' --max-concurrency=2` →5 PASS /62 assertions，30 filtered（`/tmp/connector-r7-runtime-related.log`）。没有重复 r6 未改的 ext/main/UI 集合。
+
+core `bun typecheck` →exit0、2069 files/2 projects（`/tmp/connector-r7-core-typecheck-final.log`）；无独立包 lint 命令，git diff --check exit0。7个移除臂分别去掉源秘密清理、源内容字节身份、install prefix、当前执行环境、当前服务参数、shell命令、uv nested值：命名例全部 exit1 /0 PASS /1 FAIL（`/tmp/connector-r7-removals-summary.log`、`/tmp/connector-r7-removal-*.log`），每次 scoped git restore；恢复后仅新增6例再核 →6 PASS /35 assertions（`/tmp/connector-r7-restored-final.log`）。没有削弱断言。
+
+源码归档7个文件与真实 pinned Node/npm 原件逐字一致，共6727 bytes，包含 libnpmpack 与 libnpmexec 两份 LICENSE；最后只补 LICENSE 不改程序，恢复后的6例包含读归档的全部新行为。`affected-tests --list` →exit0：**affected tests: 380 of 742 test files**（`/tmp/connector-r7-affected-final.scope` / `.list`），无 fallback；未改 selector/global setup/runner，没有扩大每个 PR 的全局必跑层。官方 docs check_repo：本 plan 0 findings，仓级56 errors/251 warnings（`/tmp/connector-r7-docs.json`）；相对链接检查exit0。已有 docs/README.md:1 index.stale 等不顺修。hooksPath=.githooks。
+
+**独立余项（仍由 #1760 实现，不能归为等待 #1759）**：
+1. UV 完整 PEP508/隐式包/extras/with/editable 需求规范化；Local/Remote/Stdin requirements/constraints/overrides/build-constraints 的内容读取、递归包含与原始解析语义；真正生效的 resolver/project source/config→非秘密内容 facts。parseUvResolvedValue 只是 wire 值层，不是完成此项。
+2. 当前执行绑定还须覆盖同内容本地 editable 源搬家/并行 Location 的源绑定；上述实物源搬家案例仍是有待修正的正缺口。uv 隐式 extras 的实际命令名映射也须跟归一需求一起完成；不得把声明路径写入 key 或以拒绝合法声明绕过。
+3. 冻结 prepareConnectorLaunch 尚未定义：取得同代 Host/assets、单一 Python pin 安装/定位与已验解释器的本地快路径、需求/config key、同 key 准备合并、有效 ready 直接绑定、miss install/capture/先验证入口再发布、当前环境/参数/source重绑、真实失败与一次网络恢复、进度/取消/egress 生命周期，接入已有 localLaunch.packagePreparation。在这之前 npm/uv 产品子链不能称作完整离线准备。
+
+**#1759 合入后生产接线（冻结 names/signatures 沿 r3/R5 接口与组装表）**：本轮最后只读复核其 HEAD 仍 ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f，签名未变化。消费同次 planPackageManagerCaches 的 env/cacheEnv/rules/locations/excluded；resolvePackageManagerLocations 只是候选。由 installPackageManagerEnvironment / packageManagerEnvironment / refreshPackageManagerEnvironment / projectPackageManagerEnvironment / createPackageManagerEnvironmentRequester 持有最终绑定和 spawn 投影，不复制。随后接 mandatory bootstrap.launchers、main assets/download Host、sidecar 发布到 index/Slot/localLaunch、Node boot 重锚、当前 identity/代的 controller 与 diagnostic/retry、bindDocumentRuntime→runtime.retry()、renderer root；打包后完成真机器 AC。该表不声称 #1759 合入就自动完成本票实现。
+
+偏离：初始文件表之外的 key schema/diagnostic export/fixture 都是同一内容责任的必要共享，原因见本节；新增 content 模块192行，不加依赖或配置开关。当前总改动9文件（约866增53删，含计划/测试），比单个 helper 的实现范围大，但未跨票。时间核对2026-11-26T21:39Z，自起始约82分钟，原预计90分钟；完整独立余项没有在本轮完成，留精确可续接状态。遗留去向：独立余项→#1760续接；生产装配→#1759合入后本票；Office compileall→documents已路由，本轮未工作；既有文档结果→文档治理。OPTIONAL：无。

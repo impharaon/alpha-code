@@ -79,7 +79,7 @@ export function subscribeDocumentChecks(context: Pick<Plugin.Context, "location"
           return { status: "conflict", checkId: check.id }
         return { status: "admitted", checkId: check.id, notificationID: check.notificationID }
       } catch (error) {
-        if (error && typeof error === "object" && "_tag" in error && error._tag === "SessionNotFoundError")
+        if (error && typeof error === "object" && "_tag" in error && error._tag === "Session.NotFoundError")
           return { status: "session-missing", checkId: check.id }
         throw error
       }

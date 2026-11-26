@@ -5,6 +5,8 @@ import { tmpdir } from "node:os"
 import { createDocumentRenderer } from "./document-render"
 import { createDocumentInspection } from "./document-check"
 import { createDocumentChecks } from "../../ui-mac/src/main/document-checks"
+import { documentCheckRoot, writeDocumentRecord } from "../../ui-mac/src/shared/document-check-records"
+import { createDocumentPythonProjections } from "../../ui-mac/src/main/document-python"
 import { documentSha256 } from "../../ui-mac/src/shared/document-check-records"
 import type {
   DocumentCaller,
@@ -24,13 +26,8 @@ async function fixture() {
   const source = join(root, "report.pdf")
   copyFileSync(join(import.meta.dir, "../../ui-mac/src/main/fixtures/document-runtime/control.pdf"), source)
   mkdirSync(join(root, ".document-output"))
-  const stored = createDocumentChecks({
-    root: join(root, "runtime"),
-    runtime: {
-      subscribe: () => () => {},
-      pythonEnvironment: async () => ({ CODEPUPPY_DOCUMENT_HOST: join(root, "host.json") }),
-    },
-  })
+  const runtime = { subscribe: () => () => {}, pythonEnvironment: async () => ({ CODEPUPPY_DOCUMENT_HOST: join(root, "host.json") }) }
+  const stored = createDocumentChecks({ root: join(root, "runtime"), runtime })
   const host = {
     ...stored,
     environment: async () => ({
@@ -81,7 +78,7 @@ async function fixture() {
     fixes: [],
     remaining: [],
   })
-  return { root, caller, source, host, input, first: first.receipt, report, stored }
+  return { root, caller, source, host, input, first: first.receipt, report, stored, runtime }
 }
 
 test("check records actual page evidence, preserves findings and never equates render with visual inspection", async () => {
@@ -154,5 +151,34 @@ test("one correction persists across renderer recreation, and old screenshots ca
   writeFileSync(f.source, Buffer.concat([before, Buffer.from("\n% second correction\n")]))
   const repeated = await createDocumentRenderer(f.input)(f.caller, { kind: "pdf", path: f.source }, f.first.checkId, 1)
   expect(repeated).toMatchObject({ status: "failed", code: "source-changed" })
+  f.stored.dispose()
+})
+
+
+test("formula report consumes the owning live projection's calculation receipt and cannot hide its errors", async () => {
+  const f = await fixture()
+  const projections = createDocumentPythonProjections({ root: join(f.root, "runtime"), generation: 1, pin: { id: "libreoffice/darwin-arm64/fixture", family: "libreoffice", target: "darwin-arm64", version: "fixture", originUrl: "https://example.org/fixture.dmg", provenanceUrl: "https://example.org/source", sha256: "a".repeat(64), bytes: 1 }, assets: f.input.assets, resources: join(import.meta.dir, "../../ui-mac/resources"), platform: "darwin" })
+  const environment = projections.environment(f.caller.location, "calculation", { phase: "ready", executable: "/owned/soffice", version: "fixture" })
+  f.runtime.pythonEnvironment = async () => environment
+  const projection = JSON.parse(readFileSync(environment.CODEPUPPY_DOCUMENT_HOST, "utf8"))
+  const source = join(f.root, "sales.xlsx")
+  copyFileSync(join(import.meta.dir, "../../ui-mac/src/main/fixtures/office-excel/cache-calculated.xlsx"), source)
+  const sha256 = documentSha256(readFileSync(source))
+  const receipt = { ...f.first, kind: "xlsx" as const, sourcePath: source, artifactPath: source, sourceSha256: sha256, artifactSha256: sha256 }
+  const archive = await documentCheckRoot(f.caller, receipt.checkId)
+  await writeDocumentRecord(join(archive, "identity.json"), { caller: f.caller, request: { kind: "xlsx", path: source }, originalSha256: sha256 })
+  await writeDocumentRecord(join(archive, "0", receipt.id, "receipt.json"), receipt)
+  // The check/receipt are application-owned contracts; the original file and #NAME? are from the pinned real LO fixture.
+  const errors = [{ sheet: "Summary", cell: "K2", formula: "=#REF!", error: "#NAME?" }]
+  const calculation = { status: "recalculated", id: "calculation", path: source, sourceSha256: sha256, resultSha256: sha256, formulaCount: 4, errors, diagnostics: [] }
+  const job = join(projection.jobs.root, "recalculate-calculation")
+  mkdirSync(job)
+  await writeDocumentRecord(join(job, "receipt.json"), calculation)
+  const inspection = createDocumentInspection()
+  for (const page of receipt.pages) inspection.observe(f.caller.sessionID, { ...page, inspected: true })
+  const report = { ...f.report(receipt), final: true, formulaCheck: { recalculationId: calculation.id, errors } }
+  expect((await inspection.check(f.caller, report, f.host)).formulaCheck).toEqual(report.formulaCheck)
+  await expect(inspection.check(f.caller, { ...report, formulaCheck: { recalculationId: calculation.id, errors: [] } }, f.host)).rejects.toThrow("actual calculation receipt")
+  projections.dispose()
   f.stored.dispose()
 })

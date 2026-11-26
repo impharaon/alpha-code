@@ -1555,6 +1555,8 @@ function npmSourceFixture() {
     "proc-log": path.dirname(arborist.resolve("proc-log/package.json")),
     "ci-info": path.dirname(config.resolve("ci-info/package.json")),
     pacote: path.dirname(arborist.resolve("pacote/package.json")),
+    "make-fetch-happen": path.dirname(pacote.resolve("make-fetch-happen/package.json")),
+    cacache: path.dirname(pacote.resolve("cacache/package.json")),
     "npm-packlist": path.dirname(pacote.resolve("npm-packlist/package.json")),
     tar: path.dirname(pacote.resolve("tar/package.json")),
     semver: path.dirname(util.resolve("semver/package.json")),
@@ -1851,4 +1853,51 @@ test("connector preparation repairs missing Python and a damaged standard librar
   for (const scenario of ["damaged-python", "damaged-stdlib"]) {
     expect(await preparationTransaction(scenario)).toMatchObject({ cached: true, pythonInstalls: 1, downloads: 1, installCount: 1 })
   }
+})
+
+// Component layer: real HTTP, npm's actual cache client, actual pinned uv metadata
+// and pinned packaging/pip JSON replies. No invented external-format fixture.
+test("uv remote requirements keep credential rotation offline and detect changed source contents", async () => {
+  const input = npmSourceFixture()
+  const capture = JSON.parse(readFileSync(new URL("./fixture/uv-requirements.json", import.meta.url), "utf8")) as { remoteSettings: string; remoteOfflineSettings: string; remoteOrigin: string; remoteArguments: string[]; replies: { input: string; output: string }[] }
+  let requests = 0, status = 200, body = "packaging<25\n"
+  const authorizations: string[] = []
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch(request) { requests++; authorizations.push(request.headers.get("authorization") ?? ""); return new Response(body, { status, headers: { "cache-control": "max-age=0, must-revalidate" } }) } })
+  try {
+    const origin = "http://127.0.0.1:" + server.port
+    const python = path.join(input.root, "python-parser.cjs")
+    writeFileSync(python, '#!/usr/bin/env node\nconst fs=require("node:fs");const input=fs.readFileSync(0,"utf8");const data=' + JSON.stringify(capture.replies) + ';const result=data.find(value=>value.input===input);if(!result)throw Error("Uncaptured Python input "+input);process.stdout.write(result.output)\n', { mode: 0o755 })
+    const layer = Layer.effect(Environment.Service, Effect.gen(function* () {
+      const current = yield* Environment.Service
+      return Environment.Service.of({ ...current, spawner: ChildProcessSpawner.make(command => command._tag === "StandardCommand" && command.command === input.launchers.uv
+        ? current.spawner.spawn(ChildProcess.make(process.execPath, ["-e", "process.stdout.write(JSON.stringify({cwd:process.cwd(),environment:process.env}))"], command.options))
+        : current.spawner.spawn(command)) })
+    })).pipe(Layer.provide(hostEnvironmentLayer))
+    const launchers = { ...input.launchers, environment: { ...input.launchers.environment, XDG_CACHE_HOME: path.join(input.root, "owned-cache") } }
+    const invoke = (offline: boolean, token: string, version = "one") => {
+      const replace = (value: string) => value.replaceAll(capture.remoteOrigin.slice("http://".length), origin.slice("http://".length)).replaceAll(capture.remoteOrigin.split(":").at(-1)!, String(server.port)).replaceAll("owned-first", token).replaceAll("version=one", "version=" + version)
+      return Effect.runPromise(Effect.scoped(normalizeUvLaunchDeclaration({ ...input, launchers, python, cwd: input.root, environment: { ...input.environment, HTTPS_PROXY: "", HTTP_PROXY: "", NO_PROXY: "127.0.0.1", XDG_CACHE_HOME: path.join(input.root, "unbound-cache") }, syntax: "uvx", arguments: [...(offline ? ["--offline"] : []), ...capture.remoteArguments.map(replace)], declaration: parseUvToolSettings(replace(offline ? capture.remoteOfflineSettings : capture.remoteSettings)) })).pipe(Effect.provide(layer)))
+    }
+    const key = (value: Awaited<ReturnType<typeof invoke>>) => connectorPreparationKey({ runner: "uv-tool", launchers, ...value })
+    const first = await invoke(false, "owned-first")
+    expect(requests).toBe(1)
+    expect(authorizations).toEqual(["Basic " + Buffer.from("own:owned-fake-secret").toString("base64")])
+    const cached = await invoke(true, "owned-rotated")
+    expect(key(cached)).toBe(key(first))
+    expect(requests).toBe(1)
+    expect(existsSync(path.join(input.root, "unbound-cache"))).toBe(false)
+    const miss = await invoke(true, "owned-rotated", "missing").then(() => undefined, error => String(error))
+    expect(miss).toContain("offline")
+    expect(requests).toBe(1)
+    body = "packaging<24\n"
+    expect(key(await invoke(false, "owned-first"))).not.toBe(key(first))
+    expect(requests).toBe(2)
+    status = 403
+    const denied = await invoke(false, "owned-denied").then(() => undefined, error => String(error))
+    expect(denied).toContain("Requirement source HTTP 403")
+    expect(requests).toBe(3)
+    const facts = JSON.stringify({ requirements: cached.requirements, options: cached.options, configuration: cached.configuration })
+    expect(facts).not.toContain("owned-first")
+    expect(facts).not.toContain("owned-fake-secret")
+  } finally { server.stop(true) }
 })

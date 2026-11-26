@@ -734,3 +734,30 @@ prepareConnectorLaunch 的 frozen 输入/返回现已定义并组合：先依赖
 必要文件偏离：新增 util/codepuppy-command-head.ts 是现有 main/platform 的同一函数/Windows后缀规则原样下沉供 core/main 共用；main/platform/index.ts 与 win32.ts 只 re-export，避免第二份命令识别 authority。startup.ts 同一失败 owner 增加准备期具体事实，diagnostic.ts/connection.ts 仅接同一 attempt 进度；npm-launch.ts 同链解码失败同样禁止把业务环境输出到错误。没有改 fence、HTTP/Protocol、gate、依赖或其它规格。
 
 **本节不是 DONE-INDEPENDENT 收据**：独立事务的 UV 完整 prepare 实物、缺损 managed Python 的自动修复、同 key 合并/取消/失败恢复的总事务命名证据仍须补齐；细项与最终检查在本轮最终收据列明。生产 bootstrap/Host/root/controller/document retry 与正式包验收继续等 #1759；其 HEAD 最后核对仍 ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f，R1/R2 names/signatures 沿前表，无复制实现。
+
+### r8 最终收据与准确续接
+
+依据版本：SPEC v1 / DESIGN v2.2 与 r4/r6 裁定；已核：Codex / GPT-6，**PARTIAL**。计划 c48aba66e0，红例957b719520/618f329c5d，内容归一 f1950cd716，解释器/绑定/事务组合85af80efff。没有新的冻结设计分叉；没有 push/PR/merge、窗口、fence 变更、全套/gate run/bin/check 或其它仓写入。
+
+- **AC-02/04/05 的准备子链**：UV 完整需求/来源/有效 resolver facts、materialized 文件与 argv、解释器 pin 检查已有命名组件证据；真实 pinned Python/uv editable 搬家并行绑定命令和产物见上一节。key 不包含当前业务输入，当前源导入正确，共享 ready不变，私有环境随 Scope 清理。这不是干净机器/真围栏/本机模块整条 AC 通过。
+- **AC-06/07/08 的准备与分类子链**：既有 attempt producer 接收阶段/字节/stderr活动；新增 preflight 依赖/cwd 和具体瞬时下载事实命名例，原 UI 状态/诊断调用方相关5例继续通过。没有宣称 controller/root 或“让助手排查”生产闭环已装配。
+- **AC-10 的缓存子链**：完整 NPM prepare 在新进程中2个 Location 真 MCP stdio 连接通过；ensureFile/installer均0，当前 argv/cwd/env 正确。只称本函数缓存准备证据，不当作断网重启打包应用验收。冷准备写回执已观察到，冷 MCP 连接因探针 stdin记录器错误未取得成功证据。
+- **AC-01/02/03/04/05/06/07/08/09/10 正式验收**：仍保留既有正式包、干净账户、真围栏、国内节点、限速、Win/原生模块与断网应用重启证明义务；本轮没有重跑先前已接受的实物下载/CLT证明。
+
+**相关检查**（package cwd，层与依赖沿既有 core test 文件的静态 imports / literal fixture路径，受影响PR及nightly；未新增scenario）：
+1. core `bun test test/codepuppy-connector-launch.test.ts --max-concurrency=2` →51 PASS、294 assertions（`/tmp/connector-r8-core-final.log`）。本轮新增6例；最后一次类型检查发现新增 classification 测试的数组被推断为 string[][]，只将它改为 readonly tuple，断言不变。
+2. 实际 grep exports/mock/枚举消费者后，core `bun test test/codepuppy-mcp-runtime.test.ts -t 'Office declarations bind|bundled slots bind|bundled declarations reject|the failed status the desktop reads|a local server that writes a secret to stderr and exits' --max-concurrency=2` →5 PASS、62 assertions（`/tmp/connector-r8-runtime-related.log`）；另仅 `-t 'launcher download classification uses'` →1 PASS、10 assertions（`/tmp/connector-r8-runtime-classification.log`）。main/platform 原命令归一消费者 `bun test src/main/platform/platform.fast.test.ts --max-concurrency=2` →12 PASS、32 assertions（`/tmp/connector-r8-platform-related.log`）。这些以外未扩跑未改层。
+3. core `bun typecheck` →exit0、2070 files/2 projects（`/tmp/connector-r8-core-typecheck-final.log`）；util →exit0、115files（`/tmp/connector-r8-util-typecheck.log`）；ui-mac →exit0（`/tmp/connector-r8-ui-typecheck.log`）。无独立包lint脚本，git diff --check exit0；hooksPath=.githooks。
+4. **8个移除臂**：错将 -C 当目录、dotenv进key、丢marker、丢递归requirements facts、绕过Python pin、绕过依赖预检、丢瞬时HTTP归因，各自命名例exit1；取消editable重绑后，复用同一真实ready、不重装，`gate slot -- bun /tmp/connector-r5-npm-proof/uv-binding-existing-removal-r8.ts` →exit1、真实Python报 `ModuleNotFoundError: No module named 'owned_editable'`。日志 `/tmp/connector-r8-removal-*.log` / `removals-summary.log`。移除脚本一度因源文本匹配两处而停止，未改startup；随后用完整返回句精确匹配完成该臂。每次 git restore 自己的单文件变更，最终新增6例复核 →6 PASS、45 assertions（`/tmp/connector-r8-restored-final.log`）。总事务未证分支没有伪造移除证据。
+5. `affected-tests --list` →exit0，**affected tests: 395 of 742 test files**（`/tmp/connector-r8-affected-final.scope` / `.list`）。相比r7多15个由命令归一共享owner的真实调用图可达文件；没有selector/global setup变更或每PR全局扩跑。
+6. 官方 docs check_repo 本plan 0 findings，仓级56 errors/251warnings（`/tmp/connector-r8-docs.json`），与r7相同；`python3 scripts/check-doc-links.py docs/specs/connector-launchers/plan.md` exit0。既有 docs/README.md:1 index.stale 等转文档治理，不顺修。
+
+**独立余项，仍归 #1760，不能算作等待 #1759**：
+1. UV 主包/解释器、Local/递归文件、resolved config 已落，但完整 public prepare 的 UV 分支还没有端到端实物；Remote requirements 的实际读取/auth/cache、signed-query凭据轮换与离线缓存、stdin EOF/本地来源边界还缺命名真实输入证明，不能据已有文件例声称全部输入域完成。当前 HTTP读取复用 bundled npm make-fetch-happen 与 descriptor 的 XDG cache，只有非秘密内容进入 key。
+2. Python receipt 在目标 binary 缺失时会走 ensureFile→普通 uv python install；部分损坏安装能否被uv自动修复尚未验证/收口，需要红先缺损例并按结果做最小修复。不要把“receipt忽略丢失文件”当作已实现修复。
+3. 完整事务的同 key 并发只安装一次、等待者/所有者取消、取消后不晚到spawn、不留ready/临时/egress，安装失败不发布/瞬时仅重试一次、精确egress归因与进度订阅仍缺总入口命名回归/移除臂。当前代码已组合KeyedMutex/Scope/retry，primitive证据不能替代这些分支。修正探针记录器后的冷MCP整链也须补一次，沿已缓存原件，不需重复下载大包。
+4. Windows trampoline只依据实际 pinned UV resource源码适配，未经Windows执行；正式Windows证明仍在正式包验收层。
+
+**#1759 合入后的生产工作，接口已准确固定**：最后只读复核 HEAD ef8a1ce8b4441aeeb12cc3a5cc0843ad43c1682f。R1 `process-fence-profile.ts` 的 resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations 仅候选；消费 `process-fence-plan.ts` planPackageManagerCaches(input: PackageManagerLocationInput & { truthPath:string; eligibility:WorkspaceDirectoryInput }) 同次绑定的 env/cacheEnv/rules/locations/excluded。R2 `shared/package-manager-environment.ts` 的 installPackageManagerEnvironment(value:unknown,pull?:()=>Promise<PackageManagerEnvironment>)、packageManagerEnvironment()、refreshPackageManagerEnvironment()、projectPackageManagerEnvironment<T>(source:Readonly<Record<string,T>>|undefined)、createPackageManagerEnvironmentRequester(post,initial) signatures 与前表一致；最终spawn消费R2，不自行投影候选位置。按前组装表接：mandatory bootstrap.launchers及校验；main assets/唯一下载Host；sidecar发布Host→index/Slot/localLaunch；Node boot重锚；当前identity/代的controller/状态/diagnostic/retry；bindDocumentRuntime→runtime.retry()；renderer root；再完成正式Mac/Win包真机器AC。没有“#1759一合入本票自动完成”的假设。
+
+偏离/规模：初始表以外的 util共享命令owner、main两个re-export及npm解码隐私错误，均为同一调用链必要项，理由见上一节；相对r7共14文件、约1018增37删（本收据另计），没有依赖/迁移/新配置。时间核对2026-11-26T23:18Z，起始约97分钟，原预期90分钟；独立余项未完成，返回PARTIAL而非DONE-INDEPENDENT。遗留去向：上述独立余项→#1760续接；生产装配→#1759合入后本票；Office compileall→documents已路由，准确原命令/exit1/stderr空继承r4记录，本轮未碰；既有仓级docs结果→文档治理。OPTIONAL：无。

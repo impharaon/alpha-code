@@ -79,8 +79,9 @@ Document JavaScript libraries docx 9.16.0 and PptxGenJS 4.0.1, and their locked
 dependencies, retain their original LICENSE/NOTICE files in
 document-assets/node_modules/. The asset inventory records shipped hashes.
 
-Noto Sans SC and Noto Serif SC, Copyright the Noto Project Authors, are licensed
-under SIL Open Font License 1.1. Full licences, copyrights, fixed source identity
+Noto Sans SC: © 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name
+'Source'. Noto Serif SC: © 2017-2024 Adobe (http://www.adobe.com/). Both are
+licensed under SIL Open Font License 1.1. Full licences, copyrights, fixed source identity
 and Code Puppy static-font modification details ship in document-assets/licenses/.
 Chinese Office templates are application-authored; their source/version are
 recorded in each template's custom properties.

@@ -602,3 +602,5 @@ A9 missing-pin green：构造不抛、query 返回真实 unknown failed，未访
 A9 published-repair green：原两项 runtime 断言不变，文件 19 PASS（A9-runtime-green.log）。仅已发布目录验证失败时丢弃并从同 pin 重提取一次；新 candidate 再失败即 failed，不循环。
 
 A7 原生材料确认及 red：一次 fontTools TTFont 读取四份随包实际 TTF 的 nameID 0（缓存中已有 FontTools，无安装/下载），Sans 两字重为“© 2014-2021 Adobe ... Reserved Font Name Source”，Serif 为“© 2017-2024 Adobe ...”；`font-copyright.txt` 保存输出。对 NOTICE 的 holder 一次性核对断言失败（缺 Adobe）；文档证据不新增正文措辞单元测试。下一提交用实际 copyright holder/年份替换 Noto Project Authors。
+
+A7 green：NOTICE 保留实际四个 nameID 0 的完整 copyright 文本（包含 Sans 的 RFN 原文），一次性 fontTools 对照 4/4 PASS（A7-green.log），OFL 文件不改。

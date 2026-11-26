@@ -481,3 +481,18 @@ test("monitor declarations merge portable and provider manifests by source name"
     expect(entries.find(entry => entry.sourceName === "portable-monitor")).toMatchObject({ sourcePath: "plugin.json" })
   }
 })
+
+
+test("real skill bodies retain shell environment expressions byte for byte except package bindings", async () => {
+  const { renderPluginText } = await import("./plugin-package")
+  const capture = await captureStandardFixture("codex:build-ios-apps")
+  const converted = await (await converter()).convertPluginTree(capture)
+  for (const path of ["skills/ios-ettrace-performance/SKILL.md", "skills/ios-memgraph-leaks/SKILL.md"]) {
+    const source = new TextDecoder().decode(await capture.readFile(path))
+    const entry = converted.package.entries.find(entry => entry.kind === "skill" && entry.sourcePath === path)!
+    if (entry.kind !== "skill") throw Error("real skill missing")
+    const bindings = { pluginRoot: "/package root", skillDir: "/skill dir", projectDir: "/project dir", pluginData: "/package data", resolveEnvironment: () => "MUST_REMAIN_SOURCE" }
+    const expected = source.replaceAll("${CLAUDE_PLUGIN_ROOT}", bindings.pluginRoot).replaceAll("${PLUGIN_ROOT}", bindings.pluginRoot).replaceAll("${CLAUDE_SKILL_DIR}", bindings.skillDir).replaceAll("${CLAUDE_PROJECT_DIR}", bindings.projectDir).replaceAll("${CLAUDE_PLUGIN_DATA}", bindings.pluginData).replaceAll("${PLUGIN_DATA}", bindings.pluginData)
+    expect(renderPluginText(entry.instruction, bindings)).toBe(expected)
+  }
+})

@@ -1,3 +1,5 @@
+import { requestSidecarStop } from "./sidecar-stop"
+import { createPluginSessionRequester } from "./plugin-session-lifecycle"
 import type { CodePuppySidecarHost } from "./hub-view"
 import { engineClient } from "./engine-client"
 import { configurePluginMcpProxy, attachPluginMcpProxyPublisher, pluginMcpProxySnapshot } from "./plugin-mcp-proxy"
@@ -52,7 +54,6 @@ import { isEphemeralLocalServerUrl } from "../shared/ephemeral-server-url"
 import { ensureEngineScratchCwd } from "./engine-scratch-cwd"
 import { markStartupTimeline } from "./startup-timeline"
 import { codepuppyUserWorkspaceDir } from "./codepuppy-user-workspace"
-import { SIDECAR_STOP_COMMAND } from "./sidecar-stop"
 import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
@@ -123,7 +124,6 @@ export type SidecarListener = {
 
 const SIDECAR_SERVICE_NAME = "opencode server"
 const SIDECAR_START_STALL_TIMEOUT = 60_000
-const SIDECAR_STOP_TIMEOUT = 6_000
 
 type SpawnLocalServerOptions = {
   userDataPath: string
@@ -766,6 +766,7 @@ export async function spawnLocalServer(
     return grant
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
+  const packageSessions = createPluginSessionRequester(message => child.postMessage(message))
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
   let credentialRespawnRequested = false
@@ -783,6 +784,7 @@ export async function spawnLocalServer(
   // SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.5):ext 的工具策略改写由 main 写进这一代 sidecar 环境算出的数据目录(ext 读的同一处),写完再回复
   const toolPolicyBaseDir = defaultPolicyBaseDir(dataDir)
   child.on("message", (message: unknown) => {
+    if (packageSessions.receive(message)) return
     if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
     if (writeGrants.receive(message)) return
@@ -822,6 +824,7 @@ export async function spawnLocalServer(
     if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
     exited = true
     electronNs.app.off("child-process-gone", onProcessGone)
+    packageSessions.close()
     projectConfigViews.close()
     writeProbes.close(`sidecar exited with code ${code}`)
     writeGrants.close(`sidecar exited with code ${code}`)
@@ -955,13 +958,7 @@ export async function spawnLocalServer(
       stop: () => {
         if (stopping) return stopping
         if (exited) return Promise.resolve()
-        child.postMessage(SIDECAR_STOP_COMMAND)
-        stopping = Promise.race([
-          exit.promise.then(() => undefined),
-          delay(SIDECAR_STOP_TIMEOUT).then(() => {
-            if (!exited) child.kill()
-          }),
-        ])
+        stopping = requestSidecarStop(child, exit.promise)
         return stopping
       },
   }

@@ -2310,11 +2310,11 @@
         "ADR-029",
         "ADR-047"
       ],
-      "lane": "#1776 slice 5, r12",
+      "lane": "#1776 slice 5, r18",
       "takeovers": [],
       "mechanism": {
         "file": "packages/ext/src/plugin-package-hooks.ts",
-        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover. S-03/S-07 private main parentPort SessionEnd receiver awaits the actual Session Location runner and the MCP owner before replying; Cleanup awaits active lifetimes. Main navigation senders remain separate pending S-03 wiring."
+        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover. S-03/S-07 private main parentPort SessionEnd receiver awaits the actual Session Location runner and the MCP owner before replying; Cleanup awaits active lifetimes. Main router/navigation/delete and logout send the fixed private message; main stop waits for known viewed Sessions before its existing stop budget, and before-quit awaits stopSidecars. The view map owns only renderer view facts, not Session epochs or process lifetimes."
       },
       "tests": [
         {
@@ -2376,6 +2376,22 @@
         {
           "file": "packages/ext/src/hub-bridge.test.ts",
           "name": "private package SessionEnd awaits the owning Location and replies only after cleanup"
+        },
+        {
+          "file": "packages/ui-mac/src/renderer/sidebar/shell-commands.test.ts",
+          "name": "leaving a real local Session waits for the main SessionEnd acknowledgement before router release"
+        },
+        {
+          "file": "packages/ui-mac/src/main/hub-view.test.ts",
+          "name": "plugin SessionEnd requester awaits the real receiver reply and rejects a dead generation"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
+          "name": "main waits for SessionEnd acknowledgements before sending the sidecar stop command"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
+          "name": "without a viewed Session main posts stop immediately and waits for the real child exit"
         }
       ]
     },

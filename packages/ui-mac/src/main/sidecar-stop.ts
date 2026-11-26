@@ -1,3 +1,4 @@
+import { endViewedPluginSessions } from "./plugin-session-lifecycle"
 // #858 —— main 与 sidecar 之间「怎么停」的唯一形状。
 //
 // main 用 `SIDECAR_STOP_COMMAND` 写,sidecar 用 `parseSidecarStopCommand` 读、用 `stopSidecarEngine` 执行。
@@ -36,4 +37,23 @@ export async function stopSidecarEngine(engine: StoppableEngine | undefined) {
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** Main's existing six-second fallback starts only after the awaited SessionEnd barrier. */
+export async function requestSidecarStop(
+  child: { postMessage(command: SidecarStopCommand): void; kill(): unknown },
+  exit: Promise<unknown>,
+) {
+  let exited = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const closed = exit.then(() => { exited = true })
+  const ending = endViewedPluginSessions("other")
+  if (ending) await ending
+  if (exited) return
+  child.postMessage(SIDECAR_STOP_COMMAND)
+  try {
+    await Promise.race([closed, new Promise<void>(resolve => {
+      timer = setTimeout(() => { if (!exited) child.kill(); resolve() }, SIDECAR_DRAIN_TIMEOUT_MS + 1000)
+    })])
+  } finally { clearTimeout(timer) }
 }

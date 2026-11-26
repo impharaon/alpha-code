@@ -70,9 +70,9 @@ export async function dispatchVideoUpload(input: {
         input.signal.throwIfAborted()
         bytes += block.length
         digest.update(block)
-        await input.progress(bytes)
         if (bytes > input.clip.bytes) throw new Error("snapshot-changed")
         yield block
+        await input.progress(bytes)
       }
       const after = await handle.stat({ bigint: true })
       if (

@@ -215,9 +215,11 @@ PLAN 阶段暂无；r3 实施的必要文件接线、测试层级调整和待组
 ## D3 按需组件、固定文件与分发
 
 - 依据：impharaon/alpha-work:SPEC-video-understanding v1 @ `25afeda6285b66b3de9d83531fa2e5a6cafa468f`，AC-15/18 及 AC-01/04/09/14/16/17 的组件与分发段；视频设计 §4.2/§5/§6 D3/§10 @ `870002ed698f1a83efa9d6ecb359ea5a0d0d41af`；本仓 launcher 设计 `VIDEO-L1-v2`、`FIRST-PARTY-NODE-v2.1` @ `a586b16fca`；固定文件设计 L2 @ impharaon/alpha-work `982e258` 的 `docs/specs/domestic-cloud-connectivity/design.md` §4.11/§10；#1775 r4 续派。
-- 核对：待确认下述缓存根的消费者接缝后实施。r4 已接受 D1+D2 `54ce411e2a..768649a187` 与收据 `b41df39997`（Claude Opus 5.5）；继承 270+39 PASS、七臂删除对照，不重复验收已接受范围。
+- 核对：Phase: IMPLEMENT D3 — #1775 r5 · Claude Opus 5.5（orchestrator）续派，消费 `FIRST-PARTY-CACHE-v2.2` @ `9757157380`：专用 argv 槽交付同代宿主派生的稳定服务缓存根；#1760 expander 未实施的集成断言 pending。r4 已接受 D1+D2 `54ce411e2a..768649a187` 与收据 `b41df39997`；继承其证据，不重复验收。
 
 ### 计划发现的输入缺口
+
+下述为 r4 的历史取证与返回；r5 已由本仓 launcher design v2.2 `FIRST-PARTY-CACHE-v2.2` @ `9757157380` 选择专用槽并结束该问题。D3 只给模板增加 `--cache-root`/`{codepuppyCacheRoot}`，调用同一展开器传受保护条目 ID `video`，实际 Node 入口读 argv 原值；不派生应用路径或实现 expander/matcher。
 
 **问题仅为宿主路径如何合法送达独立视频进程，不是 #1760 handler 尚未实现。** 已冻结的 L1 方法可以直接编码为消费端并把集成留 pending；但是它没有提供持久媒体缓存根，当前也没有其它已决定的外部进程读取面：
 
@@ -302,6 +304,22 @@ Node/uv、Python 的 pin 仍归 #1760；两平台 native/helper 与 yt-dlp 2026.
 2026-11-26 · r4 允许计划后同轮实施，也明确「计划发现冻结设计未定的决定则停止并返回 PLAN-READY」。本轮在真实 server 的 cacheRoot 注入处发现上述一个契约缺口，完成计划后停止；只修改本节，不改冻结设计/其它仓/应用实现，没有生成虚假 pin、构建或测量结果。推荐与替代的载体都交原设计确认，不在此冻结新契约。
 
 本轮收据：Codex / GPT-6，核对 D3 计划与上述固定输入、真实 stdio/spawn/bootstrap 读取面；结论为计划已备、路径交付接缝待原设计确认。通过原 alpha profile 调 canonical `check_docs_contract.check_repo(本 worktree, "impharaon/alpha-code", profile.coordination_repo, profile.project.url, "HEAD")`：本文件 0 finding；仓级 69 errors / 253 warnings，继承既有基线，不顺修。`git diff --check` exit 0。D3 行为测试 PASS 计数与删除对照均为未执行；本轮没有下载组件/新增实际 pin，没有把 D1/D2 证据计入 D3。遗留只交回原设计的缓存根消费面，其余计划待该输入确认后原顺序执行。
+
+### r5 实施接收与首批实物记录
+
+`FIRST-PARTY-CACHE-v2.2` @ `9757157380` 已用 git show 读取，未 merge/rebase。消费者给同一模板增加专用缓存 argv，并把受保护 declarationId `video` 交原 expander；服务从实际 argv 读入 cacheRoot，不建立应用路径推导。L1 消费端只发 ids 与原调用 call/deadline 元数据，嵌套请求使用同一 signal/剩余预算，不使用独立短超时；准备后继续原 Promise，磁盘/取消/完整性分类分别保留。#1760 真 expander/声明/handler 仍为集成 pending。
+
+首批五个原厂模型已在临时目录通过原地址实际下载、完整 SHA-256/长度及归档成员核对，未调用推理，未复制 pilot 模型。下面是实际交付压缩字节，总计 **326403804 B**；它尚不包含 ffmpeg/Windows OCR，不能单独证明 AC-15。唯一运行期记录落在 resources/pinned-files.json，配方只引用 ID/成员；原厂 mutable tag 不作为字节身份。
+
+| ID | bytes | SHA-256 |
+| --- | ---: | --- |
+| speech-model/any/whisper-tiny-lid | 116204861 | `c46116994e539aa165266d96b325252728429c12535eb9d8b6a2b10f129e66b1` |
+| speech-model/any/silero-vad | 643854 | `9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6` |
+| speech-model/any/sensevoice-2024-07-17-int8 | 163002883 | `7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e` |
+| speech-model/any/pyannote-segmentation-3-0 | 6958444 | `24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488` |
+| speech-model/any/3dspeaker-eres2net-base | 39593762 | `f1ee61be04000b50392a63442e5dd9feaea7e81dddd494d3647cf1c3d88a1498` |
+
+实际 SenseVoice 归档的 LICENSE 只有 71 B 的原厂链接，不能当成许可全文。已沿模型卡明确的 FunASR MODEL_LICENSE 取得全文，署名保留 FunASR/Alibaba，原文入 resources/video-runtime/licenses/SenseVoiceSmall.txt；pyannote LICENSE 直接取本次原厂归档。其余许可闭包、构建产物、完整 pin 与结果核对随下个实施单元补齐。
 
 ## D4 处理进度与帧的模型投影
 

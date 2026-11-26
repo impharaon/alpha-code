@@ -417,12 +417,14 @@
       "command": [
         "{codepuppyNode}",
         "{codepuppyResources}/video-mcp/server.js",
-        "{workspace}"
+        "{workspace}",
+        "--cache-root",
+        "{codepuppyCacheRoot}"
       ],
       "environment": {},
       "cwd": null,
       "codeSha256": {
-        "video-mcp/server.js": "70170392f8e1fa4125036520ff787533d59609434e8aadb4f256341ab7db944f",
+        "video-mcp/server.js": "41683e3a14bcac7da371b1906e723c3f38179c4142ec297e6a80aed75c343953",
         "video-mcp/speech-worker.js": "c20d7540754a96d108d187aa587e8981eca13f85e183893f645e462ae167dae8"
       },
       "tools": [
@@ -1804,6 +1806,85 @@
             ],
             "additionalProperties": false
           }
+        }
+      ],
+      "recipe": [
+        {
+          "id": "speech-model/any/sensevoice-2024-07-17-int8",
+          "archive": "tar.bz2",
+          "entry": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+          "required": [
+            "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+            "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx",
+            "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/tokens.txt"
+          ]
+        },
+        {
+          "id": "speech-model/any/whisper-tiny-lid",
+          "archive": "tar.bz2",
+          "entry": "sherpa-onnx-whisper-tiny",
+          "required": [
+            "sherpa-onnx-whisper-tiny",
+            "sherpa-onnx-whisper-tiny/tiny-encoder.int8.onnx",
+            "sherpa-onnx-whisper-tiny/tiny-decoder.int8.onnx"
+          ]
+        },
+        {
+          "id": "speech-model/any/silero-vad",
+          "archive": "file",
+          "entry": "silero_vad.onnx",
+          "required": [
+            "silero_vad.onnx"
+          ]
+        },
+        {
+          "id": "speech-model/any/pyannote-segmentation-3-0",
+          "archive": "tar.bz2",
+          "entry": "sherpa-onnx-pyannote-segmentation-3-0",
+          "required": [
+            "sherpa-onnx-pyannote-segmentation-3-0",
+            "sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx"
+          ]
+        },
+        {
+          "id": "speech-model/any/3dspeaker-eres2net-base",
+          "archive": "file",
+          "entry": "embedding.onnx",
+          "required": [
+            "embedding.onnx"
+          ]
+        },
+        {
+          "id": "speech-model/any/whisper-turbo-q5",
+          "archive": "file",
+          "entry": "ggml-large-v3-turbo-q5_0.bin",
+          "required": [
+            "ggml-large-v3-turbo-q5_0.bin"
+          ]
+        },
+        {
+          "id": "ffmpeg/darwin-arm64/9.1-openh264-2.7.0",
+          "archive": "tar.gz",
+          "entry": "ffmpeg",
+          "required": [
+            "ffmpeg",
+            "ffmpeg/bin/ffmpeg",
+            "ffmpeg/bin/ffprobe",
+            "ffmpeg/licenses/LGPL-2.1.txt",
+            "ffmpeg/licenses/OpenH264.txt"
+          ]
+        },
+        {
+          "id": "ffmpeg/win32-x64/9.1-openh264-2.7.0",
+          "archive": "tar.gz",
+          "entry": "ffmpeg",
+          "required": [
+            "ffmpeg",
+            "ffmpeg/bin/ffmpeg.exe",
+            "ffmpeg/bin/ffprobe.exe",
+            "ffmpeg/licenses/LGPL-2.1.txt",
+            "ffmpeg/licenses/OpenH264.txt"
+          ]
         }
       ]
     }

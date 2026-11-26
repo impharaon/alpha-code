@@ -15,7 +15,8 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { videoToolDefinitions } from "../resources/video-mcp/contracts"
-import { VIDEO_SERVICE_COMMAND } from "../src/shared/video-service"
+import { videoRecipes } from "../resources/video-mcp/asset-recipes"
+import { VIDEO_DECLARATION_ID, VIDEO_SERVICE_COMMAND } from "../src/shared/video-service"
 import { CODEPUPPY_OFFICE_CONNECTORS, codepuppyOfficeInstallCommand } from "../src/shared/office-advisories"
 
 const OFFICE_MCP_DIR = join(import.meta.dir, "..", "resources", "office-mcp")
@@ -51,7 +52,7 @@ export function renderOfficeMcpTools(
     formats: Object.fromEntries([
       ...formats.map((format) => [format, { command: codepuppyOfficeInstallCommand(format), tools: tools[format] }]),
       [
-        "video",
+        VIDEO_DECLARATION_ID,
         {
           command: VIDEO_SERVICE_COMMAND,
           environment: {},
@@ -65,6 +66,7 @@ export function renderOfficeMcpTools(
             ]),
           ),
           tools: videoToolDefinitions(),
+          recipe: videoRecipes,
         },
       ],
     ]),

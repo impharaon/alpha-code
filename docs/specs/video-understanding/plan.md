@@ -241,3 +241,22 @@ last_reviewed: 2026-11-26
 新增 `speech-worker.ts`：同一独立服务内的原生推理 worker，避免同步 diarization/ASR 阻塞 MCP 的取消；这是 audio.ts 的必要执行文件，不增加宿主执行入口。冻结的 sherpa 2.0.3 与 Whisper 1.1.3 以 `bun install --ignore-scripts` 锁定，未运行 postinstall/下载模型；原生库的随包构建仍归 D3。完整样本域切块、tiny LID 分路、实际 token/segment 时间、整轨说话人稳定标签、完成 chunk 的持久恢复和搜索已接入；重叠说话保留未知，不删除文字。私有 `runtime.recipe` 由准备者提供算法与该平台实际 pin/随包资产摘要的指纹，不能用版本标签代替。
 
 补充 source/probe 的前后 identity 复核、发布值/引用文件摘要、新进程读取、取消锁等待者与流式子进程失败清理。新增 `video-process.test.ts` 是字节传输/取消的真实子进程用例，不模拟编解码器；`video-transcript.test.ts` 因实际写缓存而使用文件系统层命名，代替计划中的 `.fast.test.ts`。命令 `bun test src/main/video-contracts.fast.test.ts src/main/video-source.test.ts src/main/video-cache.test.ts src/main/video-process.test.ts src/main/video-audio.fast.test.ts src/main/video-transcript.test.ts src/main/video-search.fast.test.ts`：13 pass / 0 fail，50 assertions。缓存投影数据为本机内部 schema，未冒充 sherpa/ffprobe 回执。真实模型的 AC-03/04/05 与对照评分、长片性能仍 pending；没有用 pilot 模型绕过 pin。
+
+### r3 D2 画面、输出与工具实施记录
+
+新增 frames/OCR、Vision helper 源码、精确 clip/GIF、项目导出、网站与 understand 内部准备；同一源时间/缓存结果接 info/transcript/frames/search/export/clip/gif/download。工具入参严格校验，返回经过同一 output schema，frames 按原顺序携带真实图片与 OCR/时间；内部 prepare 未冒充 understand 最终答案。组件、缓存根、资产指纹和策略代理只来自可信私有运行上下文，尚无 D3 准备者时返回 typed 未就绪。服务器将原调用取消与本机进度接入 MCP；D4 的 metadata/模型投影另验。Node native addon 由 D3 随包提供，不运行时安装。
+
+`bun test src/main/video-service.test.ts src/main/video-tools.test.ts src/main/video-frames.test.ts src/main/video-export.test.ts src/main/office-mcp-tools-snapshot.test.ts`：10 pass / 0 fail，53 assertions；含实际 SDK stdio 子进程发现/未就绪调用、缓存工具往返、源时间选帧算法、独立字幕时间解析、产物存在/冲突/逃逸与软链。stdio 用测试进程 Bun 检查 wire/build，不宣称已验证 launcher Node。移开自身忽略的 dist-video 后，原 snapshot 因 ENOENT 为红；改为在临时目录构建服务/worker再重新生成清单，两个 snapshot 转绿，干净检出无需预存构建结果。
+
+必要同链同步：`scripts/build-video-mcp.ts` 构建 worker，清单同一 `codeSha256` 登记两个 JS；`office-mcp-tools-snapshot.test.ts` 消费临时构建路径；`scripts/old-name-exceptions.tsv` 仅把已存在的两处词元登记移动到提取后的 owner。扫描初测为 41 pass / 2 fail（新位置未登记/旧位置处数失效）；修正后与 snapshot 合跑 12 pass / 0 fail。没有删除或放宽守卫。
+
+`scripts/verify-video.ts` 已提供真实结果的质量/说话人离线评分入口：校验实物/原文/实际结果 SHA-256 与 sourceId、两臂与固定 20 句、时长门槛、时长计说话人一致映射，输出计算口径及实际分数；不接受旧分数作为输入。当前标准化明确为 NFKC/小写、中文字符和字母数字词、英文保留词内撇号；尚未取得完整固定验收样本，不声称 pilot 的归一化分数可直接比较。`bun build ./scripts/verify-video.ts --target=bun --outfile=/tmp/codepuppy-video-verifier-r3.js` exit 0。性能/安装包/出网/网站/播放器一次性测量入口须随 D3 的实际准备上下文及样本接线，不能用不受 pin authority 管理的路径补成可运行的假验证。
+
+| 本片 AC 证据边界 | 当前状态 / 遗留去向 |
+| --- | --- |
+| AC-01/03/04/05/08/09 | schema、完整覆盖/真实时间算法、稳定说话人投影、检索、持久结果/新进程/取消等待者已有轻量证据；真实中文/英文/法语、20 句标注、两人五轮、首次性能、真引擎回答与缓存 10 秒仍待 D3 准备后原 AC 实测 |
+| AC-06/07 | 时点/scene 首帧/顺序算法及 Mac/Windows OCR producer 源码已落地；固定六页/真实 PTS、实际 helper/TSV 回执与只在画面数字尚未取得，对应 OCR/实际帧集成测试文件暂不创建，交 D3/D4 接线验收 |
+| AC-10/12/13 本机段 | 字幕解析/输出/源保护与内部片段准备代码已落地；真实 LGPL+OpenH264/AAC、GIF 解码与系统播放、prepare 实物摘要/范围仍待 pinned 编码产物，不用参数断言替代 |
+| AC-11/14/16/17 | 网站 argv/代理与 typed 失败、取消/空间 errno、缓存及源变化边界已落地；真实 yt-dlp 本机站点/公开 URL、坏媒体/不支持格式的实际 probe、隔离空间不足、断网/出网与 Windows 包仍 pending；已有 WAV 为唯一新增媒体夹具，不声称其它夹具已取得 |
+
+以上是已接受「没有已准备组件时只验证独立模块、实物断言 pending」的实施边界，未更改冻结设计/AC。真正的安装包、质量与平台答案不由源码存在推断通过。

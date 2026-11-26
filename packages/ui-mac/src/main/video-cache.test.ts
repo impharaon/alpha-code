@@ -14,7 +14,7 @@ test("published media results require complete files and matching content digest
   await writeFile(output, "a complete local transcript export")
   await publish(manifest, { segments: [] }, [output])
   expect(await readPublished(manifest)).toEqual({ segments: [] })
-  await writeFile(output, "different bytes")
+  await writeFile(output, "a complete LOCAL transcript export")
   expect(await readPublished(manifest)).toBeUndefined()
   await writeFile(manifest, '{"unfinished":')
   expect(await readPublished(manifest)).toBeUndefined()

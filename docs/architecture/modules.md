@@ -48,7 +48,7 @@ review_after: 2027-05-09
 | `packages/stats/` | 上游统计工具 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/stats/) |
 | `packages/storybook/` | 上游 UI 展示 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/storybook/package.json) |
 | `packages/tui/` | 上游终端界面 | `core`, `plugin`, `ui` | 见架构约束 | [入口](../../packages/tui/package.json) |
-| `packages/ui-mac/` | Code Puppy Electron 宿主、桌面 IPC 和产品界面；`resources/video-mcp/` 为独立 Node 本机媒体服务，组件与身份消费启动器 authority | `codepuppy-contracts-consumer` | 渲染进程不得直接依赖 main 私有模块 | [入口](../../packages/ui-mac/package.json) |
+| `packages/ui-mac/` | Code Puppy Electron 宿主、桌面 IPC 和产品界面；`resources/video-mcp/` 为独立 Node 本机媒体服务，组件与身份消费启动器 authority；`src/shared/project-artifact-path.ts` 拥有产物路径/命名，`project-directory-identity.ts` 拥有 ext 与媒体服务复用的只读项目身份 | `codepuppy-contracts-consumer`；本机服务仅消费共享路径与准备后的组件，不能依赖 main | 渲染进程不得直接依赖 main 私有模块 | [入口](../../packages/ui-mac/package.json) |
 | `packages/ui/` | 上游共用 UI 组件 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/ui/package.json) |
 | `packages/web/` | 上游 Web 应用 | 无已核实的同仓清单依赖 | 见架构约束 | [入口](../../packages/web/package.json) |
 | `bin` | 本地辅助入口 | 见入口 | 见架构约束 | [入口](../../bin/) |

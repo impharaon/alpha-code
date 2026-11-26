@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test"
 import { mkdtemp, copyFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { sourceOf, requireRange } from "../../resources/video-mcp/source"
+import { sourceOf, requireRange, sourceFile } from "../../resources/video-mcp/source"
 import { fail, type VideoRuntime } from "../../resources/video-mcp/runtime"
 
 const root = await mkdtemp(path.join(tmpdir(), "video-source-"))
@@ -18,6 +18,7 @@ test("source identity hashes real media once, reconciles paths and detects a cha
   expect((await sourceOf({ kind: "path", path: other }, runtime)).sourceId).toBe(source.sourceId)
   expect((await sourceOf({ kind: "id", id: source.sourceId }, runtime)).bytes).toBe(source.bytes)
   await writeFile(first, "changed local file; this is not a fabricated media container")
+  await expect(sourceFile(source)).rejects.toThrow("changed since it was opened")
   expect((await sourceOf({ kind: "path", path: first }, runtime)).sourceId).not.toBe(source.sourceId)
 })
 

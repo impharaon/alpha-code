@@ -35,19 +35,39 @@ print(json.dumps({name: server.tools_for(name) for name in formats}))
 `
 
 /** 由 `server` 的 tools_for() 渲染清单全文(不写盘)。 */
-export function renderOfficeMcpTools(server: string = OFFICE_MCP_SERVER): string {
+export function renderOfficeMcpTools(
+  server: string = OFFICE_MCP_SERVER,
+  videoRoot = join(OFFICE_MCP_DIR, "../../dist-video"),
+): string {
   const formats = CODEPUPPY_OFFICE_CONNECTORS.map((connector) => connector.format)
   const python = Bun.which("python3")
   if (!python) throw new Error("gen-office-mcp-tools: python3 is not on PATH (needed to load server.py's tools_for)")
   const run = Bun.spawnSync([python, "-I", "-B", "-c", EXPORT_TOOLS, server, ...formats], { stderr: "pipe" })
-  if (run.exitCode !== 0) throw new Error(`gen-office-mcp-tools: ${python} exited ${run.exitCode}: ${run.stderr.toString()}`)
+  if (run.exitCode !== 0)
+    throw new Error(`gen-office-mcp-tools: ${python} exited ${run.exitCode}: ${run.stderr.toString()}`)
   const tools = JSON.parse(run.stdout.toString()) as Record<string, unknown[]>
   const manifest = {
     serverSha256: createHash("sha256").update(readFileSync(server)).digest("hex"),
-    formats: Object.fromEntries(
-      [...formats.map((format) => [format, { command: codepuppyOfficeInstallCommand(format), tools: tools[format] }]),
-        ["video", { command: VIDEO_SERVICE_COMMAND, environment: {}, cwd: null, codeSha256: { "video-mcp/server.js": createHash("sha256").update(readFileSync(join(OFFICE_MCP_DIR, "../../dist-video/server.js"))).digest("hex") }, tools: videoToolDefinitions() }]],
-    ),
+    formats: Object.fromEntries([
+      ...formats.map((format) => [format, { command: codepuppyOfficeInstallCommand(format), tools: tools[format] }]),
+      [
+        "video",
+        {
+          command: VIDEO_SERVICE_COMMAND,
+          environment: {},
+          cwd: null,
+          codeSha256: Object.fromEntries(
+            ["server.js", "speech-worker.js"].map((name) => [
+              `video-mcp/${name}`,
+              createHash("sha256")
+                .update(readFileSync(join(videoRoot, name)))
+                .digest("hex"),
+            ]),
+          ),
+          tools: videoToolDefinitions(),
+        },
+      ],
+    ]),
   }
   return `${JSON.stringify(manifest, null, 2)}\n`
 }

@@ -422,7 +422,8 @@
       "environment": {},
       "cwd": null,
       "codeSha256": {
-        "video-mcp/server.js": "83d6a96e40148a7504a0bcfc71b6b8a739f422bb07660b6125faf4bedd93f325"
+        "video-mcp/server.js": "70170392f8e1fa4125036520ff787533d59609434e8aadb4f256341ab7db944f",
+        "video-mcp/speech-worker.js": "c20d7540754a96d108d187aa587e8981eca13f85e183893f645e462ae167dae8"
       },
       "tools": [
         {

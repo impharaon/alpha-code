@@ -21,8 +21,9 @@ import {
 } from "../../ui-mac/src/shared/attachment-path"
 import { ATTACHMENT_METADATA_KEY, stagedAttachmentOf } from "../../ui-mac/src/shared/attachment-path"
 import { mcpEngineToolId } from "./cloud-websearch-kill"
-import { STAGED_ATTACHMENT_PART_NAME } from "./staged-attachment-part"
-import { ATTACHMENT_READ_ID, attachmentUnavailableId, renderTemplate, renderWrapper } from "./context-injection"
+import { MEDIA_METADATA_KEY, VIDEO_MCP_NAME, mediaAttachmentOf, type MediaAttachment } from "../../ui-mac/src/shared/media-attachment"
+import { MEDIA_ATTACHMENT_PART_NAME, STAGED_ATTACHMENT_PART_NAME } from "./staged-attachment-part"
+import { MEDIA_READ_ID, MEDIA_UNAVAILABLE_ID, ATTACHMENT_READ_ID, attachmentUnavailableId, renderTemplate, renderWrapper } from "./context-injection"
 
 /** 一条附件的指令文字。`services` 缺席 = 状态读不到:不替读取工具下「不可用」的结论,照常叫模型去读。 */
 export function attachmentInstruction(meta: StagedAttachmentMeta, directory: string, services: Readonly<Record<string, unknown>> | undefined): string {
@@ -52,6 +53,26 @@ export function stagedAttachmentOfText(text: string): StagedAttachmentMeta | und
   }
 }
 
+
+export function mediaInstruction(meta: MediaAttachment, services: Readonly<Record<string, unknown>> | undefined): string {
+  const status = services ? (services[VIDEO_MCP_NAME] as { status?: unknown } | undefined)?.status ?? "absent" : undefined
+  return renderWrapper(status !== undefined && status !== "connected" && status !== "pending" ? MEDIA_UNAVAILABLE_ID : MEDIA_READ_ID, {
+    label: `${mcpEngineToolId(VIDEO_MCP_NAME, "info")} / ${mcpEngineToolId(VIDEO_MCP_NAME, "transcript")}`,
+    body: JSON.stringify({ kind: "path", path: meta.path }),
+  })
+}
+
+export function mediaAttachmentOfText(text: string): MediaAttachment | undefined {
+  const body = text.replace(/^\n+/, "")
+  const split = body.indexOf("\n\n")
+  if (split < 0 || body.slice(0, split) !== `Attached file: ${MEDIA_ATTACHMENT_PART_NAME}`) return undefined
+  try {
+    return mediaAttachmentOf({ [MEDIA_METADATA_KEY]: JSON.parse(body.slice(split + 2)) })
+  } catch {
+    return undefined
+  }
+}
+
 type MessageLike = { role?: unknown; content?: unknown; constructor: new (fields: Record<string, unknown>) => unknown }
 
 export type AttachmentReaderHookDeps = {
@@ -67,13 +88,13 @@ export function createAttachmentReaderHooks(deps: AttachmentReaderHookDeps) {
     /** I11':只在这次请求的副本里把暂存附件部件换成读取指令。绝不抛(抛出会打死这次请求)。 */
     async context(event: { messages: unknown[] }): Promise<void> {
       try {
-        const hits: Array<{ message: number; part: number; meta: StagedAttachmentMeta }> = []
+        const hits: Array<{ message: number; part: number; meta: StagedAttachmentMeta | MediaAttachment }> = []
         event.messages.forEach((raw, m) => {
           const message = raw as MessageLike
           if (message.role !== "user" || !Array.isArray(message.content)) return
           message.content.forEach((value, p) => {
             const part = value as { type?: unknown; text?: unknown }
-            const meta = part.type === "text" && typeof part.text === "string" ? stagedAttachmentOfText(part.text) : undefined
+            const meta = part.type === "text" && typeof part.text === "string" ? (stagedAttachmentOfText(part.text) ?? mediaAttachmentOfText(part.text)) : undefined
             if (meta) hits.push({ message: m, part: p, meta })
           })
         })
@@ -87,7 +108,7 @@ export function createAttachmentReaderHooks(deps: AttachmentReaderHookDeps) {
         const replaced = new Map<number, unknown[]>()
         for (const hit of hits) {
           const content = [...(replaced.get(hit.message) ?? ((event.messages[hit.message] as MessageLike).content as unknown[]))]
-          content[hit.part] = { type: "text", text: attachmentInstruction(hit.meta, deps.directory, services) }
+          content[hit.part] = { type: "text", text: "reader" in hit.meta ? attachmentInstruction(hit.meta, deps.directory, services) : mediaInstruction(hit.meta, services) }
           replaced.set(hit.message, content)
         }
         for (const [index, content] of replaced) {

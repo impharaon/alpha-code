@@ -20,6 +20,8 @@ import { dict as zh } from "../i18n/zh"
 import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
 
 type Runtime = {
+  VideoUploadDialog: typeof import("./video-upload-dialog").VideoUploadDialog
+  publishActiveSessionIdentity: typeof import("../codepuppy-ui/active-session-directory").publishActiveSessionIdentity
   createComponent: typeof createComponent
   createRoot: typeof createRoot
   createInstallConfirm: typeof createInstallConfirm
@@ -99,14 +101,14 @@ async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-function mount(options: { busy?: boolean; onCancel?: () => void; onConfirm?: () => void } = {}) {
+function mount(options: { busy?: boolean; onCancel?: () => void; onConfirm?: () => void; preview?: UploadPreview } = {}) {
   const host = document.createElement("div")
   document.body.append(host)
   disposers.push(
     runtime.render(
       () =>
         runtime.createComponent(runtime.UploadConsentDialog, {
-          state: { requestId: "request-1", preview },
+          state: { requestId: "request-1", preview: options.preview ?? preview },
           busy: options.busy ?? false,
           onCancel: options.onCancel ?? (() => {}),
           onConfirm: options.onConfirm ?? (() => {}),
@@ -655,4 +657,71 @@ describe("#1595 AC4 发送框、结果、生效状态与云端错误的文字按
       expect(zh[key]).not.toContain(PROJECT_HIDDEN_DIR)
     }
   })
+})
+
+
+test("video privacy reuses the original card with its actual purpose and inherited source scope", async () => {
+  mount({
+    preview: {
+      ...preview,
+      pipeline: "video-understanding",
+      files: [{ path: "project/.ssh/speech.mp4", sizeBytes: 1550, sensitive: true }],
+      fileCount: 1,
+    },
+  })
+  const host = document.body
+  await flush()
+  expect(host.textContent).toContain("视频理解")
+  expect(host.textContent).not.toContain("代码审查")
+  const expand = host.querySelector(".codepuppy-upl-more") as HTMLButtonElement
+  expand.click()
+  await flush()
+  expect(host.textContent).toContain(".ssh/speech.mp4")
+})
+
+test("video upload host reads the active session and uses existing confirm and cancel IPC", async () => {
+  const identity = { sessionID: "ses_video", directory: "/project" }
+  runtime.publishActiveSessionIdentity(identity)
+  const values = [{ requestId: "video-consent", preview: { ...preview, pipeline: "video-understanding" as const } }]
+  const uploadRoutes: unknown[] = [],
+    confirmed: string[] = [],
+    cancelled: string[] = []
+  Object.defineProperty(window, "api", {
+    configurable: true,
+    value: {
+      cloud: {
+        videoUploads: async (route: unknown) => {
+          uploadRoutes.push(route)
+          return [...values]
+        },
+        confirmUpload: async (id: string) => {
+          confirmed.push(id)
+          values.length = 0
+        },
+        cancelUpload: async (id: string) => {
+          cancelled.push(id)
+          values.length = 0
+        },
+      },
+    },
+  })
+  const host = document.createElement("div")
+  document.body.append(host)
+  disposers.push(runtime.render(() => runtime.createComponent(runtime.VideoUploadDialog, {}), host))
+  await flush()
+  expect(uploadRoutes[0]).toEqual(identity)
+  expect(document.body.textContent).toContain("视频理解")
+  document.body.querySelector<HTMLButtonElement>('.a-btn[data-variant="primary"]')!.click()
+  await flush()
+  expect(confirmed).toEqual(["video-consent"])
+  expect(document.body.querySelector("[role=dialog]")).toBeNull()
+  disposers.pop()!()
+  values.push({ requestId: "video-cancel", preview: { ...preview, pipeline: "video-understanding" } })
+  disposers.push(runtime.render(() => runtime.createComponent(runtime.VideoUploadDialog, {}), host))
+  await flush()
+  document.body.querySelector<HTMLButtonElement>('.a-btn[data-variant="ghost"]')!.click()
+  await flush()
+  expect(cancelled).toEqual(["video-cancel"])
+  expect(document.body.querySelector("[role=dialog]")).toBeNull()
+  runtime.publishActiveSessionIdentity(undefined)
 })

@@ -41,6 +41,7 @@ const LOCK = "alpha-web-extension-package.lock.json"
  * ran, which is the failure mode this whole file is about.
  */
 const NO_SOURCES = {
+  CODEPUPPY_PLATFORM_VIDEO_CONTRACT_SOURCE: "/nonexistent-769/platform-video",
   CODEPUPPY_PLATFORM_CONTRACT_SOURCE: "/nonexistent-769/platform",
   CODEPUPPY_PLATFORM_MODEL_CATALOG_SOURCE: "/nonexistent-769/model-catalog",
   CODEPUPPY_PLATFORM_CLOUD_MCP_SOURCE: "/nonexistent-769/cloud-mcp",
@@ -58,6 +59,7 @@ beforeEach(() => {
   cpSync(join(packageRoot, "vendor"), join(pkg, "vendor"), { recursive: true })
   for (const lock of [
     "alpha-platform-contract.lock.json",
+    "alpha-platform-video-understanding.lock.json",
     "alpha-platform-model-catalog.lock.json",
     "alpha-platform-cloud-mcp.lock.json",
     "alpha-web-contract.lock.json",

@@ -160,7 +160,8 @@ afterEach(() => {
 const handOver = (file: string, value: string) => publishCodePuppyCredentials({ [file]: { value, use: { kind: "inline" } } })
 
 /** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
-const THROATED = ["agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.experimental.idle", "session.generate", "session.http.request", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.execute.before", "tool.transform", "websearch.transform"].sort()
+// SC-01/02 throat proofs are in secret-mask/register-policy and Core tool-shell/tool-registry.
+const THROATED = ["shell.capture", "tool.execute.progress", "agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.experimental.idle", "session.generate", "session.http.request", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.execute.before", "tool.transform", "websearch.transform"].sort()
 /** 2.x 组装一次模型请求的四条钩子(`session/model-request.ts`:主循环 / 压缩 / 无工具生成 / 起标题各触发自己那条,互不经过)。 */
 const REQUEST_HOOKS = ["context", "compaction", "generate", "title"] as const
 

@@ -103,3 +103,13 @@ describe("main-owned UploadManifestV1", () => {
     }
   })
 })
+
+test("video manifest sends relative names while classifying the complete local source path",async()=>{
+ const {createVideoUploadSnapshot}=await import("./codepuppy-upload-manifest")
+ for(const [originalPath,expected] of [["/Users/person/.ssh/project/speech.mp4","speech.mp4"],["/Users/person/.ssh/private.mp4","private.mp4"]]){
+  const value=await createVideoUploadSnapshot({directory:"/Users/person/.ssh/project",originalPath:originalPath!,path:"/cache/clip.mp4",bytes:1019,sha256:"a".repeat(64),mime:"video/mp4"},"tenant")
+  expect(value.manifest.files[0]?.path).toBe(expected)
+  expect(value.manifest.consent_required).toBe(true)
+  expect(value.manifestJson).not.toContain("Users/person")
+ }
+})

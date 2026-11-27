@@ -42,7 +42,7 @@ import {
 import { isModelSelectionStore, rewriteModelSelections } from "./naming-migration-model-selection"
 import { sqliteBinary } from "./platform"
 import { editJsonText } from "./project-hidden-dir-migration"
-import { USER_DATA_LAYOUT, type UserDataItem } from "./user-data-layout"
+import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 export type { NamingMigrationJournal } from "./naming-migration-journal"
 
@@ -366,7 +366,7 @@ function planSteps(fs: MigrationFs, layout: Layout, runId: string): PlannedStep[
 
 /** 改名的 userData 项(旧 → 新);缓存删除项不在其中(AC5)。 */
 function renamedUserData(): Array<readonly [string, string]> {
-  return (Object.keys(USER_DATA_LAYOUT) as UserDataItem[])
+  return (Object.keys(LEGACY_USER_DATA) as (keyof typeof LEGACY_USER_DATA)[])
     .filter((item) => !DISCARDED_USER_DATA.includes(item))
     .map((item) => [LEGACY_USER_DATA[item], USER_DATA_LAYOUT[item]] as const)
 }

@@ -1,3 +1,4 @@
+import { testEgressDial } from "../../test-component/egress-upstream-fixture"
 // REQ-137 (`#1337`) —— AC1 的**强制半场** + AC4:真 .node(生产构建脚本现编)、真 seatbelt、真策略代理
 // (生产 startEgressPolicyProxy)、**Electron 内嵌 node**(= utilityProcess 的运行时),profile 由生产渲染器渲染(受保护集 CF 按空渲染:本文件只判别的行)
 // (`#1334` Q1.2 的四行网络规则 + 可写集),env 由生产 sidecarEgressProxyEnv 给出。
@@ -68,10 +69,10 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
     targetPort = (target.address() as net.AddressInfo).port
 
     // 只有代理这一侧解得开的名字:授权只放行它,拨号把它映到靶站(生产 dial 是 net.connect 按名字解析)。
-    proxy = await startEgressPolicyProxy({
+    proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }],
       log: (record) => void proxyLog.push(record),
       authorize: (host, port) => host === TARGET_NAME && port === targetPort,
-      dial: (host, port) => net.connect({ host: host === TARGET_NAME ? "127.0.0.1" : host, port }),
+      dial: testEgressDial((host, port) => net.connect({ host: host === TARGET_NAME ? "127.0.0.1" : host, port })),
     })
     proxyPort = proxy.port
 

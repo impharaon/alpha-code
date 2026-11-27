@@ -22,6 +22,7 @@
     "@ai-sdk/provider": "3.0.16",
     "@codepuppy/contracts-consumer": "workspace:*",
     "@opencode/plugin": "workspace:*",
+    "@opencode/schema": "workspace:*",
     "@silvia-odwyer/photon-node": "0.3.4"
   },
   "devDependencies": {

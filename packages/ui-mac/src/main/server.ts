@@ -1,5 +1,6 @@
 import { requestSidecarStop } from "./sidecar-stop"
 import { createPluginSessionRequester, watchPluginSessionNotifications } from "./plugin-session-lifecycle"
+import { publishVideoEnvironment } from "./codepuppy-video-environment"
 import type { CodePuppySidecarHost } from "./hub-view"
 import { engineClient } from "./engine-client"
 import { configurePluginMcpProxy, attachPluginMcpProxyPublisher, pluginMcpProxySnapshot } from "./plugin-mcp-proxy"
@@ -626,6 +627,8 @@ export async function spawnLocalServer(
     env: process.env,
     log: (line) => getLogger()?.warn(line),
   })
+  publishVideoEnvironment(bootstrap) // #1775 consumes FIRST-PARTY-CACHE-v2.2; #1760 owns its producer.
+
   let fence: PlannedFence | undefined
   try {
     fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })

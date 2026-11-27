@@ -1,7 +1,7 @@
 // REQ-236 `#1553` AC8 —— 附件路径只有一个来源:隐藏目录名只来自 PROJECT_HIDDEN_DIR,绝对路径只由 attachmentAbsolutePath 算出,
 // 附件代码里没有隐藏目录名或附件目录的字面量;metadata 形状的读取 fail-closed。
 import { afterAll, describe, expect, test } from "bun:test"
-import { copyFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { resolveProjectCodePuppyRoot } from "../main/codepuppy-workdir"
@@ -39,7 +39,8 @@ describe("attachmentAbsolutePath", () => {
   test("改 PROJECT_HIDDEN_DIR 的值,附件路径随之改变(拷一份共享模块改常量再装载)", async () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-attpath-")))
     temps.push(dir)
-    for (const file of ["attachment-path.ts", "office-advisories.ts"]) copyFileSync(join(import.meta.dir, file), join(dir, file))
+    // Keep the real advisories owner and its transitive runtime imports; only the hidden-dir constant is replaced.
+    writeFileSync(join(dir, "attachment-path.ts"), readFileSync(join(import.meta.dir, "attachment-path.ts"), "utf8").replace('"./office-advisories"', JSON.stringify(join(import.meta.dir, "office-advisories.ts"))))
     const constant = readFileSync(join(import.meta.dir, "project-hidden-dir.ts"), "utf8")
     expect(constant).toContain(`export const PROJECT_HIDDEN_DIR = "${PROJECT_HIDDEN_DIR}"`)
     writeFileSync(join(dir, "project-hidden-dir.ts"), constant.replace(`"${PROJECT_HIDDEN_DIR}"`, '".probe-hidden"'))

@@ -12,6 +12,7 @@
 //   `#1669`:经 Code Mode 的读取(`execute` 部件里引擎记下的内层调用,同一工具、同一路径)同样算数,见 officeCallsOf。
 //   没有调用时看本机读取工具的逐服务状态(引擎 mcp.status,当下重新取):不可用 ⇒「读取失败:没有启动」;
 //   回合还在跑 ⇒ 准备中「等待本机读取工具」/ 就绪「已存到本机，等助手读取」;回合结束 ⇒「这一轮助手没有读取」。
+import { mediaAttachmentOf, VIDEO_MCP_NAME, type MediaAttachment } from "../../../shared/media-attachment"
 import type { FilePart, Part } from "../../../engine-adapter/contract/v1"
 import {
   ATTACHMENT_READ_TOOL,
@@ -41,6 +42,7 @@ export interface TimelineAttachment {
   size?: number
   /** PDF / Office 暂存记录(「重新读取」原样带回 composer)。 */
   staged?: StagedAttachmentMeta
+  localMedia?: MediaAttachment
   /** 文件卡第二行的读取结果;图片与旧的 data: PDF 没有。 */
   read?: TimelineAttachmentRead
 }
@@ -158,6 +160,16 @@ export function timelineAttachmentsOf(parts: readonly Part[], context: () => Rea
       return attachment ? [attachment] : []
     }
     if (part.type !== "text" || !part.synthetic) return []
+    const media = mediaAttachmentOf(part.metadata)
+    if (media) {
+      const calls = context().tools.flatMap((tool) => officeCallsOf(tool, VIDEO_MCP_NAME, "transcript"))
+      const read = calls.some((call) => {
+        const source = (call.input as { source?: { kind?: unknown; path?: unknown } } | undefined)?.source
+        return call.status === "completed" && source?.kind === "path" && source.path === media.path
+      })
+      return [{ partID: part.id, name: media.name, media: "file", label: labelOf(media.name, ""), size: media.bytes, localMedia: media,
+        ...(read ? { read: { kind: "read" } as const } : {}) }]
+    }
     const staged = stagedAttachmentOf(part.metadata)
     if (!staged) return []
     return [

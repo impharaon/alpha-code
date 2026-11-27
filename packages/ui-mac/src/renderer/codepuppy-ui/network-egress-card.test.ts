@@ -9,6 +9,9 @@ import { pathToFileURL } from "node:url"
 import { createNetworkEgressActivity } from "../../main/network-egress-activity"
 import { createNetworkEgressApproval } from "../../main/network-egress-approval"
 import type { NetworkOutbound } from "../../shared/network-egress-wire"
+import { randomUUID } from "node:crypto"
+import { createEgressPassLog } from "../../main/network-egress-passes"
+import type { EgressPass } from "../../shared/network-egress-wire"
 
 const directory = mkdtempSync(join(tmpdir(), "codepuppy-network-render-"))
 await build({ configFile: false, logLevel: "silent", plugins: [appPlugin.at(-1)!], build: { outDir: directory, lib: { entry: join(import.meta.dir, "network-egress-test-runtime.tsx"), formats: ["es"], fileName: () => "runtime.js" }, rollupOptions: { output: { inlineDynamicImports: true } } } })
@@ -30,7 +33,9 @@ async function fixture(failWrite = false) {
     ready = resolve
     activity.receive({ type: "codepuppy.network.snapshot", id: 1, seq: 1, generation: 1, activities: ["ses_a", "ses_b"].map((sessionID) => ({ kind: "tool", invocationID: sessionID, ref: { ...session(sessionID), messageID: "msg_a", callID: sessionID }, tool: "shell" })) }, post)
   })
-  const service = createNetworkEgressApproval({ available: true, activity, store: { read: () => ({ ok: true, absent: true, sites: [] }), write: () => { if (failWrite) throw new Error("io") } }, log: () => {} })
+  const records: EgressPass[] = []
+  const passes = createEgressPassLog({ read: () => ({ passes: records, persistence: "ok" }), append: (record) => { records.push(record) } }, () => {})
+  const service = createNetworkEgressApproval({ available: true, activity, passes, store: { read: () => ({ ok: true, absent: true, sites: [] }), write: () => { if (failWrite) throw new Error("io") } }, log: () => {} })
   disposers.push(service.close)
   const mount = (sessionID: string) => {
     const host = document.createElement("div")
@@ -38,8 +43,26 @@ async function fixture(failWrite = false) {
     disposers.push(runtime.render(() => runtime.createComponent(runtime.NetworkEgressCards, { session: session(sessionID), api: service.api }), host))
     return host
   }
-  return { activity, service, mount }
+  return { activity, service, mount, session }
 }
+
+test("通放记录展示随 main 设置通知聚合首次、最近时间与次数", async () => {
+  const f = await fixture()
+  const host = document.createElement("div")
+  document.body.append(host)
+  disposers.push(runtime.render(() => runtime.createComponent(runtime.SettingsNetworkEgress, { api: f.service.api }), host))
+  await flush()
+  expect(host.textContent).toContain("暂无放行记录")
+  const id = randomUUID()
+  for (const [index, at] of ["2026-11-26T01:00:00.000Z", "2026-11-26T02:00:00.000Z"].entries()) {
+    f.service.recordPass({ event: "egress.policy-pass", id: `${id}:${index + 1}`, at, destination: { host: "example.com", port: 443 }, basis: "allow-all", attribution: { kind: "unknown" }, sessions: [{ session: f.session("ses_a"), tier: "allow" }], tierRevision: 1 })
+  }
+  await flush()
+  const row = host.querySelector('[data-network-egress-pass="example.com:443"]')!
+  expect(row.textContent).toContain("放行 2 次")
+  expect([...row.querySelectorAll("time")].map((time) => time.dateTime)).toEqual(["2026-11-26T01:00:00.000Z", "2026-11-26T02:00:00.000Z"])
+  expect(row.querySelector("button")).toBeNull()
+})
 
 test("真实 main 批准在两个对话渲染同一未知来源卡片，拒绝同步到两个副本", async () => {
   const f = await fixture()

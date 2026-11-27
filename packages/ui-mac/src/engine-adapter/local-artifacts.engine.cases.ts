@@ -5,7 +5,7 @@
 //
 // 同一个会话里依次:经 `execute` 调第一方 Word 写工具、`write` 一份 .html、`patch` 新建一份 .md(design §2 标「推断」的投影在这里实测)、
 // `write` 一份 .ts 与一份 .json(不是文档)、`write` 一份会话目录外的 .md(审批经适配器的 v1 回复入口批准)、经 `subagent` 让子会话
-// `write` 一份 .md。重新打开会话(读消息页)后:三条来源与子会话的文档列出,代码 / JSON / 目录外的不列。
+// `write` 一份 .md。重新打开会话(读消息页)后:write/patch 与子会话的文档列出;旧 MCP writer 作为无渲染回执的反例,代码 / JSON / 目录外的不列。
 //
 // 本文件由同名 `.test.ts` 宿主起独立 `bun test` 子进程跑。HOME / XDG 全在临时沙箱里。
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
@@ -14,7 +14,7 @@ import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
 import { codepuppyEngine, MCP_FIXTURE, scriptedModel, type Running } from "../../test-component/codepuppy-engine"
 import { readLocalArtifacts, type SessionMessageWithParts } from "../renderer/codepuppy-ui/session-rail/artifacts/local-artifacts"
-import { CODEPUPPY_OFFICE_CONNECTORS, OFFICE_WRITE_TOOL } from "../shared/office-advisories"
+import { CODEPUPPY_OFFICE_CONNECTORS } from "../shared/office-advisories"
 import { createEngineFetch } from "./index"
 import type { V1Payload } from "./opencode2/events"
 
@@ -23,7 +23,8 @@ const ORIGIN = "http://127.0.0.1:47671"
 const BUILD = "build"
 const PATCH_MODEL = "gpt-5"
 const WORD = CODEPUPPY_OFFICE_CONNECTORS.find((connector) => connector.format === "word")!.name
-const WRITE_DOCX = OFFICE_WRITE_TOOL.word
+// Negative control: historical writer output without a document receipt must not enter the panel.
+const WRITE_DOCX = "write_docx"
 const MCP_CALLS = path.join(sandbox.root, "word-calls.log")
 const model = scriptedModel()
 
@@ -152,7 +153,7 @@ describe("本机产物:嵌入式引擎 → 生产适配器 → 面板推导", ()
     expect(typeof subagent?.state.metadata?.sessionId).toBe("string")
 
     const items = await readLocalArtifacts(dir, sessionID, messagesOf)
-    expect(items.map((item) => item.path)).toEqual(["sub-report.md", "notes/plan.md", "page.html", "report.docx"])
+    expect(items.map((item) => item.path)).toEqual(["sub-report.md", "notes/plan.md", "page.html"])
     expect(items[0]!.sessionID).toBe(subagent.state.metadata.sessionId)
     expect(items.slice(1).every((item) => item.sessionID === sessionID)).toBe(true)
     expect(items.every((item, index) => index === 0 || item.writtenAt <= items[index - 1]!.writtenAt)).toBe(true)

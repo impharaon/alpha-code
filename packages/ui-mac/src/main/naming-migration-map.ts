@@ -11,8 +11,8 @@ export const LEGACY_BASE_DIR = "alpha-code-state"
 export const LEGACY_ENV_CONFIG = "alpha.jsonc"
 export const ENV_CONFIG = "codepuppy.jsonc"
 
-/** userData 下旧名持久化项(新名在 user-data-layout.ts;两边的键集合必须相同)。 */
-export const LEGACY_USER_DATA: Readonly<Record<UserDataItem, string>> = {
+/** userData 下旧名持久化项(新名在 user-data-layout.ts;仅枚举真实历史键)。 */
+export const LEGACY_USER_DATA = {
   auth: "alpha-auth.json",
   pkce: "alpha-pkce.json",
   byokKeys: "alpha-byok-keys.json",
@@ -31,10 +31,10 @@ export const LEGACY_USER_DATA: Readonly<Record<UserDataItem, string>> = {
   surfaces: "alpha-surfaces.json",
   connections: "alpha-connections",
   envFile: "alpha.env",
-}
+} as const satisfies Partial<Record<UserDataItem, string>>
 
 /** 签名或可重取的缓存(AC5):删除(挪进迁移备份目录、字节不改),由正常拉取重建。 */
-export const DISCARDED_USER_DATA: readonly UserDataItem[] = ["appliedCatalog", "discoveredEndpoints"]
+export const DISCARDED_USER_DATA: readonly (keyof typeof LEGACY_USER_DATA)[] = ["appliedCatalog", "discoveredEndpoints"]
 export const DISCARDED_CACHE_FILES = ["remote-catalog.json"] as const
 
 /** 本机第一方 Office 服务器键(`CODEPUPPY_OFFICE_CONNECTORS[].name`),按格式。 */
@@ -111,4 +111,4 @@ export const BUNDLED_PLUGIN_TOOL_NAMES: ReadonlyArray<readonly [string, string]>
 export const VISION_MARKER_KEY: readonly [string, string] = ["alpha_vision", "codepuppy_vision"]
 
 /** 项目隐藏目录(`PROJECT_HIDDEN_DIR` 的旧值)。 */
-export const LEGACY_PROJECT_HIDDEN_DIR = ".code-puppy"
+export { LEGACY_PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"

@@ -108,6 +108,11 @@ export const DOWNGRADED_ANCHORS: Record<string, SourceTextEntry> = {
  * `.cases.ts` 键豁免:它们不进整包计数,由第 ④ 层反向那半(每个 cases 文件必须被一个已登记宿主跑到)兜住。
  */
 export const KEPT_SOURCE_TEXT_READS: Record<string, SourceTextEntry> = {
+  "packages/ui-mac/src/main/video-cache.test.ts": {
+    why: "扫描器命中的是 Bun.spawn 的 --eval 装载路径 cache.ts，并非读取源码文本或按文本断言。此路径直接给独立进程装载生产缓存实现，断言该进程返回的持久结果与父进程发布值一致；路径断开或读盘失败都会非零退出。保留这一个字面路径供依赖选择器追踪，实际行为判据不降级。",
+    evidence: "#1775",
+    lines: 1,
+  },
   "packages/ui-mac/src/main/codepuppy-root-retirement.test.ts": {
     why: "主语是负全称:运营源码树与写引导资源里不得重新出现已退休的全局根 sentinel / alias 与迁移、回退入口 —— 全树扫描的文本就是被守的产物。守不住:经变量拼出来的路径字面量、扫描目录之外新加的写者。原先第 3 处 index.ts 下标锚已随 ADR-0014 删除。",
     evidence: "#428",

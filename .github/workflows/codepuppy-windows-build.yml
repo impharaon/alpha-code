@@ -57,6 +57,7 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0; same pin as codepuppy-ci
       - run: bun install
       # REQ-027:flags 必须在 run 之后。bun 自动先跑 prebuild(icons/metainfo/db-expected/
       # ext bundle/内嵌引擎 build-node)—— fresh runner 上全部产物由此生成,无本地残留依赖。

@@ -4,6 +4,9 @@ import { $ } from "bun"
 import { resolveChannel } from "./utils"
 
 const channel = resolveChannel()
+await $`bun ./scripts/build-video-runtime.ts`
+await $`bun ./scripts/build-video-mcp.ts`
+await $`bun ./scripts/gen-office-mcp-tools.ts`
 await $`bun ./scripts/copy-icons.ts ${channel}`
 await $`bun ./scripts/copy-metainfo.ts ${channel}`
 
@@ -14,7 +17,6 @@ await $`bun ./scripts/gen-db-expected.ts`
 // 单独打包的理由见该脚本文件头;产物落 out/office-preview/,由 rail-preview-host 按固定资产表服务。
 await $`bun ./scripts/build-office-preview.ts`
 
-
 // REQ-159(`#1321`):引擎进程围栏的原生模块 —— fat(arm64 + x86_64)N-API .node,darwin-only;
 // 缺片 / 空壳片脚本自己红。extraResources 把它带进包(codepuppy-fence/),sidecar 在 import 引擎前 dlopen。
 await $`bun ./scripts/build-fence-addon.ts`
@@ -22,6 +24,7 @@ await $`bun ./scripts/build-fence-addon.ts`
 // #1564:四个文档工具(Word/Excel/PowerPoint/PDF)的随包 Python 运行时 —— 目标架构一份,按 resources/office-runtime/
 // 的 lock 以哈希校验安装,并在构建期验证四种格式真能读写;打印本架构实际体积。extraResources 把它带进包(office-runtime/)。
 await $`bun ./scripts/build-office-runtime.ts`
+await $`bun ./scripts/build-document-assets.ts`
 
 // DESIGN-domestic-cloud-connectivity §4.8:搜索工具随包的 ripgrep —— 版本与 sha256 读自引擎 packages/core/src/ripgrep/binary.ts,
 // 不符即红;目标架构一份,extraResources 把它带进包(ripgrep/)。

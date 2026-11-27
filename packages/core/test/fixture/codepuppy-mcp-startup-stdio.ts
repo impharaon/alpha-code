@@ -45,9 +45,20 @@ server.setRequestHandler("tools/list", async () => {
   return { tools: [{ name: "echo", description: "echo", inputSchema: { type: "object" as const, properties: { text: { type: "string" } } } }] }
 })
 const elicitationPeers: (() => void)[] = []
-server.setRequestHandler("tools/call", async (request) => {
+server.setRequestHandler("tools/call", async (request, context) => {
   if (env.CODEPUPPY_MCP_CALL_LOG) appendFileSync(env.CODEPUPPY_MCP_CALL_LOG, `${request.params.name}\n`)
   const args = (request.params.arguments ?? {}) as Record<string, unknown>
+  if (request.params.name === "video_progress") {
+    const token = context.mcpReq._meta?.progressToken
+    if (typeof token === "string" || typeof token === "number") {
+      for (const [sequence, phase] of ["decoding", "transcribing"].entries()) {
+        await context.mcpReq.notify({ method: "notifications/progress", params: { progressToken: token, progress: sequence + 1, _meta: { "codepuppy.video.progress": { phase, completed: Number(args.completed), total: 10000, unit: "ms" } } } })
+        // A real round trip is a wire barrier, not a sleep/timing assertion: the
+        // SDK must dispatch this progress before the next work step/result.
+        await context.mcpReq.send({ method: "roots/list" })
+      }
+    }
+  }
   if (request.params.name === "slow") await Bun.sleep(Number(args.ms ?? 0))
   if (request.params.name === "elicit") {
     if (args.waitForPeer) await new Promise<void>(resolve => {

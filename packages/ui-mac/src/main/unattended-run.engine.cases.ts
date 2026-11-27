@@ -283,6 +283,11 @@ test("AC-04 敏感文件、子任务、项目外目录维持拒绝并写入原�
     expect(saveAutomation(job).ok).toBe(true)
     await withoutApproval(() => runAutomationNow(job.id))
     const record = getAutomation(job.id)!.lastRun!
+    const page = await client.message.list({ sessionID: record.sessionID!, order: "asc" })
+    const tools = page.data.flatMap((message) =>
+      message.type === "assistant" ? message.content.filter((part) => part.type === "tool") : [],
+    )
+    expect(tools[0]?.state).toMatchObject({ status: "error", error: { type: "permission.rejected" } })
     expect(record.status).toBe("failed")
     expect(record.summary).toBe(`自动化任务不能使用「${item.name}」做这一步。`)
     expect(JSON.parse(readFileSync(join(record.runDir!, "status.json"), "utf8")).error).toBe(record.summary)

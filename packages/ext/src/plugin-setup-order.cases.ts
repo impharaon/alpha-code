@@ -16,6 +16,8 @@ mock.module("./policy/index", () => ({
     order.push("registerPolicy")
     return {
       onPackagePermissionRequest: () => () => {},
+      dispose: () => { order.push("disposePolicy") },
+      videoToolFacts: async () => () => ({ kind: "builtin" }),
       seal: async () => {
         order.push("seal")
       },
@@ -91,4 +93,5 @@ test("registerPolicy 是 setup 里第一个被 await 的,seal 是最后一个;ex
   expect(middle).toContain("project:tool.hook")
   expect(middle.indexOf("project:tool.hook")).toBeGreaterThan(middle.lastIndexOf("ext:permission.hook"))
   await (cleanup as () => Promise<void>)()
+  expect(order.at(-1)).toBe("disposePolicy")
 })

@@ -17,6 +17,7 @@
 // hook; `confirm` runs at `seal()`, after the extension's hooks and the project plugin fan-out, asks with the input the
 // implementation will receive, re-decides after the answer, and then pins `tool` and `input` so any later rewrite
 // rejects the call (S1, option 2: plugins activated after the extension cannot be ordered behind it).
+import type { ProtectedFiles } from "../../../schema/src/codepuppy-protected-files"
 import { UNATTENDED_DENIAL_KEY, unattendedDenialCopy, type UnattendedDenial, type UnattendedProfile } from "../../../schema/src/codepuppy-unattended"
 import { Error as ToolError } from "@opencode/plugin/promise/tool"
 import { canonicalToolIdentity } from "../../../schema/src/tool-identity"
@@ -110,6 +111,7 @@ export interface GateCall {
 }
 
 export interface GateDeps {
+  readonly protectedRoots: ProtectedFiles.ProtectedRoots
   readonly profile: (sessionID: string, agent?: string) => Promise<UnattendedProfile | undefined>
   readonly denied: (callID: string | undefined, denial: UnattendedDenial) => void
   readonly store: ToolPolicyStore
@@ -205,7 +207,7 @@ export async function confirm(deps: GateDeps, decision: GateDecision, call: Gate
     save: askedBy === "policy" ? patterns : [],
     metadata: withRiskClassification(
       metadata,
-      classifyPermissionRequest({ permission: canonical, patterns, always: askedBy === "policy" ? patterns : [], metadata }),
+      classifyPermissionRequest({ protectedRoots: deps.protectedRoots, permission: canonical, patterns, always: askedBy === "policy" ? patterns : [], metadata }),
     ),
     source: { type: "tool", messageID: call.messageID, id: call.id },
   })
@@ -296,7 +298,7 @@ export function holdAsk(event: { effect: string }) {
   })
 }
 
-function deepFreeze<T>(value: T): T {
+export function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value)
     for (const item of Object.values(value)) deepFreeze(item)

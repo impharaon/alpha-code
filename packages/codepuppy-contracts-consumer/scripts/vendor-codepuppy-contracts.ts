@@ -16,6 +16,30 @@ import { gitInRepository } from "./git-cross-repo"
 // bytes against the lock and, when a staged checkout is present, against the upstream bytes too.
 const UPSTREAMS = [
   {
+    // #1775: VideoUnderstandingV1 is capability-scoped; other platform pins do not move.
+    // Pinned from #621's merged successor (#623); the schema SHA is the r7/r8 artifact.
+    repo: "impharaon/alpha-platform",
+    commit: "2626e2f5f8183a78da438db4654572928862f126",
+    lock: "alpha-platform-video-understanding.lock.json",
+    vendor: "vendor/alpha-platform-video-understanding",
+    sourceEnv: "CODEPUPPY_PLATFORM_VIDEO_CONTRACT_SOURCE",
+    sourceDefault: ".upstream-video-contracts",
+    sourcePrefix: "contracts",
+    commitBound: true,
+    files: [
+      "v1/video-understanding.schema.json",
+      "v1/fixtures/video-understanding/input.json",
+      "v1/fixtures/video-understanding/result.json",
+      "v1/fixtures/video-understanding/job-inline.json",
+      "v1/fixtures/video-understanding/job-artifact.json",
+      "v1/fixtures/video-understanding/models-test-price.json",
+      "v1/fixtures/video-understanding/input-unknown-model.json",
+      "v1/fixtures/video-understanding/input-unknown-field.json",
+      "v1/fixtures/video-understanding/result-negative-usage.json",
+      "v1/fixtures/video-understanding/models-missing-price.json",
+    ],
+  },
+  {
     // #640 / platform#101: bumped off bcc60bbf for the Ledger V1 hard cut. `LedgerEntryV1` is now the
     // append-only ledger fact (seq/op_id/kind/domain/signed amount/created_at ms); the old mutable
     // {id,type,title,amount_fen,status} row is gone at an unchanged schema_version — a breaking

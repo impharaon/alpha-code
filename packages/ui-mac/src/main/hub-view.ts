@@ -1,3 +1,4 @@
+import type { VideoBridgeRequest, VideoBridgeReply } from "../shared/video-understanding"
 import { networkEgressActivity, type NetworkInspection } from "./network-egress-activity"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import type { InstallOutcomeV1 } from "../shared/plugin-install"
@@ -503,6 +504,8 @@ export type CodePuppySidecarHost = {
 }
 
 export function createCodePuppySidecarHost(deps: {
+  video?: (request: VideoBridgeRequest) => Promise<VideoBridgeReply>
+  videoDisconnected?:()=>Promise<void>
   view: HubViewService
   requests: HubRequestStages
   installName(ref: HubInstallRequest["ref"]): string | undefined
@@ -512,6 +515,7 @@ export function createCodePuppySidecarHost(deps: {
   reloads: ReloadCoordinator
   log: (line: string) => void
 }): CodePuppySidecarHost {
+  let videoConnection: object | undefined
   const reply = (post: (message: CodePuppySidecarOutbound) => void, message: CodePuppySidecarOutbound) => {
     try {
       post(message)
@@ -526,6 +530,11 @@ export function createCodePuppySidecarHost(deps: {
       const inbound = parseCodePuppySidecarInbound(message)
       if (!inbound) {
         deps.log(`alpha sidecar: dropped malformed or unknown message type=${String((message as { type: unknown }).type).slice(0, 80)}`)
+        return true
+      }
+      if(inbound.type === "codepuppy.video.understand") {
+        if(!deps.video){reply(post,{type:"codepuppy.video.understand.reply",id:inbound.id,ok:false,error:"unavailable"});return true}
+        deps.video(inbound).then(value=>reply(post,value),error=>reply(post,{type:"codepuppy.video.understand.reply",id:inbound.id,ok:false,error:error instanceof Error && /^[a-z][a-z0-9_-]+$/.test(error.message) ? error.message : "cloud_failed"}))
         return true
       }
       if (inbound.type === "codepuppy.package.authorization.request") {
@@ -567,6 +576,8 @@ export function createCodePuppySidecarHost(deps: {
       return true
     },
     attach(post, generation, inspect) {
+      const connection={}
+      videoConnection=connection
       const detachNetwork = process.platform === "darwin" && generation !== undefined && inspect ? networkEgressActivity.attach(generation, post, inspect) : undefined
       const detachUnattended = unattendedRuns.attach(post)
       const detachReloads = deps.reloads.attach(post)
@@ -574,6 +585,7 @@ export function createCodePuppySidecarHost(deps: {
         detachNetwork?.()
         detachUnattended(reason)
         detachReloads(reason)
+        if(videoConnection === connection){videoConnection=undefined;void deps.videoDisconnected?.().catch(error=>deps.log(`video disconnect: ${String(error)}`))}
       }
     },
   }

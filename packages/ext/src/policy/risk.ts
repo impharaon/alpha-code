@@ -35,6 +35,7 @@
 // 没有任何规则命中 ⇒ `kind: "unknown"`,`level: "critical"`(最保守档),`rules: ["fallback:unknown"]`。
 // 分类器抛异常同样落到这一档(`fallback:classifier-threw`)—— 一次分类失败不能变成一次少问,也不能
 // 变成一个 defect 让整条工具回合 die。
+import { ProtectedFiles } from "../../../schema/src/codepuppy-protected-files"
 import type { ToolIdentity } from "../../../schema/src/tool-identity"
 
 export const RISK_LEVELS = ["low", "medium", "high", "critical"] as const
@@ -90,6 +91,7 @@ export type ToolTransportFact =
   | { readonly kind: "mcp-local"; readonly command: readonly string[] }
 
 export interface ClassifyInput {
+  readonly protectedRoots: ProtectedFiles.ProtectedRoots
   readonly permission: string
   readonly patterns: readonly string[]
   readonly always?: readonly string[]
@@ -110,13 +112,14 @@ interface Verdict {
 }
 
 interface Facts {
+  roots: ProtectedFiles.ProtectedRoots
   destinations: Set<string>
   paths: Set<string>
   programs: Set<string>
   signals: Set<string>
 }
 
-const facts = (): Facts => ({ destinations: new Set(), paths: new Set(), programs: new Set(), signals: new Set() })
+const facts = (roots: ProtectedFiles.ProtectedRoots): Facts => ({ roots, destinations: new Set(), paths: new Set(), programs: new Set(), signals: new Set() })
 
 // ── 输入上限(探针是线性正则,但输入不该无界)──────────────────────────────────
 const TEXT_PROBE_LIMIT = 200_000
@@ -146,22 +149,7 @@ function stringLeaves(value: unknown, out: string[] = [], seen = new Set<object>
 
 // ── 词法探针(raise-only)────────────────────────────────────────────────────────
 /** 凭据所在的**非常规来源**(codex「Credential Probing」的来源定义 + 本机常见落点)。 */
-const CREDENTIAL_PATH_PROBES: readonly RegExp[] = [
-  /(^|[\s"'`=:/])\.ssh(?=[/\s"'`]|$)/,
-  /\bid_(?:rsa|dsa|ecdsa|ed25519)\b/,
-  /\.aws[\\/](?:credentials|config)\b/,
-  /(^|[\s"'`=:/])\.(?:netrc|npmrc|pypirc|git-credentials)\b/,
-  /\.docker[\\/]config\.json\b/,
-  /\.kube[\\/]config\b/,
-  /(^|[\s"'`=:/])\.gnupg(?=[/\s"'`]|$)/,
-  /(^|[\s"'`=:/])\.env(?:\.[\w-]+)?(?=$|[\s"'`;|&)])/,
-  /\/etc\/(?:passwd|shadow|sudoers)\b/,
-  /Library[\\/]Keychains\b|\.keychain(?:-db)?\b/,
-  /\bcredentials\.json\b/,
-  /\bsecrets?\.(?:json|ya?ml|toml|env)\b/,
-  /\.(?:pem|p12|pfx)\b/,
-  /(?:Chrome|Chromium|Brave|Edge|Firefox)[^\n]{0,80}?(?:Cookies|Login Data|cookies\.sqlite|logins\.json)\b/,
-]
+const SYSTEM_CREDENTIAL_PATH_PROBES: readonly RegExp[] = [/\/etc\/(?:passwd|shadow|sudoers)\b/]
 
 /** 持久化削弱安全设置的落点(写入这些路径 = codex「Persistent Security Weakening」)。 */
 const PERSISTENCE_PATH_PROBES: readonly RegExp[] = [
@@ -197,10 +185,10 @@ function anyMatch(probes: readonly RegExp[], text: string): string | undefined {
 }
 
 function probeCredentialPath(text: string, f: Facts): boolean {
-  const hit = anyMatch(CREDENTIAL_PATH_PROBES, clip(text))
-  if (hit === undefined) return false
+  const hit = anyMatch(SYSTEM_CREDENTIAL_PATH_PROBES, clip(text))
+  if (hit === undefined && !ProtectedFiles.probe({ text: clip(text), roots: f.roots }).length) return false
   f.signals.add("credential-path")
-  f.paths.add(hit.trim())
+  f.paths.add((hit ?? text).trim())
   return true
 }
 
@@ -728,7 +716,7 @@ function fallback(rule: string, f: Facts): RiskClassification {
  * `path.relative` 的结果形态回答)。
  */
 export function classifyPermissionRequest(input: ClassifyInput): RiskClassification {
-  const f = facts()
+  const f = facts(input.protectedRoots)
   try {
     const identity = input.metadata["identity"]
     const verdicts = isToolIdentity(identity)

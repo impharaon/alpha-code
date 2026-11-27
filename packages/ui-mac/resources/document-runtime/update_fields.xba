@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Module1" script:language="StarBasic">
+REM Application-authored fixed Writer task, 2026-11-26. Runs only in the private app profile.
+Sub UpdateFieldsAndSave()
+  Dim Document As Object
+  Dim Index As Long
+  Document = ThisComponent
+  Document.getTextFields().refresh()
+  For Index = 0 To Document.getDocumentIndexes().getCount() - 1
+    Document.getDocumentIndexes().getByIndex(Index).update()
+  Next Index
+  Document.store()
+  Document.close(True)
+End Sub
+</script:module>

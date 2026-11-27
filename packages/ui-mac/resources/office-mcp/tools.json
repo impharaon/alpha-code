@@ -1,5 +1,5 @@
 {
-  "serverSha256": "ccb2448351f5b16993744b1c3372e357afa9d717c2fa54119e22ac7cf3b38b34",
+  "serverSha256": "efdfc2bd95c24b7dde1ba65a4f1c68c7a3e0f36db6976176cbea94db53a32858",
   "formats": {
     "word": {
       "command": [
@@ -27,181 +27,6 @@
             ],
             "additionalProperties": false
           }
-        },
-        {
-          "name": "write_docx",
-          "description": "Create, replace, or append to a Word document: title, body paragraphs, multi-level headings, tables, page size/margins (A4 default) and fonts (East Asian font set by default). Unknown fields are refused, never silently dropped.",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string",
-                "description": "Absolute path inside the granted workspace"
-              },
-              "title": {
-                "type": "string",
-                "description": "Document title (Title style), written before the blocks"
-              },
-              "paragraphs": {
-                "type": "array",
-                "description": "Document body in order. A bare string is a body paragraph; use heading blocks for section titles (e.g. 一、总体情况) instead of body text.",
-                "items": {
-                  "oneOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "const": "paragraph"
-                        },
-                        "text": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "text"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "const": "heading"
-                        },
-                        "text": {
-                          "type": "string"
-                        },
-                        "level": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 9
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "text",
-                        "level"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "const": "table"
-                        },
-                        "rows": {
-                          "type": "array",
-                          "minItems": 1,
-                          "description": "Rectangular grid of cell strings; row 0 is the header when header=true",
-                          "items": {
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                              "type": "string"
-                            }
-                          }
-                        },
-                        "header": {
-                          "type": "boolean",
-                          "default": true
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "rows"
-                      ],
-                      "additionalProperties": false
-                    }
-                  ]
-                }
-              },
-              "append": {
-                "type": "boolean",
-                "default": false
-              },
-              "page": {
-                "type": "object",
-                "description": "Page geometry. New documents default to A4 portrait with 25.4 mm margins; when appending, page is only changed if this field is given (then unspecified margins reset to 25.4 mm).",
-                "properties": {
-                  "size": {
-                    "type": "string",
-                    "enum": [
-                      "A4",
-                      "Letter"
-                    ],
-                    "default": "A4"
-                  },
-                  "orientation": {
-                    "type": "string",
-                    "enum": [
-                      "portrait",
-                      "landscape"
-                    ],
-                    "default": "portrait"
-                  },
-                  "margins": {
-                    "type": "object",
-                    "description": "Millimetres, 0–100",
-                    "properties": {
-                      "top": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 100
-                      },
-                      "bottom": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 100
-                      },
-                      "left": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 100
-                      },
-                      "right": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 100
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "additionalProperties": false
-              },
-              "font": {
-                "type": "object",
-                "description": "Document-default fonts. New documents always get an East Asian font (宋体 unless eastAsia is given); when appending, fonts only change if this field is given.",
-                "properties": {
-                  "eastAsia": {
-                    "type": "string",
-                    "description": "CJK font family, e.g. 宋体 / 黑体 / 微软雅黑"
-                  },
-                  "latin": {
-                    "type": "string",
-                    "description": "Latin font family, e.g. Times New Roman"
-                  },
-                  "size": {
-                    "type": "number",
-                    "minimum": 6,
-                    "maximum": 72,
-                    "description": "Body text size in points"
-                  }
-                },
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "path",
-              "paragraphs"
-            ],
-            "additionalProperties": false
-          }
         }
       ]
     },
@@ -217,13 +42,34 @@
       "tools": [
         {
           "name": "read_xlsx",
-          "description": "Read cell values from every worksheet in an Excel workbook",
+          "description": "Read calculated values, formulas and error locations with explicit cache sources and cursors",
           "inputSchema": {
             "type": "object",
             "properties": {
               "path": {
                 "type": "string",
                 "description": "Absolute path inside the granted workspace"
+              },
+              "sheet": {
+                "type": "string"
+              },
+              "range": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "values",
+                  "formulas",
+                  "both"
+                ]
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "cursor": {
+                "type": "string"
               }
             },
             "required": [
@@ -233,39 +79,421 @@
           }
         },
         {
-          "name": "write_xlsx",
-          "description": "Create a workbook or update addressed cells in an existing workbook",
+          "name": "excel_inspect",
+          "description": "Inspect workbook structure, read ranges or find literal text with formula values and source-bound cursors",
+          "inputSchema": {
+            "type": "object",
+            "$defs": {
+              "FindInspect": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "find",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "query": {
+                    "title": "Query",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Sheet"
+                  },
+                  "exact": {
+                    "default": false,
+                    "title": "Exact",
+                    "type": "boolean"
+                  },
+                  "caseSensitive": {
+                    "default": false,
+                    "title": "Casesensitive",
+                    "type": "boolean"
+                  },
+                  "mode": {
+                    "default": "values",
+                    "enum": [
+                      "values",
+                      "formulas"
+                    ],
+                    "title": "Mode",
+                    "type": "string"
+                  },
+                  "cursor": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Cursor"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "query"
+                ],
+                "title": "FindInspect",
+                "type": "object"
+              },
+              "RangeInspect": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "range",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "title": "Sheet",
+                    "type": "string"
+                  },
+                  "range": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Range"
+                  },
+                  "mode": {
+                    "default": "values",
+                    "enum": [
+                      "values",
+                      "formulas",
+                      "both"
+                    ],
+                    "title": "Mode",
+                    "type": "string"
+                  },
+                  "rows": {
+                    "anyOf": [
+                      {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Rows"
+                  },
+                  "cursor": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Cursor"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "sheet"
+                ],
+                "title": "RangeInspect",
+                "type": "object"
+              },
+              "SheetInspect": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "sheet",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "title": "Sheet",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "sheet"
+                ],
+                "title": "SheetInspect",
+                "type": "object"
+              },
+              "WorkbookInspect": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "workbook",
+                    "title": "Action",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action"
+                ],
+                "title": "WorkbookInspect",
+                "type": "object"
+              }
+            },
+            "discriminator": {
+              "mapping": {
+                "find": "#/$defs/FindInspect",
+                "range": "#/$defs/RangeInspect",
+                "sheet": "#/$defs/SheetInspect",
+                "workbook": "#/$defs/WorkbookInspect"
+              },
+              "propertyName": "action"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/WorkbookInspect"
+              },
+              {
+                "$ref": "#/$defs/SheetInspect"
+              },
+              {
+                "$ref": "#/$defs/RangeInspect"
+              },
+              {
+                "$ref": "#/$defs/FindInspect"
+              }
+            ]
+          }
+        },
+        {
+          "name": "excel_edit",
+          "description": "Sort a range or replace literal text through the shared preserving save and pivot-refresh path",
+          "inputSchema": {
+            "type": "object",
+            "$defs": {
+              "ReplaceEdit": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "replace",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "query": {
+                    "title": "Query",
+                    "type": "string"
+                  },
+                  "replacement": {
+                    "title": "Replacement",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "title": "Sheet"
+                  },
+                  "exact": {
+                    "default": false,
+                    "title": "Exact",
+                    "type": "boolean"
+                  },
+                  "caseSensitive": {
+                    "default": false,
+                    "title": "Casesensitive",
+                    "type": "boolean"
+                  },
+                  "inFormulas": {
+                    "default": false,
+                    "title": "Informulas",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "query",
+                  "replacement"
+                ],
+                "title": "ReplaceEdit",
+                "type": "object"
+              },
+              "SortEdit": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "title": "Path",
+                    "type": "string"
+                  },
+                  "action": {
+                    "const": "sort",
+                    "title": "Action",
+                    "type": "string"
+                  },
+                  "sheet": {
+                    "title": "Sheet",
+                    "type": "string"
+                  },
+                  "range": {
+                    "title": "Range",
+                    "type": "string"
+                  },
+                  "sortBy": {
+                    "items": {
+                      "$ref": "#/$defs/SortKey"
+                    },
+                    "minItems": 1,
+                    "title": "Sortby",
+                    "type": "array"
+                  },
+                  "hasHeader": {
+                    "default": true,
+                    "title": "Hasheader",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "path",
+                  "action",
+                  "sheet",
+                  "range",
+                  "sortBy"
+                ],
+                "title": "SortEdit",
+                "type": "object"
+              },
+              "SortKey": {
+                "additionalProperties": false,
+                "properties": {
+                  "column": {
+                    "description": "Header text (if has_header) or column letter.",
+                    "title": "Column",
+                    "type": "string"
+                  },
+                  "order": {
+                    "default": "ascending",
+                    "enum": [
+                      "ascending",
+                      "descending"
+                    ],
+                    "title": "Order",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "column"
+                ],
+                "title": "SortKey",
+                "type": "object"
+              }
+            },
+            "discriminator": {
+              "mapping": {
+                "replace": "#/$defs/ReplaceEdit",
+                "sort": "#/$defs/SortEdit"
+              },
+              "propertyName": "action"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SortEdit"
+              },
+              {
+                "$ref": "#/$defs/ReplaceEdit"
+              }
+            ]
+          }
+        },
+        {
+          "name": "excel_objects",
+          "description": "Describe or apply a typed pivot, slicer or sparkline operation",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "describe",
+                  "apply"
+                ]
+              },
+              "operation": {
+                "type": "string",
+                "enum": [
+                  "create_pivot_table",
+                  "delete_pivot_table",
+                  "add_slicer",
+                  "delete_slicer",
+                  "add_sparklines",
+                  "delete_sparklines"
+                ]
+              },
+              "path": {
+                "type": "string"
+              },
+              "inputJson": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "operation"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "excel_recalculate",
+          "description": "Recalculate a copy with verified LibreOffice, merge caches into the original package and report formula errors",
           "inputSchema": {
             "type": "object",
             "properties": {
               "path": {
-                "type": "string",
-                "description": "Absolute path inside the granted workspace"
-              },
-              "sheets": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "cells": {
-                      "type": "object",
-                      "additionalProperties": true
-                    }
-                  },
-                  "required": [
-                    "name",
-                    "cells"
-                  ],
-                  "additionalProperties": false
-                }
+                "type": "string"
               }
             },
             "required": [
-              "path",
-              "sheets"
+              "path"
             ],
             "additionalProperties": false
           }
@@ -298,57 +526,6 @@
             ],
             "additionalProperties": false
           }
-        },
-        {
-          "name": "write_pptx",
-          "description": "Create, replace, or append text slides in a PowerPoint deck",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string",
-                "description": "Absolute path inside the granted workspace"
-              },
-              "slides": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "title": {
-                      "type": "string"
-                    },
-                    "body": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "title",
-                    "body"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "append": {
-                "type": "boolean",
-                "default": false
-              }
-            },
-            "required": [
-              "path",
-              "slides"
-            ],
-            "additionalProperties": false
-          }
         }
       ]
     },
@@ -378,38 +555,2052 @@
             ],
             "additionalProperties": false
           }
+        }
+      ]
+    },
+    "video": {
+      "command": [
+        "{codepuppyNode}",
+        "{codepuppyResources}/video-mcp/server.js",
+        "{workspace}",
+        "--cache-root",
+        "{codepuppyCacheRoot}"
+      ],
+      "environment": {},
+      "cwd": null,
+      "codeSha256": {
+        "video-mcp/server.js": "44e08cf09344e2ec238932543519b46c2713d2ff38e67d6253ffb6be68b31845",
+        "video-mcp/speech-worker.js": "26473728b39b2eefe761559460e6cf3fd942a03113a7455302709dde9153e86e",
+        "video-mcp/runtime.json": "693d90cba5063be84c4265bc4e1c82e9e253aa3bb90f062760a90baebc7d787e",
+        "video-mcp/build.lock.json": "1bf6f0f80560c0f99ff1def0241fef4cd0c76cba12ba43927fcb8b5654f3fa86",
+        "video-mcp/helpers/vision": "79cc60fd94abeb3cc8750bb84472667cbfd548b03561570bac1d2ab9bb86c1dc",
+        "video-mcp/licenses.json": "07875f612b8c93b742ea1b531c713fcbbfdab04197bc6485f7bce4b835918431",
+        "video-mcp/licenses/3dspeaker.txt": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "video-mcp/licenses/dav1d.txt": "dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5",
+        "video-mcp/licenses/ejs-LICENSE": "b5065838cbac452dfc855ba6e6e031481ad2c68406f70d21ead9321374653e6c",
+        "video-mcp/licenses/ffmpeg-LGPL2.1.txt": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
+        "video-mcp/licenses/leptonica.txt": "87829abb5bbb00b55a107365da89e9a33f86c4250169e5a1e5588505be7d5806",
+        "video-mcp/licenses/libjpeg-IJG.txt": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6",
+        "video-mcp/licenses/libjpeg-turbo.txt": "2189dc45a8fe96204069f8124caa53a148dfdc193f50f584c6ca7849a6072872",
+        "video-mcp/licenses/node-addon-api.txt": "89024017b88a9f2b763f79b941a4f2db3b4428edfcacdc0b23866b2da633ad0c",
+        "video-mcp/licenses/onnxruntime-LICENSE.txt": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+        "video-mcp/licenses/onnxruntime-ThirdPartyNotices.txt": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2",
+        "video-mcp/licenses/openai-whisper.txt": "b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d",
+        "video-mcp/licenses/OpenH264.txt": "dd5c1c9668512530fa5a96e4c29ac4033d70a7eeb0eed7a42fddb6dd794ebdbb",
+        "video-mcp/licenses/pyannote-segmentation.txt": "14d7016ad68e7394d6e6b78d96cc2ae431c905287b89674cfdf021e79e62b8ba",
+        "video-mcp/licenses/SenseVoiceSmall.txt": "7dba975a2069691db4992b0592d70828b330d2f8a30a71450f4e152a554e84f8",
+        "video-mcp/licenses/sherpa-onnx.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "video-mcp/licenses/silero-vad.txt": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b",
+        "video-mcp/licenses/tessdata-fast.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "video-mcp/licenses/tesseract.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "video-mcp/licenses/whisper-cpp.txt": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+        "video-mcp/licenses/whisper-node.txt": "dcf058ad1c7a2eac57e41d3d45baae7b10eb3da71b9fa4c7f899b99e56fe3a7e",
+        "video-mcp/licenses/ytdlp-LICENSE": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c",
+        "video-mcp/node_modules/@fugood/node-whisper-darwin-arm64/index.node": "34279414489232c42e8f880f83a3e43f423fa6061e07aa3de6b6885dc3461d1b",
+        "video-mcp/node_modules/@fugood/node-whisper-darwin-arm64/package.json": "d3d9e36d2c014c58e3abe5936551508dac9994be56844dbcccf3719f560d56cd",
+        "video-mcp/node_modules/@fugood/whisper.node/lib/binding.js": "0132443efbc54234273960667c24fe06e02b23bac289a75f755d05d9b399d325",
+        "video-mcp/node_modules/@fugood/whisper.node/lib/binding.ts": "8f17179acb435f75e1db32a82f6ad98dd16cca050910db01911bac40a91a0cb7",
+        "video-mcp/node_modules/@fugood/whisper.node/lib/browser.mjs": "486addcf72e9d9cacd253e61f7b5f44d38821fc1fadbb42c6841086dd1bd2dd4",
+        "video-mcp/node_modules/@fugood/whisper.node/lib/index.js": "ddc802e95fa20f72c324dbcea556482bcd2ade3329172fa6fee5626214a89d2e",
+        "video-mcp/node_modules/@fugood/whisper.node/lib/index.ts": "2e0f2c1e895897f3308f7e9123f5ac186b0c2ca8a58d86cd0bfdd971e04edf97",
+        "video-mcp/node_modules/@fugood/whisper.node/lib/node-whisper-wasm.d.ts": "dbce9a57824a0cfa693ea67fa1fe6c3354f40004236f1545ed0b755a95849da1",
+        "video-mcp/node_modules/@fugood/whisper.node/LICENSE": "dcf058ad1c7a2eac57e41d3d45baae7b10eb3da71b9fa4c7f899b99e56fe3a7e",
+        "video-mcp/node_modules/@fugood/whisper.node/package.json": "b8d137707eceeb7fce0502f0a2e2782d8160c3bcea45e0ebf2c0f5ff5039f5c2",
+        "video-mcp/node_modules/sherpa-onnx-darwin-arm64/index.js": "3f0b863d77823f79278c60fae2473c62f7009b2f73ad4541ead097b1c2ade995",
+        "video-mcp/node_modules/sherpa-onnx-darwin-arm64/libonnxruntime.dylib": "b0613d0ae53199a83b05fa48e169211498e9d40d54beaa372068ebe5ec5b0929",
+        "video-mcp/node_modules/sherpa-onnx-darwin-arm64/libsherpa-onnx-c-api.dylib": "0a7562cab532282d3dda62d36fdb42b3fc472ac842b97a05e5f068d3fa8ee8fd",
+        "video-mcp/node_modules/sherpa-onnx-darwin-arm64/package.json": "bb717b4309b909a8e08a5fe45f9cf7ae6b755b0fd6ad2485e58a578dac723065",
+        "video-mcp/node_modules/sherpa-onnx-darwin-arm64/sherpa-onnx.node": "dbddddaf9dcdb7a36fb076a722eb68ff1fba8117fbfdef6b59467b998fbf4619",
+        "video-mcp/node_modules/sherpa-onnx-node/addon-static-import.js": "5eb1b8b13b33735f95e80dcb9b5a40d9725f7d41394c1496ce61d1d087667c9c",
+        "video-mcp/node_modules/sherpa-onnx-node/addon.js": "3049c61b1ebdbd059cb076d7b3ef79d1f1edad25e00bdb3f82b5b314045b56ed",
+        "video-mcp/node_modules/sherpa-onnx-node/audio-tagg.js": "4f38deacb6fd0dddc6adb717f54f515079a2bb8c7c077d45a4f59d7ed88664a5",
+        "video-mcp/node_modules/sherpa-onnx-node/forced-alignment.js": "e9a88a11d43ee87653ed773c902c043e0afd9ad65b5e1a288e627ef233dde351",
+        "video-mcp/node_modules/sherpa-onnx-node/keyword-spotter.js": "de79f3c50dba37be650e8f3688f56cd1a6c400f1074d9034ed99f82941e74439",
+        "video-mcp/node_modules/sherpa-onnx-node/non-streaming-asr.js": "ee754c7e78862aa49e6568012b39b9dec3fc2ed8bb2cb4092cb0dabefc427759",
+        "video-mcp/node_modules/sherpa-onnx-node/non-streaming-speaker-diarization.js": "ec2d8bae9365d6d1d6b43bb6ae31d641c7c7bce3cf31f1adb96cfed0d53b9233",
+        "video-mcp/node_modules/sherpa-onnx-node/non-streaming-speech-denoiser.js": "86b2562f53078f6bfa39895b77984e43556717de94cdf38b39cb9b4d0670ae52",
+        "video-mcp/node_modules/sherpa-onnx-node/non-streaming-tts.js": "0e59318cefbfaaf3d9247ee0b772595f2afcac039ffa79f91b2aa31bfc92e56f",
+        "video-mcp/node_modules/sherpa-onnx-node/offline-source-separation.js": "44a7ceff045b5031bb813513d7cec94e69afb47b47649fc448b5115f53f72d63",
+        "video-mcp/node_modules/sherpa-onnx-node/online-speech-denoiser.js": "40c060d62e8080e4d37fbc4bce37273afaadd42ad19ff3f6ce35c008755b7eef",
+        "video-mcp/node_modules/sherpa-onnx-node/package.json": "5d195085c4f037134d616a27e93351b0ec4240ee7e9b53e783f86901fdc600f4",
+        "video-mcp/node_modules/sherpa-onnx-node/punctuation.js": "723f7fd4920906418067ad5b63f1e5bdd12ccbce6f9af49c5dfc74e767bbaa2f",
+        "video-mcp/node_modules/sherpa-onnx-node/resampler.js": "49f0eeaed2d256ad442e56a74182b3848dd276b96351a1adf9ff9a0928162dae",
+        "video-mcp/node_modules/sherpa-onnx-node/sherpa-onnx.js": "9a1bbff769651e8bc564059bc9249ef380b9ab0389284c1599b4f353b1e19873",
+        "video-mcp/node_modules/sherpa-onnx-node/speaker-identification.js": "811ab1d07005c110593bbf3a3e17deeb6b1763b4f46f25c793554a41afa01aa2",
+        "video-mcp/node_modules/sherpa-onnx-node/spoken-language-identification.js": "d7faace010316d0eb200e5afbef9fe3a6d2a2dbeab317c7f23fa2e685cb65a26",
+        "video-mcp/node_modules/sherpa-onnx-node/streaming-asr.js": "e201af0cf90abbfdd6cb4336c2262d4d85142de09829f7f0f0efe546412d110a",
+        "video-mcp/node_modules/sherpa-onnx-node/types.js": "66c64c011c6ac850dbcd4643a9460a7e8116e6920367e54224252c6ac701d31f",
+        "video-mcp/node_modules/sherpa-onnx-node/vad.js": "516759499cfd4479f6feaf8dd81452d8189c4909ad402923dd983fba71496c38",
+        "video-mcp/wheels/yt_dlp_ejs-0.8.0-py3-none-any.whl": "79300e5fca7f937a1eeede11f0456862c1b41107ce1d726871e0207424f4bdb4",
+        "video-mcp/wheels/yt_dlp-2026.11.23-py3-none-any.whl": "e9188e0c559905f7ee05acc1ba0b6fb3f310e7565bf6dea5f62b5300e0775e35"
+      },
+      "tools": [
+        {
+          "name": "understand",
+          "description": "Understand video content through the platform, including continuous visual actions. Local preparation is automatic; the host returns the complete answer with original source times.",
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "path"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "id"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "startMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "startMs",
+                  "endMs"
+                ],
+                "additionalProperties": false
+              },
+              "question": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model": {
+                "type": "string",
+                "enum": [
+                  "gemini"
+                ]
+              }
+            },
+            "required": [
+              "source",
+              "question"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string"
+              },
+              "sourceRange": {
+                "type": "object",
+                "properties": {
+                  "startMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "startMs",
+                  "endMs"
+                ],
+                "additionalProperties": false
+              },
+              "clip": {
+                "type": "object",
+                "properties": {
+                  "relativePath": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "mime": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "relativePath",
+                  "sha256",
+                  "bytes",
+                  "mime"
+                ],
+                "additionalProperties": false
+              },
+              "sensitivity": {
+                "type": "object",
+                "properties": {
+                  "originalName": {
+                    "type": "string"
+                  },
+                  "originalPath": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "originalName",
+                  "originalPath"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "sourceId",
+              "sourceRange",
+              "clip",
+              "sensitivity"
+            ],
+            "additionalProperties": false
+          }
         },
         {
-          "name": "write_pdf",
-          "description": "Generate a text PDF, replace its text document, or append text pages",
+          "name": "info",
+          "description": "Probe a local video or audio file; paths are resolved in the current Location.",
           "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "path"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "id"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": [
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "streams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "audio",
+                        "video",
+                        "subtitle"
+                      ]
+                    },
+                    "codec": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "codec"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "cached": {
+                "type": "object",
+                "properties": {
+                  "transcript": {
+                    "type": "boolean"
+                  },
+                  "frames": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "transcript",
+                  "frames"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "sourceId",
+              "name",
+              "bytes",
+              "durationMs",
+              "streams",
+              "cached"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "transcript",
+          "description": "Read the complete local transcript with source timestamps and speakers. A range filters the result, never audio coverage.",
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "path"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "id"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "startMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "startMs",
+                  "endMs"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string"
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "startMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "startMs",
+                  "endMs"
+                ],
+                "additionalProperties": false
+              },
+              "segments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "startMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "endMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string"
+                    },
+                    "speaker": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "startMs",
+                    "endMs",
+                    "text",
+                    "language",
+                    "speaker"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "cached": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "sourceId",
+              "range",
+              "segments",
+              "cached"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "frames",
+          "description": "Extract exact, interval or scene frames with source timestamps and local OCR.",
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "path"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "id"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "selection": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "times"
+                      },
+                      "timesMs": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "timesMs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "interval"
+                      },
+                      "range": {
+                        "type": "object",
+                        "properties": {
+                          "startMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "endMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "startMs",
+                          "endMs"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "intervalMs": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "intervalMs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "scenes"
+                      },
+                      "range": {
+                        "type": "object",
+                        "properties": {
+                          "startMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "endMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "startMs",
+                          "endMs"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "threshold": {
+                        "default": 0.05,
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "threshold"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": [
+              "source",
+              "selection"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string"
+              },
+              "frames": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "requestedMs": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "actualMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "mime": {
+                      "type": "string",
+                      "const": "image/jpeg"
+                    },
+                    "width": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "height": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "ocr": {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "lines": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "text": {
+                                "type": "string"
+                              },
+                              "box": {
+                                "type": "array",
+                                "prefixItems": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "number"
+                                  }
+                                ],
+                                "items": false,
+                                "minItems": 4,
+                                "maxItems": 4
+                              }
+                            },
+                            "required": [
+                              "text",
+                              "box"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "text",
+                        "lines"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "requestedMs",
+                    "actualMs",
+                    "path",
+                    "mime",
+                    "width",
+                    "height",
+                    "ocr"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "cached": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "sourceId",
+              "frames",
+              "cached"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "search",
+          "description": "Find text or a time range in a locally cached transcript, with surrounding sentences.",
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "path"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "id"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "text": {
+                "type": "string"
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "startMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "startMs",
+                  "endMs"
+                ],
+                "additionalProperties": false
+              },
+              "contextBefore": {
+                "default": 1,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "contextAfter": {
+                "default": 1,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "source",
+              "contextBefore",
+              "contextAfter"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string"
+              },
+              "hits": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "match": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "startMs": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "endMs": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "language": {
+                          "type": "string"
+                        },
+                        "speaker": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "startMs",
+                        "endMs",
+                        "text",
+                        "language",
+                        "speaker"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "before": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "startMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "endMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "language": {
+                            "type": "string"
+                          },
+                          "speaker": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "startMs",
+                          "endMs",
+                          "text",
+                          "language",
+                          "speaker"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "after": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "startMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "endMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "language": {
+                            "type": "string"
+                          },
+                          "speaker": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "startMs",
+                          "endMs",
+                          "text",
+                          "language",
+                          "speaker"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "match",
+                    "before",
+                    "after"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "sourceId",
+              "hits"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "export",
+          "description": "Export subtitles, a transcript or frames into the current project.",
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "path"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "id"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "output": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "subtitles"
+                      },
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "srt",
+                          "vtt"
+                        ]
+                      },
+                      "range": {
+                        "type": "object",
+                        "properties": {
+                          "startMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "endMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "startMs",
+                          "endMs"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "format"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "transcript"
+                      },
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "txt",
+                          "md"
+                        ]
+                      },
+                      "range": {
+                        "type": "object",
+                        "properties": {
+                          "startMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "endMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "startMs",
+                          "endMs"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "format"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "frames"
+                      },
+                      "selection": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "times"
+                              },
+                              "timesMs": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "timesMs"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "interval"
+                              },
+                              "range": {
+                                "type": "object",
+                                "properties": {
+                                  "startMs": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "endMs": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "startMs",
+                                  "endMs"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "intervalMs": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "intervalMs"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "scenes"
+                              },
+                              "range": {
+                                "type": "object",
+                                "properties": {
+                                  "startMs": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "endMs": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "startMs",
+                                  "endMs"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "threshold": {
+                                "default": 0.05,
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "threshold"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "selection"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "destination": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "source",
+              "output",
+              "destination"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "mime": {
+                      "type": "string"
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "mime",
+                    "bytes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "files"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "clip",
+          "description": "Precisely export a source time range as MP4/H.264/AAC or M4A/AAC.",
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "path"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "id"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "startMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "startMs",
+                  "endMs"
+                ],
+                "additionalProperties": false
+              },
+              "destination": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "source",
+              "range",
+              "destination"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "properties": {
               "path": {
-                "type": "string",
-                "description": "Absolute path inside the granted workspace"
+                "type": "string"
               },
-              "pages": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
+              "mime": {
+                "type": "string"
               },
-              "mode": {
-                "type": "string",
-                "enum": [
-                  "replace",
-                  "append"
-                ],
-                "default": "replace"
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
               }
             },
             "required": [
               "path",
-              "pages"
+              "mime",
+              "durationMs"
             ],
             "additionalProperties": false
           }
+        },
+        {
+          "name": "gif",
+          "description": "Export a video source time range as a playable palette-encoded GIF.",
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "source": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "path"
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "id"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "startMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "startMs",
+                  "endMs"
+                ],
+                "additionalProperties": false
+              },
+              "destination": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fps": {
+                "default": 10,
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "width": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "source",
+              "range",
+              "destination",
+              "fps"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "mime": {
+                "type": "string",
+                "const": "image/gif"
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "path",
+              "mime",
+              "durationMs"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "download",
+          "description": "Download a public video page through the existing network policy; no login or browser cookies.",
+          "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "sourceId",
+              "path",
+              "name",
+              "bytes",
+              "durationMs"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "recipe": [
+        {
+          "id": "speech-model/any/sensevoice-2024-07-17-int8",
+          "archive": "tar.bz2",
+          "entry": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+          "required": [
+            "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+            "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx",
+            "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/tokens.txt"
+          ]
+        },
+        {
+          "id": "speech-model/any/whisper-tiny-lid",
+          "archive": "tar.bz2",
+          "entry": "sherpa-onnx-whisper-tiny",
+          "required": [
+            "sherpa-onnx-whisper-tiny",
+            "sherpa-onnx-whisper-tiny/tiny-encoder.int8.onnx",
+            "sherpa-onnx-whisper-tiny/tiny-decoder.int8.onnx"
+          ]
+        },
+        {
+          "id": "speech-model/any/silero-vad",
+          "archive": "file",
+          "entry": "silero_vad.onnx",
+          "required": [
+            "silero_vad.onnx"
+          ]
+        },
+        {
+          "id": "speech-model/any/pyannote-segmentation-3-0",
+          "archive": "tar.bz2",
+          "entry": "sherpa-onnx-pyannote-segmentation-3-0",
+          "required": [
+            "sherpa-onnx-pyannote-segmentation-3-0",
+            "sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx"
+          ]
+        },
+        {
+          "id": "speech-model/any/3dspeaker-eres2net-base",
+          "archive": "file",
+          "entry": "embedding.onnx",
+          "required": [
+            "embedding.onnx"
+          ]
+        },
+        {
+          "id": "speech-model/any/whisper-turbo-q5",
+          "archive": "file",
+          "entry": "ggml-large-v3-turbo-q5_0.bin",
+          "required": [
+            "ggml-large-v3-turbo-q5_0.bin"
+          ]
+        },
+        {
+          "id": "ffmpeg/darwin-arm64/9.1-openh264-2.7.0-dav1d-1.5.3",
+          "archive": "tar.gz",
+          "entry": "ffmpeg",
+          "required": [
+            "ffmpeg",
+            "ffmpeg/bin/ffmpeg",
+            "ffmpeg/bin/ffprobe",
+            "ffmpeg/licenses/LGPL-2.1.txt",
+            "ffmpeg/licenses/OpenH264.txt",
+            "ffmpeg/licenses/dav1d.txt"
+          ]
+        },
+        {
+          "id": "ffmpeg/win32-x64/9.1-openh264-2.7.0-dav1d-1.5.3",
+          "archive": "tar.gz",
+          "entry": "ffmpeg",
+          "required": [
+            "ffmpeg",
+            "ffmpeg/bin/ffmpeg.exe",
+            "ffmpeg/bin/ffprobe.exe",
+            "ffmpeg/licenses/LGPL-2.1.txt",
+            "ffmpeg/licenses/OpenH264.txt",
+            "ffmpeg/licenses/dav1d.txt"
+          ]
+        },
+        {
+          "id": "python/darwin-arm64/3.12.16-20261124",
+          "archive": "tar.gz",
+          "entry": "python/bin/python3",
+          "required": [
+            "python/bin/python3"
+          ]
+        },
+        {
+          "id": "python/win32-x64/3.12.16-20261124",
+          "archive": "tar.gz",
+          "entry": "python/python.exe",
+          "required": [
+            "python/python.exe"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/chi_sim-4.1.0",
+          "archive": "file",
+          "entry": "chi_sim-4.1.0.traineddata",
+          "required": [
+            "chi_sim-4.1.0.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/chi_tra-4.1.0",
+          "archive": "file",
+          "entry": "chi_tra-4.1.0.traineddata",
+          "required": [
+            "chi_tra-4.1.0.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/eng-4.1.0",
+          "archive": "file",
+          "entry": "eng-4.1.0.traineddata",
+          "required": [
+            "eng-4.1.0.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/osd-4.1.0",
+          "archive": "file",
+          "entry": "osd-4.1.0.traineddata",
+          "required": [
+            "osd-4.1.0.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Arabic",
+          "archive": "file",
+          "entry": "script-Arabic.traineddata",
+          "required": [
+            "script-Arabic.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Armenian",
+          "archive": "file",
+          "entry": "script-Armenian.traineddata",
+          "required": [
+            "script-Armenian.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Bengali",
+          "archive": "file",
+          "entry": "script-Bengali.traineddata",
+          "required": [
+            "script-Bengali.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Canadian_Aboriginal",
+          "archive": "file",
+          "entry": "script-Canadian_Aboriginal.traineddata",
+          "required": [
+            "script-Canadian_Aboriginal.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Cherokee",
+          "archive": "file",
+          "entry": "script-Cherokee.traineddata",
+          "required": [
+            "script-Cherokee.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Cyrillic",
+          "archive": "file",
+          "entry": "script-Cyrillic.traineddata",
+          "required": [
+            "script-Cyrillic.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Devanagari",
+          "archive": "file",
+          "entry": "script-Devanagari.traineddata",
+          "required": [
+            "script-Devanagari.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Ethiopic",
+          "archive": "file",
+          "entry": "script-Ethiopic.traineddata",
+          "required": [
+            "script-Ethiopic.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Fraktur",
+          "archive": "file",
+          "entry": "script-Fraktur.traineddata",
+          "required": [
+            "script-Fraktur.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Georgian",
+          "archive": "file",
+          "entry": "script-Georgian.traineddata",
+          "required": [
+            "script-Georgian.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Greek",
+          "archive": "file",
+          "entry": "script-Greek.traineddata",
+          "required": [
+            "script-Greek.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Gujarati",
+          "archive": "file",
+          "entry": "script-Gujarati.traineddata",
+          "required": [
+            "script-Gujarati.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Gurmukhi",
+          "archive": "file",
+          "entry": "script-Gurmukhi.traineddata",
+          "required": [
+            "script-Gurmukhi.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-HanS",
+          "archive": "file",
+          "entry": "script-HanS.traineddata",
+          "required": [
+            "script-HanS.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-HanS_vert",
+          "archive": "file",
+          "entry": "script-HanS_vert.traineddata",
+          "required": [
+            "script-HanS_vert.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-HanT",
+          "archive": "file",
+          "entry": "script-HanT.traineddata",
+          "required": [
+            "script-HanT.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-HanT_vert",
+          "archive": "file",
+          "entry": "script-HanT_vert.traineddata",
+          "required": [
+            "script-HanT_vert.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Hangul",
+          "archive": "file",
+          "entry": "script-Hangul.traineddata",
+          "required": [
+            "script-Hangul.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Hangul_vert",
+          "archive": "file",
+          "entry": "script-Hangul_vert.traineddata",
+          "required": [
+            "script-Hangul_vert.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Hebrew",
+          "archive": "file",
+          "entry": "script-Hebrew.traineddata",
+          "required": [
+            "script-Hebrew.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Japanese",
+          "archive": "file",
+          "entry": "script-Japanese.traineddata",
+          "required": [
+            "script-Japanese.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Japanese_vert",
+          "archive": "file",
+          "entry": "script-Japanese_vert.traineddata",
+          "required": [
+            "script-Japanese_vert.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Kannada",
+          "archive": "file",
+          "entry": "script-Kannada.traineddata",
+          "required": [
+            "script-Kannada.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Khmer",
+          "archive": "file",
+          "entry": "script-Khmer.traineddata",
+          "required": [
+            "script-Khmer.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Lao",
+          "archive": "file",
+          "entry": "script-Lao.traineddata",
+          "required": [
+            "script-Lao.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Latin",
+          "archive": "file",
+          "entry": "script-Latin.traineddata",
+          "required": [
+            "script-Latin.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Malayalam",
+          "archive": "file",
+          "entry": "script-Malayalam.traineddata",
+          "required": [
+            "script-Malayalam.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Myanmar",
+          "archive": "file",
+          "entry": "script-Myanmar.traineddata",
+          "required": [
+            "script-Myanmar.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Oriya",
+          "archive": "file",
+          "entry": "script-Oriya.traineddata",
+          "required": [
+            "script-Oriya.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Sinhala",
+          "archive": "file",
+          "entry": "script-Sinhala.traineddata",
+          "required": [
+            "script-Sinhala.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Syriac",
+          "archive": "file",
+          "entry": "script-Syriac.traineddata",
+          "required": [
+            "script-Syriac.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Tamil",
+          "archive": "file",
+          "entry": "script-Tamil.traineddata",
+          "required": [
+            "script-Tamil.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Telugu",
+          "archive": "file",
+          "entry": "script-Telugu.traineddata",
+          "required": [
+            "script-Telugu.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Thaana",
+          "archive": "file",
+          "entry": "script-Thaana.traineddata",
+          "required": [
+            "script-Thaana.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Thai",
+          "archive": "file",
+          "entry": "script-Thai.traineddata",
+          "required": [
+            "script-Thai.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Tibetan",
+          "archive": "file",
+          "entry": "script-Tibetan.traineddata",
+          "required": [
+            "script-Tibetan.traineddata"
+          ]
+        },
+        {
+          "id": "ocr-model/win32-x64/script-Vietnamese",
+          "archive": "file",
+          "entry": "script-Vietnamese.traineddata",
+          "required": [
+            "script-Vietnamese.traineddata"
+          ]
         }
       ]
     }

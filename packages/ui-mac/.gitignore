@@ -31,3 +31,7 @@ dist-engine/
 # 下载缓存在 ~/Library/Caches/codepuppy/ripgrep/,不在仓里。resources/ripgrep/ 只在 server.test.ts 的 §4.8 用例里短暂出现(桩 rg),不入库。
 native/ripgrep/build/
 resources/ripgrep/
+
+# Generated pinned npm/fonts/Chinese templates.
+native/document-assets/build/
+native/document-assets/build.staging/

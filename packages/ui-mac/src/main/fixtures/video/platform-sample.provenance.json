@@ -1,0 +1,8 @@
+{
+  "repo": "impharaon/alpha-platform",
+  "commit": "2626e2f5f8183a78da438db4654572928862f126",
+  "path": "packages/gateway/test/fixtures/video-understanding/sample.mp4",
+  "sha256": "c0f31876d4a3763354a8b1979f0b5c48b54f7e700100a7e945841bad932c142a",
+  "provenance_path": "packages/gateway/test/fixtures/video-understanding/provenance.json",
+  "purpose": "unchanged real bytes for desktop transport/cache tests; not a codec or model measurement"
+}

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
-import { activitySession, sessionRefKey, networkActivityKey, type EgressApproval, type EgressChange, type EgressDecisionReceipt, type NetworkActivity, type NetworkEgressApi, type RememberedSite } from "../shared/network-egress-wire"
-import { admitUserEgressGrant, EGRESS_GRANT_PROMPT_TIMEOUT_MS, type EgressGrantOutcome } from "./network-egress-grants"
+import { activitySession, sessionRefKey, networkActivityKey, type Destination, type EgressPass, type EgressApproval, type EgressChange, type EgressDecisionReceipt, type NetworkActivity, type NetworkEgressApi, type RememberedSite } from "../shared/network-egress-wire"
+import { admitUserEgressGrant, EGRESS_GRANT_PROMPT_TIMEOUT_MS, type EgressGrantOutcome, type EgressPassBasis } from "./network-egress-grants"
+import type { createEgressPassLog } from "./network-egress-passes"
 import { siteContains, siteForHost } from "./network-egress-sites"
 import type { createNetworkEgressActivity } from "./network-egress-activity"
 import { canonicalEgressGrantRecord, type EgressGrantTruthRead } from "./egress-grant-truth"
@@ -18,6 +19,7 @@ export function createNetworkEgressApproval(deps: {
   activity: ReturnType<typeof createNetworkEgressActivity>
   store: { read(): EgressGrantTruthRead; write(sites: readonly RememberedSite[]): void }
   log(line: string): void
+  passes?: ReturnType<typeof createEgressPassLog>
   now?: () => number
   timeoutMs?: number
 }) {
@@ -78,7 +80,35 @@ export function createNetworkEgressApproval(deps: {
       group.generation ??= snapshot.generation
       collect(group)
     }
+    void pass().then((basis) => {
+      if (!basis || deps.activity.snapshot().revision !== basis.tierRevision) return
+      for (const group of [...cards.values()]) {
+        if (!group.waiters.size || group.receipt) continue
+        notice(group, "allowed")
+        for (const waiter of [...group.waiters.values()]) waiter.finish("granted")
+        cards.delete(group.approval.requestID)
+        changed("approvals")
+      }
+    })
   })
+  async function pass(signal?: AbortSignal): Promise<EgressPassBasis | undefined> {
+    if (!deps.available) return
+    for (;;) {
+      signal?.throwIfAborted()
+      const snapshot = deps.activity.snapshot()
+      if (!snapshot.complete || !snapshot.activities.length) return
+      const sessions = [...new Map(snapshot.activities.map((activity) => { const session = activitySession(activity); return [sessionRefKey(session), session] })).values()]
+      const tiers = await new Promise<Awaited<ReturnType<typeof deps.activity.tier>>[]>((resolve, reject) => {
+        const abort = () => reject(signal?.reason)
+        signal?.addEventListener("abort", abort, { once: true })
+        Promise.all(sessions.map((session) => deps.activity.tier(session))).then(resolve, reject).finally(() => signal?.removeEventListener("abort", abort))
+      })
+      signal?.throwIfAborted()
+      if (deps.activity.snapshot().revision !== snapshot.revision) continue
+      if (tiers.some((tier) => tier !== "allow")) return
+      return { sessions: sessions.map((session) => ({ session, tier: "allow" })), tierRevision: snapshot.revision }
+    }
+  }
   function linearize<T>(operation: () => T): Promise<T> {
     const next = serial.then(operation)
     serial = next.then(() => undefined, () => undefined)
@@ -138,7 +168,8 @@ export function createNetworkEgressApproval(deps: {
       })
     },
     async settings() {
-      return { ok: true, value: deps.available ? { available: true, revision, sites: sites.map(canonicalEgressGrantRecord), passes: [], persistence } : { available: false } }
+      const recorded = deps.passes?.snapshot()
+      return { ok: true, value: deps.available ? { available: true, revision, sites: sites.map(canonicalEgressGrantRecord), passes: recorded?.passes ?? [], persistence: persistence !== "ok" ? persistence : recorded?.persistence ?? "ok" } : { available: false } }
     },
     revoke(input) {
       return linearize(() => {
@@ -165,6 +196,11 @@ export function createNetworkEgressApproval(deps: {
   return {
     api,
     authorized,
+    pass,
+    recordPass(record: EgressPass) { deps.passes?.record(record); changed("settings") },
+    denyPass(id: string, destination: Destination, basis: EgressPassBasis) {
+      deps.activity.publish({ type: "codepuppy.network.notice", requestID: id, destination, state: "denied", sessions: basis.sessions.map((entry) => entry.session), activities: deps.activity.snapshot().activities, attribution: "unknown" })
+    },
     request(host: string, port: number, signal?: AbortSignal): Promise<EgressGrantOutcome> {
       if (!deps.available || signal?.aborted) return Promise.resolve("approval-unavailable")
       const target = admitUserEgressGrant(host, port)

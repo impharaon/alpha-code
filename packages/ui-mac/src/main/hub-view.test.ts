@@ -739,3 +739,20 @@ test("plugin notification dedup ends with its Session receipt and engine generat
     } finally { next.close() }
   } finally { requester.close() }
 })
+
+test("video requests use the existing host channel with a correlated durable receipt",async()=>{
+ let disconnected=0
+ const w=world("video-host"),seen:unknown[]=[],gate=Promise.withResolvers<import("../shared/video-understanding").VideoBridgeReply>()
+ const host=createCodePuppySidecarHost({videoDisconnected:async()=>{disconnected++},video:async request=>{if(request.id===7)throw new Error("component_download_failed");seen.push(request);return gate.promise},installName:()=>undefined,packageAuthorization:async()=>({ok:false,reason:"not installed"}),view:w.service,requests:createHubRequestStages({log:()=>{}}),searchSources:async()=>({searchId:"search",query:"",sources:[],candidates:[]}),install:async()=>({ok:false,code:"unknown-id",detail:"unknown"}),reloads:w.coordinator,log:()=>{}})
+ const postedEvent=Promise.withResolvers<void>()
+ const posted:CodePuppySidecarOutbound[]=[],call={directory:w.projectDir,sessionID:"session",agent:"build",callID:"call",messageID:"message"}
+ expect(host.receive({type:"codepuppy.video.understand",id:5,call,action:"query",requestId:"durable-request"},value=>{posted.push(value);postedEvent.resolve()})).toBe(true)
+ expect(seen).toHaveLength(1);expect(posted).toEqual([])
+ gate.resolve({type:"codepuppy.video.understand.reply",id:5,ok:true,requestId:"durable-request",state:{progress:{phase:"uploading",completed:1019,unit:"bytes"}}})
+ await postedEvent.promise
+ expect(posted[0]).toMatchObject({id:5,requestId:"durable-request",state:{progress:{completed:1019}}})
+ expect(host.receive({type:"codepuppy.video.understand",id:6,call:{...call,authority:"self"},action:"query",requestId:"durable-request"},value=>{posted.push(value)})).toBe(true)
+ expect(seen).toHaveLength(1)
+ const failure=Promise.withResolvers<CodePuppySidecarOutbound>();host.receive({type:"codepuppy.video.understand",id:7,call,action:"query",requestId:"durable-request"},value=>failure.resolve(value));expect(await failure.promise).toMatchObject({ok:false,error:"component_download_failed"})
+ const old=host.attach(()=>{}),latest=host.attach(()=>{});old("old");expect(disconnected).toBe(0);latest("exit");expect(disconnected).toBe(1)
+})

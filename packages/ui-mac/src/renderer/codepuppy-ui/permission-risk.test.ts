@@ -5,7 +5,11 @@ import { classifyPermissionRequest } from "../../../../ext/src/policy/risk"
 import { permissionRiskOf } from "./permission-risk"
 
 const classify = (permission: string, patterns: string[], metadata: Record<string, unknown> = {}) =>
-  classifyPermissionRequest({ permission, patterns, always: [], metadata })
+  // #1758 AC-06 / design §4.1: trusted Location roots are required; the risk/card contract is unchanged.
+  classifyPermissionRequest({
+    protectedRoots: { platform: "darwin", project: "/project", directory: "/project", home: "/Users/me", appData: "/Users/me/Library/Application Support", localAppData: "/Users/me/Library", pathVariables: {} },
+    permission, patterns, always: [], metadata,
+  })
 
 const request = (metadata?: Record<string, unknown>) => ({ metadata })
 

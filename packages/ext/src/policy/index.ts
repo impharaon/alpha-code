@@ -472,7 +472,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
             codeModeDenials.delete(event.id)
           }
           if (!networkNotice) attachNetFailure(event as never)
-          attachWriteDenied(event as never, context.location.directory)
+          attachWriteDenied(event as never, false)
           attachDirectoryDisplay(event as never)
           attachTerminal(event as never, displays.get(event.id))
           if (event.status === "completed" && event.tool === "read" && externalRead.file(event)) event.result = await secrets.read({ call: event, file: externalRead.file(event)!, result: event.result })

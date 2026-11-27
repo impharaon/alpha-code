@@ -14,7 +14,7 @@ import { Error as ToolError } from "@opencode/plugin/promise/tool"
 import { parseToolDisplaySnapshot, type ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { classifyNetFailure, engineNetFailurePath } from "../../../schema/src/codepuppy-net-failure"
 import type { ToolFacts } from "./identity"
-import { WRITE_REFUSED_NOTE } from "../context-injection"
+import { WRITE_APPROVED_RETRY_NOTE, WRITE_REFUSED_NOTE } from "../context-injection"
 
 export const DISPLAY_KEY = "codepuppyDisplay"
 
@@ -100,13 +100,54 @@ function writeWasRefused(error: unknown, depth = 0): boolean {
   return writeWasRefused(record.cause, depth + 1) || writeWasRefused(record.error, depth + 1)
 }
 
+/**
+ * The one place that decides which sentence the model gets about a refused write (design v6 §4.4, K2): the user approved
+ * the folder after the fact → re-run only the failed part; refused (no approval, or the card was declined) → stop.
+ */
+export function refusedWriteNote(state: "approved" | "refused" | undefined): string | undefined {
+  return state === "approved" ? WRITE_APPROVED_RETRY_NOTE : state === "refused" ? WRITE_REFUSED_NOTE : undefined
+}
+
+// The closed set of error lines that name the refused object (design v6 §4.1, samples AB-P02 / AB-P06). Each captures an
+// absolute path verbatim; a relative path cannot be placed (a `cd` in the command moves its base) and is not taken.
+const REFUSED_LINE_FORMS: readonly RegExp[] = [
+  // `<prefix>: rename <A> to <B>: Operation not permitted` (mv); a path with spaces cannot be delimited and is not taken
+  /: rename (\/\S+) to (\/\S+): operation not permitted$/i,
+  // `<prefix>: operation not permitted: <P>`, P to the end of the line (zsh redirection)
+  /: operation not permitted: (\/.*)$/i,
+  // `… Operation not permitted: '<P>'` (Python PermissionError)
+  /operation not permitted: '(\/[^']*)'$/i,
+  // `EPERM: operation not permitted, <call> '<P>'` (Node, Bun); a two-path call has more after the first quote
+  /EPERM: operation not permitted, \w+ '(\/[^']*)'$/,
+  // git: `could not lock config file <P>: …`, `cannot mkdir <P>: …`
+  /(?:could not lock config file|cannot mkdir) (\/.*): operation not permitted$/i,
+  // `<prefix>: <P>: Operation not permitted` (sh redirection, touch, mkdir, cp, tee, ln, sed, install): P starts at `: /`
+  /: (\/.*?): operation not permitted$/i,
+]
+
+/**
+ * AB1: the absolute paths a command's own error output names as refused writes ("operation not permitted" only; EACCES
+ * and ENOENT are other causes). Raw text, no normalisation — `..` and symlinks are resolved by main on disk (R6) — in
+ * first-seen order, each once. Pure: no filesystem, no messages.
+ */
+export function refusedWritePaths(output: string): readonly string[] {
+  const paths = new Set<string>()
+  for (const line of output.split(/\r?\n/)) {
+    if (!/operation not permitted/i.test(line)) continue
+    const match = REFUSED_LINE_FORMS.map((form) => form.exec(line)).find((found) => found !== null)
+    for (const path of match?.slice(1) ?? []) if (path) paths.add(path)
+  }
+  return [...paths]
+}
+
 /** Append a stop instruction without inventing a cause. This hook has no main-process open-register facts,
- * so neither a known path nor a project-relative EPERM can select the precise unopened-project snippet. */
+ * so neither a known path nor a project-relative EPERM can select the precise unopened-project snippet.
+ * `approved`: the user approved the refused folder after the fact (BR-11), so the shell result gets the retry instruction. */
 export function attachWriteDenied(
   event:
     | { tool: string; input?: unknown; status: "completed"; result: { output?: unknown; content?: unknown; metadata?: Record<string, unknown> } & Record<string, unknown> }
     | { tool: string; input?: unknown; status: "error"; error: InstanceType<typeof ToolError> },
-  _directory: string,
+  approved: boolean,
 ) {
   if (event.status === "error") {
     if (!FILE_WRITE_TOOLS.has(event.tool) || !writeWasRefused(event.error.error ?? event.error)) return
@@ -120,15 +161,17 @@ export function attachWriteDenied(
   }
   if (event.tool !== "shell") return
   const output = (event.result.output as { output?: unknown } | undefined)?.output
-  if (typeof output !== "string" || !/operation not permitted/i.test(output)) return
+  if (typeof output !== "string") return
+  const note = refusedWriteNote(approved ? "approved" : /operation not permitted/i.test(output) ? "refused" : undefined)
+  if (!note) return
   const content = event.result.content
   event.result = {
     ...event.result,
     content: Array.isArray(content)
-      ? [...content, { type: "text", text: WRITE_REFUSED_NOTE }]
+      ? [...content, { type: "text", text: note }]
       : typeof content === "string"
-        ? `${content}\n\n${WRITE_REFUSED_NOTE}`
-        : [{ type: "text", text: output }, { type: "text", text: WRITE_REFUSED_NOTE }],
+        ? `${content}\n\n${note}`
+        : [{ type: "text", text: output }, { type: "text", text: note }],
   }
 }
 

@@ -294,6 +294,42 @@ console.log(JSON.stringify({touched:audit.touched,chain:has('fixture-chain-token
   expect(result).toEqual({ touched: [`readlink ${path.join(locked, ".env")}`], chain: true, linked: false, registered: true, linkTarget: true, locked: false })
 })
 
+// Design §10 SPEC5-04 with the fence's own credential stores (credentialStores(), the list C1 is planned from): HOME is a
+// source root, and in production the stores live under it, so a link into a store must never count as inside a source.
+test("links into the app's credential stores under HOME are never followed", async () => {
+  const { root, roots } = await setup()
+  const { credentialStores } = await import("../../ui-mac/src/main/codepuppy-secret-files")
+  const userData = path.join(roots.home, "Library", "Application Support", "Code Puppy")
+  const stores = credentialStores({ userDataPath: userData })
+  await mkdir(userData, { recursive: true })
+  const auth = path.join(userData, "codepuppy-auth.json")
+  await writeFile(auth, "{}")
+  await mkdir(path.join(roots.home, "links"))
+  await symlink(auth, path.join(roots.project, "link-auth"))
+  await symlink(auth, path.join(roots.home, "links", "auth"))
+  await symlink(path.join(roots.home, "links", "auth"), path.join(roots.project, "hop-auth"))
+  await symlink(userData, path.join(roots.project, "link-userdata"))
+  const followed = ["link-auth", "hop-auth", "link-userdata"].map((name) => path.join(roots.project, name))
+  await writeFile(path.join(root, "audit.mjs"), `
+import fs from 'node:fs/promises';export const touched=[];
+const followed=${JSON.stringify(followed)},store=${JSON.stringify(userData + path.sep)};
+const audit=(name,run)=>async (...args)=>{const file=String(args[0]);if(followed.includes(file)||file.startsWith(store))touched.push(name+' '+file);return run(...args)};
+export const stat=audit('stat',fs.stat),realpath=audit('realpath',fs.realpath),readFile=audit('readFile',fs.readFile),readdir=audit('readdir',fs.readdir);
+// Reading a workspace link itself is the literal walk; reading anything inside the store is a touch.
+export const readlink=async (...args)=>{const file=String(args[0]);if(file.startsWith(store))touched.push('readlink '+file);return fs.readlink(...args)};
+`)
+  expect(await nodeCollector(root, roots, `
+import {registerHooks} from 'node:module';
+registerHooks({resolve(name,context,next){return next(name==='node:fs/promises'&&context.parentURL?.endsWith('/collector.mjs')?new URL('./audit.mjs',import.meta.url).href:name,context)}});
+const {createSecretFiles}=await import('./collector.mjs');const audit=await import('./audit.mjs');
+const files=createSecretFiles(JSON.parse(process.argv[2]),${JSON.stringify(stores)});
+// I-54: a shell command naming the workspace links registers what they literally point to (SecretMask.command -> trackLink).
+for(const link of ${JSON.stringify(followed)})await files.trackLink(link);
+await files.refresh();await files.refresh();
+console.log(JSON.stringify({touched:audit.touched}));files.dispose();
+`)).toEqual({ touched: [] })
+})
+
 test("refresh arriving during capture waits for a fresh generation", async () => {
   const { root, roots } = await setup()
   const target = path.join(root, "external", "adc.json")

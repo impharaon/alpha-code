@@ -198,7 +198,7 @@ declare const ProtectedFiles: {
 }
 ```
 
-roots 全部必填，由宿主实际目录事实提供，不从工具输出或模型参数覆盖；没有机器绝对路径默认值。路径传入仍遵守现有 read 输入校验。`match` 是总函数：不适用返回 undefined，不读取文件，不请求权限。`named` 只对命令载荷中的路径词（引号内整段与按空白拆出的词，去掉 `--opt=`/`NAME=` 前缀与 `@`，`$HOME`/`${HOME}` 展开为 roots.home）调用同一 `match` 做词法探测，不读文件、不请求权限；`probe` 取其结果的 rule ID（因而两者都与 match 同样认下文的项目外范围），不能另抄受保护路径正则；无法从命令推断某个动态路径属于既有风险标注能力的边界，不影响匹配已解析文件。
+roots 全部必填，由宿主实际目录事实提供，不从工具输出或模型参数覆盖；没有机器绝对路径默认值。路径传入仍遵守现有 read 输入校验。`match` 是总函数：不适用返回 undefined，不读取文件，不请求权限。`named` 只对命令载荷中的路径词（引号内整段与按空白拆出的词，以及（v3.5 审查 R1）按 POSIX shell 规则还原的整词——去引号、还原反斜杠转义、反斜杠换行接行、相邻引号段与裸段相接，如 `../x/\.env`、`"../x y"/.env`；去掉 `--opt=`/`NAME=` 前缀与 `@`，`$HOME`/`${HOME}` 展开为 roots.home）调用同一 `match` 做词法探测，不读文件、不请求权限；原有候选全部保留，`probe` 对原已识别输入的结果不变；`probe` 取其结果的 rule ID（因而两者都与 match 同样认下文的项目外范围），不能另抄受保护路径正则；无法从命令推断某个动态路径属于既有风险标注能力的边界，不影响匹配已解析文件。
 
 现有 `classifyPermissionRequest` 的输入增加必填 `protectedRoots: ProtectedRoots`；permission、patterns、always、metadata 的形状与结果维持原契约。调用方从同一 Location 的 SecretMask 路径事实供数，不在分类器里做 IO，也不从审批 metadata 反推可信根。现有 gate 和能力轴调用共同消费这一个参数，不能让无根调用退回另一张旧正则表。
 
@@ -282,7 +282,7 @@ Windows 的 home 使用宿主 `os.homedir()`（一般为 USERPROFILE）；APPDAT
 
 ### 4.3 采集、外层事务与私有材料
 
-扩展为每个 Location 建一个私有 SecretMask，按名单 profile 读取两类来源：`sources` 给出的项目/主目录（含显式路径变量），以及（v3.4，规格 v5 BR-05）本 Location 内读文件工具已读过的项目外名单文件——SecretMask.read 先登记该 ProtectedFile，以及（v3.5，规格 v6 BR-05）shell 命令字面写出的这类文件——Shell `create.before` 时由 `SecretMask.command` 以该命令的工作目录（相对 Location 目录解析，开头 `~` 按 roots.home 展开，与引擎解析 `workdir` 同义）为相对路径基准调用 `ProtectedFiles.named` 并逐个登记；登记同步、不读文件，读取发生在随后 capture start 的采集（Core 顺序为 create.before → capture start → spawn，`packages/core/src/shell.ts:303,343,363`），因此该命令的第一段输出起即按其值遮盖。登记的文件之后每次采集与其它来源一起处理，Location 释放时清空；不预先扫描项目外、不对其目录 readdir。create.before 早于 Core 自己的工作目录解析与审批，被拒的命令也已登记其文件，只会多遮、不放出内容；已在 sources 内的路径重复登记只多一次 stat。边界按规格 v6 限制表：变量或其它命令拼出的路径、先 `cd` 再写的相对路径不认，这类项目外名单文件在读文件工具读过或被字面写出之前不贡献值。不是模型可调用工具，不把值放入 main/UI/storage。Schema 只持有发布规则与固定说明。每次根工具调用前采集，普通工具/连接器结果到达时再采集；shell start 前采集、每个直播 flush 前检查目录变化并重读变化来源、end 再采集。读到的值保留至 Location 释放，不在并发输出仍可能引用旧值时撤销。
+扩展为每个 Location 建一个私有 SecretMask，按名单 profile 读取两类来源：`sources` 给出的项目/主目录（含显式路径变量），以及（v3.4，规格 v5 BR-05）本 Location 内读文件工具已读过的项目外名单文件——SecretMask.read 先登记该 ProtectedFile，以及（v3.5，规格 v6 BR-05）shell 命令字面写出的这类文件——Shell `create.before` 时由 `SecretMask.command` 以该命令的工作目录（相对 Location 目录解析，开头 `~` 按 roots.home 展开，与引擎解析 `workdir` 同义）为相对路径基准调用 `ProtectedFiles.named` 并逐个登记；已登记文件（read 与命令登记共用）每次在 stat/采集前同样经 SPEC5-04 的逐级字面软链边界（`packages/ext/src/secret-files.ts:150-151`、`literalTarget` `:209-227`），按字面逐级算出的目标离开所有采集来源的软链不 stat、不采集，不是软链的项目外名单文件照常采集（v3.5 审查 R1）；登记同步、不读文件，读取发生在随后 capture start 的采集（Core 顺序为 create.before → capture start → spawn，`packages/core/src/shell.ts:303,343,363`），因此该命令的第一段输出起即按其值遮盖。登记的文件之后每次采集与其它来源一起处理，Location 释放时清空；不预先扫描项目外、不对其目录 readdir。create.before 早于 Core 自己的工作目录解析与审批，被拒的命令也已登记其文件，只会多遮、不放出内容；已在 sources 内的路径重复登记只多一次 stat。边界按规格 v6 限制表：变量或其它命令拼出的路径、先 `cd` 再写的相对路径不认，这类项目外名单文件在读文件工具读过或被字面写出之前不贡献值；经按字面指向所有来源之外的软链打印的文件不遮盖（SPEC5-04 边界，规格 v6 限制表编排器补记行）。不是模型可调用工具，不把值放入 main/UI/storage。Schema 只持有发布规则与固定说明。每次根工具调用前采集，普通工具/连接器结果到达时再采集；shell start 前采集、每个直播 flush 前检查目录变化并重读变化来源、end 再采集。读到的值保留至 Location 释放，不在并发输出仍可能引用旧值时撤销。
 
 允许跳过未变来源的重读，唯一缓存键为 `(dev,ino,size,mtimeNs,ctimeNs)`，取 `fs.stat({bigint:true})`；任一不同就读内容，不能仅看 mtime。SQLite 同时纳入主库、WAL、SHM 的身份；发现/消失也算变化。新受保护文件的发现使用目录五元组缓存：首次按 sources 建立已发现目录/候选文件集合；每次 flush stat 已发现目录，只对目录 stat 变化的那一层 readdir，新增子目录首次发现时按同一剪枝规则遍历。不存在的发布根保留最近现存父目录的变化检测；子目录各自 stat，不能用祖先目录未变推断整棵树未变。已知文件仍独立 stat，不能漏掉不改变目录 stat 的原地写入；已读的项目外名单文件只以文件自身 stat 五元组判定变化，沿用同一缺失/不可读重试；不逐 chunk 全量递归 readdir，也不依赖 watcher。没有 TTL 或自行选择的数量/长度上限。ENOENT/EACCES/EPERM 表示该次缺失/不可读，不贡献新值，后续仍重试判定；其它无法完成采集/解析/匹配的异常进入本次隐藏分支。
 
@@ -570,7 +570,7 @@ const hiddenResult: Tool.Result = {
 
 | 本增量收据 | 检查方 / 结论 | 遗留去向 |
 | --- | --- | --- |
-| v3.5 / 工作树 `859207d427`，规格 v6 `2e99186d59` + plan.md ⑦（红 `c425bed85b` → 实现 `18f8f451b6`） | Claude Opus 5.5 设计方定向同步：按 plan.md ⑦「设计待同步」三项逐句对照 §4.1/§4.3/§4.5 与实现（`packages/schema/src/codepuppy-protected-files.ts:293-314` 的 `named`/`probe`，`packages/ext/src/secret-mask.ts:251-257` 的 `command`，`packages/ext/src/policy/index.ts:292` 的注册，`packages/core/src/shell.ts:303,343,363` 的顺序），只改这些句子与基线/元数据；行为证据继承 plan.md ⑦ 实施收据的红例、移除臂与场景，本轮未重跑测试。没有新增独立审查轮次，review 元数据保留 R2 真实收据 | **v3.5 frozen**；无 owner-only 决定。plan.md ⑦ 注明本节未经编排器单独核对、由审查时核对。 |
+| v3.5 / 工作树 `859207d427`，规格 v6 `2e99186d59` + plan.md ⑦（红 `c425bed85b` → 实现 `18f8f451b6`，提交 `e9b97938cb`）；v3.5 审查 R1 修订 / 工作树 `904fcd14d6`：Codex 只读审查 R1 两项 Major，编排器全部接受，`66f38603df`（named 加 shell 整词）与 `fbcb8e47fa`（已登记文件过 SPEC5-04 软链边界），plan.md「⑦ 审查 R1 修正」 | Claude Opus 5.5 设计方定向同步：按 plan.md ⑦「设计待同步」三项及 R1 修正的两项逐句对照 §4.1/§4.3/§4.5 与实现（`packages/schema/src/codepuppy-protected-files.ts:293-349` 的 `named`/`probe`/`shellWords`，`packages/ext/src/secret-files.ts:150-151,209-227` 的已登记分支软链边界，`packages/ext/src/secret-mask.ts:251-257` 的 `command`，`packages/ext/src/policy/index.ts:292` 的注册，`packages/core/src/shell.ts:303,343,363` 的顺序），只改这些句子与基线/元数据；行为证据继承 plan.md ⑦ 实施收据与「⑦ 审查 R1 修正」的红例、移除臂与场景，本轮未重跑测试；design_version 保持 3.5。没有新增独立审查轮次，review 元数据保留 R2 真实收据 | **v3.5 frozen**；无 owner-only 决定。plan.md ⑦ 注明本节未经编排器单独核对、由审查时核对。 |
 
 ### v3.4：规格 v5 同步（U-43 与编排器核对修正）
 

@@ -298,7 +298,8 @@ export function named(input: { text: string; roots: ProtectedRoots }): readonly 
   })
   const candidates = /^(?:[/\\]|[a-z]:[/\\]|~[/\\])/i.test(input.text) ? [input.text, ...tokens] : tokens
   const files = new Map<string, ProtectedFile>()
-  for (const token of candidates) {
+  // Also each word as the shell reads it (`../x/\.env`, `"../x y"/.env`); the pieces above stay candidates as before.
+  for (const token of [...candidates, ...shellWords(input.text)]) {
     const value = token
       .replace(/^(?:--?[\w-]+|[a-zA-Z_]\w*)=/, "")
       .replace(/^@/, "")
@@ -311,6 +312,41 @@ export function named(input: { text: string; roots: ProtectedRoots }): readonly 
 
 export function probe(input: { text: string; roots: ProtectedRoots }): readonly string[] {
   return [...new Set(named(input).map((file) => file.rule))]
+}
+
+/** POSIX shell words: quotes removed, backslash escapes undone, adjacent quoted and bare pieces joined. */
+function shellWords(text: string): string[] {
+  const words: string[] = []
+  let word: string | undefined
+  let quote: "'" | '"' | undefined
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index]
+    if (quote === "'") {
+      if (char === "'") quote = undefined
+      else word += char
+      continue
+    }
+    if (char === "\\" && index + 1 < text.length) {
+      const next = text[++index]
+      // A backslash-newline joins lines; inside double quotes a backslash escapes only $ ` " \.
+      if (next !== "\n") word = (word ?? "") + (quote === '"' && !'$`"\\'.includes(next) ? char : "") + next
+      continue
+    }
+    if (quote === '"') {
+      if (char === '"') quote = undefined
+      else word += char
+      continue
+    }
+    if (char === "'" || char === '"') {
+      quote = char
+      word ??= ""
+    } else if (/[\s`|;&()<>]/.test(char)) {
+      if (word !== undefined) words.push(word)
+      word = undefined
+    } else word = (word ?? "") + char
+  }
+  if (word !== undefined) words.push(word)
+  return words
 }
 
 export function isCredentialName(name: string): boolean {

@@ -1873,11 +1873,12 @@ describe("safe file tools", () => {
 
   // Spec v6 BR-05: another project's protected file that a command names literally (relative to the command's working
   // directory) is registered before the command's output is released, so a first contact by command is masked from its
-  // first live chunk, never read by the read tool.
-  for (const form of ["path relative to the project", "working directory under ~"] as const) it.live(`outside project protected files a command names are masked from its first output (${form})`, () => Effect.gen(function* () {
+  // first live chunk, never read by the read tool. The path is the word the shell reads: escapes undone, quoted pieces joined.
+  for (const form of ["path relative to the project", "working directory under ~", "escaped path", "quoted directory joined to the file name"] as const) it.live(`outside project protected files a command names are masked from its first output (${form})`, () => Effect.gen(function* () {
     const location = yield* Location.Service
-    const name = `other-${randomUUID()}`
+    const name = `other project-${randomUUID()}`
     const other = path.join(os.homedir(), "work", name)
+    const directory = path.relative(location.directory, other)
     fs.mkdirSync(other, { recursive: true })
     const value = randomUUID()
     fs.writeFileSync(path.join(other, ".env"), `TOKEN=${value}\nPORT=3000\n`)
@@ -1891,9 +1892,13 @@ describe("safe file tools", () => {
     // production the engine's `~` is os.homedir() too, so the engine resolves this workdir there for the call.
     const engineHome = process.env.OPENCODE_TEST_HOME
     if (form === "working directory under ~") process.env.OPENCODE_TEST_HOME = os.homedir()
-    const shell = yield* callRaw(session.id, "shell", form === "path relative to the project"
-      ? { command: `cat ${JSON.stringify(path.relative(location.directory, path.join(other, ".env")))}` }
-      : { command: "cat .env", workdir: `~/work/${name}` }).pipe(Effect.ensuring(Effect.sync(() => { process.env.OPENCODE_TEST_HOME = engineHome })))
+    const input = {
+      "path relative to the project": { command: `cat ${JSON.stringify(path.join(directory, ".env"))}` },
+      "working directory under ~": { command: "cat .env", workdir: `~/work/${name}` },
+      "escaped path": { command: `cat ${directory.replaceAll(" ", "\\ ")}/\\.env` },
+      "quoted directory joined to the file name": { command: `cat "${directory}"/.env` },
+    }[form]
+    const shell = yield* callRaw(session.id, "shell", input).pipe(Effect.ensuring(Effect.sync(() => { process.env.OPENCODE_TEST_HOME = engineHome })))
     fs.rmSync(other, { recursive: true, force: true })
     if (Exit.isFailure(shell)) throw new Error(String(failure(shell)?.message ?? Cause.pretty(shell.cause)))
     expect(live.length).toBeGreaterThan(0)

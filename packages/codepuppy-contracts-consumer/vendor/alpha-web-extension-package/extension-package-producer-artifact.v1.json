@@ -1,6 +1,6 @@
 {
   "artifactPath": "contracts/extension-package/artifact",
-  "artifactSha256": "631dea62f20c3bb401eb82f21b57333daf599deefc71bd5a4a24bd2935bbb74d",
+  "artifactSha256": "8cff37b2699bf438825681f2bc0e3685ed370962940c3abcf6610ce169e81743",
   "files": [
     {
       "bytes": 118,
@@ -20,7 +20,7 @@
     {
       "bytes": 6822,
       "path": "claude-code.rules.v1.json",
-      "sha256": "44931537664fef23dc52f38578a561adeda1a73fc9fec6f116e5295b0909ded7"
+      "sha256": "c3896ef8664225a1aa091a223a022187414ce0eafc7192d4f0c9fcb8eea734ef"
     },
     {
       "bytes": 2220,
@@ -35,7 +35,7 @@
     {
       "bytes": 15886,
       "path": "codex.rules.v1.json",
-      "sha256": "6d600fbe19ce6b68578f24887f827dc4fa36dbb668cde0f7672ca14351ac3379"
+      "sha256": "660d8fb4a316dc246d144f6b01d67c2569642d2939e2a81ed187ab87d0a8606c"
     },
     {
       "bytes": 9247,
@@ -75,12 +75,12 @@
     {
       "bytes": 1762,
       "path": "generic-rules.v1.json",
-      "sha256": "28b835b1570c93ee2a7e3d80da42906625e4585c21938f2d61070c470571462b"
+      "sha256": "7058f02835979439b61eaae76eb7041953bcf9690bcf32013380d798da6100d1"
     },
     {
       "bytes": 315,
       "path": "host-contract-pin.v1.json",
-      "sha256": "b3a481380a7709ff84949aaeb32fdaccf49f02567a7e879e0288dd2214ba93ab"
+      "sha256": "30833073483194bd73bde615f2e34be7c159fe07aa4f4f0695deea9844027f0c"
     },
     {
       "bytes": 3677,

@@ -1,7 +1,7 @@
 {
   "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
   "artifactSha256": "254dee98bd8480cb55de26d1bbf85a8eb17cfd2b1dc3736bedeaf67b171f23c9",
-  "commit": "e0c6e11f86e74fef82770b9b630a0f68d368b8a9",
+  "commit": "f6df1b0b5f4bc08871d83b33c791db46d21ba2e4",
   "repo": "jinjunnn/alpha-code",
   "schema": "codepuppy.host-extension-package.pin.v1"
 }

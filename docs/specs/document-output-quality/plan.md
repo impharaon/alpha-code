@@ -867,3 +867,57 @@ all bun (packages/codepuppy-contracts-consumer) tests: bun.lock changed (manifes
 ```
 
 已核 Codex / GPT-6，r15 集成完成；没有真正不兼容的冻结行为分歧。已定勿重开：两功能共用既有视觉/权限权威，两个资源闭包及其许可/签名核验都保留；没有新引擎 API 或新下载器。下一步：编排器在此树执行 ship。遗留去向：既有 #1760、发布/relay、Windows/真实 LO 验收沿原归属；无新产品 OPTIONAL。本轮未运行 gate run、bin/check 或全层/全套；未 push、开 PR、部署或 rebase，所有本轮前台命令结束后交回。实际约 17 分钟（含共享 slot 排队），未超预计 75 分钟。
+
+## 切片八：真引擎与双平台安装包验收
+
+- 依据：[spec v1](spec.md) @ `31cd182e09`，AC-01..15 的整条验收及「待决」中 owner 2026-11-26 对一次默认模型实测的授权（上限 50 元）；[design](design.md) @ `7ef8b89b30` §1、§5、§8、§10；Issue #1761。片 1–7 已合入 alpha `510b573c70`。
+- 核对：本轮 brief（2026-11-27，Claude 接手实施）同轮授权写本节并实施可运行部分；Claude Opus 5.5 自核实际调用链，调度方未另行审查本节。
+
+### 现状与阻塞（2026-11-27 核对）
+
+- **产品路径还跑不起来**：`registerDocumentTools`、`publishDocumentHost` 在 main/sidecar 没有任何生产调用者（全仓搜索只有定义与测试）；`documentHost()` 未发布时抛 `document host was not published before engine startup`（`packages/util/src/codepuppy-document.ts:122-126`）。七个技能都要求先调 `codepuppy_document` 的 environment（`resources/factory-skills/office-docs/WORKFLOW.md`），Word/PPT 的 docx/PptxGenJS 还要 #1760 `resolveAssets` 给的 Node。#1760 在 origin/alpha 上只有设计（#1805 等），实现未合入；`pinned-files.json` 也还没有 LibreOffice 条目。所以 dev 构建和安装包上，「用平台默认模型让助手做成 Word」今天都走不到本票的制作/渲染/自查链。
+- **先前的付费实测已用掉同一授权的一部分**：2026-11-26 在 `~/.cache/alpha-orch/2026-11-26/doc-pilot/` 用中性 harness（直连网关、原版技能，不是产品引擎）跑过三轮：旧测试钱包 5000→4859（141 分）；prod-test 账号直连 LAX 一轮 98280→约 98039（≥241 分，P3 在重试中中止）；香港入口一轮 97962→97011（951 分）。可归入本授权的合计 ≥1333 分；两轮之间账号另有 77 分变化，无法归属（该账号也用于其它生产检查）。按保守算法，本授权剩余 ≤3590 分（35.9 元）。那三轮成绩（W 8/10、9/10，P 10/11×2 另 1 项待目测，X 结构齐但重算未执行）出自非产品路径，只能作参考，不能计作 AC-01..03 的证据。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/scripts/document-font-acceptance.ts`（新增） | AC-08 的验收驱动：用随包 Office Python 做一份宋体/黑体/微软雅黑三段的 Word，经产品自己的 `prepareDocumentProfile` 与固定 `render_document.py` 用给定的 LibreOffice 渲染；再用一份只列系统字体目录、不带随包字体与替代表的配置做对照臂。打印两臂逐段字体结果，产品臂不合格即非零退出。LO 路径由参数给出，Windows 验收（AC-15）用同一脚本 |
+| `packages/ui-mac/scripts/document-font-check.py`（新增） | 上面驱动调用的两个子命令：`make` 生成三字体 Word；`check` 用随包 PDFium 逐字读 PDF 里实际使用的字体，按段判定「只有一种中文字体」，并用随包 ReportLab 读该字体的随包原文件 cmap，判定每个字都有字形（缺字/方块即失败） |
+| `docs/specs/document-output-quality/plan.md` | 本节、实测记录与 pending 清单 |
+
+AC-01..03 的测量 runner 不在本轮落代码：它要驱动已组合好的产品引擎，而组合本身归 #1760 集成（片 4 回执「生产集成边界明确 pending」）。现在写一个在测试里自行组合 DocumentHost 的 runner，正是片 3/4 不允许的「成功替身」；它测到的也不是用户会走的路径。中性 harness 的任务文本与评分脚本保留在原处作素材（`tasks.json` sha256 前缀 `eaec636d31188410`、`score_docx.py` `3cab3058aefbcd7f`、`score_pptx.py` `66911f1d0bed30f0`、`check_xlsx.py` `440e2da69b84d1a2`），runner 落地时一并入库。
+
+### 顺序
+
+1. AC-08 驱动与检查脚本一并提交：先在三字体样本上跑对照臂，确认检查能判出混用/缺字（红），再跑产品臂（绿）；结果写入本节。
+2. #1760 组合合入后（另一轮）：runner 经已组合的 dev 构建引擎、香港网关、平台默认模型各跑一次 W/P/X 作样本，按样本费用核预计总额不超过剩余授权后再跑满九次，记录每次成品、逐项评分、费用与余额。Excel 重算必须走产品的 `OfficeExcel.recalculate`（先前评分器自己起 LO 失败，见上）。
+
+### 风险
+
+- 对照臂必须真的会失败，否则检查不能证明什么：先跑对照臂，看到混用或缺字才接受这个检查；如果这台机器上对照臂碰巧也不混用，就如实记录，AC-08 的「对照臂里出现混用」按未取得处理。
+- 本机的 LibreOffice 是 pilot 目录里同版本 26.8.3.1 的展开副本，不是从固定文件入口下载并经 verify 发布 ready 的那份；这只证明字体配置和渲染脚本的效果，不证明下载/准备链（AC-09）。
+- 本机没装微软雅黑、宋体（SimSun）、黑体（SimHei），只有系统的 Songti.ttc，符合 AC-08 的前提；Windows 默认装有微软雅黑，AC-15 在 Windows 上的 AC-08 要按该平台实际字体情况另记前提。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-08 | `bun ./scripts/document-font-acceptance.ts <soffice> <输出目录>` 的两臂输出，记命令与结果 | 一次性（需 LibreOffice 实物，不进 PR 层）；Windows 发布前在 Windows 上重跑 | 去掉随包字体或替代表（对照臂）时，检查报出同段多种中文字体或缺字形；产品臂退出码非零 |
+| AC-01..03 | pending：#1760 组合合入后的九次实测 | 一次性付费实测，按剩余授权设上限 | — |
+| 其余 AC | 见下方 pending 清单 | — | — |
+
+### pending 清单（本节截止时）
+
+| AC | 还差什么 | 前置 |
+| --- | --- | --- |
+| AC-01、02、03 | 默认模型经产品引擎各做 3 次并逐项评分；Excel 经产品重算核公式错误与汇总 | #1760 生产组合（DocumentHost 发布、Node `resolveAssets`）合入；LO 就绪路径（固定文件条目或可验证的本机就绪） |
+| AC-04、05、12 | 真引擎用例：PDF 中文可复制/图片/页眉页脚、网页断网截图比对、海报不溢出；溢出修正与一轮未修好的说明；默认模板与用户母版保真 | 同上 |
+| AC-06 | 「助手看到的图来自 LibreOffice」需模型实际读页；渲染来源与页数一致的组件证据已在片 4（三格式实际 LO 页图、独立 pypdf 页数） | 同上 |
+| AC-07、11 | 连接器用例已在片 5；AC-11「LibreOffice 打开无报错」与定制中心 Excel 条目唯一的整机核对随安装包验收 | 安装包 |
+| AC-09、10、13、14 | 干净机器无安装生成、国内下载与断点续传、香港入口不可用改原始来源、断网再做；下载卡住时三格式先交付再补查；出网记录；安装包许可证清单 | #1760 合入、LO 发行资产与国内固定文件入口上线、可签名的安装包 |
+| AC-15 | Windows 包上做 AC-01、02、03、08、09 | Windows 安装包与 Windows 执行机 |
+
+### 偏离记录
+
+暂无。

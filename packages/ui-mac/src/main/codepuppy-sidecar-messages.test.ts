@@ -317,10 +317,14 @@ test("external write scope has one read-only contract and rejects malformed or g
   const targets = [{ absolute: "/outside/a", directory: "/outside" }]
   const query = buildWriteScopeRequest(1, { access: "write", targets })
   expect(parseCodePuppySidecarInbound(query)).toEqual(query)
-  const reply = buildWriteScopeReply(1, { revision: 3, targets: [{ absolute: targets[0]!.absolute, outcome: "needs-approval" }] })
+  const reply = buildWriteScopeReply(1, { revision: 3, targets: [{ absolute: targets[0]!.absolute, outcome: "needs-approval", realDirectory: "/private/outside" }] })
   expect(parseWriteScopeReply(reply)).toEqual(reply)
+  // v7 BR-11: a folder R4 can never grant is its own outcome; the raw path is echoed, the real directory travels beside it.
+  const ineligible = buildWriteScopeReply(2, { revision: 3, targets: [{ absolute: "/Users/me/link/../f", outcome: "ineligible", realDirectory: "/Users/me" }] })
+  expect(parseWriteScopeReply(ineligible)).toEqual(ineligible)
   for (const bad of [{ ...query, register: true }, { ...query, targets: [{ absolute: "relative", directory: "/outside" }] }, { ...query, access: "execute" }, { ...query, id: -1 }]) expect(parseCodePuppySidecarInbound(bad)).toBeUndefined()
-  expect(parseWriteScopeReply({ ...reply, result: { revision: 3, targets: [{ absolute: "/outside/a", outcome: "granted" }] } })).toBeUndefined()
+  for (const target of [{ absolute: "/outside/a", outcome: "granted", realDirectory: "/outside" }, { absolute: "/outside/a", outcome: "needs-approval" }, { absolute: "/outside/a", outcome: "needs-approval", realDirectory: "outside" }, { absolute: "/outside/a", outcome: "needs-approval", realDirectory: "/outside", register: true }])
+    expect(parseWriteScopeReply({ ...reply, result: { revision: 3, targets: [target] } })).toBeUndefined()
   expect(parseCodePuppySidecarInbound(reply)).toBeUndefined()
 })
 import { parseDocumentRuntimeMessage } from "./codepuppy-sidecar-messages"

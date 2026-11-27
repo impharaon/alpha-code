@@ -558,6 +558,7 @@ function toolFailureFragments(): (TemplateFragment | TextFragment | WrapperFragm
     ),
     ...Object.entries(WEB_SEARCH_OFF_TEMPLATES).map(([id, template]) => defineTemplate({ id, sink: "tool-failure", template, maxBytes: CAP_DESCRIPTION })),
     defineText({ id: WRITE_REFUSED_ID, sink: "tool-failure", text: WRITE_REFUSED_NOTE, maxBytes: CAP_DESCRIPTION }),
+    defineText({ id: WRITE_APPROVED_RETRY_ID, sink: "tool-failure", text: WRITE_APPROVED_RETRY_NOTE, maxBytes: CAP_DESCRIPTION }),
     ...(Object.entries(POLICY_DENY_DETAIL) as [PolicyDenyReason, string | undefined][]).map(([reason, detail]) =>
       defineTemplate({
         id: policyDenyId(reason),
@@ -583,6 +584,13 @@ export const NETWORK_EGRESS_NOTE =
 export const WRITE_REFUSED_ID = "sandbox.write-refused"
 export const WRITE_REFUSED_NOTE =
   "The system refused this write (operation not permitted). Do not try other ways to write it and do not look for workarounds; stop and tell the user which write was refused."
+/**
+ * SPEC child-process-write-fence v7 BR-11 (design v6 §4.4 AB4): the user approved, after the fact, the folder a command was
+ * refused in. The command's earlier parts already ran once, so only the failed part is re-run (through the normal gate).
+ */
+export const WRITE_APPROVED_RETRY_ID = "sandbox.write-approved-retry"
+export const WRITE_APPROVED_RETRY_NOTE =
+  "The user approved writing to the folder this command was refused in; it is writable now. Re-run only the part of the command that failed - the parts before it already ran once."
 
 export const AGENT_MENTION_ID = "agent-mention.delegate"
 export const AGENT_MENTION_TEMPLATE = "Use the above message and context to generate a prompt and call the subagent tool with agent: {name}"

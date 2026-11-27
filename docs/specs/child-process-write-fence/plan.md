@@ -822,3 +822,67 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 红（产品合流处）：用 `CrossSpawnSpawner.node` 的真实 spawner 按 AC2 的命令形状（界内写、只读目录写、`echo done`）在 `gate slot` 内 16 并发跑 400 次 zsh，读 `all`：两根管道 **343/400** 最后一行不是 `done`（样本 `done\nzsh:1: permission denied: …`）；命令前加 `exec 2>&1;` 后 **0/400**。整文件不改时在负载下（同一 `gate slot` 内 4 并发 × 3 轮）12 次均通过，竞争在完整引擎下概率低，因此红证取自产品合流处。
 - 修：工作负载命令以 `exec 2>&1;` 开头，shell 报错与 `done` 同在一条流、按程序顺序记录。AC2 的五条断言不变（报错点名界外文件、界内文件无报错、最后一行 `done`、退出码 0、无 `sandbox_apply`），对照臂仍断言输出恰为 `done`、无 not permitted；`exec 2>&1` 只是 fd 复制，不写文件，不改变围栏下的落盘结果。
 - 绿：`gate slot` 内两份并发 × 3 轮，`bun test --max-concurrency 2 --timeout 90000 src/main/process-fence-engine.test.ts` **6/6 次 7 pass / 0 fail / 41 expect**（与登记条数 7 一致）。
+
+## 交付切片六｜命令中途被拦下的写入事后批准（I-55）
+
+- 依据：#1759；spec v7 BR-11、AC-13（含 BR-06 的 v7 句与限制段 v7 行）；design v6 增量 §2 AB-P01–AB-P12、§4.1–§4.5、§5、§6（实施证据 1–9）、§10 送审前裁决与「R1 审查及处置」F1–F6 @ `910e5a17b3`（#1823）。切片三的 R4/R5/R6、卡片与 receipt 原样复用，不改。INT-safety I-55（owner U-44）。
+- 核对：`0f68f09243` · 编排者 brief（`Phase: PLAN, then IMPLEMENT in the same round`）授权同轮计划并直接实施；Claude Opus 5.5 实施自核，未另收到编排者计划审查回执，不宣称独立审查通过。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/main/codepuppy-sidecar-messages.ts` 及 `codepuppy-sidecar-messages.test.ts` | R6 回答的 target 由 2 键变 3 键（加 `realDirectory`，须为绝对路径），结果值加 `ineligible`；类型、唯一 parser/build 同一提交（design §4.2）。 |
+| `packages/ui-mac/src/main/server.ts` 及 `server.test.ts` | `readWriteScope` 按 §4.2 次序判，新增 `ineligible`（`checkWritableTarget`）与每个 target 的 `realDirectory`（`plannedWritableTarget(target.directory, realpathSync.native)`）。eligibility 输入取规划处那一份：`planProductionFence` 把已有的 `locationInput.eligibility` 随 `PlannedFence` 交给代际（与 `fixedWritable` 同一种可选字段；没给的测试替身不报 `ineligible`）。 |
+| `packages/ui-mac/src/main/hub-view.test.ts`、`directory-write-approval.test.ts` | 只同步 R6 新形状（既有转发 / 假 R6 回答）。 |
+| `packages/ext/src/policy/display.ts` 及 `display.test.ts` | AB1 `refusedWritePaths(output)` 纯函数（§4.1 封闭形态表）；AB4 给模型哪一句的唯一选择函数（获准 → 重试说明；被拒 → 原 `WRITE_REFUSED_NOTE`；其余无）；`attachWriteDenied` 对 shell 结果经它选句。 |
+| `packages/ext/src/context-injection.ts`、`context-injection-inventory.snapshot.txt` | 登记 `sandbox.write-approved-retry`（sink `tool-failure`，`CAP_DESCRIPTION`）；快照用库存脚本重生。 |
+| `packages/ext/src/policy/index.ts` | `evaluateDirectoryWrite` 把 `ineligible` 并入 ask 分支（BR-08 写前不变）；seal 的 `tool.transform` 给 `shell` 再包一层 AB3（`cards` 合并表、成员 `toolCallKey`、共享拒绝同一错误对象、`signal` 中止撤回、evaluate 钩子对已撤回卡置 deny）；按 `toolCallKey` 记获准，execute.after 交给 `attachWriteDenied` 后删除；AB5 后台登记与既有 `session.hook("context")` 里的处理与历史说明附加。 |
+| `packages/ext/src/policy/register-policy.test.ts`（真插件宿主 + 真 ShellTool + 真 Permission） | `Setup` 增 `readWriteScope` 透传给 `registerPolicy`；AB3/AB5 的合并、共享拒绝、调用键、取消撤回、无人值守、R6 不可用/`ineligible`/`protected` 不出卡、后台登记与 context 钩子附说明。 |
+| `packages/ext/src/policy/identity.test.ts` | `evaluateDirectoryWrite` 的结果表加 `ineligible` → ask。 |
+| `packages/ui-mac/src/main/directory-write-approval.engine.cases.ts`（新增）、`directory-write-approval.engine.scenario.test.ts`（新增宿主） | 场景层：生产 `spawnLocalServer`（fork 换成既有引擎夹具子进程）、真实 tracker 与 R4（`createDirectoryWriteApproval`）、真 `.node` 围栏、真引擎 + 真 ext、脚本化模型经 `CP-CALL` 发出真实助手 shell 调用。文件按它端到端驱动的 R4 模块命名；没有现成宿主同时具备真 main R6/R4 与 ext↔main 桥（`fence-write-denied` 无 main；`project-writable` 的 ext 连的是假 main）。 |
+| `packages/ui-mac/native/codepuppy-fence/test/project-writable-engine.fixture.ts` | 环境变量打开时在 `codepuppyEngine()` 之前装既有的 `test-fixtures/process-fence/engine-parent-port-preload.ts`，让 ext 的 R6 查询到达宿主里的生产 main；不设时行为不变（`project-writable` 不受影响）。 |
+| `scripts/gate-files.tsv` | 新宿主登记一行；变动的已登记文件按实测改精确条数（只同步事实，不改门）。 |
+
+### 顺序
+
+1. 本计划单独提交。
+2. AB2：R6 两端（消息类型/parser/build、`readWriteScope`、`PlannedFence.eligibility`）与 ext `evaluateDirectoryWrite` 映射同一提交。红先：`server.test.ts` 新例（真临时目录：`P/link/../b` 的 `realDirectory` 为 O；HOME 下文件 `ineligible`；状态根 `ineligible`；项目外 `needs-approval`）与 sidecar-messages、identity 新行先在旧码上红。之后整跑 sidecar-messages、hub-view、server、directory-write-approval、identity 五个文件各一次。
+3. AB1 + AB4：`refusedWritePaths`、选句函数、登记与快照。夹具取 AB-P02/AB-P06 原样输出逐形态；先红后绿；整跑 `display.test.ts`、`context-injection.test.ts` 一次。
+4. AB3 + AB5：先在 `register-policy.test.ts` 写集成用例（旧码红），再实现；整跑该文件一次。
+5. 场景：新 cases + 宿主 + 夹具开关；经 `gate slot --` 跑一次宿主；去掉臂（只去掉 AB3 包装、只去掉 R6 的 `ineligible` 分支、只去掉 AB5）各在同一入口跑一次、记命令与输出后 `git restore`。最后：较宽相关集合一次（mock 或枚举 R6 回答/注入登记的文件，grep 列出）、ext 与 ui-mac `bun typecheck`、`ext-imports.test.ts`、`gate-files.tsv` 条数、`affected-tests --list` 范围行，提交。
+
+### 风险
+
+- 插件 `permission.list` 的实际返回形状（数组或 `{ data }`）与 `reply` 的入参名（`decision`）以真插件宿主为准，在第 4 步的取消用例里钉住，不按文档猜。
+- 撤回用 reject，引擎会连带本会话全部待决请求（design §4.3 第 5 步已接受）；「调用 `signal` 只在这一步被中断时中止」是设计列的推断，第 4 步取消用例同时核另一会话的无关请求仍待决。
+- AB5 依赖「后台结果在 context 钩子 `messages` 里以 `<shell id="…" state="` 开头的用户消息出现」（design 列为未实跑）：集成层用 core 自己的 `ShellResult.notification` 造正文，真实路径（`notifyWhenDone` → synthetic → 下一次请求）只在场景层证明。
+- 场景宿主的 ext↔main 桥：除 R6 外 ext 还会发包管理器授权、位置就绪等消息，宿主用生产 `createCodePuppySidecarHost`（无关依赖给最小替身）按生产路由应答，避免桥的 20 s 超时拖慢每次 shell 调用。
+- 场景里的重跑由测试本地的模型前置代理扮演「照说明只重跑失败部分」：只在最后一条工具结果含重试说明时，发出用户回合里预写的那条重跑调用；共享的 `scriptedModel` 不改（改它会让所有引擎用例进本 PR 的选择范围）。
+- 时间：设计证据面大（9 项），预计超出 3–5 小时上沿；达到 2 倍时按规则返回。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-13 / AB1 | `display.test.ts`：touch、mkdir、cp、tee、ln、install、sed、`/bin/sh` 重定向、zsh 重定向、Python、Node、Bun、git 两种、mv 两条路径逐形态原样输出 → 路径原文；`..` 原样保留；路径含空格完整取出；`Permission denied`、`No such file or directory`、无路径的 EPERM、相对路径、含空格的 rename → 空 | fast；affected PR 与 nightly（直接 import） | 词法规范化会把 `P/link/../b` 变成 `P/b`；漏一个形态即该行断言红；放宽到 EACCES/ENOENT 会让负例产出路径。 |
+| AC-13 / AB2 | `server.test.ts`：真临时目录下 `realDirectory` 按文件系统解析（软链 + `..`）、HOME 下文件与状态根 `ineligible`、项目外 `needs-approval`、受保护 `protected`；`codepuppy-sidecar-messages.test.ts` 新形状往返、2 键旧形状与非绝对 `realDirectory` 拒收；`identity.test.ts` `ineligible` → ask | fast/integration；affected PR 与 nightly | 去掉 `ineligible` 分支 ⇒ HOME 例答 `needs-approval`（红）；去掉 `realDirectory` 或改成词法规范化 ⇒ 软链例错目录；`ineligible` 不进 ask ⇒ BR-08 写前卡消失。 |
+| AC-13 / AB3 合并、共享拒绝、调用键 | `register-policy.test.ts`：同会话两条并行 shell 拒在同一目录 → 恰一张 external_directory 卡（resources `O/*`、`directoryAccess` 为原文 target）；普通拒绝 → 两条都以同一个拒绝结束、第二条不返回原输出；批准 → 两条都得重试说明、无拒写说明；两会话同调用 id 一条获准一条未获准 → 说明不串 | integration；affected PR 与 nightly | 去掉合并 ⇒ 两张卡；成员吞拒绝 ⇒ 第二条返回原输出；按调用 id 记获准 ⇒ 未获准会话也得重试说明。 |
+| AC-13 / AB3 取消 | 同文件：卡待决时中断该调用 → `permission.list` 不再有该请求、合并表空；同会话随后的新命令拒在同一目录 → 新卡；另一会话的无关待决请求仍在 | integration；affected PR 与 nightly | 去掉撤回（一次性变异记录）⇒ 中断后请求仍待决，用例红；新命令会等旧卡而不出新卡。 |
+| AC-13 / 不出卡 | 同文件：无人值守会话、R6 不可用、`ineligible`、`protected`、只有相对路径 → 无卡、原拒写说明 | integration；affected PR 与 nightly | 去掉无人值守判定 ⇒ 无人值守会话出卡等待；把 `ineligible` 当可批准 ⇒ 出卡。 |
+| AC-13 / AB5 | 同文件：`background: true` 的真 ShellTool 调用立即返回、无卡；context 钩子里以 `ShellResult.notification` 正文出现时出卡；批准 → 该消息后附重试说明且之后每次请求照附；拒绝 → 附拒写说明、钩子不抛；钩子被放弃后卡仍在、决定后下一次请求附上 | integration；affected PR 与 nightly | 去掉 AB5 ⇒ 后台结果无卡（红）；在钩子里抛出 ⇒ 请求失败（红）。 |
+| AC-13 真入口 | `directory-write-approval.engine.cases.ts` 经宿主：「全部批准」（build）`echo a >> P/a.txt && touch O/b.txt` → 卡写明 O 的真实路径 → R4 granted、引擎 pid 不变 → 工具结果带重试说明、无拒写说明 → 模型只重跑 touch → b.txt 落盘、a.txt 恰一行；「请求审批」（codepuppy-ask）同一流程，重跑先出命令卡；Node 报错写法批准臂；拒绝臂 0 落盘；相对路径、测试 HOME、受保护位置三臂无卡、原说明、0 落盘；`P/link/../b` 臂卡写明 O、批准后落盘；后台臂运行期间无卡、结果被读时出卡、批准后说明附在结果后 | scenario：nightly 与本次一次 `gate slot --`；不进每 PR 矩阵 | 同一入口只去掉 AB3 包装 ⇒ 无卡、b.txt 不存在（一次性记录）；只去掉 R6 `ineligible` ⇒ HOME 臂出卡（一次性记录）；只去掉 AB5 ⇒ 后台臂无卡（一次性记录）。 |
+| BR-08 写前不变 | `identity.test.ts` 映射行；切片三的 R4/卡片既有用例不改照过（较宽相关集合） | fast/integration | `ineligible` 改成 deny 或 allow ⇒ 映射行红。 |
+
+### 偏离记录
+
+- 2026-11-27 · 步骤 4 多改一个同调用链文件 `packages/ext/src/secret-mask.ts`：execute.after 的错误遮盖 `permissionCause` 只保留 `Permission.BlockedError` / `CorrectedError` 作原因，普通拒绝 `Permission.DeclinedError` 被丢成 `error: undefined`，于是 promise 工具里原样抛出的拒绝到了会话运行器已认不出，模型拿到一条空的失败结果继续往下走（design §4.3 第 4 步「按结束本步恢复」列为未实跑，实测在此被否定）。DeclinedError 没有字段，原样保留即可，不涉遮盖内容。红：`register-policy.test.ts` 共享拒绝例在改前 `failure(exit).error` 为 `undefined`（两条调用都只剩空 message 的 Tool.Error）；改后两条调用的原因是同一个 `Permission.DeclinedError` 实例。同一修正也让既有安装工具（BR-10，`askInstall`）的普通拒绝按其文档结束本步；该端到端行为此前无用例。
+- 2026-11-27 · 步骤 4 证据：`bun test src/policy/register-policy.test.ts` **122 pass**（原 115 + 7）；只去掉撤回（`leave` 不调 `withdrawRefusedWriteCard`）⇒ 取消例 **1 fail**（停止后请求仍待决）；只去掉 context 钩子里的 AB5 调用 ⇒ 后台例 **1 fail**；旧码上 AB3 六例红、「不出卡」例为守卫（旧码本就不出卡）。`secret-mask.test.ts`、`hub-tools.test.ts`、`display.test.ts` **53 pass**，ext `bun typecheck` exit 0。后台例的命令保持运行（`sleep 60`）：它在本宿主里完成会由 `notifyWhenDone` 触发一次真实模型回合并外呼；结果正文用 core 的 `ShellResult.notification` 造，真实完成路径归场景层。
+- 2026-11-27 · 步骤 5 证据（`f654f19dd0`）：`gate slot -- bun test --timeout 600000 ./src/main/directory-write-approval.engine.scenario.test.ts` 宿主 **1 pass**，子进程 **7 pass / 0 fail / 48 expect**（结果与 main/引擎日志、模型请求在 `node_modules/.cache/directory-write-approval/results/run-jln1w3*`），main 日志 5 次 `grant granted`（两档、Node、软链、后台各一）。同一入口的去掉臂各跑一次后 `git restore`：只去掉 AB3 包装 ⇒ 全部批准臂 **1 fail**（无卡，`outside-build` 0 文件）；只去掉 R6 的 `ineligible` 分支 ⇒ 不出卡臂 **1 fail**（main 的 HOME 那条出了 external_directory 卡）；只去掉 context 钩子里的 AB5 ⇒ 后台臂 **1 fail**（无卡）。
+- 2026-11-27 · 步骤 5 过程：首跑缺 main 的 `CODEPUPPY_GLOBAL_DIR`（宿主装配，补上）；次跑 **6 pass / 1 fail**：拒绝臂把首轮的标题请求（不带工具）也数进「模型请求」——实际记录里拒绝之后没有任何请求带这次调用的结果，本步已结束；断言改为只数带工具的请求，未放宽「无工具结果」一条。
+- 2026-11-27 · 与计划不同的一处取证：本宿主里引擎沙箱的 HOME 在应用自有的可写根（W3）之下，写它不会被拦；「主目录」一臂因此写 main 的 HOME（`eligibility.homeDir`，在任何可写根之外），即 R6 判 `ineligible` 用的那一个；生产里两者是同一个目录。
+- 2026-11-27 · 收口：较宽相关集合一次 —— ext 26 个文件（display、context-injection、identity、hub-bridge、register-policy、secret-* 八个、hub-tools、ext-imports、plugin-setup-order、plugin-fanout、policy 下 inventory/resolver/session-row-rules/tool-policy-rpc/unattended-policy/risk/ask-deadline/permission-reply-premises、external-directory-rule）**445 pass**，`plugin-host.test.ts` **126 pass**；ui-mac 的 R6 消费者（sidecar-messages、hub-view、directory-write-approval、server、gate-file-registry）在最后一次改动它们之后已整跑。ext、ui-mac `bun typecheck` exit 0；north-star guard 零上游改动。`affected-tests --list`：`affected tests: 320 of 756 test files`（`policy/index.ts`、`context-injection.ts`、`server.ts` 被广泛导入）。未跑：`project-writable.engine.scenario.test.ts`（夹具改动只在设了环境变量时生效，该场景不设，归夜间）。
+- 2026-11-27 · 代码审查 R1（Codex gpt-6.1-sol，FIX-THEN-MERGE，2 Major，编排者全部采纳）第 1 项：`secret-mask.ts` 不再凭 `_tag` 字符串保留拒绝 —— 插件工具可抛 `Object.assign(new Error(秘密), { _tag: "Permission.DeclinedError" })`，原样保留会让秘密经 `to-session-error.ts:87` 进入会话错误。改为只认引擎自己的拒绝类：ext 每次向引擎发的审批（`policy/index.ts` 的 `assertPermission`，gate 与事后卡共用）收到的普通拒绝登记其原型（`engineDecline`）；遮盖时只有原型相同才保留，并按该原型重建、不带任何调用方附加的文本，其余丢弃。红：`secret-mask.test.ts` 新例在改前伪造标签那一臂泄漏（`leaked: true`）；改后伪造被丢、真拒绝保留类而被附加的 message 不出现。`register-policy.test.ts` 共享拒绝例的断言随之由「同一个对象」改为「两个成员的原因都是引擎的 DeclinedError」（重建后不再是同一引用）；只去掉登记（`assertPermission` 不调 `engineDecline`）⇒ 该例 **1 fail**。`secret-mask.test.ts` **19 pass**、`register-policy.test.ts` **122 pass**、hub-tools 与 secret-* 四文件 **50 pass**，ext `bun typecheck` exit 0。
+- 2026-11-27 · 代码审查 R1 第 2 项：事后卡的目录主体绑定 main 首次 R6 返回的 `realDirectory`（`directoryAccess.targets[].directory` 与 `resources`/`save` 都用它，`absolute` 保留原文供 main 复查），卡上显示、按真实目录合并与 R4 授予指向同一目录；路径里的软链在首次解析之后被改指（例如到主目录）也不会让主目录出卡。红：`register-policy.test.ts` 新例（假 R6 在首次读取后把 `/project/link/..` 改解析为主目录）在改前卡的 `directory` 是原文 `/project/link/..`（R4 会再解析成主目录并给出批准按钮）；改后为 `/outside-l`，之后的 R6 查询不再带软链原文。整文件 **123 pass**，ext `bun typecheck` exit 0；`gate-files.tsv` 该行 122 → 123。
+- 2026-11-27 · R1 修正后复验（`9332edabd5`）：`gate slot -- bun test --timeout 600000 ./src/main/directory-write-approval.engine.scenario.test.ts` 宿主 **1 pass**，子进程 **7 pass / 0 fail / 48 expect**（`results/run-INngY8*`），main 日志 5 次 `grant granted`；`secret-mask.test.ts` **19 pass**、`register-policy.test.ts` **123 pass**；ext、ui-mac `bun typecheck` exit 0。
+- 2026-11-27 · 合并 origin/alpha（`e71ccc26f7`，slices 6–9 #1825、#1824、#1826）：两处冲突 —— `server.ts` 两侧都保留（import 合并 `checkWritableTarget` 与 alpha 的 `planCredentialStores`/`configureCommandSourceFence`；`PlannedFence` 同时带本切片的 `eligibility` 与 alpha 的 `configFence`），注入库存快照用 `--write` 重生（与 alpha 只差本切片那一条 `sandbox.write-approved-retry`）。复验：`fixture-identity.test.ts` **5 pass**（无需重采样）；`register-policy` **123**、`secret-mask`+`context-injection`+`display`+`identity` **99**、`server.test.ts` **59** pass；ext、ui-mac `bun typecheck` exit 0；`gate slot -- env CODEPUPPY_TEST_FILES=<本切片九个登记文件> bash scripts/assert-gate-files.sh` 九行条数与登记精确一致（含场景宿主 1 条，子进程 **7 pass / 48 expect**，`results/run-0Zuvg9*`，5 次授予）。登记簿 register-policy 行的说明随 R1-1 改为「只保留引擎的拒绝类」，条数不变。

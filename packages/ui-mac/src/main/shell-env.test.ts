@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { applyTrustedShellEnvironment, commandOnPath, loadShellEnv, queryGoInstallTarget, underGenerationFence, useGenerationFence, type ShellProbeFenceContext } from "./shell-env"
+import { __resetGenerationFenceForTests, applyTrustedShellEnvironment, commandOnPath, loadShellEnv, queryGoInstallTarget, underGenerationFence, useGenerationFence, type ShellProbeFenceContext } from "./shell-env"
 import { probeShellEnvAsync } from "./shell-env-cache"
 import { planProcessFence } from "./process-fence-plan"
 import { trialCompileProfile } from "./process-fence-compile"
@@ -104,6 +104,7 @@ test.skipIf(process.platform !== "darwin")("main helper commands find PATH tools
   plant("which", `${planted}/$1`); plant("node", "v22.5.0"); plant("npx", ""); plant("git", "diff --git a/x b/x")
   try {
     process.env.PATH = `${planted}:/usr/bin:/bin`
+    __resetGenerationFenceForTests()
     expect(commandOnPath("which", process.env.PATH)).toBe(join(planted, "which"))
     // No generation planned yet: nothing to run under, so the helper command is refused rather than run as main.
     expect(underGenerationFence("git", ["diff"])).toBeUndefined()

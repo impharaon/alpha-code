@@ -56,6 +56,10 @@ let generationFence: ShellProbeFenceContext | undefined
 export function useGenerationFence(context: ShellProbeFenceContext) {
   generationFence = context
 }
+/** Tests only: other test files in the same process may already have planned a generation. */
+export function __resetGenerationFenceForTests() {
+  generationFence = undefined
+}
 
 /**
  * A main-side helper command (tool version, git diff). On darwin it runs only under the generation fence; before any

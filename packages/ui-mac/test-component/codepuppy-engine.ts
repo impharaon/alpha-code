@@ -21,19 +21,9 @@ import { engineProjectTrust } from "../src/main/engine-project-trust"
 import { projectTrustIdentity } from "../src/main/project-trust-truth"
 import { recordProjectTrustDecision } from "../src/main/project-trust-truth-write"
 import { reconcileSkillsDerivation, skillsEnabledPath } from "../src/main/ext-receipt-v2"
-import { packageManagerShellSource } from "../engine/package-manager-shell-transform"
+import { installPreparedShellSeam } from "./prepared-shell-seam"
 
-// The production engine build (scripts/build-engine.ts) rewrites these Core/Plugin files for the prepared-Shell seam (H2);
-// the real ext delegates through it, so the source-loaded engine here gets the same rewrite.
-Bun.plugin({
-  name: "prepared-shell-seam",
-  setup(build) {
-    build.onLoad({ filter: /\/packages\/(?:core\/src\/(?:shell|plugin\/hooks|plugin\/host|tool\/plugin\/shell)|plugin\/src\/(?:effect\/shell|promise\/shell|promise\/adapter))\.ts$/ }, async (args) => {
-      const code = await Bun.file(args.path).text()
-      return { contents: packageManagerShellSource(code, args.path) ?? code, loader: "ts" }
-    })
-  },
-})
+installPreparedShellSeam()
 
 /** 真 stdio MCP 服务器(#1563 的夹具):列一个 `echo`,`CODEPUPPY_MCP_CALL_LOG` 记下每次 tools/call。 */
 export const MCP_FIXTURE = path.resolve(import.meta.dir, "../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")

@@ -56,9 +56,9 @@ export function packageManagerShellSource(code: string, file: string): string | 
   replace('                          if (!(yield* end({ status: "timeout" }))) return', `                          if (!(yield* end({ status: "timeout" }))) return
                           if (delegate) yield* Effect.promise(() => delegate.cancel("timeout"))`)
   replace("                  yield* outputDone.await", "                  yield* outputDone.await\n                  if (delegate) yield* Effect.promise(() => delegate.finish())")
-  replace('          ).pipe(Effect.catchTag("AppProcessError", (error) => Deferred.fail(ready, error))),', `          ).pipe(
+  // The spawn failure path also closes the Shell capture (#1758); the lease finishes on every outcome.
+  replace('          ).pipe(Effect.catchTag("AppProcessError", (error) => Effect.gen(function* () {', `          ).pipe(
             Effect.ensuring(delegate ? Effect.promise(() => delegate.finish()) : Effect.void),
-            Effect.catchTag("AppProcessError", (error) => Deferred.fail(ready, error)),
-          ),`)
+            Effect.catchTag("AppProcessError", (error) => Effect.gen(function* () {`)
   return code
 }

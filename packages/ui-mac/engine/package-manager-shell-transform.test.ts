@@ -50,7 +50,8 @@ const shell = { resolve: () => Effect.succeed("/bin/sh") }
 const ShellSelect = { args: (shell, command) => ["-c", command] }
 const bus = { publish: () => Effect.void }
 const removeCommand = () => Effect.void
-const hooks = { trigger: (domain, name, event) => Effect.sync(() => {
+// No Shell capture hook (#1758) is registered here; only the prepared-Shell event answers.
+const hooks = { has: () => Effect.succeed(false), trigger: (domain, name, event) => Effect.sync(() => {
   events.push(name)
   if (name === "codepuppy.prepared") event.delegate = {
     executionSource: "IFS= read -r proof <&3; exec 3<&-; [ \\"$proof\\" = private-test-bytes ] && printf delegated",

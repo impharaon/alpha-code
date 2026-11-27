@@ -17,7 +17,10 @@ import { engineAuthorization, withEngineAuthorization } from "../../src/main/eng
 import { publishInProcessEngine } from "../../src/main/in-process-engine"
 import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { engineProjectTrust } from "../../src/main/engine-project-trust"
+import { installPreparedShellSeam } from "../../test-component/prepared-shell-seam"
 
+// Before the ext and engine modules load: the production build gives the engine the prepared-Shell seam.
+installPreparedShellSeam()
 const env = process.env
 const userData = env.CP1321_USER_DATA!
 const extDir = env.CP1321_EXT_DIR || undefined

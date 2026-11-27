@@ -1565,6 +1565,6 @@ export function registerExtIpcHandlers(
   // ready 时 attach;onViewChanged 接 `ext-hub-view-changed` 推送。
   // #1760: the pre-spawn dependency read resolves installed declarations from this same effective catalog;
   // R8 rebinds an explicit connector cwd through the existing writer and this coordinator's reload.
-  const connectorWorkspace = (server: string, folder: string) => bindConnectorWorkspace({ server, folder }, reloads.request)
+  const connectorWorkspace = (identity: { directory: string; server: string }, folder: string) => bindConnectorWorkspace({ identity, folder }, reloads.request)
   return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1, resolveEffectiveCatalog, connectorWorkspace }
 }

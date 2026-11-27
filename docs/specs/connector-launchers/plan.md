@@ -930,7 +930,7 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 
 2026-11-27 · V24-R1 install 脚本（本轮提交）：`connectorNpmDefaults` 去掉 `ignore-scripts`，准备安装的 argv 与 npm-exec 运行器环境都不再强制它，用户自己的 npm 配置（含 ignore-scripts）按官方 npx 一样保留。本地源的内容身份与归档（content 程序里 `libnpmpack`/`npm-packlist` 的 `ignoreScripts`）仍固定为 true：那是计算准备 key 时打包本地源，不是安装；若跟着放开，算 key 本身就会运行 prepack/prepare 脚本。这一处显式保留，原先它只是读同一个默认值。
 
-2026-11-27 · R8 显式 cwd（`55e4fe0163`）：新模块 `connector-workspace-binding.ts`。声明里明确配置了 cwd（不含 `{workspace}`）时，main 用既有写端（`persistMcpWithPolicy` → `persistMcp`，同一策略入口与停用投影）只把 cwd 换成所选文件夹，其余命令/环境/业务字段原样保留，再经 ext-ipc 已有的重载协调器请求一次 global 重载，由重载重读定义并重启连接器；`{workspace}` 或没有 cwd 的声明照旧在所选 Location 重新连接；写失败回 `unavailable` 并带原因，取消仍回 cancelled。来源：目录与包派生（`deriveMcpConfig`）从不产出 cwd，显式 cwd 只出现在用户自建的全局定义里，所以只接这一个写端；项目 `codepuppy.jsonc` 里手写的 cwd 没有既有的改写端（项目侧只有事务化安装与 `removeProjectMcpConfigInLock`），这种定义仍走「所选 Location 重连」，cwd 不变 → 观察项，不在本票另造项目写端。
+2026-11-27 · R8 显式 cwd（`55e4fe0163`）：新模块 `connector-workspace-binding.ts`。声明里明确配置了 cwd（不含 `{workspace}`）时，main 用既有写端（`persistMcpWithPolicy` → `persistMcp`，同一策略入口与停用投影）只把 cwd 换成所选文件夹，其余命令/环境/业务字段原样保留，再经 ext-ipc 已有的重载协调器请求一次 global 重载，由重载重读定义并重启连接器；`{workspace}` 或没有 cwd 的声明照旧在所选 Location 重新连接；写失败回 `unavailable` 并带原因，取消仍回 cancelled。来源：目录与包派生（`deriveMcpConfig`）从不产出 cwd，显式 cwd 只出现在用户自建的全局定义里，所以只接这一个写端；Codex r1 B3 后改为按完整身份解析当前生效来源：全局定义存在即以它为准（ext 只把全局没有的项目 MCP 补进来），否则读该 Location 项目的 `.codepuppy/codepuppy.jsonc`；项目定义的显式 cwd 在持有该项目 Bundle 锁时经新原语 `rebindProjectMcpCwdInLock` 只改 `mcp.<name>.cwd`（与项目卸载原语同一根身份校验、插件封印与原子提交），重载作用域为该目录。
 
 ### r10 独立部分实施收据（#1759 合入前）
 

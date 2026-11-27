@@ -177,7 +177,7 @@ type SpawnLocalServerOptions = {
   /** #1760: the effective catalog the pre-spawn dependency read resolves installed declarations against (ext-ipc's resolver). */
   connectorCatalog?: () => Promise<{ entries: readonly CatalogEntry[]; version: string }>
   /** R8: rewrite an explicit connector cwd through its existing writer; `location` means the chosen folder is the reconnect Location. */
-  connectorWorkspace?: (server: string, folder: string) => import("./connector-workspace-binding").ConnectorWorkspaceBinding
+  connectorWorkspace?: (identity: { directory: string; server: string }, folder: string) => import("./connector-workspace-binding").ConnectorWorkspaceBinding
   /**
    * DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时(`credentials.unavailable`)或主进程读不出表时,请求既有的 `credential-change` 重启
    * (index.ts 接到 requestSidecarRespawn:既有队列与自愈阶梯,有界)。
@@ -983,7 +983,7 @@ export async function spawnLocalServer(
       const picked = await (focused ? electronNs.dialog.showOpenDialog(focused, dialogOptions) : electronNs.dialog.showOpenDialog(dialogOptions))
       const directory = picked.canceled ? undefined : picked.filePaths[0]
       if (!directory) return { ok: false, error: "cancelled" }
-      const bound = options.connectorWorkspace?.(identity.server, directory) ?? { kind: "location" }
+      const bound = options.connectorWorkspace?.(identity, directory) ?? { kind: "location" }
       if (bound.kind === "failed") return { ok: false, error: "unavailable", detail: bound.detail }
       return bound.kind === "cwd" ? { ok: true } : reconnect(identity.server, directory)
     },

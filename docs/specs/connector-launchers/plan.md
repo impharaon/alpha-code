@@ -941,3 +941,20 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 **#1759 合入后续接（A 组余项）**：server 次序 fence → 同次绑定 env 建 createLauncherAssetAuthority（`launcherBundleDirectory`/`hostLauncherPlatform`）→ 产出 launchers 并改为必填；pinned 桥绑定 authority.ensureFile/ensureEntry；server 挂 `createConnectorLaunchMainBridge`（resolveAssets=authority、runtimeDependencies=reader+已装声明、diagnostic 动作走桥）；sidecar.ts 在引擎前 `createConnectorLaunchSidecarHost` + publishConnectorLaunchHost；文档 `node` 绑定 authority.resolveAssets；撤销 uvx/npx 的 300000 ms；一次性真入口证据（计划证明表）。**B 组**：R5 代理归属标记与证据推送、R6 reopen（消费合入时 #1757 的批准面）、R8 换文件夹、密钥补充。
 
 遗留去向：①`scripts/north-star-guard.sh` 对本分支 exit 1，点名 r5 `24f2809238` 改的上游 `core/src/mcp/pool.ts`（转发 diagnostic）与 r4 `22c41a6d06` 改的上游 `core/test/mcp.test.ts`（精确断言补 preparation）→ ship 前须处理（编排器裁定：撤回/改走自有文件或按北极星规则另立 ADR）；本轮诊断改由 sidecar 读派生文件，pool.ts 的转发可随之撤回。②`packages/util/src/codepuppy-hash.ts:20` 文件末多一空行（r3）→ 顺手可修。③文档行的「让助手排查」在 unknown 失败时诊断回 unavailable（文档准备没有进程 transcript）→ 意图项或随 B 组定。OPTIONAL：无。
+
+### r11 #1759 合入后接线与一次性真入口证据
+
+依据：本节计划与核对行裁定；#1759 合入 `51b7963872`（origin/alpha `aa1a8426b2`）；已核：Claude Opus 5.5。提交：`4322779e70`（北极星守卫 exit 0）、`d0da542d6c`（hash 文件末空行）、`51b7963872`（合入，七处冲突两边保留）、`79010eb75b`（#1759 消费接线）。启动器包用原构建脚本预构建：`gate slot -- bun ./scripts/build-connector-launchers.ts` exit 0，`native/connector-launchers/build/mac-arm64/runtime.json` 的 pinSet `98f61dba…f9fd` 与 r2 一致。
+
+**一次性真入口**（不入套件；`/tmp/r10-probe/realentry.test.ts` + `driver.ts`）：真 `spawnLocalServer`（main 侧：#1759 `planPackageManagerCaches` 的同次绑定与生产 profile 渲染、`forkLauncherAuthority`、bootstrap、pinned/窄消息桥、当前代投影、真策略代理）fork 一个 bun 进程，按 sidecar.ts 的 start 顺序先以生产 `.node` 施加该 profile，再发布 bootstrap、#1759 R2、ConnectorLaunchHost、注入、ext、嵌入式引擎；隔离 HOME/userData 在系统临时目录之外，PATH 最前放记录执行的旧 `uv/uvx/node/npm/npx/python3`。经引擎 HTTP 加入目录里的真实定义并连接。口径：引擎跑在 bun（dev 树），不是 Electron utilityProcess 与正式签名包。
+
+| AC 部分 | 命令 / 结果 | 对照臂 |
+| --- | --- | --- |
+| AC-01 开发入口（五个官方） | `gate slot -- bun test /tmp/r10-probe/realentry.test.ts`（connect）exit 0：空 userData、空缓存下 fetch 37.9 s、filesystem 38.6 s、playwright 115.4 s、chrome-devtools 115.5 s、markitdown 119.2 s 全部 connected；引擎日志的进程为随包 `native/connector-launchers/build/mac-arm64/node/bin/node`；出网只有 registry.npmjs.org、pypi.org、files.pythonhosted.org（Python pin 由 main 的固定文件 authority 取） | Git「需要先安装 git」由 R5 谓词用例承担；干净 Mac/无弹窗/正式包仍属发布层 |
+| AC-05 | 同一次：PATH 最前的旧工具记录文件不存在（`old tools ran false`） | r10 本地用例已证去掉 localLaunch 会执行 marker |
+| AC-02 开发入口 | 同一次：以引擎首启完成后的 HOME 为基线，启用五个连接器后 HOME 只多出引擎自己的空目录 `~/.local/share/opencode/shell/<hash>`（引擎首次起子进程时建，非启动器写入）；Python 装在 `userData/package-managers/uv/python`，准备入口在 `userData/connector-runtime/prepared/<key>`（约 490 MB + 499 MB） | `gate slot -- bun /tmp/r10-probe/arm.ts <iso>` exit 0：同一生产 profile、同一随包 uv、同一已验镜像，撤掉 UV_PYTHON_INSTALL_DIR 并令 XDG_DATA_HOME 取 HOME 值 → `failed to create directory …/home/.local/share/uv/python: Operation not permitted (os error 1)`、HOME 内未出现；保留绑定位置 → `Installed Python 3.12.16`；同 profile 下另一 HOME 写入 → `Operation not permitted`，证明不是无围栏对照 |
+| AC-06 状态流 | `PROBE_PHASE=observe` exit 0：订阅当前代投影得到 `preparing:packages → launcher → python:activity → python:bytes 262144/25270084 … → packages → connecting → connected`（111 个状态，31.2 s）；200 KB/s 限速未测 | — |
+| AC-08 | connect 同一次：exit 23 的本地服务 → 行 `failed`，`connectorLaunchApi.diagnostic(identity)` 回原命令、`exitCode: 23`、stderr 原文 `probe crash: boom secret-xyz`（经 main→sidecar 窄桥读派生 transcript） | r10 用例：去掉诊断身份/路径核对即失败 |
+| AC-10 开发入口 | `PROBE_PHASE=offline` exit 0：同一 userData、新进程第 2 代、代理拒绝一切出网：filesystem 1.2 s、fetch 3.1 s、playwright 4.1 s、chrome-devtools 4.2 s、markitdown 5.0 s 全部 connected，代理记录为空（没有任何 CONNECT 尝试），HOME 无新增 | `PROBE_PHASE=offline-arm` exit 0：同一入口改用随包 node + npx 的默认设置（无准备入口）→ 5.1 s 后 `failed`（进程 exit 1），代理记录三次 `registry.npmjs.org deny` |
+
+未取得：AC-03 北京/香港、AC-04 用户添加的带本机模块的 npx 包（uvx 一侧的 fetch 依赖 pydantic-core 原生扩展，已连上；npm 原生模块与签名 Node 的库验证属正式包）、AC-06 200 KB/s 限速、AC-09 Windows、正式包/干净账户——均属发布层或下一轮。HOME 下引擎自建的空 `opencode/shell/<hash>` 是否计入 AC-02 由验收方判定（非启动器路径，位于引擎自己的数据根）。

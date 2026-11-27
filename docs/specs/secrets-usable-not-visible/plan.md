@@ -895,3 +895,51 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 - 移除臂（临时改写，`git restore` 回到已暂存的修正）：只取第一个地址 → secret-values `BOTH` 行、secret-read 各红；整段 `URL.parse` 门 → `MONGO_URL` 行、secret-read 各红（首次按逗号截断的臂不忠实、未变红，已改为整段解析后重做）；不加保护的解码 → URIError 红；跳过键值段 → `CONN` 行、secret-read 各红；精确词匹配 → Schema `PGPASSWORD` 红；仅相等时还原 → 改主机三例红；旧偏移公式 → 长视图两例红。日志 `/tmp/secrets-r1-arm-*.log`。
 - 静态：schema、ext、ui-mac `bun typecheck` 均 exit 0；7 个改动 TS 的 oxlint 0 warnings / 0 errors。
 - 偏离：Schema 词表加 `PWD`、名字片段以凭据词结尾即算——均为审查裁定所需，冻结设计 §4.1 的词表正文随设计同步更新。
+
+## ⑦ 规格 v6：命令里字面写出的项目外名单路径先登记
+
+- 依据：[规格 v6](spec.md) @ `2e99186d59`：BR-05 的 v6 句与 AC-13（来源：协调仓安全意图 I-54，owner 2026-11-27 U-44 选「补上：命令里写出的路径先登记（推荐）」）；[冻结设计](design.md) v3.4 §4.1（`probe` 对命令载荷路径词调用同一 `match`）、§4.3（已读项目外名单文件经 `track` 计入采集；shell start 前采集）、§4.5（SC-01 `ShellHooks` 的 `create.before` 与 capture）的入口不改签名；#1758。代码基线 `a56d861523`（origin/alpha）。继承 ①..⑥ 收据，不重审已定范围。
+- 核对：本轮按派单计划与实施同轮，本节未经编排器单独核对；由编排器在审查时核对。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/schema/src/codepuppy-protected-files.ts` | `probe` 现有的命令路径词扫描提成 `named({ text, roots })`，返回这些路径词经同一 `match` 命中的 ProtectedFile（按路径去重）；`probe` 改为取其 rule ID 去重，签名与结果不变。不新增路径规则或第二个分词器。 |
+| `packages/ext/src/secret-mask.ts` | 新增 `command({ command, cwd })`：把 Shell 的工作目录按 Location 目录解析（含开头的 `~`，与引擎解析 `workdir` 同义），作为相对路径的基准调用 `ProtectedFiles.named`，对每个命中文件调用既有 `files.track`。同步、不读文件；读取在随后 capture start 的 `files.refresh()`。 |
+| `packages/ext/src/policy/index.ts` | `seal` 在 capture 注册旁注册 `context.shell.hook("create.before", (event) => secrets.command(event))`。Core 先触发 create.before、再触发 capture start、之后才 spawn（`packages/core/src/shell.ts:303,343,357`），start 的 refresh 已采集登记文件，所以第一段输出起就按它遮盖。 |
+| `packages/ext/src/policy/register-policy.test.ts` | 表例 `outside project protected files a command names are masked from its first output`：隔离 HOME 下另一项目的 `.env`（凭据名变量 + 端口），未经 read，第一次接触是 shell `cat`：(a) 相对项目目录写出的路径；(b) `workdir` 为 `~/work/<另一项目>` 后 `cat .env`。每段 chunk 发布后读运行中的输出文件（沿用 `registered shell capture masks live files and preserves program use` 的观察插件写法），实时与最终结果都没有值、有 `TOKEN=[REDACTED]` 与 `PORT=3000`。 |
+| `scripts/gate-files.tsv` | register-policy 精确条数 101→103。 |
+| 本 `plan.md` | 本节与收据。 |
+
+Schema 的 `codepuppy-protected-files.test.ts` 不在任何 `.gate-tests` 根下（⑥ 收据已记），不在那里加例；`named` 的行为由 ext 受选用例覆盖，`probe` 结果不变由既有 risk 用例钉住。
+
+### 顺序
+
+1. 规格 v6（`2e99186d59`）与本节各一提交。
+2. **红例提交**：register-policy 表例两行在未修改的实现上各 FAIL（值出现在实时输出与结果），记录输出。
+3. **实现提交**：Schema `named`/`probe`、`SecretMask.command`、seal 注册、gate-files 条数。结束时完整跑 register-policy、secret-mask、secret-files、risk 各一次。
+4. 返回前一次扩大相关集：`ProtectedFiles.probe` 的消费者与枚举者（ext risk、ui-mac permission-risk/PermissionDialog/RiskTag）、`createSecretMask`/create.before 的既有用例（plugin-host、codepuppy-ext-no-shell-layer、context-injection）；经 `gate slot --` 跑场景 `protected files` 各行（含 AC-11、AC-12）一次；schema/ext/ui-mac `bun typecheck`、改动 TS 的 oxlint、`affected-tests --list`。移除臂（工作树临时改写、跑具名例、`git restore`）：不注册 create.before；登记挪到 capture end；工作目录不参与解析；不展开 `~`。
+
+### 风险
+
+- create.before 早于 Core shell 自己的 `prepare`（工作目录解析、external_directory 与命令审批）：被拒的命令也已登记其文件，只会多遮，不放出任何内容；登记不读文件，读取发生在 capture start（审批之后、spawn 之前）。
+- 登记集合随 Location 存续累积（与 read 的 `track` 相同），每次 refresh 对每个登记文件 stat 一次；不存在的路径按缺失重试，不报错。已在 sources 内的名单路径也会登记，只多一次 stat，不改采集结果。
+- create.before 覆盖本 Location 的全部 Shell.create（shell 工具与会话里的 `!` 命令，`packages/core/src/session/shell.ts:13`），两者的输出走同一 capture，规则一致。
+- 规格 v6 限制表所列：拼出来的路径、先 `cd` 再写的相对路径不认。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-13 | register-policy `outside project protected files a command names are masked from its first output`（相对路径、`~` 工作目录两行） | integration（受影响 PR 与夜间） | 不注册 create.before：两行的实时输出与结果出现值；登记挪到 capture end：两行实时输出出现值（结果仍遮）；工作目录不参与解析或不展开 `~`：`~` 工作目录行出现值 |
+
+### 设计待同步（交编排器，本节不改 design.md）
+
+- §4.1 `declare const ProtectedFiles` 增 `named(input: { text: string; roots: ProtectedRoots }): readonly ProtectedFile[]`，`probe` 注释为「`named` 命中文件的 rule ID」；「项目外范围」段「这类文件只在读文件工具读过之后由 §4.3 的已读文件来源计入采集」补「或命令里字面写出其路径时（规格 v6）」。
+- §4.3 首段「本 Location 内读文件工具已读过的项目外名单文件——SecretMask.read 先登记该 ProtectedFile」补「以及 shell 命令字面写出的这类文件——Shell create.before 时由 SecretMask.command 以该命令的工作目录解析并登记」；「未读过的项目外名单文件不贡献值（规格 v5 批准记录所列边界）」改为规格 v6 限制表的边界；SecretMask 类型增 `command(input: { command: string; cwd: string }): void`。
+- §4.5 SC-01 段：扩展另消费 `ShellHooks["create.before"]`，只读 command/cwd、不改事件；接口不变。
+
+### 偏离记录
+
+暂无。

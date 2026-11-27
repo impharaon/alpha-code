@@ -1,6 +1,6 @@
 import { Tool } from "../../schema/src/tool"
 import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
-import { envAssignments } from "./secret-values"
+import { envAssignments, envView, maskSpans } from "./secret-values"
 
 /** Consume an already encoded read page. Page selection and line labels belong to the reader. */
 export function projectSecretRead(input: {
@@ -73,7 +73,9 @@ export function projectEnvRows(sources: readonly string[], rows: readonly { numb
       }
       const left = Math.max(0, Math.min(prefix.length, record.valueStart - start))
       const right = Math.max(0, Math.min(prefix.length, record.valueEnd - start))
-      const value = ProtectedFiles.isPublicValue(record) ? prefix.slice(left, right)
+      const view = envView(record)
+      const value = view.kind === "public" ? prefix.slice(left, right)
+        : view.kind === "embedded" ? maskSpans(source, view.spans.map(([from, to]) => [record.valueStart + from, record.valueStart + to] as const), start + left, start + right)
         : record.valueStart <= end ? ProtectedFiles.REDACTED : ""
       projected.push(mask(prefix.slice(0, left) + value) + suffix)
     }

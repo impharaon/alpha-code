@@ -11,7 +11,7 @@ import path from "node:path"
 import { Schema } from "effect"
 import type { ToolFacts } from "./policy/identity"
 import { AUTOMATION_PROFILES, type UnattendedProfile } from "../../schema/src/codepuppy-unattended"
-import { credentialValues, envAssignments } from "./secret-values"
+import { credentialValues, envAssignments, envSecret } from "./secret-values"
 import { projectSecretRead } from "./secret-read"
 import { isUtf8 } from "node:buffer"
 import { fileURLToPath } from "node:url"
@@ -228,6 +228,8 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     prepareMutation: async (input: EnvMutation): Promise<EnvMutation> => (await prepareMutation(input)).mutation,
     read: async (input: { call: MaskCall; file: ProtectedFiles.ProtectedFile; result: Tool.Result }): Promise<Tool.Result> => {
       const state = stateOf(input.call, "read")
+      // A protected file outside every scanned source joins later collection once read (spec v5 BR-05).
+      files.track(input.file)
       try {
         const after = input.file.view === "variables" ? new TextDecoder("utf-8", { fatal: true }).decode(await readFile(state?.read?.target ?? input.file.path)) : undefined
         if (after !== undefined) files.remember(credentialValues(input.file, Buffer.from(after)))
@@ -290,7 +292,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       try {
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
-        if (state?.mutations?.some((snapshot) => [snapshot.before, snapshot.after].some((source) => source !== undefined && envAssignments(source).some((record) => !ProtectedFiles.isPublicValue(record) && record.rhs.split(/\r?\n/).some((part) => {
+        if (state?.mutations?.some((snapshot) => [snapshot.before, snapshot.after].some((source) => source !== undefined && envAssignments(source).some((record) => envSecret(record) && record.rhs.split(/\r?\n/).some((part) => {
           const fragment = part.replace(/^["'`]|["'`]$/g, "")
           return fragment.length > 0 && input.error.message.includes(fragment)
         }))))) throw new Error("Restored env excerpt in error")

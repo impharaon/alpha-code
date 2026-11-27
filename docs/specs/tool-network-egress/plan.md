@@ -399,4 +399,19 @@ R1-5 的有效移除证据：`python3 /tmp/egress-r8-controls.py` 退出 0；包
 
 ### 偏离记录
 
-暂无。
+2026-11-27：没有偏离本节的文件、顺序或判据。cases 的测试辅助 `until` 增加可选等待上限（默认仍 15 s），供两条 AC-14 用例等待真实 45 秒窗口；较宽相关集按 rg 补入下表所列文件。
+
+### 实施证据（2026-11-27）
+
+以下命令均从 U 执行；`gate slot` 实际取得共享 slot 后才启动用例。
+
+| 步骤 | 命令 | 结果 |
+| --- | --- | --- |
+| 1 先红（`b3e78e8570`，只含测试） | `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts src/renderer/codepuppy-ui/network-egress-card.test.ts` | 退出 1，14 pass / 5 fail。分别红在：替换后的 `:169` 用例拉取为空（`:174`）、切换用例与「有收件人」用例拿不到卡片、到期用例在没人看过的请求仍被保留处（撤销时多出一次 approvals 变更，`:255`）、卡片用例找不到卡片。日志 `/tmp/egress-i46-red-kept.log`。 |
+| 2 服务与卡片（`ef964127ff`） | 同上；另 `bun test --max-concurrency 2 src/renderer/i18n/locale-regression.test.ts` 独立进程 | 退出 0，19 pass / 0 fail；locale 10 pass / 0 fail。测试未改。 |
+| 3 真引擎正臂（`8428af0cc0`） | `gate slot -- bun test --max-concurrency 2 --timeout 120000 ./src/main/network-egress.engine.cases.ts -t 'AC-14'` | 退出 0，2 pass / 9 filtered / 0 fail，51.05 s。main PID 76719，围栏内引擎 PID 76731，实际 apply libsandbox、profile 9007 B。正看着：A 出卡（地址与「此时没有对话在运行工具」），允许后连接器收到 `200 Connection Established` 与靶站正文，再连成功且批准请求仍只有 1 次；切到 B 出同一 requestID，A 回来仍可选，在 B 拒绝后连接器得 403、代理记录 `user-denied`、A 的卡消失；两条均无 notice。没有在看：等待 45 016 ms 后 403，代理 detail `approval-unavailable`，之后打开的对话列表为空。日志 `/tmp/egress-i46-scenario.log`，产物 `node_modules/.cache/egress-outside-76719/evidence.json`。 |
+| 3 对照臂（一次性） | 本工作树临时删去 `listApprovals` 的观看者接纳行，同一 slot 方式只跑 `-t 'AC-14 没有对话在运行工具时'`，随后 `git restore src/main/network-egress-approval.ts` | 退出 1，0 pass / 1 fail，45.09 s；引擎 PID 77168、profile 9007 B。红在「viewed conversation shows no card」，同一断言打印连接器收到 403 与代理记录 `detail: "approval-unavailable"`。恢复后 `git status --short` 为空。日志 `/tmp/egress-i46-control.log`。 |
+| 4 较宽相关集 | `bun test --max-concurrency 2 src/main/network-egress-ipc.test.ts src/main/network-egress-proxy.test.ts src/main/network-egress-passes.test.ts src/main/egress-grant-truth.test.ts src/main/gate-file-registry.test.ts src/main/old-name-scan.test.ts`；另一进程 `bun test --max-concurrency 2 src/renderer/codepuppy-ui/network-egress.test.ts src/renderer/codepuppy-ui/settings-tools.test.ts src/renderer/i18n/zh-punctuation.fast.test.ts src/renderer/i18n/brand-residue-scan.test.ts` | 退出 0，79 pass / 0 fail；退出 0，29 pass / 0 fail。由 rg 找出导入 approval/卡片的测试、`gate-files.tsv` 的登记判据与扫描全部文案的两份测试。 |
+| 无系统对话框 | `rg -n showMessageBox packages/ui-mac/src/main \| rg -i 'egress\|network'`；`rg -n 'configureEgressGrantApproval\(' packages/ui-mac/src/main`（排除测试） | 前者退出 1、零命中；后者只有 `network-egress-grants.ts:86` 定义与 `index.ts:1013` 以生产服务接线。 |
+
+U `bun typecheck` 退出 0。仓库根 `affected-tests --list` 退出 0：`affected tests: 156 of 746 test files`，含本片的 approval 与卡片测试；scenario 宿主按层只在夜间运行。没有启动应用、Electron 或窗口，没有运行整包、`bin/check` 或 `gate run`。

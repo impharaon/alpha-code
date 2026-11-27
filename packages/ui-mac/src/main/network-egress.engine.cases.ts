@@ -5,7 +5,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test"
 import { GlobalRegistrator } from "@happy-dom/global-registrator"
 import appPlugin from "@opencode-ai/app/vite"
 import { build } from "vite"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, realpathSync, writeFileSync, symlinkSync, lstatSync, readlinkSync, renameSync, rmSync } from "node:fs"
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, realpathSync, writeFileSync, symlinkSync, lstatSync, readlinkSync, renameSync, rmSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
 import { pathToFileURL } from "node:url"
@@ -56,7 +56,7 @@ let upstream: ReturnType<typeof createServer>
 const upstreamSockets = new Set<Socket>()
 const upstreamConnects: string[] = []
 let child: ReturnType<typeof Bun.spawn>
-let prepared: { sandbox: EngineSandbox; userData: string; globalRoot: string; project: string; config: string; env: Record<string, string> }
+let prepared: { sandbox: EngineSandbox; userData: string; globalRoot: string; project: string; config: string; connector: { trigger: string; results: string }; env: Record<string, string> }
 let runtime: typeof import("../renderer/codepuppy-ui/network-egress-test-runtime")
 let enginePID = 0
 let generation = 1
@@ -69,8 +69,8 @@ const waiting = new Map<number, { resolve(value: unknown): void; reject(error: E
 const disposers: Array<() => void> = []
 const turns = new Set<Promise<unknown>>()
 const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
-const until = async <T>(read: () => T | Promise<T>, label: string): Promise<NonNullable<T>> => {
-  for (const end = Date.now() + 15_000; Date.now() < end;) {
+const until = async <T>(read: () => T | Promise<T>, label: string, ms = 15_000): Promise<NonNullable<T>> => {
+  for (const end = Date.now() + ms; Date.now() < end;) {
     const value = await read()
     if (value) return value as NonNullable<T>
     await Bun.sleep(25)
@@ -135,6 +135,26 @@ function mount(sessionID: string) {
   disposers.push(runtime.render(() => runtime.createComponent(runtime.NetworkEgressCards, { session: ref(sessionID), api: service.api }), host))
   return host
 }
+/** A card area that can leave again, as when the user switches to another conversation. */
+function view(sessionID: string) {
+  const host = mount(sessionID)
+  const dispose = disposers.pop()!
+  let left = false
+  const leave = () => { if (left) return; left = true; dispose(); host.remove() }
+  disposers.push(leave)
+  return { host, leave }
+}
+/** No card area is mounted and no conversation runs tools. Earlier cases' areas stay mounted until afterAll, and each one lists approvals, i.e. counts as viewing (design §4.9). */
+async function idle() {
+  disposers.splice(0).reverse().forEach((dispose) => dispose())
+  document.body.replaceChildren()
+  await Promise.allSettled([...turns])
+  await until(() => activity.snapshot().complete && !activity.snapshot().activities.length, "no conversation is running tools")
+}
+/** Ask the engine-started connector (network-egress-engine-peer.ts) to connect while idle; its outcomes come back per target. */
+const reach = (authority: string) => appendFileSync(prepared.connector.trigger, `${authority}\n`)
+const reached = (authority: string): Array<{ target: string; connect: string; response: string }> =>
+  existsSync(prepared.connector.results) ? readFileSync(prepared.connector.results, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)).filter((entry) => entry.target === authority) : []
 async function click(host: HTMLElement, approval: EgressApproval, decision: string) {
   const button = await until(() => host.querySelector<HTMLButtonElement>(`[data-network-egress-request="${approval.requestID}"] [data-network-egress-decision="${decision}"]:not([disabled])`), "missing conversation decision button")
   button.click()
@@ -395,5 +415,72 @@ test("系统路由注入：真实引擎围栏连接仅由本地上游代理承�
   expect(upstreamConnects.slice(before)).toContain("via-proxy.egress.invalid:80")
   expect((await service.api.listApprovals({ session: ref(a) }))).toEqual({ ok: true, value: [] })
 }, 20_000)
+
+
+test("AC-14 没有对话在运行工具时，引擎启动的连接器联网，卡片出现在正看着的对话；切到另一个对话也出现，在哪里决定都算同一次", async () => {
+  await idle()
+  const a = await session()
+  const b = await session()
+  const shown = view(a)
+  const target = "198.18.0.14:80"
+  const asked = connects.length
+  const before = logs.length
+  reach(target)
+  // Known-bad arm (no viewed delivery): no card ever comes and the connection ends with the 45 s window; report why.
+  await until(() => shown.host.querySelector("[data-network-egress-request]") || reached(target).length, "connector CONNECT", 60_000)
+  const shownCard = shown.host.querySelector<HTMLElement>("[data-network-egress-request]")
+  expect(shownCard, `viewed conversation shows no card; connector got ${JSON.stringify(reached(target))}; proxy ${JSON.stringify(logs.slice(before).filter((record) => record.event === "egress.connect" && record.host === "198.18.0.14"))}`).not.toBeNull()
+  expect(shownCard!.textContent).toContain(target)
+  expect(shownCard!.textContent).toContain("此时没有对话在运行工具")
+  const approval = await card(a, "198.18.0.14")
+  expect(approval.recipients).toEqual([])
+  await click(shown.host, approval, "allow-session")
+  const [allowed] = await until(() => reached(target).length ? reached(target) : undefined, "allowed connection outcome")
+  expect(allowed!.connect).toStartWith("HTTP/1.1 200")
+  expect(allowed!.response).toContain("egress-target-ok")
+  reach(target)
+  await until(() => reached(target).length === 2, "the connector connects again")
+  expect(reached(target)[1]!.response).toContain("egress-target-ok")
+  expect(connects.slice(asked), "the second connection asks nobody").toEqual(["198.18.0.14"])
+  expect(upstreamConnects).toContain(target)
+
+  const other = "198.18.0.15:80"
+  reach(other)
+  const waiting = await card(a, "198.18.0.15")
+  shown.leave()
+  const next = view(b)
+  await until(() => next.host.querySelector(`[data-network-egress-request="${waiting.requestID}"]`)?.textContent?.includes("此时没有对话在运行工具"), "B shows the same waiting card")
+  const back = view(a)
+  await until(() => back.host.querySelector(`[data-network-egress-request="${waiting.requestID}"] [data-network-egress-decision]`), "A still offers the choice")
+  await click(next.host, waiting, "deny")
+  const [denied] = await until(() => reached(other).length ? reached(other) : undefined, "the decision in B settles the waiting connection")
+  expect(denied!.connect).toStartWith("HTTP/1.1 403")
+  await until(() => !back.host.querySelector(`[data-network-egress-request="${waiting.requestID}"]`), "A no longer offers the choice")
+  expect(logs.some((record) => record.event === "egress.connect" && record.host === "198.18.0.15" && record.detail === "user-denied")).toBe(true)
+  expect(messages.filter((message) => message.type === "codepuppy.network.notice" && ["198.18.0.14", "198.18.0.15"].includes(message.destination.host))).toEqual([])
+  console.log("EGRESS-AC14-VIEWED", JSON.stringify({ mainPID: process.pid, enginePID, allowed: reached(target), denied }))
+  next.leave(); back.leave()
+}, 90_000)
+
+test("AC-14 没有在看任何对话：不出卡片，等待期满后这次连接以原因失败；之后打开对话也没有这张卡", async () => {
+  await idle()
+  const target = "198.18.0.16:80"
+  const asked = connects.length
+  const before = logs.length
+  const started = Date.now()
+  reach(target)
+  // Nothing may list approvals before the window ends: a conversation that lists them is one being viewed.
+  const [ended] = await until(() => reached(target).length ? reached(target) : undefined, "the unviewed connection ends", 60_000)
+  expect(ended!.connect).toStartWith("HTTP/1.1 403")
+  expect(connects.slice(asked)).toEqual(["198.18.0.16"])
+  expect(logs.slice(before).filter((record) => record.event === "egress.connect" && record.host === "198.18.0.16").map((record) => record.detail)).toEqual(["approval-unavailable"])
+  const a = await session()
+  const opened = view(a)
+  expect(await service.api.listApprovals({ session: ref(a) })).toEqual({ ok: true, value: [] })
+  expect(opened.host.querySelector("[data-network-egress-request]")).toBeNull()
+  expect(messages.filter((message) => message.type === "codepuppy.network.notice" && message.destination.host === "198.18.0.16")).toEqual([])
+  console.log("EGRESS-AC14-UNVIEWED", JSON.stringify({ mainPID: process.pid, enginePID, waitedMs: Date.now() - started, ended }))
+  opened.leave()
+}, 90_000)
 
 }

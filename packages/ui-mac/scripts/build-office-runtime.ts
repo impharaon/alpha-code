@@ -23,7 +23,7 @@
 // Build on the target host: darwin-arm64 or win32-x64. Node is owned by the launcher; this builder only ships Office Python.
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -122,9 +122,12 @@ export function buildOfficeRuntime(options: { arch?: TargetArch } = {}): OfficeR
     .update(readFileSync(requirementsPath))
     .update(readFileSync(scriptPath))
     .digest("hex")
-  const reused = readText(join(dir, STAMP)) === stamp
-  if (!reused) install({ arch, dir, lock, requirementsPath, locked, stamp })
-  installOfficeExcel(dir)
+  const reused = holdingOfficeRuntimeBuild(dir, () => {
+    const reused = readText(join(dir, STAMP)) === stamp
+    if (!reused) install({ arch, dir, lock, requirementsPath, locked, stamp })
+    syncOfficeExcel(dir)
+    return reused
+  })
   const modules = verify(dir, arch, locked)
   const size = measure(dir)
   console.log(
@@ -133,8 +136,66 @@ export function buildOfficeRuntime(options: { arch?: TargetArch } = {}): OfficeR
   return { dir, arch, reused, ...size, modules }
 }
 
+/**
+ * One builder at a time per target. Builders share `<dir>.staging` and replace `<dir>`, and the PR gate runs the
+ * test files that build this runtime in parallel workers: without this a second builder deletes the first one's
+ * tree mid-pip or mid-compileall (compileall then names the vanished files on stdout and exits 1). The lock file
+ * holds the holder's pid; a lock whose holder no longer runs (killed build) is moved aside and taken over.
+ * Synchronous because the build itself is: a heartbeat lock could not beat during a multi-minute spawnSync.
+ */
+export function holdingOfficeRuntimeBuild<T>(dir: string, action: () => T): T {
+  const lock = `${dir}.lock`
+  const pause = new Int32Array(new SharedArrayBuffer(4))
+  mkdirSync(dirname(lock), { recursive: true })
+  for (let waited = false; ; ) {
+    try {
+      writeFileSync(lock, String(process.pid), { flag: "wx" })
+      break
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+    }
+    const holder = readText(lock)
+    if (holder && !running(Number(holder))) {
+      const aside = `${lock}.${process.pid}`
+      try {
+        renameSync(lock, aside)
+      } catch {
+        continue
+      }
+      // Another waiter may have taken over first: a live holder's lock goes back where it was.
+      if (readText(aside) !== holder)
+        try {
+          linkSync(aside, lock)
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+        }
+      rmSync(aside, { force: true })
+      continue
+    }
+    if (!waited) console.log(`[alpha:office-runtime] waiting for the build held by pid ${holder} (${lock})`)
+    waited = true
+    Atomics.wait(pause, 0, 0, 200)
+  }
+  try {
+    return action()
+  } finally {
+    rmSync(lock, { force: true })
+  }
+}
+
+function running(pid: number) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM"
+  }
+}
+
 /** App modules share the Office interpreter; the community MCP distribution is never installed. */
-export function installOfficeExcel(dir: string) {
+export const installOfficeExcel = (dir: string) => holdingOfficeRuntimeBuild(dir, () => syncOfficeExcel(dir))
+
+function syncOfficeExcel(dir: string) {
   const source = join(packageDir, "resources/office-excel")
   const files = [...new Bun.Glob("**/*").scanSync({ cwd: source, onlyFiles: true })].filter((file) => !file.includes("__pycache__/")).sort()
   const manifest = JSON.parse(readFileSync(join(source, "sources.json"), "utf8")) as { files: { path: string; sha256: string }[] }
@@ -387,15 +448,16 @@ function retry<T>(attempts: number, action: () => T): T {
       return action()
     } catch (error) {
       if (attempt >= attempts) throw error
-      console.warn(`[alpha:office-runtime] attempt ${attempt}/${attempts} failed, retrying: ${error instanceof Error ? error.message.split("\n")[0] : error}`)
+      console.warn(`[alpha:office-runtime] attempt ${attempt}/${attempts} failed, retrying: ${error instanceof Error ? error.message : error}`)
     }
   }
 }
 
 function run(cmd: string, args: string[], options: { env?: Record<string, string>; cwd?: string; input?: string } = {}): string {
   const result = spawnSync(cmd, args, { encoding: "utf8", stdio: "pipe", maxBuffer: 64 * 1024 * 1024, ...options })
+  // compileall (and pip's progress) report on stdout: a failure message with only stderr can be empty.
   if (result.status !== 0)
-    throw new Error(`${cmd} ${args.join(" ")} exited ${result.status ?? result.signal}:\n${result.stderr || result.error?.message || ""}`)
+    throw new Error(`${cmd} ${args.join(" ")} exited ${result.status ?? result.signal}:\n${[result.stderr, result.stdout?.slice(-8000)].filter(Boolean).join("\n") || result.error?.message || ""}`)
   return result.stdout
 }
 

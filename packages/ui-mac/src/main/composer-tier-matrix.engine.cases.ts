@@ -746,21 +746,24 @@ describe("protected files", () => {
 
   test("protected files ordinary env values stay visible", async () => {
     const value = randomUUID()
-    await protectedRow(BUILD, { ".env": `DB_HOST=db\nAPI_KEY=${value}\n` }, async (row) => {
+    const password = randomUUID()
+    await protectedRow(BUILD, { ".env": `DB_HOST=db\nAPI_KEY=${value}\nDATABASE_URL=postgres://app:${password}@db/x\n` }, async (row) => {
       expect(await row.call("read", { path: ".env" })).toEqual([])
       const read = await row.snapshot()
-      hidden(read, [value])
+      hidden(read, [value, password])
       for (const text of [read.model, read.records, read.cards]) {
         expect(text.includes("DB_HOST=db")).toBe(true)
         expect(text.includes("API_KEY=[REDACTED]")).toBe(true)
+        expect(text.includes("DATABASE_URL=postgres://app:[REDACTED]@db/x")).toBe(true)
       }
       expect(await row.call("shell", { command: "cat .env; echo mongodb" })).toEqual([])
       const shell = await row.snapshot()
       const disk = fs.readFileSync(row.captures[0]!.file, "utf8")
-      hidden({ ...shell, disk, card: row.card() }, [value])
+      hidden({ ...shell, disk, card: row.card() }, [value, password])
       for (const text of [shell.model, disk, row.card()?.output ?? ""]) {
         expect(text.includes("DB_HOST=db")).toBe(true)
         expect(text.includes("API_KEY=[REDACTED]")).toBe(true)
+        expect(text.includes("DATABASE_URL=postgres://app:[REDACTED]@db/x")).toBe(true)
         expect(text.includes("mongodb")).toBe(true)
       }
     })

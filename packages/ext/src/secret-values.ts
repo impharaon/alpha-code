@@ -30,9 +30,58 @@ export function envAssignments(text: string) {
   )
 }
 
-/** `CredentialFields.env` selects credential names, as for structured credential documents (spec v5 BR-06). */
-export function envSecret(record: { name: string }) {
-  return ProtectedFiles.isCredentialName(record.name)
+/** A password inside a URL-shaped value is a credential field whatever its name (spec v5 BR-06); both written forms. */
+export function urlPasswords(value: unknown): string[] {
+  if (typeof value !== "string" || !/^[a-z][a-z0-9+.-]*:\/\/[^\s/?#@]*:[^\s/?#@]*@/i.test(value.trim())) return []
+  const password = URL.parse(value.trim())?.password
+  if (!password) return []
+  return [...new Set([password, /%(?![0-9a-f]{2})/i.test(password) ? password : decodeURIComponent(password)])]
+}
+
+const embedded = (value: unknown) => urlPasswords(value).flatMap((password) => secretScalar("password", password))
+
+/** Sorted, merged spans of every occurrence of the given passwords. */
+function passwordSpans(text: string, passwords: readonly string[]) {
+  const spans = passwords
+    .flatMap((password) => [...text.matchAll(new RegExp(password.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))].map((match): [number, number] => [match.index, match.index + password.length]))
+    .sort((left, right) => left[0] - right[0])
+  return spans.reduce<[number, number][]>((merged, span) => {
+    const last = merged.at(-1)
+    if (last && span[0] <= last[1]) last[1] = Math.max(last[1], span[1])
+    else merged.push([...span])
+    return merged
+  }, [])
+}
+
+/** `text[from, to)` with every span that reaches into it shown as one placeholder. */
+export function maskSpans(text: string, spans: readonly (readonly [number, number])[], from = 0, to = text.length) {
+  let cursor = from
+  let result = ""
+  for (const [start, end] of spans) {
+    if (end <= cursor || start >= to) continue
+    result += text.slice(cursor, Math.max(cursor, start)) + ProtectedFiles.REDACTED
+    cursor = Math.min(end, to)
+  }
+  return result + text.slice(cursor, to)
+}
+
+/**
+ * How one env value is shown (spec v5 BR-06, the same credential-field rule as structured files): a credential name hides
+ * the value; otherwise only embedded URL passwords are masked in place. A password the source does not show verbatim keeps
+ * the whole value hidden.
+ */
+export function envView(record: { name: string; value: string; rhs: string }) {
+  if (ProtectedFiles.isCredentialName(record.name)) return { kind: "secret" as const }
+  const passwords = urlPasswords(record.value)
+  if (!passwords.length) return { kind: "public" as const }
+  const value = passwordSpans(record.value, passwords)
+  const rhs = passwordSpans(record.rhs, passwords)
+  if (!value.length || !rhs.length) return { kind: "secret" as const }
+  return { kind: "embedded" as const, spans: rhs, value: maskSpans(record.value, value), rhs: maskSpans(record.rhs, rhs) }
+}
+
+export function envSecret(record: { name: string; value: string; rhs: string }) {
+  return envView(record).kind === "secret"
 }
 
 /** Collect only published credential fields; callers own IO and failure handling. */
@@ -50,7 +99,8 @@ export function credentialValues(file: ProtectedFiles.ProtectedFile, bytes: Uint
     ].filter((value) => value.length > 0)
   }
   const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
-  if (file.profile === "env") return envAssignments(text).flatMap((item) => (envSecret(item) ? secretScalar(item.name, item.value) : []))
+  if (file.profile === "env")
+    return envAssignments(text).flatMap((item) => [...(envSecret(item) ? secretScalar(item.name, item.value) : []), ...embedded(item.value)])
   if (file.format === "json") return documentValues(file.profile, JSON.parse(text))
   if (file.format === "credential-url")
     return text
@@ -89,6 +139,7 @@ export function credentialValues(file: ProtectedFiles.ProtectedFile, bytes: Uint
     const indent = line.match(/^\s*/)![0].length
     while (index + 1 < lines.length && lines[index + 1].trim() && lines[index + 1].match(/^\s*/)![0].length > indent)
       parts.push(lines[++index].trim())
+    values.push(...embedded(parts.join("\n").replace(/^(["'])(.*)\1$/s, "$2")))
     if (!selection.assignments.some((pattern) => fieldMatch(match[1], pattern))) continue
     values.push(...secretScalar(match[1], file.profile === "npm" ? scalar(parts.join("\n")) : parts.join("\n")))
   }
@@ -98,15 +149,15 @@ export function credentialValues(file: ProtectedFiles.ProtectedFile, bytes: Uint
 export function documentValues(profile: ProtectedFiles.CredentialProfile, document: unknown): Uint8Array[] {
   const selection = ProtectedFiles.CredentialFields[profile]
   if ("names" in selection)
-    return leaves(document).flatMap((item) =>
-      ProtectedFiles.isCredentialName(item.path.at(-1) ?? "") ? secretScalar(item.path.at(-1)!, item.value) : [],
-    )
+    return leaves(document).flatMap((item) => [
+      ...(ProtectedFiles.isCredentialName(item.path.at(-1) ?? "") ? secretScalar(item.path.at(-1)!, item.value) : []),
+      ...embedded(item.value),
+    ])
   if (!("json" in selection)) return []
-  return leaves(document).flatMap((item) =>
-    selection.json.some((selector) => selected(item.path, selector))
-      ? secretScalar(item.path.at(-1) ?? "", item.value)
-      : [],
-  )
+  return leaves(document).flatMap((item) => [
+    ...(selection.json.some((selector) => selected(item.path, selector)) ? secretScalar(item.path.at(-1) ?? "", item.value) : []),
+    ...embedded(item.value),
+  ])
 }
 
 export function secretScalar(name: string, value: unknown): Uint8Array[] {

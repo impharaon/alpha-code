@@ -29,7 +29,19 @@ export async function resolveProtectedFile(file: string, roots: ProtectedFiles.P
 
 type EntryPlan = { readonly candidate: string; readonly descend: boolean; readonly link: boolean; resolved?: readonly (ProtectedFiles.ProtectedFile | undefined)[] }
 
-export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
+/** The app's own credential stores, the list the fence plans into C1 (ui-mac codepuppy-secret-files.ts credentialStores()). */
+export type CredentialStorePaths = readonly { readonly path: string; readonly kind: "dir" | "file" }[]
+
+export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots, credentialStores: CredentialStorePaths = []) {
+  // Literal comparison on case-insensitive volumes (darwin and win32 defaults): fold so a case variant still matches.
+  const fold = (file: string) => path.resolve(file).toLowerCase()
+  const stores = credentialStores.map((store) => ({ kind: store.kind, path: fold(store.path) }))
+  const under = (parent: string, child: string) => child === parent || child.startsWith(parent.endsWith(path.sep) ? parent : parent + path.sep)
+  /** A store, a path inside a directory store, or a directory holding one: walking or resolving it would touch the store. */
+  const reachesStore = (file: string) => {
+    const target = fold(file)
+    return stores.some((store) => under(target, store.path) || (store.kind === "dir" && under(store.path, target)))
+  }
   const directories = new Map<string, { version: string; entries: Dirent[] }>()
   // Per source and directory version, whose entry names and kinds are then fixed: what each entry was found to be.
   const plans = new Map<string, { version: string; entries: EntryPlan[] }>()
@@ -75,7 +87,8 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   }
   const scan = async () => {
     const sources = ProtectedFiles.sources(roots)
-    const inside = (file: string) => withinSources(sources, file)
+    // Design §10 SPEC5-04: HOME is itself a source root, and the stores live under it; they never count as inside a source.
+    const inside = (file: string) => !reachesStore(file) && withinSources(sources, file)
     for (const [index, source] of sources.entries()) {
       const visited = new Set<string>()
       const walk = async (directory: string): Promise<void> => {
@@ -169,7 +182,8 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
     roots,
     remember,
     track: (file: ProtectedFiles.ProtectedFile) => {
-      if (!disposed) tracked.set(file.path, file)
+      // The app's own credential stores are never collected, however a path reaches them (SPEC5-04).
+      if (!disposed && !reachesStore(file.path)) tracked.set(file.path, file)
     },
     /**
      * A path a command names that is a link registers the list file its literal target is (spec v6 BR-05). The walk is the
@@ -178,7 +192,7 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
      */
     trackLink: async (candidate: string) => {
       const sources = ProtectedFiles.sources(roots)
-      const readable = (file: string) => withinSources(sources, file) || ProtectedFiles.match({ path: file, roots }) !== undefined
+      const readable = (file: string) => !reachesStore(file) && (withinSources(sources, file) || ProtectedFiles.match({ path: file, roots }) !== undefined)
       if (disposed || !readable(candidate)) return
       // A word that cannot be read as a link (ENOTDIR, ENAMETOOLONG) names no link; the command itself must still run.
       const target = await literalTarget(candidate, readable).catch(() => undefined)

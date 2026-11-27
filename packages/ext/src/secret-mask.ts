@@ -22,7 +22,7 @@ import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
 import { stripAnsi } from "../../session-ui/src/tools/ansi"
 import { toolCallKey } from "./policy/identity"
 import { DISPLAY_KEY } from "./policy/display"
-import { createSecretFiles, resolveProtectedFile } from "./secret-files"
+import { createSecretFiles, resolveProtectedFile, type CredentialStorePaths } from "./secret-files"
 
 type MaskCall = { sessionID: string; messageID: string; id: string }
 type CallState = {
@@ -37,8 +37,8 @@ type CallState = {
 }
 const WRAPPED = Symbol("secret-progress")
 
-export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
-  const files = createSecretFiles(roots)
+export function createSecretMask(roots: ProtectedFiles.ProtectedRoots, credentialStores: CredentialStorePaths = []) {
+  const files = createSecretFiles(roots, credentialStores)
   const calls = new Map<string, CallState>()
   // Design §10 SPEC5-03: Location release takes no new calls; the calls already running finish masking, then values clear.
   let closing = false

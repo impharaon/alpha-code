@@ -4,7 +4,7 @@ import { engineScenario } from "./engine-scenario-host.cases.ts"
 const host = {
   title: "对话联网批准：真引擎、真围栏、站点记忆、即时撤销与模型说明",
   cases: "src/main/network-egress.engine.cases.ts",
-  pass: process.platform === "darwin" ? 9 : 0,
+  pass: process.platform === "darwin" ? 11 : 0,
   args: ["--max-concurrency", "2", "--timeout", "90000"],
   timeout: 240_000,
 }

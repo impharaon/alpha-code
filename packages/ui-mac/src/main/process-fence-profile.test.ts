@@ -553,6 +553,16 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
     expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/a" }], deny: [{ kind: "literal", value: "/a/b" }] }, "/a/b/c")).toBe(true)
     expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/a" }], deny: [{ kind: "literal", value: "/a/b" }] }, "/a/b")).toBe(false)
     expect(processFenceRulesCover({ allow: [], deny: [] }, "/a")).toBe(false)
+    // APFS treats another letter case and another Unicode normalization as the same name (code review R1 #1): an NFD
+    // spelling of an NFC root — or the reverse, or either in another case — is that root, on the allow and the deny side.
+    const [nfc, nfd] = ["/Users/alpha/caf\u00e9.txt", "/Users/alpha/cafe\u0301.txt"]
+    for (const [rule, spelled] of [[nfc, nfd], [nfd, nfc], [nfc, "/Users/alpha/CAFE\u0301.TXT"], [nfd, `${nfc}/inner`]] as const) {
+      expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: rule }], deny: [] }, spelled), spelled).toBe(true)
+      expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/Users" }], deny: [{ kind: "subpath", value: rule }] }, spelled), spelled).toBe(false)
+      expect(processFenceRulesCover({ allow: [{ kind: "literal", value: rule }], deny: [] }, spelled, "file"), spelled).toBe(spelled.endsWith("/inner") ? false : true)
+    }
+    expect(processFenceRulesCover({ allow: [{ kind: "regex", value: "^/Users/alpha/caf\u00e9\\.txt$" }], deny: [] }, nfd, "file")).toBe(true)
+    expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: nfc }], deny: [] }, "/Users/alpha/cafe.txt")).toBe(false)
   })
 })
 

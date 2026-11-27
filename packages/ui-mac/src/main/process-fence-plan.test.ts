@@ -235,12 +235,17 @@ describe("planWriteApproval", () => {
       }
       mkdirSync(join(home, "made-dir")); writeFileSync(join(home, "made.txt"), "x")
       mkdirSync(join(root, "outside")); symlinkSync(join(root, "outside"), join(home, "linked")); symlinkSync(join(home, "made-dir"), join(home, "linked-in-home"))
-      expect(["missing", "made-dir", "made.txt", "linked", "linked-in-home"].map(stored)).toEqual([
+      // Created after approval in another spelling of the same name (code review R1 #2): still that path; the approved
+      // spelling stays the root.
+      writeFileSync(join(home, "CASE.TXT"), "x"); writeFileSync(join(home, "cafe\u0301.txt"), "x")
+      expect(["missing", "made-dir", "made.txt", "linked", "linked-in-home", "case.txt", "caf\u00e9.txt"].map(stored)).toEqual([
         { kind: "new-path", root: join(home, "missing") },
         { kind: "new-path", root: join(home, "made-dir") },
         { kind: "new-path", root: join(home, "made.txt") },
         { reason: "home-or-app-state" },
         { reason: "home-or-app-state" },
+        { kind: "new-path", root: join(home, "case.txt") },
+        { kind: "new-path", root: join(home, "caf\u00e9.txt") },
       ])
       // Open (now): something already there is never a new path.
       expect(planWriteApproval(disk.eligibility, { absolute: join(home, "made.txt"), directory: home })).toMatchObject({ eligible: false, reason: "home-or-app-state" })
@@ -451,8 +456,10 @@ test.skipIf(process.platform !== "darwin")("carried new paths in HOME are render
     const project = join(root, "project"), outside = join(root, "outside"), userData = join(root, "userData")
     for (const directory of [project, outside, join(home, "made-dir"), join(home, "sub")]) mkdirSync(directory)
     writeFileSync(join(home, "made.txt"), "x")
+    // Approved as `note.txt` / NFC `café.txt`, created as `NOTE.TXT` / NFD (code review R1 #2).
+    writeFileSync(join(home, "NOTE.TXT"), "x"); writeFileSync(join(home, "cafe\u0301.txt"), "x")
     symlinkSync(outside, join(home, "linked"))
-    const carried = ["missing.txt", "made.txt", "made-dir", "linked", "sub/nested"].map((name) => join(home, name))
+    const carried = ["missing.txt", "made.txt", "made-dir", "note.txt", "caf\u00e9.txt", "linked", "sub/nested"].map((name) => join(home, name))
     const logs: string[] = []
     const plan = planProcessFence({
       userDataPath: userData, sidecarEnv: { HOME: home },
@@ -464,13 +471,16 @@ test.skipIf(process.platform !== "darwin")("carried new paths in HOME are render
       isDirectory: (path) => statSync(path).isDirectory(), stat: (path) => statSync(path, { bigint: true }), lstat: (path) => lstatSync(path, { bigint: true }),
       mkdirp: (path) => void mkdirSync(path, { recursive: true }), compile: trialCompileProfile, log: (line) => void logs.push(line),
     })
-    expect(plan.newPaths).toEqual(carried.slice(0, 3))
-    expect(logs.filter((line) => line.startsWith("process fence: approved new path"))).toEqual(carried.slice(3).map((path) => `process fence: approved new path ${path} excluded — no longer that new path directly in HOME (a link, re-pointed, or HOME changed)`))
+    expect(plan.newPaths).toEqual(carried.slice(0, 5))
+    expect(logs.filter((line) => line.startsWith("process fence: approved new path"))).toEqual(carried.slice(5).map((path) => `process fence: approved new path ${path} excluded — no longer that new path directly in HOME (a link, re-pointed, or HOME changed)`))
     const lines = plan.profile.split("\n")
-    expect(lines.slice(lines.findIndex((line) => line.endsWith("; W1")) + 1).slice(0, 3)).toEqual(carried.slice(0, 3).map((path) => `  (subpath "${path}") ; NP5 本人批准的主目录下新路径`))
-    expect(processFenceWriteRules(plan.profile).allow).toEqual(expect.arrayContaining(carried.slice(0, 3).map((value) => ({ kind: "subpath", value }))))
+    expect(lines.slice(lines.findIndex((line) => line.endsWith("; W1")) + 1).slice(0, 5)).toEqual(carried.slice(0, 5).map((path) => `  (subpath "${path}") ; NP5 本人批准的主目录下新路径`))
+    expect(processFenceWriteRules(plan.profile).allow).toEqual(expect.arrayContaining(carried.slice(0, 5).map((value) => ({ kind: "subpath", value }))))
     const fenced = (script: string) => spawnSync(SANDBOX_EXEC, ["-p", plan.profile, "/bin/sh", "-c", script], { encoding: "utf8", env: { HOME: home, PATH: "/usr/bin:/bin" }, timeout: 10_000 })
     expect(fenced(`printf new > '${join(home, "missing.txt")}' && printf more >> '${join(home, "made.txt")}' && mkdir -p '${join(home, "made-dir", "a")}'`).status).toBe(0)
+    // The approved spelling's rule covers the entry in either spelling.
+    for (const name of ["note.txt", "NOTE.TXT", "caf\u00e9.txt", "cafe\u0301.txt"]) expect(fenced(`printf w >> '${join(home, name)}'`).status, name).toBe(0)
+    expect([readFileSync(join(home, "NOTE.TXT"), "utf8"), readFileSync(join(home, "cafe\u0301.txt"), "utf8")]).toEqual(["xww", "xww"])
     for (const script of [`printf s > '${join(home, "sibling.txt")}'`, `printf z > '${join(home, "linked", "esc")}'`, `printf n > '${join(home, "sub", "nested")}'`]) expect(fenced(script).status, script).not.toBe(0)
     expect(readFileSync(join(home, "missing.txt"), "utf8")).toBe("new")
     expect(readdirSync(outside)).toEqual([])

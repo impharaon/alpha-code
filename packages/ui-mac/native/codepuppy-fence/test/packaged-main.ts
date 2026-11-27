@@ -33,6 +33,7 @@ const quote = (text: string) => `'${text.replace(/'/g, "'\\''")}'`
 const addonPath = join(process.resourcesPath, "codepuppy-fence/codepuppy_fence.node")
 const helper = join(app.getAppPath(), "out/main/chunks/assets/g0-issue-probe").replace("app.asar/", "app.asar.unpacked/")
 const password = "g0-isolated-test"
+let generations = 0
 
 async function boot(name: string, variant = "production") {
   const root = join(run, name)
@@ -95,6 +96,8 @@ async function boot(name: string, variant = "production") {
       databasePath: join(userData, "engine.db"), engineConfigDirectory: join(userData, "engine-config"),
       extPluginPath: join(process.resourcesPath, "codepuppy-ext"), officeMcpManifest: join(root, "office-tools.json"),
       factorySkillDirs: [], env: { CODEPUPPY_JSONC_TRUTH_DISABLE: "1", CODEPUPPY_MODELS_DISABLE: "1", OPENCODE_ENABLE_FILEWATCH: "0" }, log: (line) => log.push(line),
+      // Each boot is its own engine generation, numbered by main as spawnLocalServer does (options.generation).
+      sidecarGeneration: ++generations,
     }),
   })
   await waitFor(() => ready || !!failure || exited !== undefined, `${name} engine ready`, 90_000)

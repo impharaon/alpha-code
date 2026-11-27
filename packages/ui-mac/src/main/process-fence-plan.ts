@@ -246,8 +246,9 @@ export type WriteApprovalScope =
 /**
  * What approving a write to `target` makes writable — the one judgement R6, R4, the tracker and the planner share (K2).
  * A new path: the request's folder is HOME itself, the object's parent is HOME (device + inode), and nothing is there now
- * (`stored`: or it is still itself, created after the approval — a link or a re-point is not). Anything else is the folder
- * rule; a new-path request that no longer qualifies ends at HOME's refusal, never at P approved as a folder.
+ * (`stored`: or it is still itself, created after the approval — in any spelling the file system treats as that name, kept
+ * under the approved spelling; a link or a re-point is not). Anything else is the folder rule; a new-path request that no
+ * longer qualifies ends at HOME's refusal, never at P approved as a folder.
  * Synchronous and read-only; an unresolved symlink throws (plannedWritableTarget).
  */
 export function planWriteApproval(input: WorkspaceDirectoryInput, target: DirectoryAccessTarget, mode: "open" | "stored" = "open"): WriteApprovalScope {
@@ -263,9 +264,20 @@ export function planWriteApproval(input: WorkspaceDirectoryInput, target: Direct
     }
   }
   const parent = dirname(object.target)
-  const absent = object.missing.has(object.target) || (mode === "stored" && object.missing.size === 0 && canonicalWorkspacePath(input, target.absolute) === resolve(target.absolute))
+  const link = (path: string) => {
+    try {
+      return lstatSync(path).isSymbolicLink()
+    } catch {
+      return true // Not there by this name after all: not kept.
+    }
+  }
+  // `stored` (design v7 NP5): created since the approval, the entry at the approved name is the same object whichever spelling
+  // it was created in (APFS: another case, NFC/NFD; code review R1 #2). Not a link; the approved spelling stays the root,
+  // and the profile's rule in that spelling covers the entry either way.
+  const kept = mode === "stored" && object.missing.size === 0 && !link(target.absolute) && same(target.absolute, object.target)
+  const absent = object.missing.has(object.target) || kept
   if (absent && same(parent, input.homeDir) && same(folder.target, parent) && checkWritableTarget(input, object).eligible)
-    return { eligible: true, kind: "new-path", root: join(canonicalWorkspacePath(input, parent), basename(object.target)) }
+    return { eligible: true, kind: "new-path", root: kept ? resolve(target.absolute) : join(canonicalWorkspacePath(input, parent), basename(object.target)) }
   const check = checkWritableTarget(input, folder)
   return check.eligible ? { eligible: true, kind: "directory", root: check.directory, planned: folder } : { eligible: false, reason: check.reason, directory: folder.target }
 }

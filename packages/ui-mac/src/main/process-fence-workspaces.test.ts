@@ -500,12 +500,17 @@ describe("用户打开登记是两个消费者的共同资格", () => {
       expect(await tracker.grantNewPath({ server: "remote", path: join(home, "x") }, first)).toEqual({ grant: "not-local" })
       covered = new Set([join(home, "covered")])
       expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, "covered") }, first)).toEqual({ grant: "granted" })
-      // Another generation of this run had note.txt: it is never issued again (the planner carries it instead).
+      // Another generation of this run had note.txt: it is never issued again (a survivor keeps that sandbox) — in any spelling
+      // the file system treats as that name. This generation does not write it (its profile does not carry it, e.g. trimmed by
+      // the byte wall), so the request fails rather than reading as granted (code review R1 #1, #3; design v7 §5).
       const second = generation()
       tracker.noteGeneration(second, [], [join(home, "later.txt")])
-      expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, "note.txt") }, second)).toEqual({ grant: "granted" })
-      expect(issued).toEqual([[join(home, "note.txt"), "new-path"]])
-      expect(tracker.carriedNewPaths()).toEqual([join(home, "note.txt"), join(home, "later.txt")])
+      for (const spelled of ["note.txt", "NOTE.TXT"]) expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, spelled) }, second), spelled).toEqual({ grant: "failed", reason: "grant-failed" })
+      // An NFD spelling of a path carried in NFC is the same entry on APFS: not issued either.
+      expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, "caf\u00e9.txt") }, first)).toEqual({ grant: "granted" })
+      expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, "cafe\u0301.txt") }, second)).toEqual({ grant: "failed", reason: "grant-failed" })
+      expect(issued).toEqual([[join(home, "note.txt"), "new-path"], [join(home, "caf\u00e9.txt"), "new-path"]])
+      expect(tracker.carriedNewPaths()).toEqual([join(home, "note.txt"), join(home, "later.txt"), join(home, "caf\u00e9.txt")])
       expect(tracker.carriedWorkspaces()).toEqual([])
       expect(readdirSync(home).sort()).toEqual(["existing.txt", "sub"])
     } finally {

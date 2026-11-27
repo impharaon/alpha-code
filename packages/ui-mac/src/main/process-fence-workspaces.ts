@@ -469,7 +469,10 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
         return { grant: "ineligible", reason: scope.eligible ? "not-opened-by-you" : ineligibleReason(scope.reason) }
       if (!sidecar) return { grant: "failed", reason: "grant-failed" }
       // The same issue rule as settle: what this generation writes, or another generation of this run could, is never issued.
-      if (sidecar.generationWrites(target.path) || carriedFromOtherGenerations(target.path, sidecar)) return { grant: "granted" }
+      // Only this generation's own coverage is granted; a path only history covers (its profile does not carry it, e.g.
+      // trimmed by the byte wall) cannot be written here — grant-failed (design v7 §5; code review R1 #3).
+      if (sidecar.generationWrites(target.path)) return { grant: "granted" }
+      if (carriedFromOtherGenerations(target.path, sidecar)) return { grant: "failed", reason: "grant-failed" }
       carry(target.path, sidecar, "new-path") // an attempt may already have produced a consumed token in this generation
       const result = await sidecar.grantWrite(target.path, "new-path")
       return result.outcome === "failed" ? { grant: "failed", reason: "grant-failed" } : { grant: "granted" }

@@ -276,7 +276,18 @@ test.each([
   const safe = await mask.error({ call, tool: "cp_probe", error: original })
   expect(safe.message).toBe(hidden ? ProtectedFiles.MASKING_FAILED_TEXT : original.message)
   expect(Object.getPrototypeOf(safe) === Object.getPrototypeOf(original)).toBe(true)
-  if (!hidden) expect(safe.metadata?.[UNATTENDED_DENIAL_KEY]).toEqual(original.metadata?.[UNATTENDED_DENIAL_KEY])
+  expect(safe.metadata?.[UNATTENDED_DENIAL_KEY]).toEqual(original.metadata?.[UNATTENDED_DENIAL_KEY])
+})
+
+// Code Mode attaches a child call's unattended denial to the outer result; hiding the payload keeps the run failed.
+test("hidden Code Mode result keeps the unattended denial", async () => {
+  const { mask, roots } = await setup()
+  const denial = { version: 1, reason: "readonly", tool: "cp_probe", message: unattendedDenialCopy("readonly", "cp_probe") }
+  await mask.begin({ call, kind: "execute" })
+  await writeFile(path.join(roots.project, "credentials.json"), "{")
+  const safe = await mask.result({ facts: undefined, call, tool: "execute", result: { content: "done", metadata: { [UNATTENDED_DENIAL_KEY]: denial } } })
+  expect(safe.content).toEqual([{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }])
+  expect(safe.metadata?.[UNATTENDED_DENIAL_KEY]).toEqual(denial)
 })
 
 test("line-wise output masks each multiline credential fragment", async () => {

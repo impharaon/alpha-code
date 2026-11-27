@@ -1018,7 +1018,11 @@ describe("#1698 不合格的导出值被忽略,启动照常", () => {
         // 被忽略的路径变量在 sidecar 的环境里也没有(引擎与文档看到同一个「没设」);别的变量本来就不过河或原样
         if (["OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME"].includes(row.name)) expect([row.name, env[row.name]]).toEqual([row.name, undefined])
         expect(warned.filter((line) => line.includes(`${row.name} ignored`))).toHaveLength(1)
-        expect(warned.filter((line) => line.includes(row.bad))).toEqual([])
+        // The value probe covers the reader's own lines (its one format, `bootstrap: <name> ignored (<reason>)`,
+        // codepuppy-bootstrap-build.ts `ignored`); unrelated warnings such as a missing ext dist path contain "." too.
+        const reader = warned.filter((line) => line.startsWith("bootstrap: "))
+        expect(reader.length).toBeGreaterThan(0)
+        expect(reader.filter((line) => line.includes(row.bad))).toEqual([])
       } finally {
         for (const [name, value] of Object.entries(saved)) {
           if (value === undefined) delete process.env[name]

@@ -8,15 +8,16 @@ import type { ShellCapture } from "@opencode/plugin/promise/shell"
 import { createSecretSpool, type SecretSpool } from "./secret-spool"
 import { createSecretStream } from "./secret-stream"
 import path from "node:path"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import type { ToolFacts } from "./policy/identity"
-import { AUTOMATION_PROFILES, type UnattendedProfile } from "../../schema/src/codepuppy-unattended"
-import { credentialValues, envAssignments } from "./secret-values"
+import { AUTOMATION_PROFILES, UNATTENDED_DENIAL_KEY, UnattendedDenial, unattendedDenialCopy, type UnattendedProfile } from "../../schema/src/codepuppy-unattended"
+import { credentialValues, envAssignments, envSecret } from "./secret-values"
 import { projectSecretRead } from "./secret-read"
 import { isUtf8 } from "node:buffer"
 import { fileURLToPath } from "node:url"
-import type { ToolEditor, ToolContext } from "@opencode/plugin/promise/tool"
-import { Tool } from "../../schema/src/tool"
+import { Error as ToolError, type ToolEditor, type ToolContext } from "@opencode/plugin/promise/tool"
+// Type only: a runtime relative import of the schema tool module splits Tool.Error from Core's in the engine.
+import type { Tool } from "../../schema/src/tool"
 import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
 import { stripAnsi } from "../../session-ui/src/tools/ansi"
 import { toolCallKey } from "./policy/identity"
@@ -99,10 +100,19 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       ...(display === undefined ? {} : { [DISPLAY_KEY]: display }),
     }
   }
-  const hiddenMetadata = (state?: CallState): Tool.Metadata => ({
+  // The policy's own unattended denial survives hiding so the automation still records the run failed; its sentence is
+  // rebuilt from the fixed copy instead of keeping the incoming text.
+  const hiddenDenial = (value?: Tool.Metadata): Tool.Metadata => {
+    const denial = Schema.decodeUnknownOption(UnattendedDenial)(value?.[UNATTENDED_DENIAL_KEY])
+    if (Option.isNone(denial)) return {}
+    const { reason, tool } = denial.value
+    return { [UNATTENDED_DENIAL_KEY]: { version: 1, reason, tool, message: unattendedDenialCopy(reason, tool) } }
+  }
+  const hiddenMetadata = (state?: CallState, terminal?: Tool.Metadata): Tool.Metadata => ({
     output: ProtectedFiles.MASKING_FAILED_TEXT,
     ...(state?.kind === "execute" ? { toolCalls: [] } : {}),
     ...(state?.published?.[DISPLAY_KEY] === undefined ? {} : { [DISPLAY_KEY]: state.published[DISPLAY_KEY] }),
+    ...hiddenDenial(terminal),
   })
   const content = async (item: Tool.Content): Promise<Tool.Content> => {
     if (item.type === "text") return { type: "text", text: text(item.text) }
@@ -228,6 +238,8 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     prepareMutation: async (input: EnvMutation): Promise<EnvMutation> => (await prepareMutation(input)).mutation,
     read: async (input: { call: MaskCall; file: ProtectedFiles.ProtectedFile; result: Tool.Result }): Promise<Tool.Result> => {
       const state = stateOf(input.call, "read")
+      // A protected file outside every scanned source joins later collection once read (spec v5 BR-05).
+      files.track(input.file)
       try {
         const after = input.file.view === "variables" ? new TextDecoder("utf-8", { fatal: true }).decode(await readFile(state?.read?.target ?? input.file.path)) : undefined
         if (after !== undefined) files.remember(credentialValues(input.file, Buffer.from(after)))
@@ -274,7 +286,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         return result
       } catch {
         if (state) state.failed = true
-        const safe = hiddenMetadata(state)
+        const safe = hiddenMetadata(state, input.result.metadata)
         try {
           await finishProgress(state, true)
         } catch {
@@ -287,19 +299,20 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     },
     error: async (input: { call: MaskCall; tool: string; error: Tool.Error }): Promise<Tool.Error> => {
       const state = stateOf(input.call, input.tool)
+      // Masking keeps the incoming class: Core recognises its errors by class (as in policy/display.ts).
+      const Constructor = input.error.constructor as typeof ToolError
       try {
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
-        if (state?.mutations?.some((snapshot) => [snapshot.before, snapshot.after].some((source) => source !== undefined && envAssignments(source).some((record) => !ProtectedFiles.isPublicValue(record) && record.rhs.split(/\r?\n/).some((part) => {
+        if (state?.mutations?.some((snapshot) => [snapshot.before, snapshot.after].some((source) => source !== undefined && envAssignments(source).some((record) => envSecret(record) && record.rhs.split(/\r?\n/).some((part) => {
           const fragment = part.replace(/^["'`]|["'`]$/g, "")
           return fragment.length > 0 && input.error.message.includes(fragment)
         }))))) throw new Error("Restored env excerpt in error")
-        const error = new Tool.Error({
+        const error = new Constructor({
           message: text(input.error.message),
           error: permissionCause(input.error, "mask"),
           metadata: metadata(await mutationProjection({ ...state?.last, ...input.error.metadata }, state) as Tool.Metadata),
         })
-        if (error.error) Object.setPrototypeOf(error, Object.getPrototypeOf(input.error))
         await finishProgress(state, false)
         return error
       } catch {
@@ -309,9 +322,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         } catch {
           /* Never recover the previous dynamic progress. */
         }
-        const error = new Tool.Error({ message: ProtectedFiles.MASKING_FAILED_TEXT, error: permissionCause(input.error, "hide"), metadata: hiddenMetadata(state) })
-        if (error.error) Object.setPrototypeOf(error, Object.getPrototypeOf(input.error))
-        return error
+        return new Constructor({ message: ProtectedFiles.MASKING_FAILED_TEXT, error: permissionCause(input.error, "hide"), metadata: hiddenMetadata(state, input.error.metadata) })
       } finally {
         if (state) calls.delete(toolCallKey(input.call))
       }
@@ -366,9 +377,9 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
                 readAccess.protect(context, file)
                 if (file.view === "notice") {
                   try { await stat(target); await access(target, constants.R_OK) } catch (cause) {
-                    throw new Tool.Error({ message: `${(cause as NodeJS.ErrnoException).code === "ENOENT" ? "File not found:" : "Unable to read"} ${request.path}` })
+                    throw new ToolError({ message: `${(cause as NodeJS.ErrnoException).code === "ENOENT" ? "File not found:" : "Unable to read"} ${request.path}` })
                   }
-                  if (!Schema.isSchema(draft.output)) throw new Tool.Error({ message: ProtectedFiles.MASKING_FAILED_TEXT })
+                  if (!Schema.isSchema(draft.output)) throw new ToolError({ message: ProtectedFiles.MASKING_FAILED_TEXT })
                   return { output: Schema.decodeUnknownSync(draft.output)({ type: "text-page", content: ProtectedFiles.PROTECTED_FILE_TEXT, mime: "text/plain", offset: 1, truncated: false }), content: [{ type: "text", text: ProtectedFiles.PROTECTED_FILE_TEXT }], metadata: { truncated: false } }
                 }
                 const before = await readFile(file.path).then((bytes) => new TextDecoder("utf-8", { fatal: true }).decode(bytes)).catch(() => undefined)

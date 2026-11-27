@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import { Tool } from "../../schema/src/tool"
 import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
+import { UNATTENDED_DENIAL_KEY, unattendedDenialCopy } from "../../schema/src/codepuppy-unattended"
 import { createSecretMask, replaceSecretBytes } from "./secret-mask"
 
 const owned: string[] = []
@@ -48,7 +49,7 @@ test("capture reprojects the terminal file with newly discovered values", async 
   await mask.capture(event("chunk", `first=${first}\nnew=${second}\nPORT=3000\n`))
   expect(live.join("").includes(first)).toBe(false)
   expect(live.join("").includes(second)).toBe(true) // Approved print-before-write live window.
-  await writeFile(path.join(roots.project, ".env"), `NEW=${second}\nPORT=3000\n`)
+  await writeFile(path.join(roots.project, ".env"), `NEW_TOKEN=${second}\nPORT=3000\n`)
   const end = event("end")
   await mask.capture(end)
   expect(end.disposition).toBe("replace")
@@ -258,14 +259,35 @@ test("permission causes retain session rejection and masked feedback", async () 
   }
 })
 
-test("permission rejection preserves the engine tool error prototype", async () => {
+// The engine recognises only its own error class; the gate's unattended denial carries no permission cause.
+test.each([
+  { title: "permission rejection", cause: true, hidden: false },
+  { title: "unattended denial without a cause", cause: false, hidden: false },
+  { title: "hidden failure of an unattended denial", cause: false, hidden: true },
+])("$title preserves the engine tool error prototype", async ({ cause, hidden }) => {
   const { Permission } = await import("../../core/src/permission")
   const { ToolFailure } = await import("../../ai/src/schema/errors")
-  const { mask } = await setup()
-  const cause = new Permission.BlockedError({ rules: [], permission: "read", resources: [".env"] })
-  const original = new ToolFailure({ message: "Unable to read .env", error: cause })
-  const safe = await mask.error({ call, tool: "read", error: original })
+  const { mask, roots } = await setup()
+  const denial = { version: 1, reason: "readonly", tool: "cp_probe", message: unattendedDenialCopy("readonly", "cp_probe") }
+  const original = cause
+    ? new ToolFailure({ message: "Unable to read .env", error: new Permission.BlockedError({ rules: [], permission: "read", resources: [".env"] }) })
+    : new ToolFailure({ message: denial.message, metadata: { [UNATTENDED_DENIAL_KEY]: denial } })
+  if (hidden) await writeFile(path.join(roots.project, "credentials.json"), "{")
+  const safe = await mask.error({ call, tool: "cp_probe", error: original })
+  expect(safe.message).toBe(hidden ? ProtectedFiles.MASKING_FAILED_TEXT : original.message)
   expect(Object.getPrototypeOf(safe) === Object.getPrototypeOf(original)).toBe(true)
+  expect(safe.metadata?.[UNATTENDED_DENIAL_KEY]).toEqual(original.metadata?.[UNATTENDED_DENIAL_KEY])
+})
+
+// Code Mode attaches a child call's unattended denial to the outer result; hiding the payload keeps the run failed.
+test("hidden Code Mode result keeps the unattended denial", async () => {
+  const { mask, roots } = await setup()
+  const denial = { version: 1, reason: "readonly", tool: "cp_probe", message: unattendedDenialCopy("readonly", "cp_probe") }
+  await mask.begin({ call, kind: "execute" })
+  await writeFile(path.join(roots.project, "credentials.json"), "{")
+  const safe = await mask.result({ facts: undefined, call, tool: "execute", result: { content: "done", metadata: { [UNATTENDED_DENIAL_KEY]: denial } } })
+  expect(safe.content).toEqual([{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }])
+  expect(safe.metadata?.[UNATTENDED_DENIAL_KEY]).toEqual(denial)
 })
 
 test("line-wise output masks each multiline credential fragment", async () => {

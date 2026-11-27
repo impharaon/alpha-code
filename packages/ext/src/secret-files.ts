@@ -27,11 +27,16 @@ export async function resolveProtectedFile(file: string, roots: ProtectedFiles.P
   }
 }
 
+type EntryPlan = { readonly candidate: string; readonly descend: boolean; readonly link: boolean; resolved?: readonly (ProtectedFiles.ProtectedFile | undefined)[] }
+
 export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   const directories = new Map<string, { version: string; entries: Dirent[] }>()
+  // Per source and directory version, whose entry names and kinds are then fixed: what each entry was found to be.
+  const plans = new Map<string, { version: string; entries: EntryPlan[] }>()
   const files = new Map<string, string>()
   const retained = new Map<string, Uint8Array>()
   const encrypted = new Map<string, Uint8Array[]>()
+  const tracked = new Map<string, ProtectedFiles.ProtectedFile>()
   let snapshot: readonly Uint8Array[] = []
   const publishValues = () => { snapshot = [...retained.values(), ...[...encrypted.values()].flat()] }
   let pending: Promise<void> | undefined
@@ -69,7 +74,7 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
     files.set(key, version)
   }
   const scan = async () => {
-    for (const source of ProtectedFiles.sources(roots)) {
+    for (const [index, source] of ProtectedFiles.sources(roots).entries()) {
       const visited = new Set<string>()
       const walk = async (directory: string): Promise<void> => {
         if (disposed) return
@@ -89,21 +94,36 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
         if (visited.has(key)) return
         visited.add(key)
         const entries = await directoryEntries(directory, identity)
-        for (const entry of entries) {
-          if (disposed) return
-          const candidate = path.join(directory, entry.name)
-          const relative = path.relative(source.root, candidate).split(path.sep).join("/")
-          if (entry.isDirectory() || entry.isSymbolicLink()) {
-            // Published literal subtree exclusions prune IO; only Schema matches protected file paths.
-            if (relative.split("/").some((segment) => source.exclude.includes(`**/${segment}`))) continue
-            if (source.include.some((pattern) => canDescend(relative, pattern, roots.platform))) await walk(candidate)
+        const version = sourceVersion(identity)
+        const planKey = `${index}\0${directory}`
+        let plan = plans.get(planKey)
+        if (plan?.version !== version) {
+          plan = {
+            version,
+            entries: entries.flatMap((entry): EntryPlan[] => {
+              const candidate = path.join(directory, entry.name)
+              if (!entry.isDirectory() && !entry.isSymbolicLink()) return [{ candidate, descend: false, link: false }]
+              const relative = path.relative(source.root, candidate).split(path.sep).join("/")
+              // Published literal subtree exclusions prune IO; only Schema matches protected file paths.
+              if (relative.split("/").some((segment) => source.exclude.includes(`**/${segment}`))) return []
+              const descend = source.include.some((pattern) => canDescend(relative, pattern, roots.platform))
+              return [{ candidate, descend, link: entry.isSymbolicLink() }]
+            }),
           }
-          const target = await available(() => realpath(candidate))
-          if (!target) continue
-          const matches = [
-            ProtectedFiles.match({ path: candidate, roots }),
-            ProtectedFiles.match({ path: target, roots }),
-          ]
+          plans.set(planKey, plan)
+        }
+        for (const item of plan.entries) {
+          if (disposed) return
+          const candidate = item.candidate
+          if (item.descend) await walk(candidate)
+          let matches = item.resolved
+          if (!matches) {
+            const target = await available(() => realpath(candidate))
+            if (!target) continue
+            matches = [ProtectedFiles.match({ path: candidate, roots }), ProtectedFiles.match({ path: target, roots })]
+            // A link's target can move while its directory stays the same; any other entry resolves the same until it does.
+            if (!item.link) item.resolved = matches
+          }
           if (!matches.some((file) => file !== undefined)) continue
           const info = await available(() => stat(candidate, { bigint: true }))
           if (!info?.isFile()) continue
@@ -115,6 +135,12 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
         }
       }
       await walk(source.root)
+    }
+    // Protected files outside every source (another project's, once read) are re-checked without listing their directory.
+    for (const file of tracked.values()) {
+      if (disposed) return
+      const info = await available(() => stat(file.path, { bigint: true }))
+      if (info?.isFile()) await available(() => capture(file, info))
     }
   }
   const directoryEntries = async (directory: string, identity: BigIntStats) => {
@@ -136,6 +162,9 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   return {
     roots,
     remember,
+    track: (file: ProtectedFiles.ProtectedFile) => {
+      if (!disposed) tracked.set(file.path, file)
+    },
     values: () => snapshot,
     refresh: async () => {
       if (disposed) throw new Error("Secret files released")
@@ -152,7 +181,9 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
     dispose: () => {
       disposed = true
       directories.clear()
+      plans.clear()
       files.clear()
+      tracked.clear()
       retained.clear()
       for (const values of encrypted.values()) for (const value of values) value.fill(0)
       encrypted.clear()

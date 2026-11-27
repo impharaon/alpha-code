@@ -2,11 +2,12 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { Result } from "effect"
-import { Tool } from "../../schema/src/tool"
+import { Error as ToolError } from "@opencode/plugin/promise/tool"
+import type { Tool } from "../../schema/src/tool"
 import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
 import { Patch } from "../../util/src/patch"
 import { Bom } from "../../util/src/bom"
-import { envAssignments } from "./secret-values"
+import { envAssignments, envView } from "./secret-values"
 import { resolveProtectedFile } from "./secret-files"
 
 export type EnvMutation =
@@ -22,7 +23,7 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
     try { return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(await readFile(name)) }
     catch (cause) {
       if ((cause as NodeJS.ErrnoException).code === "ENOENT") return undefined
-      if (required) throw new Tool.Error({ message: `Unable to read env file: ${name}` })
+      if (required) throw new ToolError({ message: `Unable to read env file: ${name}` })
     }
   }
   const target = (name: string) => path.resolve(roots.directory, name)
@@ -41,7 +42,7 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
       return { mutation: input, snapshots }
     }
     const source = Bom.split(before.replaceAll("\r\n", "\n")).text
-    const names = new Set(envAssignments(input.oldString).filter((item) => item.value === ProtectedFiles.REDACTED).map((item) => item.name))
+    const names = new Set(envAssignments(input.oldString).filter((item) => item.value.includes(ProtectedFiles.REDACTED)).map((item) => item.name))
     const layout = input.oldString.split(/\r?\n/).includes(ProtectedFiles.REDACTED) ? "line-slots" : "assignments"
     const masked = maskTemplate(source, names, layout)
     const query = maskTemplate(input.oldString.replaceAll("\r\n", "\n"), names, layout).text
@@ -50,7 +51,7 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
       // A unique assignment sequence supplies values; Core retains its own whitespace/unicode matching tiers.
       const wanted = envAssignments(input.oldString)
       const all = envAssignments(source)
-      const candidates = all.flatMap((item, index) => wanted.length && wanted.every((row, offset) => all[index + offset]?.name === row.name && (row.value === ProtectedFiles.REDACTED || all[index + offset]?.value === row.value)) ? [item] : [])
+      const candidates = all.flatMap((item, index) => wanted.length && wanted.every((row, offset) => all[index + offset]?.name === row.name && (row.value === ProtectedFiles.REDACTED || all[index + offset]?.value === row.value || shown(all[index + offset]!) === row.value)) ? [item] : [])
       if (candidates.length === 1) {
         const base = counts(all.filter((item) => item.valueEnd <= candidates[0].start))
         const oldString = restoreFields(input.oldString, records, base)
@@ -58,11 +59,11 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
         snapshots.push({ path: target(input.path), file, before })
         return { mutation: { ...input, oldString, newString }, snapshots }
       }
-      if (names.size || envAssignments(input.newString).some((item) => item.value === ProtectedFiles.REDACTED)) throw new Tool.Error({ message: `Could not find oldString in ${input.path}. It must identify the env assignments.` })
+      if (names.size || envAssignments(input.newString).some((item) => item.value.includes(ProtectedFiles.REDACTED))) throw new ToolError({ message: `Could not find oldString in ${input.path}. It must identify the env assignments.` })
       snapshots.push({ path: target(input.path), file, before })
       return { mutation: input, snapshots }
     }
-    if (matches.length > 1 && input.replaceAll !== true) throw new Tool.Error({ message: `Found ${matches.length} matches for oldString, but expected exactly one. Add more surrounding context to make oldString unique, or set replaceAll to true to replace every occurrence.` })
+    if (matches.length > 1 && input.replaceAll !== true) throw new ToolError({ message: `Found ${matches.length} matches for oldString, but expected exactly one. Add more surrounding context to make oldString unique, or set replaceAll to true to replace every occurrence.` })
     const replacements = matches.map((match) => ({ ...match, text: restoreFields(input.newString, records, counts(envAssignments(source).filter((item) => item.valueEnd <= match.start))) }))
     const after = replacements.toReversed().reduce((text, item) => text.slice(0, item.start) + item.text.replaceAll("\r\n", "\n") + text.slice(item.end), source)
     snapshots.push({ path: target(input.path), file, before, after: Bom.join(after, Bom.has(Buffer.from(before))) })
@@ -93,7 +94,7 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
       hunks.push({ ...hunk, contents }); snapshots.push({ path: target(destination), file, before, after: contents }); continue
     }
     const source = Bom.split(before.replaceAll("\r\n", "\n")).text
-    const names = new Set(hunk.chunks.flatMap((chunk) => envAssignments([...chunk.oldLines, ...chunk.newLines, chunk.changeContext ?? ""].join("\n")).filter((item) => item.value === ProtectedFiles.REDACTED).map((item) => item.name)))
+    const names = new Set(hunk.chunks.flatMap((chunk) => envAssignments([...chunk.oldLines, ...chunk.newLines, chunk.changeContext ?? ""].join("\n")).filter((item) => item.value.includes(ProtectedFiles.REDACTED)).map((item) => item.name)))
     const layout = hunk.chunks.some((chunk) => [...chunk.oldLines, ...chunk.newLines].includes(ProtectedFiles.REDACTED)) ? "line-slots" : "assignments"
     const view = maskTemplate(source, names, layout)
     try {
@@ -119,7 +120,7 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
       hunks.push(restored); snapshots.push({ path: target(destination), file, before, after: Patch.joinBom(after.content, after.bom) })
       if (hunk.movePath) snapshots.push({ path: target(hunk.path), file, before, after: "" })
     } catch {
-      throw new Tool.Error({ message: `Unable to restore env patch: ${hunk.path}` })
+      throw new ToolError({ message: `Unable to restore env patch: ${hunk.path}` })
     }
   }
   return { mutation: snapshots.length ? { ...input, patchText: serialize(hunks) } : input, snapshots }
@@ -128,11 +129,25 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
 function counts(records: ReturnType<typeof envAssignments>) {
   return new Map(records.map((item) => [item.name, item.occurrence]))
 }
+/** The value as the read view shows it when only embedded fields are masked. */
+function shown(record: ReturnType<typeof envAssignments>[number]) {
+  const view = envView(record)
+  return view.kind === "embedded" ? view.value : undefined
+}
 function restoreFields(text: string, current: ReturnType<typeof envAssignments>, base = new Map<string, number>()) {
   return envAssignments(text).toReversed().reduce((result, item) => {
-    if (item.value !== ProtectedFiles.REDACTED) return result
+    if (!item.value.includes(ProtectedFiles.REDACTED)) return result
     const prior = current.find((entry) => entry.name === item.name && entry.occurrence === (base.get(item.name) ?? 0) + item.occurrence)
     if (!prior) return result
+    if (item.value !== ProtectedFiles.REDACTED) {
+      // Put each embedded mask back by position with the current field text; other edits to the value stay.
+      const view = envView(prior)
+      if (view.kind !== "embedded") return result
+      const fields = view.spans.map(([start, end]) => prior.rhs.slice(start, end))
+      let index = 0
+      const rhs = item.rhs.replaceAll(ProtectedFiles.REDACTED, (mask) => fields[index++] ?? mask)
+      return result.slice(0, item.valueStart) + rhs + result.slice(item.valueEnd)
+    }
     let end = item.valueEnd
     for (let line = 0; line < prior.rhs.split(/\r?\n/).length - 1; line++) {
       const continuation = result.slice(end).match(/^\r?\n\[REDACTED\](?=\r?\n|$)/)
@@ -143,9 +158,10 @@ function restoreFields(text: string, current: ReturnType<typeof envAssignments>,
   }, text)
 }
 function maskTemplate(text: string, names: ReadonlySet<string>, layout: "line-slots" | "assignments") {
-  const records = envAssignments(text).filter((item) => names.has(item.name)).map((item) => ({
-    ...item, replacement: (layout === "line-slots" ? item.rhs.split(/\r?\n/) : [item.rhs]).map(() => ProtectedFiles.REDACTED).join("\n"),
-  }))
+  const records = envAssignments(text).filter((item) => names.has(item.name)).map((item) => {
+    const view = envView(item)
+    return { ...item, replacement: view.kind === "embedded" ? view.rhs : (layout === "line-slots" ? item.rhs.split(/\r?\n/) : [item.rhs]).map(() => ProtectedFiles.REDACTED).join("\n") }
+  })
   const spans = records.map((item, index) => {
     const delta = records.slice(0, index).reduce((sum, entry) => sum + entry.replacement.length - entry.valueEnd + entry.valueStart, 0)
     return { ...item, from: item.valueStart + delta, to: item.valueStart + delta + item.replacement.length }
@@ -159,7 +175,7 @@ function maskTemplate(text: string, names: ReadonlySet<string>, layout: "line-sl
         if (position === span.from) return span.valueStart
         if (position === span.to) return span.valueEnd
         if (position < span.to) throw new Error("Partial env placeholder")
-        delta += ProtectedFiles.REDACTED.length - span.valueEnd + span.valueStart
+        delta += span.to - span.from - span.valueEnd + span.valueStart
       }
       return position - delta
     },

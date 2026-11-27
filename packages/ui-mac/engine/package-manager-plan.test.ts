@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, chmodSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync, chmodSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { spawn, spawnSync } from "node:child_process"
@@ -53,9 +53,11 @@ test("H1 plans only executable brew words with source spans and deterministic va
 test("H1 follows successful cd and literal exports without taking skipped branches", () => {
   expect(plan("cd p && brew --prefix")[0].cwd).toBe(join(root, "p"))
   expect(plan("cd p; brew --prefix")).toEqual([])
-  expect(plan("false && export PATH=/wrong; brew --prefix")[0].assignments).toEqual([])
-  expect(plan("false || export PATH=/right; brew --prefix")[0].assignments).toMatchObject([{ name: "PATH", value: "/right", origin: "export" }])
-  expect(plan("unknown && export A=x; brew '$VALUE'")[0].assignments).toEqual([])
+  // The command's own assignments; the shell's own exported PWD is pinned by the H3 oracle below.
+  const own = (command: string) => plan(command)[0].assignments.filter((entry) => entry.name !== "PWD" && entry.name !== "OLDPWD")
+  expect(own("false && export PATH=/wrong; brew --prefix")).toEqual([])
+  expect(own("false || export PATH=/right; brew --prefix")).toMatchObject([{ name: "PATH", value: "/right", origin: "export" }])
+  expect(own("unknown && export A=x; brew '$VALUE'")).toEqual([])
   expect(plan("export A=x; brew \"$A\"")[0].argv).toEqual(["x"])
   expect(plan("(cd p && brew --prefix); brew --prefix").map((node) => node.cwd)).toEqual([join(root, "p"), root])
 })
@@ -67,14 +69,41 @@ test("H3 environment carries only exported variables and the leaf's own prefix a
   expect(planned("export X=1; brew --prefix", "/bin/bash").X).toBe("1")
   expect(planned("X=1 brew --prefix", "/bin/bash").X).toBe("1")
   expect(plan("X=jq; brew install \"$X\"")[0].argv).toEqual(["install", "jq"])
-  // Oracle: the same source in each real interpreter with /usr/bin/env in the brew position.
-  const sources = ["X=1; brew --prefix", "export X=1; brew --prefix", "X=1 brew --prefix", "X=1; export X; brew --prefix", "export X; X=1; brew --prefix", "set -a; X=1; brew --prefix", "set -a; set +a; X=1; brew --prefix", "PATH=/bin:/usr/bin; brew --prefix", "VALUE=changed; brew --prefix"]
+  // Oracle: the same source in each real interpreter with /usr/bin/env in the brew position. The shells report a
+  // physical PWD, so the planner gets the real path of the same directory.
+  const physical = realpathSync(root)
+  mkdirSync(join(physical, "p"), { recursive: true })
+  const plannedAt = (command: string, shell: string) => ({ ...snapshot, ...Object.fromEntries(planner.planPackageManagerExecution({ manager: "homebrew", command, shell, cwd: physical, env: snapshot })[0].assignments.map((entry) => [entry.name, entry.value])) }) as Record<string, string>
+  const sources = ["X=1; brew --prefix", "export X=1; brew --prefix", "X=1 brew --prefix", "X=1; export X; brew --prefix", "export X; X=1; brew --prefix", "set -a; X=1; brew --prefix", "set -a; set +a; X=1; brew --prefix", "PATH=/bin:/usr/bin; brew --prefix", "VALUE=changed; brew --prefix",
+    "brew --prefix", "cd p && brew --prefix", "pushd p >/dev/null && brew --prefix", "cd p && cd - >/dev/null && brew --prefix", "export X=1; unset X; brew --prefix"]
   for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) for (const source of sources) {
-    const real = spawnSync(shell, ["-c", source.replace("brew --prefix", "/usr/bin/env")], { cwd: root, env: snapshot, encoding: "utf8" })
+    const real = spawnSync(shell, ["-c", source.replace("brew --prefix", "/usr/bin/env")], { cwd: physical, env: snapshot, encoding: "utf8" })
     expect(real.status).toBe(0)
     const actual = Object.fromEntries(real.stdout.trim().split("\n").map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]))
-    const expected = planned(source, shell)
-    for (const name of ["X", "PATH", "VALUE"]) expect(`${shell} ${source} ${name}=${expected[name]}`).toBe(`${shell} ${source} ${name}=${actual[name]}`)
+    const expected = plannedAt(source, shell)
+    for (const name of ["X", "PATH", "VALUE", "PWD", "OLDPWD"]) expect(`${shell} ${source} ${name}=${expected[name]}`).toBe(`${shell} ${source} ${name}=${actual[name]}`)
+  }
+})
+
+test("H1 a planned leaf's argv and cwd match the real shell; undeterminable words stay unplanned", () => {
+  const physical = realpathSync(root), recorder = join(physical, "argv-recorder"), snapshot = { HOME: physical, PATH: "/usr/bin:/bin" }
+  mkdirSync(join(physical, "p"), { recursive: true })
+  writeFileSync(recorder, `#!/bin/sh\nprintf '%s\\n' "$#"\nfor a in "$@"; do printf '[%s]\\n' "$a"; done\n/bin/pwd -P\n`)
+  chmodSync(recorder, 0o755)
+  const at = (command: string, shell: string) => planner.planPackageManagerExecution({ manager: "homebrew", command, shell, cwd: physical, env: snapshot })
+  // Names outside the snapshot are unknown; a brace list in a POSIX shell is unknown.
+  expect(at("brew install $NOT_IN_SNAPSHOT", "/bin/bash")).toEqual([])
+  expect(at("brew install {jq,wget}", "/bin/sh")).toEqual([])
+  expect(at("brew install {jq,wget}", "/bin/zsh")[0].argv).toEqual(["install", "jq", "wget"])
+  expect(at("X=; brew install $X jq", "/bin/bash")[0]?.argv).toEqual(["install", "jq"])
+  const sources = ["X=; brew install $X jq", "X=; brew install \"$X\" jq", "brew install {jq,wget}", "brew install pre{a,b}post", "cd p && brew --prefix", "pushd p >/dev/null && brew --prefix",
+    "cd p && cd - >/dev/null && brew --prefix", "export X=1; unset X; brew install \"$X\"", "brew install \"$PWD\"", "cd p && brew install \"$OLDPWD\" \"$PWD\""]
+  for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) for (const source of sources) {
+    const nodes = at(source, shell)
+    if (!nodes.length) continue
+    const real = spawnSync(shell, ["-c", source.replace("brew", recorder)], { cwd: physical, env: snapshot, encoding: "utf8" })
+    expect(real.status).toBe(0)
+    expect(`${shell} ${source}\n${nodes[0].argv.length}\n${nodes[0].argv.map((arg) => `[${arg}]\n`).join("")}${nodes[0].cwd}\n`).toBe(`${shell} ${source}\n${real.stdout}`)
   }
 })
 

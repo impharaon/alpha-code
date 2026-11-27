@@ -61,7 +61,8 @@ export function packageManagerScanSource(source: string): string {
     const variable = /^\\$(?:([A-Za-z_][A-Za-z0-9_]*)|\\{([A-Za-z_][A-Za-z0-9_]*)\\})/.exec(input.slice(index))
     if (variable) {
       const value = pm.environment[variable[1] ?? variable[2]]
-      if (value === null || (mode === "word" && pm.wordKind !== "assignment" && /[\\s*?\\[\\]]/.test(value ?? ""))) pm.unresolved = true
+      // A name outside the snapshot and the source is unknown (startup files or the shell itself may set it).
+      if (value === null || value === undefined || (mode === "word" && pm.wordKind !== "assignment" && /[\\s*?\\[\\]]/.test(value ?? ""))) pm.unresolved = true
       if (text) bashAppend(text, value ?? "")
       return index + variable[0].length - 1
     }
@@ -104,9 +105,12 @@ export function scanPackageManagerSource(input: string, dialect: Dialect): Packa
 export function resolvePackageManagerWord(input: string, environment: Readonly<Record<string, string | null>>, dialect: Dialect, kind: "word" | "assignment"): string | undefined {
   const pm: PackageManagerScanContext = { events: [], suppressed: 0, environment, wordKind: kind, decoded: [] }
   const context: BashContext = { remaining: MAX_INPUT_LENGTH * MAX_SUBSTITUTION_DEPTH, dialect, packageManager: pm }
-  const result = scanBash(input, 0, 0, context)
-  if (result.kind === "opaque" || pm.unresolved || pm.decoded!.length !== 1 || pm.events.some((event) => event.kind !== "command")) return
-  const value = pm.decoded![0]
+  // A lone empty word would be an empty command name; an ordinary word is resolved as the argument of a fixed one.
+  const position = kind === "word" ? 1 : 0
+  const result = scanBash(position ? ": " + input : input, 0, 0, context)
+  if (result.kind === "opaque" || pm.unresolved || pm.decoded!.length > position + 1 || pm.events.some((event) => event.kind !== "command")) return
+  // No decoded word: the expansion produced nothing (the caller decides whether that is an empty field or none).
+  const value = pm.decoded![position] ?? ""
   return value.includes("\0") ? undefined : value
 }
 `

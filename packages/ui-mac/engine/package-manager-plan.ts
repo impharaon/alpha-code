@@ -31,6 +31,19 @@ export function planPackageManagerExecution(input: {
     const match = value === undefined ? undefined : /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/s.exec(value)
     return match ? { name: match[1], value: match[2], origin, start: raw.start, end: raw.end } : undefined
   }
+  // The fields one source word becomes; undefined when that cannot be determined.
+  const fields = (raw: string, state: State): string[] | undefined => {
+    if (/\{[^}]*(,|\.\.)[^}]*\}/.test(raw)) {
+      // Brace expansion: only one list of plain literal alternatives, in shells that expand it.
+      const list = /^([\w.@/:+%=-]*)\{([\w.@/:+%=-]+(?:,[\w.@/:+%=-]+)+)\}([\w.@/:+%=-]*)$/.exec(raw)
+      if (!list || dialect === "posix") return undefined
+      return list[2]!.split(",").map((alternative) => list[1] + alternative + list[3])
+    }
+    const value = word(raw, state)
+    if (value === undefined) return undefined
+    // An unquoted expansion that is empty produces no field.
+    return value === "" && !/["'\\]/.test(raw) ? [] : [value]
+  }
   const visit = (leaf: Leaf, state: State): Outcome => {
     if (leaf.kind === "group") {
       const result = sequence(leaf.events, state)
@@ -58,7 +71,9 @@ export function planPackageManagerExecution(input: {
       if (leaf.words[index]?.raw.startsWith("-")) return { success: state, failure: state }
     }
     const program = word(leaf.words[index]?.raw ?? "", state)
-    const args = leaf.words.slice(index + 1).map((raw) => word(raw.raw, state))
+    const split = leaf.words.slice(index + 1).map((raw) => fields(raw.raw, state))
+    const args = split.every((field) => field !== undefined) ? split.flat() as string[] : undefined
+    const span = { start: leaf.words[index]?.start ?? 0, end: leaf.words[index]?.end ?? 0 }
     if (program === "export") {
       const next = leaf.words.slice(index + 1).reduce((current, raw) => {
         const parsed = assignment(raw, state, "export")
@@ -73,7 +88,18 @@ export function planPackageManagerExecution(input: {
       }, state)
       return invert({ success: next }, leaf.negated)
     }
+    if (program === "unset") {
+      // The name loses its value and export attribute. A snapshot name still reaches brew: assignments can only set values.
+      if (leaf.words.slice(index + 1).some((raw) => raw.raw.startsWith("-") && raw.raw !== "-v")) return invert({ success: state }, leaf.negated)
+      const next = leaf.words.slice(index + 1).reduce((current, raw) => {
+        const name = /^[A-Za-z_][A-Za-z0-9_]*$/.exec(raw.raw)?.[0]
+        if (!name) return current
+        return { ...current, env: { ...current.env, [name]: "" }, exported: without(current.exported, name), assignments: current.assignments.filter((entry) => entry.name !== name) }
+      }, state)
+      return invert({ success: next }, leaf.negated)
+    }
     if (program === "set") {
+      if (!args) return invert({ success: state }, leaf.negated)
       let allexport = state.allexport
       for (let at = 0; at < args.length; at++) {
         const option = args[at]
@@ -83,14 +109,22 @@ export function planPackageManagerExecution(input: {
       }
       return invert({ success: { ...state, allexport } }, leaf.negated)
     }
-    if (program === "cd") {
-      const target = args[0] === "--" ? args[1] : args[0] ?? state.env.HOME
-      const next = state.cwd && target !== undefined && target !== null && (args.length <= 1 || args[0] === "--") ? resolve(state.cwd, target) : null
-      return invert({ success: { ...state, cwd: next }, failure: state }, leaf.negated)
+    if (program === "cd" || program === "pushd") {
+      const operands = args?.[0] === "--" ? args.slice(1) : args
+      let target: string | null | undefined = operands && operands.length <= 1 ? (operands[0] ?? (program === "cd" ? state.env.HOME : undefined)) : undefined
+      if (program === "pushd" && (operands?.length !== 1 || /^[+-]/.test(target ?? ""))) target = undefined
+      if (program === "cd" && target === "-") target = state.env.OLDPWD
+      // CDPATH may redirect a relative target.
+      const cdpath = state.env.CDPATH
+      if (typeof target === "string" && !/^(\/|\.\.?(\/|$))/.test(target) && cdpath !== undefined && cdpath !== "") target = undefined
+      const next = state.cwd && typeof target === "string" && target !== "" ? resolve(state.cwd, target) : null
+      return invert({ success: changedDirectory(state, next, span), failure: state }, leaf.negated)
     }
+    // The directory stack is not modelled: after popd the directory is unknown.
+    if (program === "popd") return invert({ success: changedDirectory(state, null, span), failure: state }, leaf.negated)
     if (program === "true" || program === ":") return invert({ success: state }, leaf.negated)
     if (program === "false") return invert({ failure: state }, leaf.negated)
-    if (program && basename(program) === "brew" && node.cwd && (program.includes("/") || node.env.PATH !== null) && prefixes.every((raw) => assignment(raw, state, "prefix")) && args.every((arg) => arg !== undefined)) {
+    if (program && basename(program) === "brew" && node.cwd && (program.includes("/") || node.env.PATH !== null) && prefixes.every((raw) => assignment(raw, state, "prefix")) && args !== undefined) {
       const envAssignments = leaf.words.slice(leaf.builtin + 1, index).flatMap((raw) => {
         const parsed = assignment(raw, state, "prefix")
         return parsed ? [parsed] : []
@@ -134,7 +168,11 @@ export function planPackageManagerExecution(input: {
     }
     return result
   }
-  sequence(facts, { cwd: input.cwd, env: input.env, assignments: [], exported: new Set(Object.keys(input.env)), allexport: false })
+  const initial: State = { cwd: input.cwd, env: input.env, assignments: [], exported: new Set(Object.keys(input.env)), allexport: false }
+  // Every shell exports PWD as its directory at start; zsh also sets OLDPWD to it, bash and sh drop an inherited one.
+  const started = exported(initial, { name: "PWD", value: input.cwd, origin: "export", start: 0, end: 0 })
+  sequence(facts, dialect === "zsh" ? exported(started, { name: "OLDPWD", value: input.cwd, origin: "export", start: 0, end: 0 })
+    : { ...started, env: { ...started.env, OLDPWD: "" }, exported: without(started.exported, "OLDPWD") })
   return plans
 }
 
@@ -143,6 +181,17 @@ function assigned(state: State, value: PackageManagerAssignment): State {
 }
 function exported(state: State, value: PackageManagerAssignment): State {
   return { ...assigned(state, value), exported: new Set([...state.exported, value.name]) }
+}
+function without(names: ReadonlySet<string>, name: string): ReadonlySet<string> {
+  return new Set([...names].filter((entry) => entry !== name))
+}
+/** cd/pushd: PWD becomes the new directory and OLDPWD the previous PWD, both exported; an unknown move makes all three unknown. */
+function changedDirectory(state: State, next: string | null, span: { start: number; end: number }): State {
+  if (next === null) return { ...unknown(unknown(state, "PWD"), "OLDPWD"), cwd: null }
+  const previous = state.env.PWD
+  const moved = { ...state, cwd: next }
+  const old = typeof previous === "string" ? exported(moved, { name: "OLDPWD", value: previous, origin: "export", ...span }) : unknown(moved, "OLDPWD")
+  return exported(old, { name: "PWD", value: next, origin: "export", ...span })
 }
 function unknown(state: State, name: string): State {
   return { ...state, env: { ...state.env, [name]: null }, assignments: state.assignments.filter((entry) => entry.name !== name), exported: new Set([...state.exported, name]) }

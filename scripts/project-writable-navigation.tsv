@@ -58,6 +58,11 @@ packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	onClick	reference c
 packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	onClick	reference choose	2	reference:R3
 packages/ui-mac/src/renderer/codepuppy-ui/workspace-chip.tsx	onClick	props.onSelect	1	consume:user-consume
 packages/ui-mac/src/renderer/codepuppy-ui/workspace-writable.ts	recordWorkspaceOpen	window.api?.recordWorkspaceOpen	1	bridge
+packages/ui-mac/src/renderer/extensions/connector-assistant-host.tsx	ConnectorAssistantHost	props.projects.startChat	1	consume:user-consume
+packages/ui-mac/src/renderer/extensions/connector-assistant-host.tsx	ConnectorAssistantHost	navigate	1	consume:user-consume
+packages/ui-mac/src/renderer/extensions/connector-assistant-host.tsx	ConnectorAssistantHost	hrefFor.session	1	consume:user-consume
+packages/ui-mac/src/renderer/extensions/connector-launch-assistant.ts	createConnectorAssistantHandoff	input.startChat	1	consume:user-consume
+packages/ui-mac/src/renderer/extensions/connector-launch-assistant.ts	createConnectorAssistantHandoff	input.navigate	1	consume:user-consume
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	startDraft	1	consume:restore
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	CodePuppySidebar	reference startChat	1	reference:R1
 packages/ui-mac/src/renderer/sidebar/codepuppy-sidebar.tsx	startChat	recordWorkspaceOpen	1	record:R1

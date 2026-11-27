@@ -249,6 +249,24 @@ test("A4 failed main outcome is shown without manage or install confirmation", a
   expect(host.querySelector("button")).toBeNull()
 })
 
+test("a failed marketplace source command shows the command and its actual error on the card", async () => {
+  const detail = 'Command "xcrun agent plugin path --plugin-format claude" exited with 72: xcrun: error: unable to find utility "agent", not a developer tool or in PATH'
+  harness({ requestId: "request_context7", stage: "failed", outcome: { ok: false, code: "source-unreachable", detail } })
+  const host = mount(row())
+  await flush()
+  expect(host.textContent).toContain("未能读取插件来源，请重试。")
+  expect(host.textContent).toContain(detail)
+  expect(host.querySelector("button")).toBeNull()
+})
+
+test("other source failures on the card keep only the localized sentence", async () => {
+  harness({ requestId: "request_context7", stage: "failed", outcome: { ok: false, code: "source-unreachable", detail: "Selected source could not be captured" } })
+  const host = mount(row())
+  await flush()
+  expect(host.textContent).toContain("未能读取插件来源，请重试。")
+  expect(host.textContent).not.toContain("Selected source could not be captured")
+})
+
 test("A4 missing both identities only shows tool result; running search reports its actual query", async () => {
   const h = harness(null)
   const host = mount(row({ requestId: undefined, phase: "completed", result: "submitted; result pending" }))

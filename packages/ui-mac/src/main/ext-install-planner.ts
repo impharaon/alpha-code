@@ -177,7 +177,7 @@ import {
   type UpsertInput,
 } from "./ext-receipt-v2"
 import type { PackageEnvelopeIdentityV1 } from "./package-installability"
-import { computeInstalledGraphDigest, parseOwnerToken, type PackageGraphNodeV1, type PackageGraphV1, type PackageMutationEnvelopeV1 } from "./ext-package-ledger-v3"
+import { computeInstalledGraphDigest, parseOwnerToken, pluginPackageStoreKey, type PackageGraphNodeV1, type PackageGraphV1, type PackageMutationEnvelopeV1 } from "./ext-package-ledger-v3"
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import { diffPackageGraphsV1, planPackageClaimTransferV1, planPackageChildConflictsV1, planPackageChildRemovalsV1 } from "./ext-package-lifecycle"
 import { buildDepartingChildConfigItemsV1 } from "./ext-package-tx-builders"
@@ -2964,7 +2964,7 @@ export async function setPackageStateV1(
       const advisory = deps.advisoryGate({ catalogId: record.id, name: record.name, payloadDigest: record.payloadDigest, provenance: record.origin === "catalog" ? "cache" : "bundled" })
       if (!advisory.allowed) return { ok: false, reason: `advisory ${advisory.advisoryId}: ${advisory.reason}` }
       if (record.origin === "catalog" && verified) {
-        const matched = verifyPackageCandidate(graph, verified, graph.pluginTree ? { ...rootRecord, id: graph.root.componentId } : record)
+        const matched = verifyPackageCandidate(graph, verified, pluginPackageStoreKey(graph) ? { ...rootRecord, id: graph.root.componentId } : record)
         if (!matched.ok) return matched
       }
     }

@@ -179,9 +179,9 @@ describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
     const ctx = registered.filter((k) => HOOK_CONTEXT_CLASS[k as keyof typeof HOOK_CONTEXT_CLASS] === "context").sort()
     expect(ctx).toEqual(THROATED)
     // 四条请求钩子挂的是**同一个**回调对象:下面 ③b / ③h 在四条钩子上逐一过真宿主,这里再钉住它们不会各自漂移。
-    // context 另有 policy、联网 notice、包 Invocation、package hooks 与 MCP 别名回调;共用的请求组装器恰好出现一次。
+    // context 另有 policy、联网 notice、包 Invocation、package hooks、MCP 别名、包语言服务预览诊断与包输出样式回调;共用的请求组装器恰好出现一次。
     const [context, ...rest] = REQUEST_HOOKS.map((name) => recorded.hooks[`session.${name}`] ?? [])
-    expect(context).toHaveLength(6)
+    expect(context).toHaveLength(8)
     const assemble = rest[0]![0]!
     expect(context!.filter(callback => callback === assemble)).toHaveLength(1)
     for (const other of rest) {

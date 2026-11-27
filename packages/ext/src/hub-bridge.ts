@@ -1,4 +1,4 @@
-import { parsePackageSessionMessage, type PackageSessionMessage } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
+import { buildPackageLanguageStatus, parsePackageLanguageOpen, parsePackageSessionMessage, type PackageLanguageOpenMessage, type PackageLanguageStatusMessage, type PackageSessionMessage } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { parseVideoBridgeReply, type VideoBridgeRequest, type VideoBridgeReply } from "../../ui-mac/src/shared/video-understanding"
 import { createNetworkEgress } from "./network-egress"
 import { parseNetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
@@ -45,6 +45,8 @@ import {
   buildHubViewRequest,
   buildReloadReport,
   buildPackageLocationReady,
+  buildNativeFileSync,
+  parseNativeFileSyncReply,
   isCodePuppySidecarMessage,
   parseHubRequestReply,
   parseHubViewReply,
@@ -57,6 +59,7 @@ import {
   parseDocumentRuntimeMessage,
   type DocumentRuntimeMessage,
 } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
+import type { NativeFileSource, NativeFileState } from "../../schema/src/codepuppy-project-config"
 
 /** Electron utilityProcess 的 `process.parentPort` 里本模块用到的那两样。 */
 export type HubPort = {
@@ -81,6 +84,10 @@ export type HubBridge = {
   readonly unattended: ReturnType<typeof createUnattendedState>
   onPackageSession(handler: (message: PackageSessionMessage) => Promise<boolean>): () => void
   readWriteScope(request: Pick<WriteScopeRequest, "access" | "targets">): Promise<WriteScopeReply["result"]>
+  /** main's successful workspace preview opens; every Location decides whether the project root is its own. */
+  onLanguageOpen(handler: (message: PackageLanguageOpenMessage) => void): () => void
+  /** Design v3.4 R-l: the latest runtime state of one package language server, for the installed package row. */
+  languageStatus(status: Omit<PackageLanguageStatusMessage, "type">): void
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
   search(input: { directory: string; query: string }): Promise<{ ok: true; result: SourceSearchResultV1 } | BridgeFailure>
@@ -90,6 +97,13 @@ export type HubBridge = {
   /** 本进程里 main 搜索答过的候选(目录条目与 main 铸的编号)的名称与来源;没答过 ⇒ undefined。 */
   installSubject(id: string): HubInstallSubject | undefined
   locationReady(directory: string): void
+  /**
+   * D6(§4.6,R-m):把本代发现的原生文件来源交给 main,拿回绑定状态。取不到(无 parentPort / 超时 / main 答失败 / 应答畸形)⇒
+   * undefined,调用方沿用上一代。成功的应答同时成为 `nativeStates()` 的进程内最新值。
+   */
+  syncNativeSources(input: { directory: string; sources: NativeFileSource[] }): Promise<readonly NativeFileState[] | undefined>
+  /** 最近一次成功 sync 的状态(继承技能的 skill.transform 同步读取;R-n)。 */
+  nativeStates(): readonly NativeFileState[]
   report(input: { generation: number; scope: ReloadScope; outcome: ReloadOutcome; directories: string[]; error?: string }): void
   /** main → ext 的重载请求交给谁。只能挂一个(调度器);挂上之前到达的请求按序缓存,挂上时补交。 */
   onReloadRequest(handler: (message: ReloadRequestMessage) => void): void
@@ -122,8 +136,12 @@ export function createHubBridge(
   const earlyDocument: DocumentRuntimeMessage[] = []
   const readyHandlers = new Set<(check: DeferredDocumentCheck, sidecarGeneration: number) => boolean>()
   const earlyReady: { check: DeferredDocumentCheck; sidecarGeneration: number }[] = []
+  const languageOpens = new Set<(message: PackageLanguageOpenMessage) => void>()
   let reloadHandler: ((message: ReloadRequestMessage) => void) | undefined
   let seq = 0
+  let nativeStates: readonly NativeFileState[] = []
+  /** §4.6 的 sync 应答不带 type,只按这些 id 结算。 */
+  const untyped = new Set<number>()
   const unattended = createUnattendedState()
   const subjects = new Map<string, HubInstallSubject>()
   const remember = (result: SourceSearchResultV1) => {
@@ -139,7 +157,15 @@ export function createHubBridge(
 
   port?.on("message", (event) => {
     const message = event?.data
-    if (!isCodePuppySidecarMessage(message)) return
+    if (!isCodePuppySidecarMessage(message)) {
+      const id = (message as { id?: unknown } | undefined)?.id
+      const entry = typeof id === "number" && untyped.has(id) ? pending.get(id) : undefined
+      if (!entry) return
+      untyped.delete(id as number)
+      pending.delete(id as number)
+      clearTimeout(entry.timer)
+      return entry.settle(message)
+    }
     const type = (message as { type: string }).type
     // #1760: the sidecar's launcher lane (its ConnectorLaunchHost) shares this parentPort; those messages are not the hub's.
     if (type.startsWith("codepuppy.connector-launch.") || type.startsWith("codepuppy.pinned-file.")) return
@@ -165,6 +191,12 @@ export function createHubBridge(
       const parsed = parseDocumentRuntimeMessage(message)
       if (!parsed) return log("[@codepuppy/ext] dropped malformed document runtime message")
       if (![...documentHandlers].some((handler) => handler(parsed))) earlyDocument.push(parsed)
+      return
+    }
+    if (type === "codepuppy.package.lsp.open") {
+      const parsed = parsePackageLanguageOpen(message)
+      if (!parsed) return log("runtime-failed: malformed package language open message")
+      for (const open of languageOpens) open(parsed)
       return
     }
     if (type.startsWith("codepuppy.network.")) {
@@ -209,6 +241,7 @@ export function createHubBridge(
         pending.delete(id)
         signal?.removeEventListener("abort", aborted)
         onCancel?.(id)
+        untyped.delete(id)
         resolve({ ok: false, reason: "timeout", detail: "the app did not answer in time" })
       }, budget)
       pending.set(id, {
@@ -228,6 +261,7 @@ export function createHubBridge(
         port.postMessage(build(id))
       } catch (error) {
         pending.delete(id)
+        untyped.delete(id)
         clearTimeout(timer)
         signal?.removeEventListener("abort", aborted)
         log(`[@codepuppy/ext] hub bridge: request ${id} could not be posted: ${error instanceof Error ? error.message : String(error)}`)
@@ -288,6 +322,14 @@ export function createHubBridge(
       const result = await ask((id) => buildWriteScopeRequest(id, request), (message) => parseWriteScopeReply(message)?.result)
       return "ok" in result ? { error: "unavailable" } : result
     },
+    onLanguageOpen: handler => {
+      languageOpens.add(handler)
+      return () => { languageOpens.delete(handler) }
+    },
+    languageStatus(status) {
+      try { port?.postMessage(buildPackageLanguageStatus(status)) }
+      catch { log("[@codepuppy/ext] hub bridge: language server status could not be posted") }
+    },
     available: !!port,
     onDocumentRuntimeMessage(handler) {
       documentHandlers.add(handler)
@@ -339,6 +381,26 @@ export function createHubBridge(
       ),
     packageAuthorization: (packageId) => ask((id) => buildPackageAuthorizationQuery(id, packageId), (message) => parsePackageAuthorizationReply(message)?.result),
     installSubject: (id) => subjects.get(id),
+    async syncNativeSources(input) {
+      const reply = await ask(
+        (id) => {
+          untyped.add(id)
+          return buildNativeFileSync({ id, ...input })
+        },
+        (message) => parseNativeFileSyncReply(message),
+      )
+      if ("reason" in reply) {
+        log(`[@codepuppy/ext] native source sync: ${reply.reason} — ${reply.detail}`)
+        return undefined
+      }
+      if (!reply.ok) {
+        log(`[@codepuppy/ext] native source sync: ${reply.code} — ${reply.message}`)
+        return undefined
+      }
+      nativeStates = reply.states
+      return reply.states
+    },
+    nativeStates: () => nativeStates,
     locationReady(directory) {
       try { port?.postMessage(buildPackageLocationReady(directory)) }
       catch { log("[@codepuppy/ext] hub bridge: Location readiness could not be posted") }

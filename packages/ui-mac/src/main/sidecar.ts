@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url"
 // #607:注入组合体住在自己的模块里 —— 本文件的第一个 import(registerHooks)与顶层
 // getParentPort() 让 sidecar.ts 无法被测试 import,注入因此长期零覆盖。见 codepuppy-config-injection.ts。
 import { injectCodePuppyConfig, type CodePuppyConfigInjectionResult } from "./codepuppy-config-injection"
+import { sidecarNativeSources } from "./sidecar-native-sources"
 // #613 R1:ready 消息构造抽成 bun 可真执行的单元 —— 文本锚锁不住「值真的上车」,运行时闸门
 // 在 sidecar-ready-message.test.ts;本文件不得字面量构造 ready 消息(接线锚断言其不存在)。
 import { buildReadyMessage, type SidecarReadyMessage } from "./sidecar-ready-message"
@@ -267,6 +268,8 @@ async function start(command: StartCommand) {
           publishInProcessEngine(inProcess)
         },
         projectTrust: engineProjectTrust,
+        // R-m:配置装载等 ext 预载完,再经它进程级的 hub bridge(ext plugin.ts 的 processState)问 main。
+        nativeSources: sidecarNativeSources(extPreload),
       },
     )
     engine = started

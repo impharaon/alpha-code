@@ -65,6 +65,7 @@ function makeHarness(admit: boolean) {
     installPackage: body("installPackage"),
     installFromSource: body("installFromSource"),
     setPackageState: body("setPackageState"),
+    setNativeSourceState: body("setNativeSourceState"),
     savePackageSecrets: body("savePackageSecrets"),
     installCatalog: body("installCatalog"),
     uninstallV2: body("uninstallV2"),
@@ -105,6 +106,7 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
       "ext-install-package",
       "ext-install-from-source",
       "ext-set-package-state",
+      "ext-set-native-source-state",
       "ext-save-package-secrets",
       "ext-uninstall-v2",
       "ext-uninstall-package",
@@ -128,6 +130,7 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
     expect(Object.values(LOCAL_PACKAGE_READ_CHANNELS)).toEqual([
       "ext-prepare-plugin-source",
       "ext-installed-packages",
+      "ext-native-sources",
     ])
     const write = new Set<string>(Object.values(GATED_WRITE_CHANNELS))
     // 集合级互斥:将来往读表里加通道的人,若顺手也登进写表,这条一起红。
@@ -152,7 +155,7 @@ describe("GATED_WRITE_CHANNELS — 表完整性", () => {
 })
 
 describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", () => {
-  test("放行:全部 13 通道 body 收到原实参,gate 收到该通道的解析 root", async () => {
+  test("放行:全部 14 通道 body 收到原实参,gate 收到该通道的解析 root", async () => {
     const h = makeHarness(true)
     const w = buildGatedWriteChannels(h)
     await w.installCatalog({ catalogId: "mcp:demo", scope: { scope: "project", projectDir: "/p" } })
@@ -168,6 +171,7 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
     await w.installPackage("package:supabase")
     await w.setPackageState({ packageId: "package:supabase", state: "disabled" })
     await w.savePackageSecrets({ packageId: "package:github", secrets: {} })
+    await w.setNativeSourceState({ file: "/h/.claude/skills/a/SKILL.md", kind: "skill", entry: "a", action: "disable" })
     expect(h.bodyLog.map((b) => b.key)).toEqual([
       "installCatalog",
       "uninstallV2",
@@ -182,10 +186,11 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
       "installPackage",
       "setPackageState",
       "savePackageSecrets",
+      "setNativeSourceState",
     ])
     // root 断言:global 面 / intent 定根 / 项目面 / 导入 target 定根
-    expect(h.gateLog).toEqual([PROJECT, PROJECT, GLOBAL, GLOBAL, PROJECT, PROJECT, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL])
-    expect(h.bodyLog.slice(10).map((entry) => entry.args)).toEqual([["package:supabase"], [{ packageId: "package:supabase", state: "disabled" }], [{ packageId: "package:github", secrets: {} }]])
+    expect(h.gateLog).toEqual([PROJECT, PROJECT, GLOBAL, GLOBAL, PROJECT, PROJECT, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL, GLOBAL])
+    expect(h.bodyLog.slice(10).map((entry) => entry.args)).toEqual([["package:supabase"], [{ packageId: "package:supabase", state: "disabled" }], [{ packageId: "package:github", secrets: {} }], [{ file: "/h/.claude/skills/a/SKILL.md", kind: "skill", entry: "a", action: "disable" }]])
     // 实参透传抽查
     expect(h.bodyLog[7]?.args).toEqual(["m", { type: "local" }, ["K"]])
     expect(h.bodyLog[3]?.args).toEqual([{ type: "skill" }, "gen-000001-abcdef12"])
@@ -193,7 +198,7 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
 
   })
 
-  test("gate 拒绝:全部 13 通道 body 零调用,拒因原样返回", async () => {
+  test("gate 拒绝:全部 14 通道 body 零调用,拒因原样返回", async () => {
     const h = makeHarness(false)
     const w = buildGatedWriteChannels(h)
     const results = await Promise.all([
@@ -210,9 +215,10 @@ describe("逐通道:gate 先行、root 正确、拒绝短路、实参透传", ()
       w.installPackage("package:supabase"),
       w.setPackageState({ packageId: "package:supabase", state: "disabled" }),
       w.savePackageSecrets({ packageId: "package:github", secrets: {} }),
+      w.setNativeSourceState({ file: "/h/.claude/skills/a/SKILL.md", kind: "skill", entry: "a", action: "remove" }),
     ])
     expect(h.bodyLog).toEqual([])
-    expect(h.gateLog).toHaveLength(13)
+    expect(h.gateLog).toHaveLength(14)
     for (const r of results) expect(r).toEqual({ ok: false, reason: "gate refused" })
   })
 

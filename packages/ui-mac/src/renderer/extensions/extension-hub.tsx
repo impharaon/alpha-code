@@ -37,6 +37,9 @@ import { installableCatalogEntries, installableCatalogPackages } from "./catalog
 import { Dialog } from "../codepuppy-ui/Dialog"
 import { Button } from "../codepuppy-ui/Button"
 import { pushToast } from "../codepuppy-ui/Toast"
+import { Tooltip } from "../codepuppy-ui/Tooltip"
+import { NativeSourceDetail } from "./extension-detail"
+import type { NativeSourceRowV1 } from "../../shared/native-source-view"
 import { Banner } from "../codepuppy-ui/Banner"
 import type { ServerInfo } from "../sidebar/use-projects"
 import {
@@ -198,6 +201,67 @@ export function ExtensionHub(props: {
   /** 存量图缺少显示名时,先取同 id 的目录名称,再回退到根组件名。 */
   const packLabel = (pack: { packageId: string; displayName: string | null; rootComponentName: string }): string =>
     (pack.displayName ?? "").trim() || catalog().packages?.find((view) => view.catalogId === pack.packageId)?.presentation.displayName.trim() || pack.rootComponentName
+  // ── D6 片 6b:本机文件条目(活稿 #hub-native)。行由 main 的安全视图给出;启停 / 移除 / 重新加入只经写闸通道,
+  //    生效与否看引擎下一代(main 请一次 force 重载,视图变化事件到了就重读)。
+  const [nativeRows, { refetch: refetchNative }] = createResource(
+    () => (props.open() ? `${section()}:${projectDir() ?? ""}:${ext.store.hubRows.map((row) => `${row.id}:${row.state}:${row.stateReason?.code}`).join("|")}` : null),
+    () => extIpc.nativeSources(projectDir()),
+  )
+  onCleanup(extIpc.onHubViewChanged(() => { void refetchNative() }))
+  const NATIVE_PAGE: Record<HubSection, readonly NativeSourceRowV1["kind"][]> = { connectors: ["mcp", "plugin"], skills: ["skill", "command"], agents: ["agent"] }
+  const nativeKey = (row: NativeSourceRowV1) => JSON.stringify([row.file, row.kind, row.entry, row.target ?? null])
+  const nativeAll = () => {
+    const state = nativeRows()
+    return state?.ok ? state.rows : []
+  }
+  const nativeOnPage = () => nativeAll().filter((row) => NATIVE_PAGE[section()].includes(row.kind))
+  const nativeGlobal = () => nativeOnPage().filter((row) => !row.removed && row.scope === "global")
+  const nativeProject = () => (projectDir() ? nativeOnPage().filter((row) => !row.removed && row.scope === "project") : [])
+  const nativeRemoved = () => nativeOnPage().filter((row) => row.removed)
+  const nativeName = (row: NativeSourceRowV1) => (row.kind === "command" ? `/${row.entry}` : row.kind === "plugin" ? row.entry.replace(/\.(js|ts)$/, "") : row.entry)
+  const nativeDescription = (row: NativeSourceRowV1) => row.description ?? typeLabel(row.kind)
+  const [nativeBusy, setNativeBusy] = createSignal<Record<string, boolean>>({})
+  const [nativeErr, setNativeErr] = createSignal<Record<string, string>>({})
+  const [managedNativeKey, setManagedNativeKey] = createSignal<string | null>(null)
+  const managedNative = () => nativeAll().find((row) => nativeKey(row) === managedNativeKey())
+  const runNative = async (row: NativeSourceRowV1, action: "enable" | "disable" | "remove" | "rejoin") => {
+    const id = nativeKey(row)
+    if (nativeBusy()[id]) return
+    setNativeBusy((current) => ({ ...current, [id]: true }))
+    setNativeErr((current) => ({ ...current, [id]: "" }))
+    try {
+      const result = await extIpc.setNativeSourceState({ file: row.file, kind: row.kind, entry: row.entry, ...(row.target !== undefined ? { target: row.target } : {}), action })
+      if (!result.ok) {
+        setNativeErr((current) => ({ ...current, [id]: extensionError(result.reason, "codepuppy.ext.error.toggle") }))
+        return
+      }
+      if (action === "remove") {
+        if (managedNativeKey() === id) setManagedNativeKey(null)
+        pushToast({ kind: "success", title: t("codepuppy.ext.packageRemovedName", { name: nativeName(row) }), detail: t("codepuppy.ext.nativeRemovedHint") })
+      }
+      if (action === "rejoin") pushToast({ kind: "success", title: t("codepuppy.ext.nativeRejoined", { name: nativeName(row) }) })
+      await refetchNative()
+    } finally {
+      setNativeBusy((current) => ({ ...current, [id]: false }))
+    }
+  }
+  const nativeMenu = (row: NativeSourceRowV1): MoreMenuItem[] => [
+    { key: "native-state", label: t("codepuppy.ext.turnOn"), checked: row.desiredState === "enabled", disabled: nativeBusy()[nativeKey(row)], onSelect: () => void runNative(row, row.desiredState === "enabled" ? "disable" : "enable") },
+    { key: "manage", label: t("codepuppy.ext.packageManage"), onSelect: () => { setDetail(null); setManagedPackageId(null); setManagedNativeKey(nativeKey(row)) } },
+    { key: "remove-native", label: t("codepuppy.ext.remove"), danger: true, disabled: nativeBusy()[nativeKey(row)], onSelect: () => void runNative(row, "remove") },
+  ]
+  /** 名称旁的一个状态词:正在生效 → 项目两态 → 已关闭(已移除的行不写状态)。 */
+  const NativeStatus = (cp: { row: NativeSourceRowV1 }) => (
+    <Show when={!cp.row.removed}>
+      <Show when={cp.row.applying} fallback={
+        <Show when={cp.row.consent} fallback={<Show when={cp.row.desiredState === "disabled"}><RowStatus tone="off" text={t("codepuppy.ext.packageOff")} /></Show>}>
+          {(consent) => <RowStatus tone={consent() === "consent-denied" ? "warn" : "off"} text={t(consent() === "consent-denied" ? "codepuppy.ext.nativeConsentDenied" : "codepuppy.ext.nativeAwaitingConsent")} />}
+        </Show>
+      }>
+        <RowStatus tone="progress" text={t("codepuppy.ext.packageApplying")} />
+      </Show>
+    </Show>
+  )
   /** 已装扩展包清单**读不出来**(与「一个都没装」是两件事)。 */
   const packagesUnreadable = () => {
     const state = installedPackages()
@@ -595,6 +659,7 @@ export function ExtensionHub(props: {
   const gotoSection = (key: HubSection) => {
     setDetail(null)
     setManagedPackageId(null)
+    setManagedNativeKey(null)
     setQuery("")
     setSegment("recommended")
     setHubSection(key)
@@ -646,6 +711,7 @@ export function ExtensionHub(props: {
       closePackageAuthz()
       setDetail(null)
       setManagedPackageId(null)
+      setManagedNativeKey(null)
       setQuery("")
     } else {
       // REQ-032:进 hub 时刷新远端 catalog(main 侧 ETag 304 零成本;失败回退缓存/内置,B20 永不空白)
@@ -740,6 +806,7 @@ export function ExtensionHub(props: {
     if (confirming() || authz() || confirmBusy() || authzBusy()) return
     if (document.querySelector("[role=dialog]")) return
     if (managedPackageId()) { setManagedPackageId(null); return }
+    if (managedNativeKey()) { setManagedNativeKey(null); return }
     if (detail()) {
       setDetail(null)
       return
@@ -1337,7 +1404,8 @@ export function ExtensionHub(props: {
   // 分组(冻结稿 `.grp-h`):与侧栏「项目」同一种安静小标题 —— 箭头 + 名称 + 数量,点标题收起 / 展开(本次打开期间记住)。
   const [closedGroups, setClosedGroups] = createSignal<Record<string, boolean>>({})
   const Group = (cp: { id: string; label: string; count?: number; aside?: JSX.Element; actionLabel?: string; onAction?: () => void; children: JSX.Element }) => {
-    const open = () => !closedGroups()[cp.id]
+    // 「已移除」平时收起(活稿 #hub-native-skills),其余组默认展开。
+    const open = () => !(closedGroups()[cp.id] ?? cp.id === "native-removed")
     return (
       <section class="codepuppy-ext-grp" data-group-id={cp.id} data-open={open() ? "" : undefined}>
         <div class="codepuppy-ext-grp-h">
@@ -1631,8 +1699,13 @@ export function ExtensionHub(props: {
         ),
       )
     // 冻结稿 `#hub-connectors`:状态是名称旁的一个词(待登录 / 待填令牌 / 已关闭 / 未能启用),说明行只写原因或这个包是干什么的。
-    const notRunning = () => presentation().notRunning.map((item) => `${item.sourceName} · ${t(item.reasonKey)}`).join("；")
-    const showsFailure = () => status()?.kind === "error" || (status() === undefined && presentation().notRunning.length > 0)
+    // Design v3.4 R-l: enabled packages also show each language server's latest runtime state on the same line.
+    const languageServers = () => pack().desiredState === "enabled" ? presentation().languageServers : []
+    const notRunning = () => [
+      ...presentation().notRunning.map((item) => `${item.sourceName} · ${t(item.reasonKey)}`),
+      ...languageServers().map((item) => `${item.sourceName} · ${t(item.reasonKey, { detail: item.detail })}`),
+    ].join("；")
+    const showsFailure = () => status()?.kind === "error" || (status() === undefined && (presentation().notRunning.length > 0 || languageServers().some((item) => item.failed)))
     // 冻结稿 `#hub-row-menu`:待登录 / 待填令牌时,菜单第一项就是那个动作 —— 登录直接发起,令牌进管理页的填写框。
     const accountItem = (): MoreMenuItem[] => {
       const auth = authorization()
@@ -1663,7 +1736,7 @@ export function ExtensionHub(props: {
     const baseDescription = () => {
       const current = status()
       if (current?.kind === "error") return current.reason
-      if (!current && presentation().notRunning.length > 0) return notRunning()
+      if (!current && (presentation().notRunning.length > 0 || languageServers().length > 0)) return notRunning()
       const state = rootHub()
       if (pack().components.some((component) => component.kind === "cloud") && state && state.state !== "available")
         return state.reasonKey ? `${t(state.textKey)} · ${t(state.reasonKey)}` : t(state.textKey)
@@ -1770,7 +1843,7 @@ export function ExtensionHub(props: {
                 </Show>
               )}
             </Show>
-            <Show when={!status() && presentation().notRunning.length > 0}>
+            <Show when={!status() && (presentation().notRunning.length > 0 || languageServers().some((item) => item.failed))}>
               <RowStatus tone="err" text={t("codepuppy.ext.statusFailed")} />
             </Show>
           </div>
@@ -1801,6 +1874,71 @@ export function ExtensionHub(props: {
       </div>
     )
   }
+  // D6 片 6b(活稿 #hub-native-skills / -connectors / -removed):本机文件条目一行 —— 与包同一种行、同一个「…」菜单;
+  // 名称后是目录小字(无圆点状态小字,悬停看完整路径);已移除的行只有「+」重新加入。
+  const NativeRow = (cp: { row: NativeSourceRowV1 }) => {
+    const row = () => cp.row
+    const id = () => nativeKey(row())
+    return (
+      <div
+        class="codepuppy-ext-kit"
+        data-native-source={row().file}
+        data-native-kind={row().kind}
+        data-native-entry={row().entry}
+        data-clickable={row().removed ? undefined : ""}
+        onClick={() => { if (!row().removed) { setDetail(null); setManagedPackageId(null); setManagedNativeKey(id()) } }}
+      >
+        <span class="codepuppy-ext-kit-ic">
+          <Show when={row().kind !== "mcp"} fallback={<HubIc name="db" size={18} />}>
+            {row().kind === "command" ? "/" : (row().entry[0] ?? "?").toUpperCase()}
+          </Show>
+        </span>
+        <div class="codepuppy-ext-kit-body">
+          <div class="codepuppy-ext-kit-ttl">
+            <b data-native-name="">{nativeName(row())}</b>
+            <Tooltip label={row().file}>
+              <span class="codepuppy-ext-st" data-native-directory="">{row().directoryLabel}</span>
+            </Tooltip>
+            <NativeStatus row={row()} />
+          </div>
+          <div class="codepuppy-ext-kit-desc">{nativeDescription(row())}</div>
+          <Show when={nativeErr()[id()]}>
+            {(error) => <p class="codepuppy-ext-card-err" role="alert">{error()}</p>}
+          </Show>
+        </div>
+        <Show
+          when={row().removed}
+          fallback={<MoreMenu id={`native:${id()}`} label={t("codepuppy.ext.packageManageName", { name: nativeName(row()) })} items={nativeMenu(row())} />}
+        >
+          <Tooltip label={t("codepuppy.ext.nativeRejoin")}>
+            <button
+              class="codepuppy-ext-add"
+              data-iact=""
+              data-native-rejoin=""
+              aria-label={t("codepuppy.ext.nativeRejoinName", { name: nativeName(row()) })}
+              disabled={nativeBusy()[id()]}
+              onClick={(event) => {
+                event.stopPropagation()
+                void runNative(row(), "rejoin")
+              }}
+            >
+              <HubIc name="plus" />
+            </button>
+          </Tooltip>
+        </Show>
+      </div>
+    )
+  }
+  /** 收起的「已移除 N」组:排在「本项目」之后、目录类别之前;没有移除项时整组不出现。 */
+  const NativeRemovedGroup = () => (
+    <Show when={nativeRemoved().length > 0}>
+      <Group id="native-removed" label={t("codepuppy.ext.nativeRemovedGroup")} count={nativeRemoved().length}>
+        <div class="codepuppy-ext-grid" data-group="native-removed">
+          <For each={nativeRemoved()}>{(row) => <NativeRow row={row} />}</For>
+        </div>
+      </Group>
+    </Show>
+  )
   // 整包移除的结果与「读不出」—— 区块级,**故意放在包行之外**:行会随着包图消失,解释不能跟着走;
   // 「读不出」与「没装」**永远分开**,折叠成一句「暂无扩展包」会让用户以为东西丢了而去重装。
   const PackageFeedback = () => (
@@ -2291,14 +2429,18 @@ export function ExtensionHub(props: {
     </Group>
   )
   const ProjectGroup = () => (
-    <Show when={projectDir() && installedPage().project.length > 0}>
-      <div class="codepuppy-ext-scopeh">
-        {t("codepuppy.ext.scopeProjectGroup")} · {projectLabel(projectDir()!)}
-      </div>
-      <div class="codepuppy-ext-grid" data-group="project">
-        <For each={installedPage().project}>{(row) => <InstalledRow row={row} />}</For>
-      </div>
-    </Show>
+    <>
+      <Show when={projectDir() && installedPage().project.length + nativeProject().length > 0}>
+        <div class="codepuppy-ext-scopeh">
+          {t("codepuppy.ext.scopeProjectGroup")} · {projectLabel(projectDir()!)}
+        </div>
+        <div class="codepuppy-ext-grid" data-group="project">
+          <For each={installedPage().project}>{(row) => <InstalledRow row={row} />}</For>
+          <For each={nativeProject()}>{(row) => <NativeRow row={row} />}</For>
+        </div>
+      </Show>
+      <NativeRemovedGroup />
+    </>
   )
   const Skeleton = () => (
     <Show when={!ext.store.ready && installedAll().length === 0}>
@@ -2361,6 +2503,7 @@ export function ExtensionHub(props: {
                       if (ev.currentTarget.value.trim()) {
                         setDetail(null)
                         setManagedPackageId(null)
+                        setManagedNativeKey(null)
                       }
                     }}
                   />
@@ -2378,8 +2521,19 @@ export function ExtensionHub(props: {
               </Show>
 
               <Show
-                when={!detail() && !managedPackageId()}
+                when={!detail() && !managedPackageId() && !managedNative()}
                 fallback={
+                  <Show when={!managedNative()} fallback={<Show when={managedNative()}>{(row) => <NativeSourceDetail
+                    row={row()}
+                    label={nativeName(row())}
+                    description={nativeDescription(row())}
+                    status={<NativeStatus row={row()} />}
+                    directory={projectDir()}
+                    crumb={sectionLabel()}
+                    error={nativeErr()[nativeKey(row())]}
+                    menu={<MoreMenu id={`native-manage:${nativeKey(row())}`} label={t("codepuppy.ext.packageManageName", { name: nativeName(row()) })} items={nativeMenu(row())} />}
+                    onBack={() => setManagedNativeKey(null)}
+                  />}</Show>}>
                   <Show when={managedPackage()} fallback={<Show when={detail()}>{(target) => <ExtensionDetail
                     target={target()}
                     ext={ext}
@@ -2407,6 +2561,7 @@ export function ExtensionHub(props: {
                     onSessionToggle={runSessionToggle}
                   />}</Show>}>
                     {(pack) => <InstalledPackageDetail pack={pack()} label={packLabel(pack())} crumb={sectionLabel()} view={catalog().packages?.find((view) => view.catalogId === pack().packageId)} description={managedDescription(pack())} ext={ext} directory={projectDir()} menu={<MoreMenu id={`manage:${pack().packageId}`} label={t("codepuppy.ext.packageManageName", { name: packLabel(pack()) })} items={packageMenu(pack())} />} error={packErr()[pack().packageId]} onBack={() => setManagedPackageId(null)} />}
+                  </Show>
                   </Show>
                 }
               >
@@ -2437,9 +2592,9 @@ export function ExtensionHub(props: {
                   </Show>
                   <PackageFeedback />
                   <Skeleton />
-                  <Show when={(cloudReady() && cloudConnectorMatches() ? 1 : 0) + orderedPackages().length + installedPage().global.length > 0}>
+                  <Show when={(cloudReady() && cloudConnectorMatches() ? 1 : 0) + orderedPackages().length + installedPage().global.length + nativeGlobal().length > 0}>
                   <InstalledGroup
-                    count={(cloudReady() && cloudConnectorMatches() ? 1 : 0) + orderedPackages().length + installedPage().global.length}
+                    count={(cloudReady() && cloudConnectorMatches() ? 1 : 0) + orderedPackages().length + installedPage().global.length + nativeGlobal().length}
                   >
                     <div class="codepuppy-ext-grid" data-group="installed">
                       <Show when={cloudReady() && cloudConnectorMatches()}>
@@ -2447,6 +2602,7 @@ export function ExtensionHub(props: {
                       </Show>
                       <For each={orderedPackages()}>{(pack) => <InstalledPackageRow pack={pack} />}</For>
                       <For each={installedPage().global}>{(row) => <InstalledRow row={row} />}</For>
+                      <For each={nativeGlobal()}>{(row) => <NativeRow row={row} />}</For>
                     </div>
                   </InstalledGroup>
                   </Show>
@@ -2460,7 +2616,8 @@ export function ExtensionHub(props: {
                       !cloudReady() &&
                       orderedPackages().length === 0 &&
                       installedPage().global.length === 0 &&
-                      installedPage().project.length === 0
+                      installedPage().project.length === 0 &&
+                      nativeOnPage().length === 0
                     }
                   >
                     <p class="codepuppy-ext-man-empty">{t("codepuppy.ext.empty")}</p>
@@ -2532,7 +2689,7 @@ export function ExtensionHub(props: {
                 <Show when={section() === "skills"}>
                   <Skeleton />
                   <Show
-                    when={installedPage().global.length > 0 || orderedPackages().length > 0}
+                    when={installedPage().global.length > 0 || orderedPackages().length > 0 || nativeGlobal().length > 0}
                     fallback={
                       <Show when={ext.store.ready && !searching()}>
                         <p class="codepuppy-ext-man-empty">
@@ -2541,10 +2698,11 @@ export function ExtensionHub(props: {
                       </Show>
                     }
                   >
-                    <InstalledGroup count={orderedPackages().length + installedPage().global.length}>
+                    <InstalledGroup count={orderedPackages().length + installedPage().global.length + nativeGlobal().length}>
                       <div class="codepuppy-ext-grid" data-group="installed">
                         <For each={orderedPackages()}>{(pack) => <InstalledPackageRow pack={pack} />}</For>
                         <For each={installedPage().global}>{(row) => <InstalledRow row={row} />}</For>
+                        <For each={nativeGlobal()}>{(row) => <NativeRow row={row} />}</For>
                       </div>
                     </InstalledGroup>
                   </Show>
@@ -2581,7 +2739,7 @@ export function ExtensionHub(props: {
                 <Show when={section() === "agents"}>
                   <Skeleton />
                   <Show
-                    when={installedPage().global.length > 0 || ownAgentsUnreceipted().length > 0 || orderedPackages().length > 0}
+                    when={installedPage().global.length > 0 || ownAgentsUnreceipted().length > 0 || orderedPackages().length > 0 || nativeGlobal().length > 0}
                     fallback={
                       <Show when={ext.store.ready && !searching()}>
                         <p class="codepuppy-ext-man-empty">
@@ -2590,11 +2748,12 @@ export function ExtensionHub(props: {
                       </Show>
                     }
                   >
-                    <InstalledGroup count={orderedPackages().length + installedPage().global.length + ownAgentsUnreceipted().length}>
+                    <InstalledGroup count={orderedPackages().length + installedPage().global.length + ownAgentsUnreceipted().length + nativeGlobal().length}>
                       <div class="codepuppy-ext-grid" data-group="installed">
                         <For each={orderedPackages()}>{(pack) => <InstalledPackageRow pack={pack} />}</For>
                         <For each={installedPage().global}>{(row) => <InstalledRow row={row} />}</For>
                         <For each={ownAgentsUnreceipted()}>{(a) => <AgentRow a={a} />}</For>
+                        <For each={nativeGlobal()}>{(row) => <NativeRow row={row} />}</For>
                       </div>
                     </InstalledGroup>
                   </Show>

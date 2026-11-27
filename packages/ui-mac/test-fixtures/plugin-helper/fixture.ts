@@ -38,6 +38,7 @@ export async function captureWholeFixture(name: string, select?: (path: string) 
       : { kind: "file", path: file.path, mode: file.mode, bytes: "bytes" in file ? Number(file.bytes) : 0, digest: `sha256:${"sha256" in file ? file.sha256 : ""}` })
   return {
     source: { kind: "marketplace", locator: sample.repository, repository: sample.repository, commit: sample.commit, pluginPath: sample.pluginPath, entryName: sample.name, ecosystem: sample.ecosystem as "claude" | "codex" },
+    materialization: "copy",
     nodes,
     readFile: async path => new Uint8Array(await Bun.file(join(root, path)).arrayBuffer()),
   }
@@ -57,6 +58,7 @@ export async function captureFixture(plugin: string, changes: Record<string, str
   const nodes: TreeNode[] = [...files].map(([path, bytes]) => ({ kind: "file", path, mode: 0o644, bytes: bytes.length, digest: digest(bytes) }))
   return {
     source: { kind: "marketplace", locator: recorded.repository, repository: recorded.repository, commit: recorded.commit, pluginPath: plugin, ecosystem },
+    materialization: "copy",
     nodes,
     readFile: async (path) => {
       const bytes = files.get(path)
@@ -76,6 +78,7 @@ export async function captureStandardFixture(name: string, changes: Record<strin
   }
   return {
     source: { kind: "marketplace", locator: sample.repository, repository: sample.repository, commit: sample.commit, pluginPath: sample.pluginPath, entryName: name.split(":")[1], ecosystem: sample.ecosystem as "claude" | "codex" },
+    materialization: "copy",
     nodes: [...files].map(([path, bytes]) => ({ kind: "file", path, mode: sample.files.find(file => file.path === path)?.mode ?? 0o644, bytes: bytes.length, digest: digest(bytes) })),
     readFile: async path => { const bytes = files.get(path); if (!bytes) throw Error("Missing sample file"); return bytes },
   }

@@ -113,11 +113,15 @@ export const baseTranscript = (input: {
   return {
     providerMetadataKey,
     system: [
-      SystemPart.make(
-        input.agent.system
-          ? input.agent.system
-          : SessionSystemPrompt.make(input.tools.definitions.map((tool) => tool.name)),
-      ),
+      {
+        ...SystemPart.make(
+          input.agent.system
+            ? input.agent.system
+            : SessionSystemPrompt.make(input.tools.definitions.map((tool) => tool.name)),
+        ),
+        // codepuppy(#1776 S-10): mark the engine's own default coding prompt so an output style can replace exactly it.
+        ...(input.agent.system ? {} : { metadata: { codepuppyRole: "default-coding" } }),
+      },
       {
         ...SystemPart.make(Instructions.join(input.initial)),
         metadata: { experimental: { instructions: input.initial } },

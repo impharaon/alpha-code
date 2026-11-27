@@ -27,6 +27,7 @@ import {
   PACKAGE_DISPLAY_NAME_MAX,
   decodePackageClaimV1,
   decodePackageGraphV1,
+  pluginPackageStoreKey,
   decodePackageMutationEnvelopeV1,
   directUninstallVerdict,
   parseOwnerToken,
@@ -144,6 +145,23 @@ describe("REQ-128 #706 — 严格解码", () => {
       expect(decodePackageGraphV1({ ...malformed, installedGraphDigest: computeInstalledGraphDigest(malformed as never) }).ok).toBe(false)
     }
     expect(decodePackageGraphV1(graph()).ok).toBe(true)
+  })
+
+  test("a linked plugin root resource round-trips, is digest-bound and excludes a copied tree", () => {
+    const root = { componentId: "bundle:demo", kind: "bundle" as const, name: "plugin-demo", required: true, manifestDigest: D2 }
+    const linked = graph({ root, pluginLink: { bindingId: D3, storeKey: "bundle--plugin-demo" } })
+    expect(decodePackageGraphV1(linked)).toEqual({ ok: true, value: linked })
+    expect(linked.installedGraphDigest).not.toBe(graph({ root, pluginLink: { bindingId: D1, storeKey: "bundle--plugin-demo" } }).installedGraphDigest)
+    for (const bad of [
+      { pluginLink: { bindingId: D3, storeKey: "bundle--other" } },
+      { pluginLink: { bindingId: "not-a-digest", storeKey: "bundle--plugin-demo" } },
+      { pluginLink: { bindingId: D3, storeKey: "bundle--plugin-demo", path: "/printed" } },
+      { pluginLink: { bindingId: D3, storeKey: "bundle--plugin-demo" }, pluginTree: { treeDigest: D1, storeKey: "bundle--plugin-demo" } },
+    ]) {
+      const malformed = { ...linked, ...bad }
+      expect(decodePackageGraphV1({ ...malformed, installedGraphDigest: computeInstalledGraphDigest(malformed as never) }).ok).toBe(false)
+    }
+    expect(pluginPackageStoreKey(linked)).toBe("bundle--plugin-demo")
   })
 
   test("graph 往返 + installedGraphDigest 篡改响亮失败", () => {

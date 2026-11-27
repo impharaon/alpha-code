@@ -62,7 +62,7 @@ import {
   planPackageClaimTransferV1,
   type PackageChildRemovalVerdictV1,
 } from "./ext-package-lifecycle"
-import { validatePackageMutationScopeV1, type PackageGraphV1, type PackageLedgerMutationV1 } from "./ext-package-ledger-v3"
+import { pluginPackageStoreKey, validatePackageMutationScopeV1, type PackageGraphV1, type PackageLedgerMutationV1 } from "./ext-package-ledger-v3"
 import { applyPackageMutation, findRecordV2, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 
 /** 实物删除需要的注入面。刻意是 `PlannerInstallers` 的**子集**(同名同签名)—— 生产接线传的就是
@@ -136,7 +136,7 @@ export function removePackageChildArtifactsV1(
     }
     if (child.kind === "skill") {
       const state = readPackageLedgerStateV1(root, { sideEffectFree: true })
-      if (state.ok && state.packageGraphs.some(graph => graph.pluginTree && graph.children.some(node => node.kind === "skill" && node.name === child.name))) {
+      if (state.ok && state.packageGraphs.some(graph => pluginPackageStoreKey(graph) && graph.children.some(node => node.kind === "skill" && node.name === child.name))) {
         const grants = installers.removeInstallGrants(root, [skillGenerationKey(child.name)])
         if (!grants.ok) return { ok: false, reason: grants.reason, removed, warnings }
         removed.push(...grants.removed)

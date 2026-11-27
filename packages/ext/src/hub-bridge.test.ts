@@ -13,7 +13,7 @@ import {
   type HubView,
 } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { createHubBridge, type HubPort } from "./hub-bridge"
-import { buildUnattendedLive, buildUnattendedAck } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
+import { buildPackageLanguageOpen, buildUnattendedLive, buildUnattendedAck } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 
 test("进程级监听安装完整快照后回执,旧快照和坏输入不能改名单", async () => {
   const wire = fakePort()
@@ -312,6 +312,25 @@ describe("hub-bridge — tool policy writer (I-13)", () => {
   })
 })
 
+test("language open messages from main reach every Location and status messages pass main's inbound parser", () => {
+  const wire = fakePort()
+  const logs: string[] = []
+  const bridge = createHubBridge(wire.port, { log: line => logs.push(line) })
+  const opened: unknown[] = []
+  const release = bridge.onLanguageOpen(message => opened.push(message))
+  const open = buildPackageLanguageOpen("/work/project", "file:///work/project/typed.py")
+  wire.deliver(open)
+  wire.deliver({ ...open, fileUri: "/work/project/typed.py" })
+  wire.deliver({ ...open, extra: true })
+  release()
+  wire.deliver(open)
+  expect(opened).toEqual([open])
+  expect(logs.filter(line => line.includes("malformed package language open"))).toHaveLength(2)
+  const status = { packageId: "claude:pyright-lsp", entryId: "lsp:.claude-plugin/plugin.json#pyright", sourceName: "pyright", treeDigest: "sha256:" + "1".repeat(64), state: "dependency-missing" as const, detail: "pyright-langserver" }
+  bridge.languageStatus(status)
+  expect(parseCodePuppySidecarInbound(wire.sent.at(-1))).toEqual({ type: "codepuppy.package.lsp.status", ...status })
+})
+
 test("private package SessionEnd awaits the owning Location and replies only after cleanup", async () => {
   const wire = fakePort()
   const logs: string[] = []
@@ -402,4 +421,23 @@ test("launcher-lane messages on the shared parentPort are left to the sidecar ho
   wire.deliver({ type: "codepuppy.pinned-file.result", id: 8, sidecarGeneration: "2", delivery: { result: { ok: false, error: "cancelled" } } })
   wire.deliver({ type: "codepuppy.hub.request.reply", id: 9, record: null })
   expect(lines).toEqual(["[@codepuppy/ext] hub bridge: codepuppy.hub.request.reply for no pending request ignored"])
+})
+
+test("native source sync settles by id and reports unavailable without a port", async () => {
+  const wire = fakePort()
+  const bridge = createHubBridge(wire.port, { log: () => {}, timeoutMs: 1000 })
+  const source = { file: "/h/.claude/skills/a/SKILL.md", kind: "skill" as const, entry: "a", active: true }
+  const state = { file: source.file, kind: source.kind, entry: source.entry, desiredState: "disabled" as const, removed: false }
+  const pending = bridge.syncNativeSources({ directory: "/w", sources: [source] })
+  const sent = wire.sent.at(-1) as { type: string; id: number }
+  expect(sent).toMatchObject({ type: "codepuppy.package.source", operation: "sync", directory: "/w", sources: [source] })
+  wire.deliver({ id: sent.id + 100, ok: true, states: [] })
+  wire.deliver({ id: sent.id, ok: true, states: [state] })
+  expect(await pending).toEqual([state])
+  expect(bridge.nativeStates()).toEqual([state])
+  const failed = bridge.syncNativeSources({ directory: "/w", sources: [] })
+  wire.deliver({ id: (wire.sent.at(-1) as { id: number }).id, ok: false, code: "write-failed", message: "no" })
+  expect(await failed).toBeUndefined()
+  expect(bridge.nativeStates()).toEqual([state])
+  expect(await createHubBridge(undefined, { log: () => {} }).syncNativeSources({ directory: "/w", sources: [] })).toBeUndefined()
 })

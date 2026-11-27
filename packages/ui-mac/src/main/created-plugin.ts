@@ -12,6 +12,7 @@ export async function convertCreatedPlugin(draft: CreatedPluginDraftV1) {
     const bytes = new Map(files.map((file) => [file.path, file.data]))
     const capture: Capture = {
       source: { kind: "created", locator: draft.name },
+      materialization: "copy",
       nodes: files.map((file) => ({ kind: "file", path: file.path, mode: 0o644, bytes: file.data.length, digest: `sha256:${sha256Hex(file.data)}` })),
       readFile: async (path) => {
         const value = bytes.get(path)

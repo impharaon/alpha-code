@@ -89,7 +89,9 @@ review_after: 2027-05-09
 
 整包 command/agent 与 skill/MCP 进入同一 PackageGraph/declarations。`ext-package-tx-builders.ts` 的包指令 builder 只生成 receipt 及 agent 启停 config 项，正文仍由 live 树的统一指令描述持有；共享 converter 的 `pluginInstructionDefinition` 负责 metadata/body 分离，不在运行端重写 YAML。
 
-`packages/ext/src/plugin-package-invocation.ts` 将已安装包的 command/agent/skill 接到原 command、skill 与 subagent 执行器，沿唯一 PackageAllowSetV3 检查分项和项目范围。调用期工具规则由既有 policy 绑定，下一用户输入/idle 清除；paths 用实际文件工具完成事件，preload 与 memory 在子会话上下文绑定，模型建议/effort 从原模型目录解析。指令模板只经 S-01 的 core renderer，源 shell 规则匹配复用纯 ShellScan，未新增执行循环或模板解释器。
+`packages/ext/src/plugin-package-invocation.ts` 将已安装包的 command/agent/skill 接到原 command、skill 与 subagent 执行器，沿唯一 PackageAllowSetV3 检查分项和项目范围。调用期工具规则由既有 policy 绑定，下一用户输入/idle 清除；paths 用实际文件工具完成事件，preload 与 memory 在子会话上下文绑定，模型建议/effort 从原模型目录解析。指令模板只经 S-01 的 core renderer，源 shell 规则匹配复用纯 ShellScan，未新增执行循环或模板解释器。包 settings.json 指定的助手在 setup transform 里成为 engine 默认（S-11）；每个会话第一条消息时，当时的默认被钉进会话 metadata，engine-adapter 不带 agent 时回到它，后来的默认只带新会话。
+
+`packages/ext/src/plugin-package-styles.ts` 负责包输出样式：在现有斜杠命令入口注册 `output-style`，选择存进本会话 metadata；在 awaited context hook 里把样式正文加进下一次请求。keep-coding-instructions 为 false 时，只先去掉 engine 标为 default-coding 的 fallback 段和 ext 自己注入的、逐字相同的 agent prompt。只对主会话生效，包关闭后引用即清除。
 
 
 会话 monitor 由同一包 runner 在真实 prompt/Invocation 启动，源 when 控制 always 或指定 skill；同包/entry/session 只启动一次。stdout 行（含最后残行）经原 synthetic/inbox 通知本会话，stderr 留在脱敏进程诊断。包/代/会话有效性校验与 hook 共用，关闭或换代取消 AppProcess 资源；安装/开关不自行启动，任务 scope 结束不停止仍属会话的 monitor。
@@ -104,3 +106,5 @@ S-04 在 core 配置读取及技能 watcher/重扫的发布链选取文件修订
 
 
 `packages/ext/src/plugin-package-process.ts` 消费 S-01 bind-only 结果与既有 AppProcess；`shared/plugin-mcp-config.ts` 的同一 process config 持有 OPTION/default/secret/DATA 绑定，MCP 与包进程复用。hook 的会话资源由 `plugin-package-hooks.ts` 管理，当前接通 package command 的 SessionStart/UserPromptSubmit awaited 阶段与原生 idle 上的 Stop（block/reason 由同 Session synthetic 继续），按真实历史生成私有 JSONL。PreToolUse 位于既有 policy 的 deny 与 confirm/pin 之间，复用 identity 的源工具/字段转换；allow/ask 仅绑定本次 session/message/call、最终输入及服务/包代际，ask 胜 allow，硬 deny 与安装询问保持原权威。UserPromptExpansion 在原命令/手动技能展开前执行；可提前指定的真实原生 message ID 贯穿 prompt_id，不另造会话输入。技能/助手 hooks 由同一 Invocation 的激活/释放管理，scoped 进程与迟到结果跟随 scope 撤销；Stop 继续同任务时延续该 scope。CLAUDE_SKILL_DIR 仍由同一个 process config 绑定。源文件路径在 identity 按真实 Location 解析为 Claude 格式。PermissionRequest 在原 policy 的真实 ask 产生卡片前消费当前工具调用，源 command JSON 的 allow/deny 沿最终绑定重判，BR-10 与硬 deny 仍保持原权威。PostToolUse 从真实 completed 工具终态取源工具输入/响应并将输出放回同一任务的下一次 context；PostToolUseFailure 消费 execute.after error，保留真实错误及中断标志。StopFailure 只消费 session.execution.failed 的真实 type/message，不当正常 Stop 或按 asyncRewake 产生恢复循环，异步上下文留待原会话下一次输入消费。prompt PreToolUse 沿同一 runner 先匹配，使用现有无工具 generate.text 与有效用户模型；ok=true 不生成放行。拒绝先留下原生工具错误，continueOnBlock=false 再于同任务下一次 awaited context 屏障结束，不丢理由或多跑一轮模型。包/配置/代际与会话生命周期收回进程和迟到上下文。`shared/plugin-package-runtime.ts` 是桌面连接状态投影的唯一列表，安装结果不把尚未接通的事件或 monitor 当已运行。
+
+`packages/ext/src/plugin-package-language.ts` 是插件语言服务（lspServers / .lsp.json）唯一的运行端：每个 Location 按 packageId/entryId/项目根经既有 AppProcess 起 stdio 进程，同一 `pluginProcessConfig` 绑定 command/args/env 与 ROOT/DATA/OPTION；只由实际 read/edit/write/patch 工具结果与 main 预览成功打开的匹配后缀文件懒启动，诊断按 URI＋版本保存并附在同一工具结果上，filesystem.changed 只重发已打开文档。entry 运行状态只由它经既有私部 sidecar 消息报给 main，main 只存最新值供已装包行显示，不运行语言服务。

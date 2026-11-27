@@ -14,6 +14,7 @@ import { pluginInstructionDefinition } from "../../ui-mac/src/shared/host-extens
 import { pluginText, renderPluginText } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 import { pluginDataDirectory, publicPluginOption } from "../../ui-mac/src/shared/installed-plugin-settings"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
+import { SESSION_DEFAULT_AGENT_KEY } from "../../ui-mac/src/shared/permission-tier"
 import { allInstalledPluginInstructions, installedPluginPackage } from "./plugin-package-skills"
 import { managedPackageEntryAllowedHere, managedSkillAllowedHere, managedMcpAllowedHere } from "./package-scope"
 import { readPackageAllowSet } from "./gen-skill-paths"
@@ -28,7 +29,8 @@ type Scope = {
   item: Instruction
   text: string
   pendingPrompt: boolean
-  via: "command" | "tool" | "task" | "path" | "attachment"
+  /** `main`: a package agent leading a top-level session (S-11), rebound for each user turn. */
+  via: "command" | "tool" | "task" | "path" | "attachment" | "main"
   dispose: () => void
   partial: boolean
 }
@@ -323,7 +325,14 @@ export async function registerPackageInvocations(
       metadata: { ...result.metadata, partial: true },
     }
   }
+  // BR-25 / S-11: the enabled package agent named by its package settings.json; the last one in store-key order wins.
+  const leadAgent = () =>
+    instructions()
+      .filter((item) => item.entry.kind === "agent" && item.installed.description.defaults?.agent === item.entry.id && allowed(item))
+      .toSorted((left, right) => left.installed.key.localeCompare(right.installed.key))
+      .at(-1)
   const transformAgents = (editor: AgentEditor) => {
+    const lead = leadAgent()
     for (const item of instructions()) {
       if (item.entry.kind !== "agent") continue
       if (!allowed(item)) {
@@ -332,7 +341,8 @@ export async function registerPackageInvocations(
       }
       input.policy.bindPackageAgent(item.name, invocationRules(item), bindings(item))
       editor.update(item.name, (agent) => {
-        agent.mode = "subagent"
+        // A package default must be selectable as a primary agent; delegation still reaches it.
+        agent.mode = item.name === lead?.name ? "all" : "subagent"
         agent.hidden = false
         const definition = pluginInstructionDefinition(item.entry.instruction)
         agent.description = definition.description
@@ -342,7 +352,24 @@ export async function registerPackageInvocations(
       })
     }
   }
-  await context.agent.transform(transformAgents)
+  await context.agent.transform((editor) => {
+    transformAgents(editor)
+    // Only here, before the post-phase configuration plugin: the user's own default_agent is applied after it and wins.
+    // The post-activation tail reuses transformAgents without touching the default.
+    const lead = leadAgent()
+    if (lead) editor.default(lead.name)
+  })
+  // A later default (a package default, the user's default_agent) leads new sessions only: at a session's first prompt
+  // the then-current default is pinned in its metadata, and an agent-less session is switched to it so the engine stops
+  // re-selecting the default per request. The engine adapter returns a session without an explicit agent to this pin.
+  await context.session.hook("prompt", async (event) => {
+    const session = await context.session.get({ sessionID: event.sessionID }).catch(() => undefined)
+    if (!session || session.metadata?.[SESSION_DEFAULT_AGENT_KEY] !== undefined) return
+    const pinned = (await context.agent.list()).data[0]?.id
+    if (!pinned) return
+    await context.session.update({ sessionID: event.sessionID, metadata: { ...session.metadata, [SESSION_DEFAULT_AGENT_KEY]: pinned } })
+    if (!session.agent) await context.session.switchAgent({ sessionID: event.sessionID, agent: pinned })
+  })
   await context.command.transform((editor) => {
     for (const item of instructions()) {
       if (item.entry.kind === "agent" || !item.entry.invocation.userInvocable || !allowed(item)) continue
@@ -506,7 +533,13 @@ export async function registerPackageInvocations(
       event.prompt.skills = event.prompt.skills?.filter((skill) => skill.id !== current.id)
     }
   })
-  await context.session.hook("context", async (event) => {
+  await context.session.hook("context", async (event, call) => {
+    // A package agent leading a top-level session gets the same prepared body, preload and call rules as a delegated child.
+    const lead = instructions().find((item) => item.entry.kind === "agent" && item.name === event.agent)
+    if (lead && allowed(lead) && !scopes.get(event.sessionID)?.has(lead.installed.key + ":" + lead.entry.id)) {
+      const session = await context.session.get({ sessionID: event.sessionID })
+      if (!session.parentID) bind(event.sessionID, lead, await prepared(lead, "", event.sessionID, call.signal), "main")
+    }
     const active = [...(scopes.get(event.sessionID)?.values() ?? [])]
     for (const scope of active) {
       requireActive(scope.item)
@@ -517,7 +550,7 @@ export async function registerPackageInvocations(
         last.content.some((part) => part.type === "text" && part.text === MAX_STEPS_PROMPT)
       )
         scope.partial = true
-      if (["task", "path", "attachment"].includes(scope.via)) event.system.push({ type: "text", text: scope.text })
+      if (["task", "path", "attachment", "main"].includes(scope.via)) event.system.push({ type: "text", text: scope.text })
     }
     const scope = active.findLast((scope) => scope.item.entry.invocation.effort)
     if (

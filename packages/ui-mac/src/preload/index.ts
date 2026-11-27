@@ -282,6 +282,9 @@ const api: ElectronAPI = {
     // `GATED_WRITE_CHANNELS` 逐字一致(preview / cancel / 列表纯读,只有 confirm 过写闸);
     // 三条读通道**必须**在这里暴露,否则第 3/6 跳在 renderer 结构上到不了。
     installedPackages: () => ipcRenderer.invoke("ext-installed-packages"),
+    // D6 片 6b:本机文件条目(列表纯读;开关 / 移除 / 重新加入过写闸)。
+    nativeSources: (projectDir) => ipcRenderer.invoke("ext-native-sources", projectDir),
+    setNativeSourceState: (intent) => ipcRenderer.invoke("ext-set-native-source-state", intent),
     installPackage: (packageId) => ipcRenderer.invoke("ext-install-package", packageId),
     setPackageState: (intent) => ipcRenderer.invoke("ext-set-package-state", intent),
     packageAuthorization: (packageId) => ipcRenderer.invoke("ext-package-authorization", packageId),

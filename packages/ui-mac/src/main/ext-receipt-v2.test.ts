@@ -27,6 +27,8 @@ import {
   removeRecordV2,
   setDesiredStateV2,
   setDesiredStatesV2,
+  setNativeSourceStateV2,
+  syncNativeSourcesV2,
   reconcileSkillsDerivation,
   skillsEnabledPath,
   toV1Receipt,
@@ -1087,4 +1089,44 @@ test("a bundle-only package projects enabled disabled and project-enabled root m
   expect(applyPackageMutation(root, { operation: "update", transactionId: "hooks-project", graphBeforeDigest: graph.installedGraphDigest, graphAfter: scoped, claimMutations: [], childRecordMutations: [] }).ok).toBe(true)
   expect(setDesiredStateV2(root, "bundle", "hooks", "enabled").ok).toBe(true)
   expect(projection()).toEqual({ v: 3, keys: [], scoped: [{ kind: "bundle", name: "hooks", projectPath: scope.scope.projectPath }], mcp: [] })
+})
+
+describe("D6 native source bindings (DESIGN-local-plugin-install §4.6)", () => {
+  const skill = { file: "/home/u/.config/opencode/skills/notes/SKILL.md", kind: "skill" as const, entry: "notes" }
+  const mcp = { file: "/home/u/.config/opencode/opencode.json", kind: "mcp" as const, entry: "github" }
+
+  test("sync keeps existing desired state and binds new sources from native active", () => {
+    const first = syncNativeSourcesV2(root, [{ ...skill, active: true }, { ...mcp, active: false }])
+    expect(first).toEqual({ ok: true, states: [{ ...skill, desiredState: "enabled", removed: false }, { ...mcp, desiredState: "disabled", removed: false }] })
+    expect(setNativeSourceStateV2(root, skill, "disable").ok).toBe(true)
+    // 文件被编辑后再次发现(原生声明仍是开启)⇒ 用户的关闭不被重置;未再出现的关闭项仍交回
+    const again = syncNativeSourcesV2(root, [{ ...skill, active: true }])
+    expect(again).toEqual({ ok: true, states: [{ ...skill, desiredState: "disabled", removed: false }, { ...mcp, desiredState: "disabled", removed: false }] })
+    // 其他写者重写账本时原样带上 D6 段
+    expect(upsertRecordV2(root, upsertInput()).ok).toBe(true)
+    expect((readRaw() as unknown as { nativeSources: unknown[] }).nativeSources).toHaveLength(2)
+    expect(syncNativeSourcesV2(root, [])).toEqual({ ok: true, states: [{ ...skill, desiredState: "disabled", removed: false }, { ...mcp, desiredState: "disabled", removed: false }] })
+  })
+
+  test("native binding remove suppresses and rejoin restores without touching files", () => {
+    const dir = path.join(root, "skills", "notes")
+    fs.mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, "SKILL.md")
+    fs.writeFileSync(file, "---\nname: notes\n---\nbody\n")
+    const ref = { file, kind: "skill" as const, entry: "notes" }
+    syncNativeSourcesV2(root, [{ ...ref, active: true }])
+    expect(setNativeSourceStateV2(root, ref, "remove")).toEqual({ ok: true, states: [{ ...ref, desiredState: "enabled", removed: true }] })
+    expect(syncNativeSourcesV2(root, [{ ...ref, active: true }])).toEqual({ ok: true, states: [{ ...ref, desiredState: "enabled", removed: true }] })
+    expect(setNativeSourceStateV2(root, ref, "rejoin")).toEqual({ ok: true, states: [{ ...ref, desiredState: "enabled", removed: false }] })
+    expect(syncNativeSourcesV2(root, [])).toEqual({ ok: true, states: [] })
+    expect(fs.readFileSync(file, "utf8")).toBe("---\nname: notes\n---\nbody\n")
+    expect(setNativeSourceStateV2(root, { ...ref, entry: "other" }, "disable").ok).toBe(false)
+  })
+
+  test("a malformed native section fails closed for every writer", () => {
+    fs.writeFileSync(ledgerFile(), JSON.stringify({ v: 2, receipts: [], records: [], nativeSources: [{ ...skill, desiredState: "off", removed: false }] }))
+    expect(syncNativeSourcesV2(root, [{ ...skill, active: true }]).ok).toBe(false)
+    expect(upsertRecordV2(root, upsertInput()).ok).toBe(false)
+    expect(readRaw()).toEqual({ v: 2, receipts: [], records: [], nativeSources: [{ ...skill, desiredState: "off", removed: false }] } as never)
+  })
 })

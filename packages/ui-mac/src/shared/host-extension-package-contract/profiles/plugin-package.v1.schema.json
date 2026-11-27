@@ -21,6 +21,7 @@
         "provider",
         "name",
         "source",
+        "materialization",
         "tree",
         "treeDigest",
         "entries",
@@ -100,6 +101,9 @@
               "type": "string"
             }
           }
+        },
+        "materialization": {
+          "const": "copy"
         },
         "tree": {
           "type": "array",
@@ -1459,6 +1463,155 @@
                     ]
                   }
                 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "server"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "lsp"
+                  },
+                  "server": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "command",
+                      "args",
+                      "extensionToLanguage",
+                      "transport",
+                      "env",
+                      "restartOnCrash",
+                      "diagnostics"
+                    ],
+                    "properties": {
+                      "command": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/Text"
+                          },
+                          {
+                            "minItems": 1
+                          }
+                        ]
+                      },
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Text"
+                        }
+                      },
+                      "extensionToLanguage": {
+                        "type": "object",
+                        "minProperties": 1,
+                        "propertyNames": {
+                          "pattern": "^\\..+"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "transport": {
+                        "enum": [
+                          "stdio",
+                          "socket"
+                        ]
+                      },
+                      "env": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "$ref": "#/$defs/Text"
+                        }
+                      },
+                      "initializationOptions": {
+                        "$ref": "#/$defs/JsonTemplate"
+                      },
+                      "settings": {
+                        "$ref": "#/$defs/JsonTemplate"
+                      },
+                      "workspaceFolder": {
+                        "$ref": "#/$defs/Text"
+                      },
+                      "startupTimeout": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "shutdownTimeout": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "requestTimeout": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "restartOnCrash": {
+                        "type": "boolean"
+                      },
+                      "maxRestarts": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "diagnostics": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "instruction",
+                  "keepCodingInstructions"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "output-style"
+                  },
+                  "instruction": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "keepCodingInstructions": {
+                    "type": "boolean"
+                  }
+                }
               }
             ]
           }
@@ -1705,6 +1858,56 @@
             }
           }
         ]
+      }
+    },
+    "Json": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Json"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Json"
+          }
+        }
+      ]
+    },
+    "JsonTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "bindings"
+      ],
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/Json"
+        },
+        "bindings": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^/"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/Text"
+          }
+        }
       }
     }
   }

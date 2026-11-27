@@ -20,7 +20,7 @@ import { engineClient } from "./engine-client"
 import { launchedByPackageRunner, RUNNER_FIRST_FETCH_STARTUP_MS } from "./engine-explicit-config"
 import { readMcpLeafStrict, validateServer } from "./ext-config"
 import { projectScopeIdentity, readPackageLedgerStateV1 } from "./ext-receipt-v2"
-import type { PackageGraphV1 } from "./ext-package-ledger-v3"
+import { pluginPackageStoreKey, type PackageGraphV1 } from "./ext-package-ledger-v3"
 import { credentialStores, readCredentialTable, readRegularFileNoFollow } from "./codepuppy-secret-files"
 import { isOfficialConnector } from "./official-connector-names"
 import { officialRuntimeParent } from "./official-connector-recipes"
@@ -131,8 +131,9 @@ async function applyAt(
         return { directory: target, name, status: "unavailable", detail: "Installed connector definition is unavailable" }
       // The credential table is read only for a definition that references a file (review R1 item 3: one unreadable store entry must not
       // make a connector without credentials unavailable).
-      const installed = graph?.pluginTree && installedPluginDescription(root, graph)
-      const settings = graph?.pluginTree && readInstalledPluginSettings(root, graph.pluginTree.storeKey)
+      const storeKey = graph && pluginPackageStoreKey(graph)
+      const installed = storeKey ? installedPluginDescription(root, graph!) : undefined
+      const settings = storeKey && readInstalledPluginSettings(root, storeKey)
       const entry = installed && installed.description.entries.find(entry => entry.kind === "mcp" && installed.hostNames[entry.id] === name)
       const refs = collectMcpFileRefPaths(leaf.value)
       const bound = installed && settings && entry?.kind === "mcp" ? bindPluginMcp({ description: installed.description, entry, settings, pluginRoot: installed.pluginRoot, projectDir: target,

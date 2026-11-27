@@ -40,13 +40,13 @@ const it = testEffect(Layer.empty)
 afterEach(() => CodePuppyProjectGate.resetForTest())
 
 /** 与上游 test/config/config.test.ts 的 testLayer 同一种搭法:真 Config.layer,全局目录与 HOME 都在临时目录里。 */
-function configLayer(directory: string, globalDirectory: string, home: string) {
+function configLayer(directory: string, globalDirectory: string, home: string, system: string | false = false) {
   const locationLayer = Layer.succeed(
     Location.Service,
     Location.Service.of(location({ directory: AbsolutePath.make(directory) }, { projectDirectory: AbsolutePath.make(directory) })),
   )
   const built = AppNodeBuilder.build(LayerNode.group([Config.node, Bus.node]), [
-    Config.node.replace(Config.configured({ system: false })),
+    Config.node.replace(Config.configured({ system })),
     Location.node.replace(locationLayer),
     Global.node.replace(Global.layerWith({ config: globalDirectory, home })),
     Credential.node.replace(emptyCredentialNode),
@@ -571,3 +571,173 @@ it.live("审查2:constructor / toString / __proto__ 顶层键按未知键丢弃,
   expect({ ...info }).toEqual({ instructions: ["NOTES.md"] })
   expect(CodePuppyProjectGate.view(f.project)?.withheld).toEqual([])
 }))
+
+// ── D6(DESIGN-local-plugin-install §4.6,R-m):原生文件按引用管理 ─────────────────────────────────────────────────────
+// 契约 C 的可选钩子由一份假 main 作答(记下来源、交回预设状态);状态只在账本里,源文件从不改写。
+type NativeState = import("@opencode/schema/codepuppy-project-config").NativeFileState
+type NativeSource = import("@opencode/schema/codepuppy-project-config").NativeFileSource
+function nativeMain(states: NativeState[]) {
+  const calls: NativeSource[][] = []
+  return {
+    calls,
+    states,
+    fail: false,
+    sync(input: { directory: string; sources: NativeSource[] }) {
+      calls.push(input.sources)
+      return Promise.resolve(this.fail ? undefined : this.states)
+    },
+  }
+}
+const off = (file: string, kind: NativeState["kind"], entry: string, extra: Partial<NativeState> = {}): NativeState => ({ file, kind, entry, desiredState: "disabled", removed: false, ...extra })
+const readAgents = (f: Fixture, entries: Entry[]) =>
+  Effect.gen(function* () {
+    const agents = yield* Agent.Service
+    yield* ConfigAgentPlugin.Plugin.effect(host({ location: location({ directory: AbsolutePath.make(f.project) }), agent: agentHost(agents) })).pipe(Effect.provide(Config.testLayer(entries)))
+    return (yield* agents.list()).map((item) => String(item.id))
+  }).pipe(Effect.scoped, Effect.provide(AppNodeBuilder.build(LayerNode.group([Agent.node, Bus.node, FSUtil.node, Global.node]))))
+
+describe("D6 原生文件来源", () => {
+  const projectFiles = {
+    "home/work/project/opencode.json": {
+      mcp: { servers: { keep: { type: "local", command: ["keep"] }, off: { type: "local", command: ["off"] } } },
+      agents: { inlinekeep: { system: "k" }, inlineoff: { system: "o" } },
+      commands: { ckeep: { template: "k" }, coff: { template: "o" } },
+    },
+    "home/work/project/.opencode/plugins/off.js": "throw new Error('disabled native plugin executed')",
+    "home/work/project/.opencode/plugins/on.js": "export default {}",
+    "home/work/project/.opencode/agents/fileoff.md": "---\ndescription: off\n---\nOFF",
+    "home/work/project/.opencode/agents/filekeep.md": "---\ndescription: keep\n---\nKEEP",
+    "home/work/project/.opencode/commands/cmdoff.md": "OFF",
+    "home/work/project/.opencode/commands/cmdkeep.md": "KEEP",
+  }
+
+  it.live("native file view filters disabled entries and keeps siblings", () => run(async () => {
+    await using f = await fixture(projectFiles)
+    const doc = path.join(f.project, "opencode.json")
+    const dir = path.join(f.project, ".opencode")
+    const main = nativeMain([
+      off(doc, "mcp", "off"),
+      off(doc, "agent", "inlineoff"),
+      off(doc, "command", "coff", { desiredState: "enabled", removed: true }),
+      off(path.join(dir, "plugins/off.js"), "plugin", "off.js", { target: path.join(dir, "plugins/off.js") }),
+      off(path.join(dir, "agents/fileoff.md"), "agent", "fileoff"),
+      off(path.join(dir, "commands/cmdoff.md"), "command", "cmdoff"),
+      off(path.join(dir, "skills/off/SKILL.md"), "skill", "off"),
+    ])
+    CodePuppyProjectGate.install({ trusted: () => true, nativeSources: (input) => main.sync(input) })
+    const entries = await Effect.runPromise(entriesOf(f))
+    const info = documentAt(entries, doc)!.info
+    expect(info.mcp?.servers?.off?.disabled).toBe(true)
+    expect(info.mcp?.servers?.keep?.disabled).toBeUndefined()
+    expect(Object.keys(info.agents ?? {})).toEqual(["inlinekeep"])
+    expect(Object.keys(info.commands ?? {})).toEqual(["ckeep"])
+    const policies = ManagedPolicy.statements(entries)
+    expect(ManagedPolicy.decision(policies, "plugin.use", path.join(dir, "plugins/off.js"))).toBe("deny")
+    expect(ManagedPolicy.decision(policies, "plugin.use", path.join(dir, "plugins/on.js"))).toBe("allow")
+    // 文档级来源整份交给 main,带原生声明状态;源文件字节不变
+    expect(main.calls[0]).toContainEqual({ file: doc, kind: "mcp", entry: "off", active: true })
+    expect(main.calls[0]).toContainEqual({ file: path.join(dir, "plugins/on.js"), kind: "plugin", entry: "on.js", target: path.join(dir, "plugins/on.js"), active: true })
+    expect(JSON.parse(await fs.readFile(doc, "utf8"))).toEqual(projectFiles["home/work/project/opencode.json"])
+    // 目录读取点:关闭的文件按入口拿掉,兄弟文件照常;读完把本点发现的文件来源交给 main
+    const agents = await Effect.runPromise(readAgents(f, entries))
+    expect(agents).toContain("filekeep")
+    expect(agents).toContain("inlinekeep")
+    expect(agents).not.toContain("fileoff")
+    expect(agents).not.toContain("inlineoff")
+    expect(main.calls.at(-1)).toContainEqual({ file: path.join(dir, "agents/fileoff.md"), kind: "agent", entry: "fileoff", active: true })
+    const entry = entries.find((item) => item.type === "directory" && item.path === dir)!
+    await Effect.runPromise(CodePuppyProjectGate.observe(f.project, "command", Effect.sync(() => {
+      expect(CodePuppyProjectGate.markdown(f.project, entry, "command")(path.join(dir, "commands/cmdoff.md"), "OFF")).toBeUndefined()
+      expect(CodePuppyProjectGate.markdown(f.project, entry, "command")(path.join(dir, "commands/cmdkeep.md"), "KEEP")).toBe("KEEP")
+    })))
+    expect(main.calls.at(-1)?.map((source) => source.entry)).toEqual(["cmdoff", "cmdkeep"])
+    expect(CodePuppyProjectGate.nativeSkill(f.project, path.join(dir, "skills/off/SKILL.md"), "off")).toBe(false)
+    expect(CodePuppyProjectGate.nativeSkill(f.project, path.join(dir, "skills/keep/SKILL.md"), "keep")).toBe(true)
+    // 反向臂:没有钩子 ⇒ 原生声明全部生效
+    CodePuppyProjectGate.install({ trusted: () => true })
+    const plain = await Effect.runPromise(entriesOf(f))
+    expect(documentAt(plain, doc)!.info.mcp?.servers?.off?.disabled).toBeUndefined()
+    expect(Object.keys(documentAt(plain, doc)!.info.commands ?? {})).toEqual(["ckeep", "coff"])
+    expect(await Effect.runPromise(readAgents(f, plain))).toContain("fileoff")
+  }))
+
+  it.live("native states follow the last answer: first load without one uses declarations, a later failure keeps the previous states", () => run(async () => {
+    await using f = await fixture(projectFiles)
+    const doc = path.join(f.project, "opencode.json")
+    const main = nativeMain([off(doc, "mcp", "off")])
+    main.fail = true
+    CodePuppyProjectGate.install({ trusted: () => true, nativeSources: (input) => main.sync(input) })
+    expect(documentAt(await Effect.runPromise(entriesOf(f)), doc)!.info.mcp?.servers?.off?.disabled).toBeUndefined()
+    main.fail = false
+    expect(documentAt(await Effect.runPromise(entriesOf(f)), doc)!.info.mcp?.servers?.off?.disabled).toBe(true)
+    main.fail = true
+    expect(documentAt(await Effect.runPromise(entriesOf(f)), doc)!.info.mcp?.servers?.off?.disabled).toBe(true)
+  }))
+
+  it.live("untrusted project native plugins are bound from their declaration while the trust gate still withholds them", () => run(async () => {
+    await using f = await fixture({ "home/work/project/.opencode/plugins/notify.js": "throw new Error('unallowed plugin executed')" })
+    const target = path.join(f.project, ".opencode/plugins/notify.js")
+    const main = nativeMain([])
+    CodePuppyProjectGate.install({ trusted: () => false, nativeSources: (input) => main.sync(input) })
+    const entries = await Effect.runPromise(entriesOf(f))
+    expect(main.calls[0]).toContainEqual({ file: target, kind: "plugin", entry: "notify.js", target, active: true })
+    expect(ManagedPolicy.decision(ManagedPolicy.statements(entries), "plugin.use", target)).toBe("deny")
+    CodePuppyProjectGate.install({ trusted: () => true, nativeSources: (input) => main.sync(input) })
+    expect(ManagedPolicy.decision(ManagedPolicy.statements(await Effect.runPromise(entriesOf(f))), "plugin.use", target)).toBe("allow")
+  }))
+})
+
+// 评审 Minor 3(design §4.6:288):系统 / MDM 目录与 HTTP 技能索引维持今天的行为 —— 不成为可开关的原生来源。
+describe("D6 原生来源不纳管系统目录与技能索引", () => {
+  it.live("system config directory entries stay outside native bindings", () => run(async () => {
+    await using f = await fixture({
+      "system/plugins/sys.js": "export default {}",
+      "system/skills/sys/SKILL.md": "---\nname: sys\ndescription: managed\n---\nbody\n",
+      "home/work/project/.opencode/plugins/own.js": "export default {}",
+    })
+    const system = path.join(f.root, "system")
+    const sysPlugin = path.join(system, "plugins/sys.js")
+    const sysSkill = path.join(system, "skills/sys/SKILL.md")
+    const main = nativeMain([off(sysPlugin, "plugin", "sys.js", { target: sysPlugin }), off(sysSkill, "skill", "sys")])
+    CodePuppyProjectGate.install({ trusted: () => true, nativeSources: (input) => main.sync(input) })
+    const entries = await Effect.runPromise(Effect.gen(function* () {
+      const config = yield* Config.Service
+      return yield* config.entries()
+    }).pipe(Effect.provide(configLayer(f.project, f.global, f.home, system))))
+    expect(main.calls.flat().some((source) => source.file.startsWith(system + path.sep))).toBe(false)
+    expect(main.calls.flat().some((source) => source.entry === "own.js")).toBe(true)
+    expect(ManagedPolicy.decision(ManagedPolicy.statements(entries), "plugin.use", sysPlugin)).toBe("allow")
+    expect(CodePuppyProjectGate.nativeSkill(f.project, sysSkill, "sys")).toBe(true)
+  }))
+
+  it.live("skills pulled from an HTTP skill index are not native bindings", () => run(async () => {
+    await using f = await fixture({
+      "cache/indexed/SKILL.md": "---\nname: indexed\ndescription: from index\n---\nbody\n",
+      "home/work/project/local/mine/SKILL.md": "---\nname: mine\ndescription: local\n---\nbody\n",
+    })
+    const cached = path.join(f.root, "cache/indexed")
+    const local = path.join(f.project, "local")
+    const main = nativeMain([off(path.join(cached, "SKILL.md"), "skill", "indexed")])
+    CodePuppyProjectGate.install({ trusted: () => true, nativeSources: (input) => main.sync(input) })
+    await Effect.runPromise(entriesOf(f))
+    const { ConfigSkillPlugin } = await import("@opencode/core/config/plugin/skill")
+    const { SkillDiscovery } = await import("@opencode/core/skill/discovery")
+    const { Skill: SkillService } = await import("@opencode/core/skill")
+    const { Watcher } = await import("@opencode/core/filesystem/watcher")
+    const { Info: ConfigInfo } = await import("@opencode/schema/config")
+    const { Schema } = await import("effect")
+    const document = new (await import("@opencode/schema/config")).Document({ type: "document", info: Schema.decodeUnknownSync(ConfigInfo)({ skills: [local, "https://example.test/skills/"] }) })
+    const ids = await Effect.runPromise(Effect.gen(function* () {
+      const service = yield* SkillService.Service
+      yield* ConfigSkillPlugin.Plugin.effect(host({ location: location({ directory: AbsolutePath.make(f.project) }), skill: { list: () => Effect.die("unused"), transform: service.transform, reload: service.reload } })).pipe(
+        Effect.provide(Config.testLayer([document])),
+        Effect.provideService(SkillDiscovery.Service, SkillDiscovery.Service.of({ pull: () => Effect.succeed([AbsolutePath.make(cached)]) })),
+        Effect.provideService(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make(f.project) }))),
+      )
+      return (yield* service.list()).map((item) => String(item.id))
+    }).pipe(Effect.scoped, Effect.provide(Layer.merge(AppNodeBuilder.build(LayerNode.group([SkillService.node, Bus.node, FSUtil.node, Global.node])), Watcher.testLayer))))
+    expect(ids.sort()).toEqual(["indexed", "mine"])
+    expect(main.calls.flat().some((source) => source.entry === "indexed")).toBe(false)
+    expect(main.calls.flat().some((source) => source.entry === "mine")).toBe(true)
+  }))
+})

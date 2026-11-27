@@ -28,11 +28,20 @@ mockElectron(() => ({
   BrowserWindow: class {},
   dialog: {},
   ipcMain: { handle: () => {}, on: () => {} },
+  // ext-ipc 的装载链在 import 时登记自有协议(D6 生产接线用例)
+  protocol: { registerSchemesAsPrivileged: () => {}, handle: () => {} },
 }))
 mock.module("./logging", () => ({
   getLogger: () => ({ log: () => {}, warn: () => {}, error: () => {} }),
   write: () => {},
   rotateServerLogs: () => {},
+  // ext-ipc(D6 生产接线用例)另外 import 的几个出口
+  exportDebugLogs: async () => undefined,
+  tail: () => "",
+  serverLogRoots: () => [],
+  initLogging: () => {},
+  initCrashReporter: () => {},
+  startNetLog: async () => {},
 }))
 
 const { spawnLocalServer } = await import("./server")
@@ -321,5 +330,45 @@ test("#1575: fork 按登录账户 × 本安装写启动文档的 policy.account(
     expect(await forkStart(4396)).not.toHaveProperty("account")
   } finally {
     rmSync(otherInstall, { recursive: true, force: true })
+  }
+})
+
+// D6 / R-m 的生产接线(#1776 片 6):sidecar 的契约 C 钩子(sidecarNativeSources,sidecar.ts 与引擎测试宿主共用)→ ext 进程级
+// hub bridge → parentPort → registerExtIpcHandlers 交回的**生产** codepuppySidecar → main 的 createNativeSources → 账本。
+test("native source sync crosses the production sidecar hook and main host into the ledger", async () => {
+  const { registerExtIpcHandlers } = await import("./ext-ipc")
+  const { sidecarNativeSources } = await import("./sidecar-native-sources")
+  const { createHubBridge } = await import("../../../ext/src/hub-bridge")
+  const { initCodePuppyEnvironment, __resetCodePuppyEnvironmentForTests } = await import("./codepuppy-environment")
+  const { codepuppyGlobalRoot } = await import("./codepuppy-installs")
+  delete process.env.CODEPUPPY_GLOBAL_DIR
+  __resetCodePuppyEnvironmentForTests()
+  initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: userDataPath, baseRoot: join(userDataPath, "codepuppy-state"), homeDir: join(userDataPath, "home") })
+  const main = registerExtIpcHandlers(userDataPath, "dev", async () => { throw new Error("no engine in this unit") }, join(userDataPath, "home"), undefined, async () => undefined)
+  await main.ledgerReady
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  const bridge = createHubBridge({
+    postMessage: (message) => queueMicrotask(() => {
+      main.codepuppySidecar.receive(message, (reply) => queueMicrotask(() => { for (const listener of listeners) listener({ data: reply }) }))
+    }),
+    on: (_event, listener) => void listeners.push(listener),
+  }, { log: () => {} })
+  const slot = Symbol.for("codepuppy.ext.process")
+  const holder = globalThis as { [slot]?: unknown }
+  const previous = holder[slot]
+  holder[slot] = { hubBridge: bridge }
+  try {
+    const file = join(userDataPath, "home", ".config", "opencode", "skills", "notes", "SKILL.md")
+    const hook = sidecarNativeSources(Promise.resolve())
+    expect(await hook({ directory: join(userDataPath, "project"), sources: [{ file, kind: "skill", entry: "notes", active: false }] })).toEqual([{ file, kind: "skill", entry: "notes", desiredState: "disabled", removed: false }])
+    const ledger = JSON.parse(readFileSync(join(codepuppyGlobalRoot(), "installs.json"), "utf8")) as { nativeSources: unknown[] }
+    expect(ledger.nativeSources).toEqual([{ file, kind: "skill", entry: "notes", desiredState: "disabled", removed: false }])
+    expect(bridge.nativeStates()).toEqual(ledger.nativeSources)
+    // ext 还没装上(进程级对象不在) ⇒ 钩子答 undefined,闸门沿用上一代
+    holder[slot] = undefined
+    expect(await hook({ directory: join(userDataPath, "project"), sources: [] })).toBeUndefined()
+  } finally {
+    holder[slot] = previous
+    __resetCodePuppyEnvironmentForTests()
   }
 })

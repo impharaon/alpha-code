@@ -70,6 +70,9 @@ let secretFailure: string | undefined
 let stateFailure: string | undefined
 let leaveApplying = false
 let remoteCatalog: unknown = { source: "none" }
+// D6 片 6b:本机文件条目走 main 的真实实现(createNativeSources + 临时账本),只替换引擎列表、项目同意与重载出口。
+type NativeMain = ReturnType<(typeof import("../src/main/native-sources"))["createNativeSources"]>
+let nativeMain: NativeMain | undefined
 const calls = {
   importSkillFolder: 0,
   filePicker: [] as Array<{ title?: string }>,
@@ -127,6 +130,8 @@ Object.defineProperty(window, "api", {
     },
     openLink: async (url: string) => { calls.links.push(url) },
     updater: { check: async () => {} },
+    // 本机连接器的管理页带现有「权限」段;这里只要它读得到「暂时读不到」,不测策略编辑本身。
+    toolPolicy: { inventory: async () => ({ ok: false as const, reason: "fixture" }) },
     auth: { start: async () => {}, setMode: async () => {} },
     ext: {
       listInstalls: async () => ({ global: receipts, project: projectReceipts, warnings: [] }),
@@ -135,6 +140,8 @@ Object.defineProperty(window, "api", {
       onSessionGrantsEnded: () => () => {},
       inventoryView: async () => ({ catalogVersion: null, catalogChannel: null, rows: inventoryRows, warnings: [] }),
       installedPackages: async () => ({ ok: true as const, packages: installedPackages }),
+      nativeSources: async (projectDir?: string) => (nativeMain ? { ok: true as const, rows: await nativeMain.rows(projectDir) } : { ok: true as const, rows: [] }),
+      setNativeSourceState: async (intent: unknown) => (nativeMain ? nativeMain.setState(intent) : { ok: false as const, reason: "no native main" }),
       packageAuthorization: async (packageId: string) => ({ ok: true, packageId, items: packageAuthorizationItems }),
       installPackage: async (id: string) => { calls.installPackage.push(id); return { ok: true } },
       setPackageState: async (intent: { packageId: string; state: "enabled" | "disabled" }) => {
@@ -346,6 +353,7 @@ function reset() {
   stateFailure = undefined
   leaveApplying = false
   calls.importSkillFolder = 0
+  nativeMain = undefined
   for (const list of [calls.filePicker, calls.installCatalog, calls.setInstallState, calls.uninstall, calls.builtinApply, calls.installPackage, calls.packageState, calls.packageSecrets, calls.packageRemove, calls.auth, calls.links]) list.length = 0
 }
 afterAll(async () => {
@@ -1001,6 +1009,27 @@ test("graph marketplace source and notRunning facts reach the installed row and 
   }
 })
 
+test("language server runtime states reach the enabled installed row on its reason line", async () => {
+  // Renderer boundary values in the design v3.4 R-l DTO; the program name is the real pyright-lsp command.
+  for (const [state, detail, text, failed] of [
+    ["dependency-missing", "pyright-langserver", "pyright · 本机缺少程序 pyright-langserver", true],
+    ["diagnostics-ready", undefined, "pyright · 语言服务诊断已就绪", false],
+  ] as const) {
+    reset()
+    await realInstalledPackage(0)
+    Object.assign(installedPackages[0]!, { desiredState: "enabled", languageServers: [{ sourceName: "pyright", state, ...(detail ? { detail } : {}) }] })
+    mount()
+    await waitFor(() => expect(q('[data-installed-package]')?.textContent).toContain(text))
+    expect(q('[data-installed-package] [data-row-status]')?.textContent === "未能启用").toBe(failed)
+  }
+  reset()
+  await realInstalledPackage(0)
+  Object.assign(installedPackages[0]!, { desiredState: "disabled", languageServers: [{ sourceName: "pyright", state: "dependency-missing", detail: "pyright-langserver" }] })
+  mount()
+  await waitFor(() => expect(q('[data-installed-package]')).toBeInstanceOf(HTMLElement))
+  expect(q('[data-installed-package]')?.textContent).not.toContain("pyright-langserver")
+})
+
 test("openPackageManagement opens the requested installed identity from another tab without installing", async () => {
   reset()
   await realInstalledPackage(0)
@@ -1260,4 +1289,127 @@ test("review B7 one search finds own agents and local/created packages across ta
     expect(document.body.textContent).not.toContain("docs-writer")
     expect(calls.installPackage).toEqual([])
   } finally { Object.assign(window.api.ext, { sourcesSearch: previous }) }
+})
+
+// ── D6 片 6b(活稿 #hub-native):本机文件条目行 ───────────────────────────────────────────────────────────────────────
+const { createNativeSources } = await import("../src/main/native-sources")
+const { ToastViewport } = await import("../src/renderer/codepuppy-ui/Toast")
+const nativeHome = "/home/native-user"
+async function nativeFixture(input: { consent?: "granted" | "awaiting-consent" | "consent-denied"; descriptions?: Record<string, unknown>[] } = {}) {
+  const fs = await import("node:fs")
+  const os = await import("node:os")
+  const path = await import("node:path")
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-native-"))
+  const reloads: string[] = []
+  nativeMain = createNativeSources({
+    root: () => root,
+    home: nativeHome,
+    descriptions: async () => ({ skills: input.descriptions ?? [], agents: [], commands: [] }),
+    consent: () => input.consent ?? "granted",
+    pending: () => false,
+    defaultDirectory: () => "/work/any",
+    requestReload: (reason) => void reloads.push(reason),
+    log: () => {},
+  })
+  return { root, reloads, ledger: () => JSON.parse(fs.readFileSync(path.join(root, "installs.json"), "utf8")).nativeSources as Array<Record<string, unknown>> }
+}
+function mountToasts() {
+  const root = document.createElement("div")
+  root.className = "a-ui"
+  document.body.append(root)
+  disposals.push(render(() => createComponent(ToastViewport, {}), root))
+}
+
+test("native file rows show directory, menu switch, removal group and rejoin", async () => {
+  reset()
+  const skill = `${nativeHome}/.claude/skills/review-pr/SKILL.md`
+  const command = `${nativeHome}/.config/opencode/commands/release-notes.md`
+  const native = await nativeFixture({ descriptions: [{ id: "review-pr", path: skill, description: "审查拉取请求，按严重程度列出问题和修改建议" }] })
+  await nativeMain!.sync("/work/any", [{ file: skill, kind: "skill", entry: "review-pr", active: true }, { file: command, kind: "command", entry: "release-notes", active: true }])
+  mountToasts()
+  mount("skills")
+  const row = () => q('[data-group="installed"] [data-native-entry="review-pr"]')
+  await waitFor(() => expect(row()).toBeInstanceOf(HTMLElement))
+  expect(q("[data-native-name]", row()!)?.textContent).toBe("review-pr")
+  expect(q("[data-native-directory]", row()!)?.textContent).toBe("~/.claude/skills")
+  expect(q("[data-native-directory] i", row()!)).toBeNull()
+  expect(row()!.textContent).toContain("审查拉取请求")
+  const commandRow = q('[data-group="installed"] [data-native-entry="release-notes"]')!
+  expect(q("[data-native-name]", commandRow)?.textContent).toBe("/release-notes")
+  expect(q("[data-native-directory]", commandRow)?.textContent).toBe("~/.config/opencode")
+  // 「…」菜单与包同一组:开启开关 / 管理 / 移除
+  click(q("[data-more]", row()!))
+  await waitFor(() => expect(q('[role="switch"]')).toBeInstanceOf(HTMLElement))
+  expect(q('[role="switch"]')?.getAttribute("aria-checked")).toBe("true")
+  click(q('[role="switch"]'))
+  await waitFor(() => expect(row()?.textContent).toContain("已关闭"))
+  expect(native.ledger().find((item) => item.entry === "review-pr")).toMatchObject({ desiredState: "disabled", removed: false })
+  // 移除:行离开「已安装」,进收起的「已移除 1」,提示说明文件还在
+  click(q("[data-more]", row()!))
+  await waitFor(() => expect(qa("button").some((button) => button.textContent?.trim() === "移除")).toBe(true))
+  click(qa("button").find((button) => button.textContent?.trim() === "移除")!)
+  await waitFor(() => expect(row()).toBeNull())
+  await waitFor(() => expect(document.body.textContent).toContain("已移除『review-pr』"))
+  expect(document.body.textContent).toContain("文件仍在原处，可在「已移除」里重新加入。")
+  const removedGroup = () => q('[data-group-id="native-removed"]')
+  expect(removedGroup()?.textContent).toContain("已移除")
+  expect(removedGroup()?.textContent).toContain("1")
+  expect(q('[data-native-rejoin]')).toBeNull()
+  click(q(".codepuppy-ext-grp-toggle", removedGroup()!))
+  await waitFor(() => expect(q('[data-native-rejoin]')).toBeInstanceOf(HTMLElement))
+  expect(q('[data-native-rejoin]')?.getAttribute("aria-label")).toBe("重新加入 review-pr")
+  expect(q('[data-group="native-removed"] [data-more]')).toBeNull()
+  click(q('[data-native-rejoin]'))
+  await waitFor(() => expect(row()).toBeInstanceOf(HTMLElement))
+  await waitFor(() => expect(document.body.textContent).toContain("已重新加入『review-pr』"))
+  expect(row()?.textContent).not.toContain("已关闭")
+  expect(removedGroup()).toBeNull()
+  expect(native.ledger().find((item) => item.entry === "review-pr")).toMatchObject({ desiredState: "enabled", removed: false })
+  expect(native.reloads).toHaveLength(3)
+})
+
+test("native project rows show consent words and the manage page writes the full path", async () => {
+  for (const consent of ["awaiting-consent", "consent-denied"] as const) {
+    reset()
+    const project = "/tmp/hub-native-project"
+    const plugin = `${project}/.opencode/plugins/notify-on-finish.js`
+    const mcp = `${nativeHome}/.config/opencode/opencode.json`
+    await nativeFixture({ consent })
+    await nativeMain!.sync(project, [
+      { file: plugin, kind: "plugin", entry: "notify-on-finish.js", target: plugin, active: true },
+      { file: `${project}/.codepuppy/opencode.json`, kind: "mcp", entry: "staging-db", active: true },
+      { file: mcp, kind: "mcp", entry: "postgres-local", active: true },
+    ])
+    pathname = hrefFor.directory(project)
+    mount("connectors")
+    const projectRow = () => q('[data-group="project"] [data-native-entry="notify-on-finish.js"]')
+    await waitFor(() => expect(projectRow()).toBeInstanceOf(HTMLElement))
+    expect(q("[data-native-name]", projectRow()!)?.textContent).toBe("notify-on-finish")
+    expect(q("[data-native-directory]", projectRow()!)?.textContent).toBe(".opencode")
+    expect(projectRow()!.textContent).toContain(consent === "consent-denied" ? "项目同意已拒绝" : "等待项目同意")
+    expect(projectRow()!.textContent).toContain("插件")
+    const db = q('[data-group="project"] [data-native-entry="staging-db"]')!
+    expect(q("[data-native-directory]", db)?.textContent).toBe(".codepuppy")
+    expect(db.textContent).toContain("连接器")
+    const global = q('[data-group="installed"] [data-native-entry="postgres-local"]')!
+    expect(q("[data-native-directory]", global)?.textContent).toBe("~/.config/opencode")
+    expect(global.textContent).not.toContain("等待项目同意")
+    // 未被允许项目里的开关照常可拨,状态仍是项目同意那一词
+    click(q("[data-more]", projectRow()!))
+    await waitFor(() => expect(q('[role="switch"]')).toBeInstanceOf(HTMLElement))
+    click(q('[role="switch"]'))
+    await waitFor(() => expect(projectRow()?.textContent).toContain(consent === "consent-denied" ? "项目同意已拒绝" : "等待项目同意"))
+    // 管理页:来源 = 本机文件 + 完整路径;生效范围按目录
+    click(projectRow())
+    await waitFor(() => expect(q("[data-native-detail]")).toBeInstanceOf(HTMLElement))
+    expect(q("[data-native-source-path]")?.textContent).toBe(`本机文件${plugin}`)
+    expect(q("[data-native-detail]")?.textContent).toContain("仅当前项目")
+    expect(q("[data-native-detail]")?.textContent).toContain("1 个插件")
+    expect(q("[data-native-detail]")?.textContent).not.toContain("版本")
+    expect(q("[data-native-detail] [data-more]")).toBeInstanceOf(HTMLElement)
+    click(q(".codepuppy-ext-crumb-link"))
+    await waitFor(() => expect(q("[data-native-detail]")).toBeNull())
+    click(q('[data-group="installed"] [data-native-entry="postgres-local"]'))
+    await waitFor(() => expect(q("[data-native-detail]")?.textContent).toContain("我的所有项目"))
+  }
 })

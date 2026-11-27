@@ -13,7 +13,7 @@ import * as http from "node:http"
 import { createServer } from "node:net"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
 import { app, BrowserWindow, dialog, ipcMain, powerMonitor } from "electron"
@@ -1123,7 +1123,8 @@ const main = Effect.gen(function* () {
   // REQ-096(#188):隔离 HTML preview 控制通道(main-owned 一次性静态 host,html-preview-host.ts)。
   registerHtmlPreviewIpcHandlers()
   // REQ-108(#244):右栏文件查看器 —— workspace 文件 descriptor/有界读取 + html/pdf 叠放载体。
-  registerWorkspaceFileIpcHandlers()
+  // Design §4.11 / S-02: a successful preview open reaches the same project's package language runtime in ext.
+  registerWorkspaceFileIpcHandlers((workspaceDir, file) => codepuppySidecar.openLanguageFile(workspaceDir, pathToFileURL(file).href))
   registerRailPreviewIpcHandlers()
   // 叠放载体的 session 必须落盘(PDF viewer 是扩展,内存 profile 里不装载 —— 见
   // rail-preview-host 文件头)。上次运行崩溃会留下分区目录,开机扫一次尾。

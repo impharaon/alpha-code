@@ -16,7 +16,7 @@
 // 两个 file 探针对各自方案外的 key 都 **fail-closed**(同一句 "no typed probe for file item …"),
 // 因此新增 file 消费方必须在此显式登记探针,绝不会静默放行。
 
-import { pluginSettingsProbe } from "./plugin-package-config"
+import { missingLinkedPluginSource, pluginSettingsProbe } from "./plugin-package-config"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -69,8 +69,12 @@ export function extensionHealthProbeRouter(root: string): HealthProbe {
       try {
         const installed: unknown = JSON.parse(readFileSync(join(input.generationDir, INSTALLED_PLUGIN_PACKAGE_FILE), "utf8"))
         if (!validInstalledPluginPackage(installed)) return { healthy: false, reason: "Plugin package metadata is invalid" }
-        const checked = verifyPluginTreeOnDisk(installed.description.tree, join(input.generationDir, PLUGIN_TREE_DIRECTORY))
-        return checked.ok ? { healthy: true } : { healthy: false, reason: checked.reason }
+        // A linked package is checked as its managed view: links are inspected, never followed into the located directory,
+        // and a link whose source went away is named (BR-11) rather than reported healthy.
+        const checked = verifyPluginTreeOnDisk(installed.description.materialization === "copy" ? installed.description.tree : installed.view!, join(input.generationDir, PLUGIN_TREE_DIRECTORY))
+        if (!checked.ok) return { healthy: false, reason: checked.reason }
+        const missing = installed.view && missingLinkedPluginSource(installed.view)
+        return missing ? { healthy: false, reason: missing } : { healthy: true }
       } catch { return { healthy: false, reason: "Plugin package tree could not be read" } }
     }
     const gen = await skillGenerationProbe(input)

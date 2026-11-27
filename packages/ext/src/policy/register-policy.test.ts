@@ -2427,10 +2427,11 @@ describe("v7 BR-11: after-the-fact approval of a write refused mid-command", () 
     yield* (yield* Permission.Service).reply({ requestID: cards[0]!.id, reply: "reject" })
     const [a, b] = [yield* E.Fiber.join(first), yield* E.Fiber.join(second)]
     expect(Exit.isFailure(a) && Exit.isFailure(b)).toBe(true)
-    // The engine's own decline, kept as raised through the tool's error masking: the session runner ends the step on it.
+    // The engine's own decline class survives the tool's error masking (rebuilt, without anything a tool attached), so the
+    // session runner ends the step on it for every member.
     const declined = (exit: any) => (failure(exit) as { error?: unknown })?.error
     expect(declined(a)).toBeInstanceOf(Permission.DeclinedError)
-    expect(declined(b)).toBe(declined(a))
+    expect(declined(b)).toBeInstanceOf(Permission.DeclinedError)
     expect(texts(b)).toEqual([])
   }))
 

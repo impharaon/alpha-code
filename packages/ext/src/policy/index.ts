@@ -228,6 +228,11 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     return [...configured, ...(permissions ?? []).filter((rule) => rule.effect === "deny"), ...(facts ? invocationRules(sessionID, facts, call?.input) : []), ...(hook && facts ? packageHookRules(hook, facts) : [])]
   }
 
+  // Every approval the extension asks goes to the engine here; a plain decline it raises is the one the error mask keeps.
+  const assertPermission = (input: unknown) => context.permission.assert(input as never).catch((error: unknown) => {
+    secrets.engineDecline(error)
+    throw error
+  })
   const deps: GateDeps = {
     protectedRoots: secrets.roots,
     profile,
@@ -236,7 +241,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     facts: factsFor,
     ruleset,
     directory: () => context.location.directory,
-    assert: (input) => context.permission.assert(input as never),
+    assert: (input) => assertPermission(input),
   }
 
   // ── SPEC child-process-write-fence v7 BR-11 (design v6 §4.3, §4.3.1, §4.4): a write refused mid-command ───────────
@@ -294,7 +299,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         owner: { messageID: call.messageID, id: call.id },
         keys: fresh.map(([real]) => call.sessionID + "\0" + real),
         members: new Set(),
-        decision: context.permission.assert({
+        decision: assertPermission({
           sessionID: call.sessionID,
           ...(call.agent ? { agent: call.agent } : {}),
           action: "external_directory",

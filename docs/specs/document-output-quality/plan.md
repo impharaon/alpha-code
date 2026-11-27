@@ -7,7 +7,7 @@ status: active
 spec: SPEC-document-output-quality
 design: DESIGN-document-output-quality
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # PLAN-document-output-quality｜文档产出质量实施计划
@@ -988,6 +988,32 @@ AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口�
 | §4.11 证明 4 | 宿主运行期间，用宿主的测试 HOME 起无围栏默认 profile LO：实际管道名逐字等于渲染器的拒绝行；围栏内 bind 该名被拒；第二次启动 `--convert-to pdf` 被第一个实例接收并完成。拒绝行的对照臂由常驻测试的「去掉拒绝行可 bind」承担 | 一次性 | 没有拒绝行时围栏内进程能抢先 bind 该名（F-23 已证可截获请求） |
 | §4.11 证明 5 | 产品固定文件入口下载 + `extractDocumentRuntime` 展开到宿主 userData；记录 dmg、展开树与 `soffice` 的 xattr；首次执行（证明 1 的 verify 与 render）的 rc 与同时间窗的 syspolicyd 日志；`mdimport` 后 `mdfind -onlyin` 能查到包内文件，此时 `lsregister -dump` 与 `pluginkit -mAvvv` 在 document-runtime 下 0 条；对照：同一字节的 `.app` 副本执行后可见登记，随即注销并复查。常驻：`document-runtime.test.ts` 的 dmg 展开用例 | 一次性 + integration | 展开目录改回 `.app`：常驻用例红，对照臂可见登记 |
 
+### 一次性证据（2026-11-27，darwin-arm64 dev 构建，代码 `07a533efba`）
+
+证据目录 `~/.cache/alpha-orch/2026-11-27/impl-1761-lo-pipe/`。组合宿主源码在其中 `probe-host/`（`host.ts` sha256 前缀 `e774ff0d451356ad`，不入库）：LSUIElement 的 Electron 副本跑 main，调产品 `spawnLocalServer`（真 utilityProcess sidecar、生产计划器与原生模块围栏、出网代理；所有端点指向关闭的回环端口，没有付费调用），LO 经产品 `pinnedFileAuthority(userData).ensureFile` 下载、产品 `extractDocumentRuntime` 展开，产品自己的三个 LO 脚本经引擎 `POST /api/session/:id/shell`（不调模型）在围栏进程树里执行。构建：`gate slot -- bunx electron-vite build --config scripts/lo-fence-probe/electron.vite.config.ts`；运行：`gate slot -- bun ./scripts/lo-fence-probe/run.ts --evidence "$HOME/Library/Application Support/alpha-1761-lo-fence-probe" --mode full|proof4|removal`。宿主副本退出时注销，`lsregister -dump` 无残留。
+
+**证明 1**（`report-full.log`）：下载 via=relay，sha256 与 pin 一致；展开后目录为 `LibreOffice` 与空的 `mount-*`。围栏内 `verify_runtime.py`（首次执行）exit 0，1 页 PDF；`render_document.py` docx/xlsx/pptx 均 `status: rendered`；`recalculate_document.py` `status: recalculated`，`A3 = A1*A2` 的缓存值回读为 42。**移除臂**（`report-removal.log`，计划器去掉 `unixListen` 的临时构建，已 `git restore`）：同一 verify `CalledProcessError … soffice … returned non-zero exit status 1`，EXIT=1；docx render `{"status": "failed", "code": "conversion"}`。
+
+**证明 2**（同一次围栏 shell）：bind `/tmp/OSL_PIPE_501_SingleOfficeIPC_<随机 hex>` OK；用户默认管道名（`/tmp/…6ab84c86f1cf4898a7a4cf9bd748e7`）、`OSL_PIPE_502_…`、`OSL_PIPE_501_other_…` 均 EPERM；connect `$TMPDIR` 外部监听者、冒充用户默认管道名的外部监听者、`/var/run/mDNSResponder` 均 EPERM。对照：同三条 connect 在围栏外的宿主里均 OK。常驻用例同形（`network-egress-fence.test.ts` A4/A5）。
+
+**证明 3**：`process-fence-profile.test.ts`「管道名推算」三个采样全等（采集 `proof3-capture.txt`：无围栏 LO 26.8.3.1，HOME 分别为 ASCII、含中文/空格/`;`、hash 含不补零字节的路径，首次与再次启动同名）。
+
+**证明 4**（`report-proof4.log`，产品引擎运行期间）：渲染器对宿主 HOME 的拒绝行为 `/private/tmp/OSL_PIPE_501_SingleOfficeIPC_6ab84c86f1cf4898a7a4cf9bd748e7`；用户 LO 启动前围栏内 bind 它得 EPERM；无围栏的用户 LO 以默认 profile 启动后建的正是这个名字；运行中围栏内 bind 得 EADDRINUSE；第二次启动 `--convert-to pdf` exit 0、自身输出为空，`convert … -> …/chinese-report.pdf` 出现在第一个实例的输出里，第一个实例随后自行退出——请求被用户自己的实例接收并处理。拒绝行的对照臂由常驻 A5 承担（去掉拒绝行时围栏内可 bind 该名）。
+
+**证明 5**：
+- xattr：下载的 dmg 只有 `com.apple.provenance` 与 `com.apple.diskimages.recentcksum`；展开的 `LibreOffice` 与 `soffice` 只有 `com.apple.provenance`；展开树里带 `com.apple.quarantine` 的文件 0 个。
+- 首次执行：第一次尝试（19:35:45 起）时宿主自己的 HTTP 60 s 超时先断（`report-full-attempt1.log`，shell 请求在命令结束时才返回），同窗 syspolicyd 有 `GK performScan` 与 `GK evaluateScanResult: 2`（team 7P5S3ZLCN7）、写入 provenance，打印出的行里没有拒绝（摘录 `syspolicyd-attempt1-observed.txt`；这些 default 级日志之后已从日志缓冲里过期）。放宽超时后第二次展开同一字节，首次 verify 48 s exit 0，render 随后 4–7 s。
+- 真实使用（verify、三种 render、重算、用户 LO 两次启动）之后：`lsregister -dump` 与 `pluginkit -mAvvv` 在宿主根下均 0 条。
+- Spotlight：本机 `mdutil -s /System/Volumes/Data` 为「Index is read-only」，`mdimport` 后 `mdfind -onlyin <userData>/document-runtime "kMDItemFSName == 'Info.plist'"` 仍 0 条，这个观察条件在本机达不到。
+- 对照臂：同一字节 `cp -c -R` 为 `control/LibreOffice.app`，`soffice --version` 与一次转换后 `lsregister` 出现应用与两个 QuickLook 扩展共 3 条、`pluginkit` 列出两个扩展；`pluginkit -r` 与 `lsregister -u` 注销后复查均 0 条，副本已删。
+- 发布验收（正式签名包、Spotlight 正常索引的机器上）：首次文档请求之后依次跑 `xattr -l "<userData>/pinned-files/libreoffice/darwin-arm64/26.8.3/LibreOffice_26.8.3_MacOS_aarch64.dmg"`、`xattr -r -l "<userData>/document-runtime/libreoffice/darwin-arm64/26.8.3/LibreOffice" | grep -c com.apple.quarantine`、`log show --start "<首次请求时间>" --predicate 'process == "syspolicyd"' --info`、`mdimport "<userData>/document-runtime"` 后 `mdfind -onlyin "<userData>/document-runtime" "kMDItemFSName == 'Info.plist'"`（须非 0），再 `lsregister -dump | grep -c "<userData>/document-runtime"` 与 `pluginkit -mAvvv | grep -c "<userData>/document-runtime"`（均须 0）。
+
 ### 偏离记录
 
-暂无。
+2026-11-27 · 证明 1 的触发方式：没有模型调用就走不到 ext 的 `environment` 与 Location 校验处理器，所以宿主直接用产品的固定文件入口与 `extractDocumentRuntime` 取得运行时，按 `document-runtime.ts` 的派发方式准备 verify 任务、按 ext 渲染器的方式准备 render 任务、用产品 `createDocumentPythonProjections` 写 ready 投影，再在围栏引擎的会话 shell 里执行同样的脚本。围栏由同一 sidecar 进程树继承，与 Location 处理器相同；`createDocumentRuntime` 的派发与发布改名不在本证据里，它们本轮未改，由 `document-runtime.test.ts` 覆盖。
+
+2026-11-27 · 证明 5 只做到一部分：宿主是 dev 构建的 Electron 副本，不是正式签名包；本机 Spotlight 索引只读，`mdfind` 的条件达不到。这两项按上面的命令转为发布验收。
+
+2026-11-27 · `document-runtime.test.ts` 的 dmg 用例用 UDRW 镜像：产品的 `hdiutil attach` 会校验压缩镜像（UDRO/UDZO 实测 3–7 s），UDRW 整条用例约 3.3 s，在 integration 的 5 s 预算内。
+
+2026-11-27 · 宿主第一版 unix 探针在 bind 得 EADDRINUSE 后仍会删 socket 文件，把用户 LO 的活管道删掉，导致第二次启动自己另起实例（`report-proof4-probe-unlinked.log`）；改为只删自己建的文件后重跑即为上面的证明 4。这说明围栏内进程本就能删掉 `/private/tmp` 里用户 LO 的管道文件（W11 可写，F-21 已记），作为设计观察交回，不在本轮改。

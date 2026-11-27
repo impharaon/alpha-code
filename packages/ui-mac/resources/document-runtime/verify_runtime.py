@@ -17,7 +17,7 @@ def verify(runtime_root, job_root):
     runtime = Path(runtime_root).resolve(strict=True)
     job = Path(job_root).resolve(strict=True)
     config = json.loads((job / 'verify.json').read_text(encoding='utf-8'))
-    executable = runtime / ('LibreOffice.app/Contents/MacOS/soffice' if sys.platform == 'darwin' else 'program/soffice.com')
+    executable = runtime / ('LibreOffice/Contents/MacOS/soffice' if sys.platform == 'darwin' else 'program/soffice.com')
     executable.resolve(strict=True).relative_to(runtime)
     template = Path(config['template']).resolve(strict=True)
     if hashlib.sha256(template.read_bytes()).hexdigest() != config['templateSha256']:

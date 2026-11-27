@@ -23,6 +23,7 @@ import {
   WRITABLE_ROOT_IDS,
   assertEgressProxyPort,
   assertSeatbeltSafePath,
+  libreOfficeSingleInstancePipe,
   processFenceRulesCover,
   processFenceWriteRules,
   renderProcessFenceProfile,
@@ -416,6 +417,49 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     expect(out.filter((l) => /network-outbound/.test(l))).toEqual([`(allow network-outbound (remote ip "localhost:61234"))`])
     // DNS 刻意不放行:没有 mDNSResponder 那一行(`#1334` Q3:解析搬到代理那一侧)
     expect(renderProcessFenceProfile(base)).not.toContain("mDNSResponder")
+  })
+
+  test("`#1761` N5:放行行紧接 N4,其后每条 userInstallations 一行拒绝(后写者胜),再接受保护集;只写推算出的管道名、不写用户路径;省略或空列表不渲染", () => {
+    const home = (name: string) => `/Users/${name}/Library/Application Support/LibreOffice/4`
+    const profile = renderProcessFenceProfile({ ...base, unixListen: [{ kind: "libreoffice-single-instance", uid: 501, userInstallations: [home("alpha"), home("beta")] }] })
+    const lines = tokens(profile)
+    const n4 = lines.indexOf(NETWORK_LINES(4443).at(-1)!)
+    expect(lines.slice(n4 + 1, n4 + 4)).toEqual([
+      `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_501_SingleOfficeIPC_[0-9a-f]+$")))`,
+      `(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/${libreOfficeSingleInstancePipe(501, home("alpha"))}")))`,
+      `(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/${libreOfficeSingleInstancePipe(501, home("beta"))}")))`,
+    ])
+    expect(lines.slice(n4 + 4)).toEqual([...CF_LINES, ...C1_LINES])
+    expect(lines.some((line) => line.includes("LibreOffice/4"))).toBe(false)
+    // 只监听:没有 network-outbound 的加法,也没有 /tmp 写法(seatbelt 按解析后的 /private/tmp 匹配,F-21)
+    expect(lines.filter((l) => /network-outbound/.test(l))).toEqual([`(allow network-outbound (remote ip "localhost:4443"))`])
+    expect(lines.some((line) => line.includes('"/tmp/') || line.includes("#\"^/tmp/"))).toBe(false)
+    // 渲染进 profile 的写规则不变(签发判定只读文件写规则)
+    expect(processFenceWriteRules(profile)).toEqual(processFenceWriteRules(renderProcessFenceProfile(base)))
+    expect(tokens(renderProcessFenceProfile({ ...base, unixListen: [] }))).toEqual(tokens(renderProcessFenceProfile(base)))
+    expect(tokens(renderProcessFenceProfile({ ...base, unixListen: [{ kind: "libreoffice-single-instance", uid: 0, userInstallations: [] }] })).slice(n4 + 1, n4 + 2)).toEqual([
+      `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_0_SingleOfficeIPC_[0-9a-f]+$")))`,
+    ])
+  })
+
+  test("`#1761` N5 fail-closed:uid 不是非负安全整数、或 userInstallations 里有非绝对路径 ⇒ 拒绝渲染", () => {
+    const render = (uid: unknown, userInstallations: unknown[] = []) =>
+      renderProcessFenceProfile({ ...base, unixListen: [{ kind: "libreoffice-single-instance", uid: uid as number, userInstallations: userInstallations as string[] }] })
+    for (const bad of [-1, 1.5, Number.NaN, 2 ** 53, "501", undefined, null]) expect(() => render(bad), String(bad)).toThrow(/unix listen uid must be a non-negative safe integer/)
+    for (const bad of ["relative/LibreOffice/4", "", undefined]) expect(() => render(501, [bad]), String(bad)).toThrow(/userInstallations\[0\] must be absolute/)
+    // 用户路径不进 profile,所以引号、分号这类 seatbelt 字面量写不了的字符照样渲染
+    expect(() => render(501, ['/Users/a"b;c/Library/Application Support/LibreOffice/4'])).not.toThrow()
+  })
+
+  test("`#1761` 管道名推算 = 真实 LibreOffice 26.8.3.1 的管道名(以下 HOME 下无围栏启动默认 profile,/private/tmp 里实际出现的名字;plan.md r5 证明 3 的采集记录)", () => {
+    // 期望值是采样,不是从推算式抄来的:ASCII;含中文、空格与 `;`(UTF-8 逐字节 %XX);hash 里有小于 0x10 的字节(不补零,31 位)
+    const samples: Array<[home: string, pipe: string]> = [
+      ["/private/tmp/lo1761-cap/home-ascii", "OSL_PIPE_501_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb"],
+      ["/private/tmp/lo1761-cap/用户 目录;x/home", "OSL_PIPE_501_SingleOfficeIPC_d6c4244ec5cd23e4ee169d76abd7daee"],
+      ["/private/tmp/lo1761-cap/家 0;z", "OSL_PIPE_501_SingleOfficeIPC_d630e8a40bef033169add33ca795c25"],
+    ]
+    for (const [home, pipe] of samples) expect(libreOfficeSingleInstancePipe(501, `${home}/Library/Application Support/LibreOffice/4`), home).toBe(pipe)
+    expect(libreOfficeSingleInstancePipe(0, "/private/tmp/lo1761-cap/home-ascii/Library/Application Support/LibreOffice/4")).toBe("OSL_PIPE_0_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb")
   })
 
   test("`#1337` fail-closed:代理端口不是 1..65535 的整数 ⇒ 拒绝渲染(没有那扇门就没有 profile)", () => {

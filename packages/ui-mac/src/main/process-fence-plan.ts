@@ -489,8 +489,11 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
 
   // DESIGN-stored-credentials-fence §4.5:存放点落到真实路径(userData 的真实路径求不出 ⇒ 抛 ⇒ 拒 fork)
   const credentialRules = planCredentialStores(input.credentialStores, deps)
+  // `#1761` N5(DESIGN-document-output-quality §4.11):LibreOffice 的单实例管道;用户自己 LibreOffice 的默认 profile 是发布版 bootstraprc 的
+  // `$SYSUSERCONFIG/LibreOffice/4`,home 与引擎根同一个。不看 LO 是否已就绪:profile 只在 sidecar 启动时渲染一次。
+  const unixListen = [{ kind: "libreoffice-single-instance" as const, uid: process.getuid!(), userInstallations: [join(home, "Library", "Application Support", "LibreOffice", "4")] }]
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
+    { workspaces: union.selected, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules, unixListen },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)

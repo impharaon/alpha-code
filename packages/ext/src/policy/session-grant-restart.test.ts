@@ -36,7 +36,7 @@ async function boot(root: string, project: string) {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (inner) => (dispatch = withEngineAuthorization(inner, PASSWORD)), projectTrust: engineProjectTrust },
+    { onDispatch: (inner) => (dispatch = withEngineAuthorization(inner, PASSWORD)), projectTrust: engineProjectTrust, packageManagerEnvironment: {} },
   )
   async function call(method: string, route: string, body?: unknown): Promise<{ status: number; body: any }> {
     const response = await dispatch!(

@@ -185,7 +185,7 @@ const UPSTREAMS = [
     // path and aggregate SHA, and reads every source byte from that exact Git object. Unlike the
     // older optional staged fixtures above, an unavailable checkout or missing commit is a hard
     // failure:provenance cannot be proved by a self-consistent replacement lock.
-    // #1776: 9f7b66d (alpha-web #322) republishes checkpoint e0c6e11f86 (host aggregate 254dee98…).
+    // #1776: 9f7b66d (producer #322) republishes checkpoint e0c6e11f86 (host aggregate 254dee98…).
     repo: "jinjunnn/alpha-web",
     commit: "9f7b66de081da2dc2a3776fe2703b5a582ce8786",
     lock: "alpha-web-extension-package.lock.json",

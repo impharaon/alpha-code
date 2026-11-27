@@ -45,6 +45,8 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
   const settle = () => {
     if (closing && calls.size === 0) files.dispose()
   }
+  // After release only the calls already running (and their Code Mode children) produce output; any other is withheld.
+  const admitted = (call: MaskCall) => !closing || calls.has(toolCallKey(call))
   const views = new WeakMap<object, () => Tool.Result>()
   type Capture = { raw: SecretSpool; stream: ReturnType<typeof createSecretStream>; publish: ShellCapture["publish"] }
   const captures = new Map<string, Capture>()
@@ -243,9 +245,11 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     prepareMutation: async (input: EnvMutation): Promise<EnvMutation> => (await prepareMutation(input)).mutation,
     read: async (input: { call: MaskCall; file: ProtectedFiles.ProtectedFile; result: Tool.Result }): Promise<Tool.Result> => {
       const state = stateOf(input.call, "read")
+      const running = admitted(input.call)
       // A protected file outside every scanned source joins later collection once read (spec v5 BR-05).
-      files.track(input.file)
+      if (running) files.track(input.file)
       try {
+        if (!running) throw new Error("Location released")
         const after = input.file.view === "variables" ? new TextDecoder("utf-8", { fatal: true }).decode(await readFile(state?.read?.target ?? input.file.path)) : undefined
         if (after !== undefined) files.remember(credentialValues(input.file, Buffer.from(after)))
         const render = () => projectSecretRead({ file: input.file, result: input.result, sources: [state?.read?.before, after].filter((source): source is string => source !== undefined), requested: state?.read?.requested ?? input.file.path, target: state?.read?.target ?? input.file.path, mask: text })
@@ -271,6 +275,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     result: async (input: { call: MaskCall; tool: string; facts: ToolFacts | undefined; result: Tool.Result }): Promise<Tool.Result> => {
       const state = stateOf(input.call, input.tool)
       try {
+        if (!admitted(input.call)) throw new Error("Location released")
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
         const view = views.get(input.result)?.()
@@ -308,6 +313,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       // Masking keeps the incoming class: Core recognises its errors by class (as in policy/display.ts).
       const Constructor = input.error.constructor as typeof ToolError
       try {
+        if (!admitted(input.call)) throw new Error("Location released")
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
         if (state?.mutations?.some((snapshot) => [snapshot.before, snapshot.after].some((source) => source !== undefined && envAssignments(source).some((record) => envSecret(record) && record.rhs.split(/\r?\n/).some((part) => {
@@ -337,6 +343,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     progress: async (input: { call: MaskCall; facts: ToolFacts | undefined; update: Tool.Metadata }): Promise<Tool.Metadata> => {
       const state = calls.get(toolCallKey(input.call))
       try {
+        if (!admitted(input.call)) throw new Error("Location released")
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
         const runtime = shellRuntime(input.update, input.facts).fields

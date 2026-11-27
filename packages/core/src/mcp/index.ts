@@ -43,7 +43,9 @@ import { McpPool } from "./pool.js"
 import { readFileSync } from "node:fs"
 import { withFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
-import { declaredListedTools, listsDeclaration, sameTool, type DeclaredTool } from "./codepuppy-first-party-mcp.js"
+import { declaredFirstPartyTools, listedFirstPartyTools, listsDeclaration, sameTool, type DeclaredTool } from "./codepuppy-first-party-mcp.js"
+import { connectorLocalLaunch } from "./codepuppy-local-launch.js" // codepuppy(#1760)
+import { connectorLaunchHost } from "@opencode/util/codepuppy-connector-launch"
 import type { PinnedFilesCallPreparation } from "@opencode/util/codepuppy-connector-launch"
 import { reconnectDelay, type StartFailure } from "./codepuppy-startup.js"
 import { effectiveName, normalizedName } from "../tool/runtime.js"
@@ -428,6 +430,9 @@ export const layer = (options?: Options) =>
       // codepuppy ── end
 
       const makeEntry = (name: ServerName, config: Mcp.ServerConfig, started: number): ServerEntry => {
+        // codepuppy(#1565, #1760) ── one verified declaration feeds both the eager tool list and the trusted launch context.
+        const bootstrap = tryCodePuppyBootstrap()
+        const firstParty = declaredFirstPartyTools(name, config, bootstrap?.paths.officeMcpManifest, readFileSync, documentPythonEnvironmentFor(location), bootstrap?.launchers)
         // Local servers run on this Location's execution plane, so only Locations on the host share them.
         const pooled =
           config.pool === true &&
@@ -454,7 +459,7 @@ export const layer = (options?: Options) =>
           })
         const entry: ServerEntry = {
           config,
-          declared: declaredListedTools(name, config, tryCodePuppyBootstrap()?.paths.officeMcpManifest, readFileSync, documentPythonEnvironmentFor(location), tryCodePuppyBootstrap()?.launchers), // codepuppy(#1565)
+          declared: listedFirstPartyTools(firstParty), // codepuppy(#1565)
           status: { status: "pending" },
           startup: Latch.makeUnsafe(),
           attempt: { started, settled: Latch.makeUnsafe() },
@@ -474,6 +479,7 @@ export const layer = (options?: Options) =>
             lock: locks.withLock(name),
             callbacks,
             fork,
+            localLaunch: connectorLocalLaunch({ config, directory: location.directory, bootstrap, declared: firstParty, host: connectorLaunchHost }), // codepuppy(#1760)
             events: {
               connecting: Effect.gen(function* () {
                 // A server still pending from creation keeps the window that started with its entry.

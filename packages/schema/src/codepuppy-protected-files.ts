@@ -289,25 +289,28 @@ export function match(input: { path: string; roots: ProtectedRoots }): Protected
   }
 }
 
-export function probe(input: { text: string; roots: ProtectedRoots }): readonly string[] {
+/** The protected files a command or payload names literally; relative paths resolve against `roots.directory`. */
+export function named(input: { text: string; roots: ProtectedRoots }): readonly ProtectedFile[] {
   // Keep quoted paths with spaces, while also finding paths inside a quoted command/payload.
   const tokens = [...input.text.matchAll(/"([^"]*)"|'([^']*)'|([^\s"'`|;&()<>]+)/g)].flatMap((token) => {
     const value = token[1] ?? token[2] ?? token[3]
     return [value, ...value.split(/\s+/)]
   })
   const candidates = /^(?:[/\\]|[a-z]:[/\\]|~[/\\])/i.test(input.text) ? [input.text, ...tokens] : tokens
-  return [
-    ...new Set(
-      candidates.flatMap((token) => {
-        const value = token
-          .replace(/^(?:--?[\w-]+|[a-zA-Z_]\w*)=/, "")
-          .replace(/^@/, "")
-          .replace(/^\$(?:HOME|\{HOME\})(?=[/\\]|$)/, () => input.roots.home)
-        const item = match({ path: value, roots: input.roots })
-        return item ? [item.rule] : []
-      }),
-    ),
-  ]
+  const files = new Map<string, ProtectedFile>()
+  for (const token of candidates) {
+    const value = token
+      .replace(/^(?:--?[\w-]+|[a-zA-Z_]\w*)=/, "")
+      .replace(/^@/, "")
+      .replace(/^\$(?:HOME|\{HOME\})(?=[/\\]|$)/, () => input.roots.home)
+    const item = match({ path: value, roots: input.roots })
+    if (item && !files.has(item.path)) files.set(item.path, item)
+  }
+  return [...files.values()]
+}
+
+export function probe(input: { text: string; roots: ProtectedRoots }): readonly string[] {
+  return [...new Set(named(input).map((file) => file.rule))]
 }
 
 export function isCredentialName(name: string): boolean {

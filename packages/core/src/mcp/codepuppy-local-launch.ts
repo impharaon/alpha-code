@@ -27,8 +27,8 @@ export function connectorLocalLaunch(input: {
   return {
     sidecarGeneration: String(generation),
     runtimeRoot: launchers.runtimeRoot,
-    // Values the user configured for this server; short flags are left readable so masking cannot shred the diagnostic.
-    secrets: Object.values(environment).filter((value) => value.length >= 8),
+    // Every value configured for this server is a known secret fact here (a {file:} key arrives already substituted).
+    secrets: Object.values(environment).filter((value) => value !== ""),
     host: input.host(),
     ...(input.declared ? { firstParty: { launchers, declaration: input.declared } } : {}),
     ...(runner && command[0] !== undefined

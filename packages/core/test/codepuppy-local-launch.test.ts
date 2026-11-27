@@ -31,8 +31,9 @@ describe("connectorLocalLaunch", () => {
   })
 
   test("a native command keeps its own environment: diagnostics and the dependency gate only, never package preparation", () => {
-    const value = connectorLocalLaunch({ config: local(["python3", "server.py"], { API_TOKEN: "sk-owned-secret-value", DEBUG: "1" }), directory: "/w", bootstrap: desktop, declared: undefined, host: () => host })
-    expect(value).toMatchObject({ sidecarGeneration: "6", runtimeRoot: launchers.runtimeRoot, secrets: ["sk-owned-secret-value"], host })
+    // A short key is still a key: every configured value is masked, never filtered by length.
+    const value = connectorLocalLaunch({ config: local(["python3", "server.py"], { API_TOKEN: "sk-owned-secret-value", API_KEY: "abc123", EMPTY: "" }), directory: "/w", bootstrap: desktop, declared: undefined, host: () => host })
+    expect(value).toMatchObject({ sidecarGeneration: "6", runtimeRoot: launchers.runtimeRoot, secrets: ["sk-owned-secret-value", "abc123"], host })
     expect(value?.packagePreparation).toBeUndefined()
     expect(value?.firstParty).toBeUndefined()
   })

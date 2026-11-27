@@ -1,4 +1,4 @@
-import { Tool } from "../../schema/src/tool"
+import type { Tool } from "../../schema/src/tool"
 import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
 import { envAssignments, envView, maskSpans } from "./secret-values"
 

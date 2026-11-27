@@ -208,8 +208,8 @@ function join(a?: State, b?: State): State | undefined {
     assignments: a.assignments.filter((entry) => b.assignments.some((other) => JSON.stringify(entry) === JSON.stringify(other))),
     exported: new Set([...a.exported].filter((name) => b.exported.has(name))),
     allexport: a.allexport && b.allexport,
-    // A name unset on either path does not reach brew with an inherited value.
-    unset: new Set([...a.unset, ...b.unset]),
+    // Only a name unset on both paths is certain, as with assignments (design :786).
+    unset: new Set([...a.unset].filter((name) => b.unset.has(name))),
   }
 }
 function invert(outcome: Outcome, negated: boolean): Outcome { return negated ? { success: outcome.failure, failure: outcome.success } : outcome }

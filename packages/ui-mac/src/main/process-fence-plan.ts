@@ -274,6 +274,8 @@ export type ProcessFencePlan = {
   profile: string
   addonPath: string
   workspaces: string[]
+  /** The approved new paths in HOME this profile renders after W1 (design v7 NP5), after the compile trim. */
+  newPaths: string[]
   dropped: string[]
   excluded: WorkspaceExclusion[]
   attempts: number
@@ -305,6 +307,12 @@ export type PlanProcessFenceInput = {
    * persisted: an app restart starts from the truth file alone.
    */
   carriedWorkspaces: readonly string[]
+  /**
+   * SPEC v8 BR-08 (design v7 NP5): new paths directly in HOME the user approved in an earlier generation of this app run.
+   * Each is kept only while planWriteApproval (`stored`) still reads it as that same new path; otherwise it is excluded with
+   * a log line, never re-pointed. Never persisted.
+   */
+  carriedNewPaths?: readonly string[]
   /** SPEC-engine-config-fence CF-8:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory(exported.env, exported.home))。 */
   engineConfigDirectory: string
   /** CF-4 的另一份(实现期修订 2 A):主进程启动时读的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts userEnvFile);没设为空。 */
@@ -509,23 +517,32 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     deps.log(`process fence: workspace truth unavailable — workspace union falls back to the default workspace only: ${error instanceof Error ? error.message : String(error)}`)
     candidates = []
   }
+  const eligibility: WorkspaceDirectoryInput = { homeDir: home, appStateRoot, configFenceRoots: () => fenceSet.configFenceRoots, realpath: deps.realpath, isDirectory: deps.isDirectory, stat: deps.stat }
   const union = selectWorkspaceUnion({
     candidates: [...candidates, ...input.carriedWorkspaces],
     defaultWorkspace: deps.defaultWorkspace(),
-    homeDir: home,
-    appStateRoot,
-    configFenceRoots: () => fenceSet.configFenceRoots,
-    realpath: deps.realpath,
-    isDirectory: deps.isDirectory,
-    stat: deps.stat,
+    ...eligibility,
   })
   if (union.selected.length === 0)
     throw new Error("process fence: the default workspace is not a directory on disk — refusing to fork an engine that could not write anywhere a user expects")
+  // design v7 NP5: an approved new path stays only while it is still that path directly in HOME — created since as a file or
+  // a folder is fine; a link, a re-point or a parent that is no longer HOME is excluded, never followed.
+  const newPaths = (input.carriedNewPaths ?? []).filter((path) => {
+    let scope: WriteApprovalScope | undefined
+    try {
+      scope = planWriteApproval(eligibility, { absolute: path, directory: dirname(path) }, "stored")
+    } catch {
+      // An unresolved link at the path: excluded below.
+    }
+    if (scope?.eligible && scope.kind === "new-path" && scope.root === path) return true
+    deps.log(`process fence: approved new path ${path} excluded — no longer that new path directly in HOME (a link, re-pointed, or HOME changed)`)
+    return false
+  })
 
   // DESIGN-stored-credentials-fence §4.5:存放点落到真实路径(userData 的真实路径求不出 ⇒ 抛 ⇒ 拒 fork)
   const credentialRules = planCredentialStores(input.credentialStores, deps)
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
+    { workspaces: union.selected, newPaths, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)
@@ -533,6 +550,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     profile: trimmed.profile,
     addonPath,
     workspaces: trimmed.workspaces,
+    newPaths: trimmed.newPaths,
     dropped: trimmed.dropped,
     excluded: union.excluded,
     attempts: trimmed.attempts,

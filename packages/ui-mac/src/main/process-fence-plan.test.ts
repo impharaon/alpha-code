@@ -442,6 +442,42 @@ test.skipIf(process.platform !== "darwin")("writable location truth stays fenced
   })
 })
 
+// SPEC v8 BR-08 (design v7 NP5, §6 evidence 6 and 8): the production planner carries new paths approved earlier in this run
+// into the next generation as `(subpath P)` right after W1, and only while each is still that path directly in HOME. The
+// rendered profile is applied with the real sandbox-exec: P can be created and written, its sibling and a link at P cannot.
+test.skipIf(process.platform !== "darwin")("carried new paths in HOME are rendered after W1 while still themselves; a link, a re-point or a deeper path is excluded with a log line", () => {
+  withLocationDisk((disk) => {
+    const { home, root } = disk
+    const project = join(root, "project"), outside = join(root, "outside"), userData = join(root, "userData")
+    for (const directory of [project, outside, join(home, "made-dir"), join(home, "sub")]) mkdirSync(directory)
+    writeFileSync(join(home, "made.txt"), "x")
+    symlinkSync(outside, join(home, "linked"))
+    const carried = ["missing.txt", "made.txt", "made-dir", "linked", "sub/nested"].map((name) => join(home, name))
+    const logs: string[] = []
+    const plan = planProcessFence({
+      userDataPath: userData, sidecarEnv: { HOME: home },
+      addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../../out/main"), exists: existsSync },
+      egressProxyPort: 4443, carriedWorkspaces: [], carriedNewPaths: carried, engineConfigDirectory: disk.protected, homebrewFence: [], credentialStores: [],
+    }, {
+      homeDir: () => home, codepuppyGlobalRoot: () => join(disk.state, "env", "dev"), appStateRoot: () => disk.state,
+      realpath: realpathSync.native, defaultWorkspace: () => project, readWorkspaces: () => [],
+      isDirectory: (path) => statSync(path).isDirectory(), stat: (path) => statSync(path, { bigint: true }), lstat: (path) => lstatSync(path, { bigint: true }),
+      mkdirp: (path) => void mkdirSync(path, { recursive: true }), compile: trialCompileProfile, log: (line) => void logs.push(line),
+    })
+    expect(plan.newPaths).toEqual(carried.slice(0, 3))
+    expect(logs.filter((line) => line.startsWith("process fence: approved new path"))).toEqual(carried.slice(3).map((path) => `process fence: approved new path ${path} excluded — no longer that new path directly in HOME (a link, re-pointed, or HOME changed)`))
+    const lines = plan.profile.split("\n")
+    expect(lines.slice(lines.findIndex((line) => line.endsWith("; W1")) + 1).slice(0, 3)).toEqual(carried.slice(0, 3).map((path) => `  (subpath "${path}") ; NP5 本人批准的主目录下新路径`))
+    expect(processFenceWriteRules(plan.profile).allow).toEqual(expect.arrayContaining(carried.slice(0, 3).map((value) => ({ kind: "subpath", value }))))
+    const fenced = (script: string) => spawnSync(SANDBOX_EXEC, ["-p", plan.profile, "/bin/sh", "-c", script], { encoding: "utf8", env: { HOME: home, PATH: "/usr/bin:/bin" }, timeout: 10_000 })
+    expect(fenced(`printf new > '${join(home, "missing.txt")}' && printf more >> '${join(home, "made.txt")}' && mkdir -p '${join(home, "made-dir", "a")}'`).status).toBe(0)
+    for (const script of [`printf s > '${join(home, "sibling.txt")}'`, `printf z > '${join(home, "linked", "esc")}'`, `printf n > '${join(home, "sub", "nested")}'`]) expect(fenced(script).status, script).not.toBe(0)
+    expect(readFileSync(join(home, "missing.txt"), "utf8")).toBe("new")
+    expect(readdirSync(outside)).toEqual([])
+    expect(existsSync(join(home, "sibling.txt")) || existsSync(join(home, "sub", "nested"))).toBe(false)
+  })
+})
+
 function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new Set<string>([ADDON])) {
   const made: string[] = []
   const logs: string[] = []

@@ -92,7 +92,7 @@ import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, writableLocationTruthPath, type FenceRunWritable } from "./process-fence-workspaces"
 import { homedir } from "node:os"
-import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
+import { lstatSync, mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { receiveToolPolicyWrite } from "../../../ext/src/policy/store"
 import { createPinnedFileMainBridge, pinnedFileAuthority } from "./connector-launch-host"
@@ -137,8 +137,11 @@ export type SidecarListener = {
    */
   probeWrite: (directory: string) => Promise<WorkspaceWriteProbeFact>
   readonly fenced: boolean
-  /** Main's eligibility consumer is the sole caller; successful grants live only in this listener. */
-  grantWrite: (directory: string) => Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>
+  /**
+   * Main's eligibility consumer is the sole caller; successful grants live only in this listener. `"new-path"`: a path
+   * directly in HOME that does not exist yet (SPEC v8 BR-08), issued as itself without being created.
+   */
+  grantWrite: (path: string, kind?: WriteApprovalKind) => Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>
   /**
    * Whether this generation's sandbox already writes `directory` (or an ancestor) by main's own knowledge: the
    * rules of the profile main rendered and applied, plus this generation's finished and in-flight grants. String
@@ -332,13 +335,15 @@ function capturePackageManagerUserEnvironment(userDataPath: string, source: Reco
 }
 
 /** `eligibility`: the planner's identity/eligibility input (the same one R4 uses); R6 answers `ineligible` from it. */
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; eligibility?: WorkspaceDirectoryInput; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; configFence?: ProcessFencePlan["configFence"]; roots?: ProcessFencePlan["roots"] }
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; newPaths?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; eligibility?: WorkspaceDirectoryInput; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; configFence?: ProcessFencePlan["configFence"]; roots?: ProcessFencePlan["roots"] }
 
 type ProductionFenceInput = {
   userDataPath: string
   sidecarEnv: Record<string, string>
   egressProxyPort: number | undefined
   carriedWorkspaces: readonly string[]
+  /** SPEC v8 BR-08 (design v7 NP5): new paths in HOME the user approved during this run (the tracker's run-lifetime set). */
+  carriedNewPaths: readonly string[]
   /** SPEC-engine-config-fence CF-8:the start document's engineConfigDirectory (the same value). */
   engineConfigDirectory: string
   /** CF-4 (实现期修订 2 A):the env file main reads at start (codepuppy-secrets.ts userEnvFile — the one authority); unset = absent. */
@@ -405,6 +410,7 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
       addon: { packaged: electronNs.app.isPackaged, resourcesPath: process.resourcesPath, moduleDir, exists: existsSync },
       egressProxyPort,
       carriedWorkspaces: input.carriedWorkspaces,
+      carriedNewPaths: input.carriedNewPaths,
       engineConfigDirectory: input.engineConfigDirectory,
       ...(input.envFile ? { envFile: input.envFile } : {}),
       // DESIGN-stored-credentials-fence §4.5:C1 的存放点与 T1 / P / T2 的表同一份清单
@@ -541,7 +547,7 @@ export async function prepareShellProbeFence(): Promise<ShellProbeFenceContext> 
   const snapshot = resolveShellProbeRoots({ env: { ...process.env }, home: homedir(), userDataPath })
   const port = process.platform === "darwin" ? (await ensureEgressPolicyProxy()).port : undefined
   const env = { ...snapshot.env, ...(port === undefined ? {} : sidecarEgressProxyEnv(port)) }
-  const fence = await planProductionFence({ userDataPath, sidecarEnv: env, egressProxyPort: port, carriedWorkspaces: [], engineConfigDirectory: snapshot.roots.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
+  const fence = await planProductionFence({ userDataPath, sidecarEnv: env, egressProxyPort: port, carriedWorkspaces: [], carriedNewPaths: [], engineConfigDirectory: snapshot.roots.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
   return { ...snapshot, env, profile: fence?.profile ?? "" }
 }
 
@@ -767,7 +773,7 @@ export async function spawnLocalServer(
 
   let fence: PlannedFence | undefined
   try {
-    fence = await (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
+    fence = await (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], carriedNewPaths: options.fenceRun?.carriedNewPaths() ?? [], engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
   } catch (error) {
     getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
     throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
@@ -922,12 +928,23 @@ export async function spawnLocalServer(
   // back. The same directory's own in-flight grant is joined instead (grantWrite coalesces; nothing new is issued).
   const generationWrites: SidecarListener["generationWrites"] = (directory) =>
     !writeRules || processFenceRulesCover({ allow: [...writeRules.allow, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules.deny }, directory)
-  const grantWrite: SidecarListener["grantWrite"] = (directory) => {
+  const grantWrite: SidecarListener["grantWrite"] = (directory, kind = "directory") => {
     if (exited || !child.pid) return Promise.resolve({ outcome: "failed", detail: "engine not running" })
     if (!fence) return Promise.resolve({ outcome: "failed", detail: "engine has no fence" })
+    // The tracker supplies its freshly validated canonical identity. Never follow a later rebind. A new path: its parent is
+    // still itself and nothing is there yet — the kernel would issue for whatever a link there points at (design v7 NP-P07 C9).
+    const unchanged = () => {
+      if (kind === "directory") return realpathSync.native(directory) === directory
+      if (realpathSync.native(dirname(directory)) !== dirname(directory)) return false
+      try {
+        lstatSync(directory)
+        return false
+      } catch (error) {
+        return (error as NodeJS.ErrnoException)?.code === "ENOENT"
+      }
+    }
     try {
-      // The tracker supplies its freshly validated canonical identity. Never follow a later rebind.
-      if (realpathSync.native(directory) !== directory) throw new Error("workspace path changed")
+      if (!unchanged()) throw new Error("workspace path changed")
     } catch {
       getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=realpath errno=unknown`)
       return Promise.resolve({ outcome: "failed", detail: "workspace path changed" })
@@ -944,8 +961,9 @@ export async function spawnLocalServer(
           return { outcome: "failed", detail: `${issued.step} errno=${issued.errno}` }
         }
         // Assertion, not the protection: the tracker issues only for an identity outside every root this generation
-        // writes, just re-validated by stillSelf; fenced code cannot rename components of such a path.
-        if (realpathSync.native(directory) !== directory) {
+        // writes, just re-validated by stillSelf (a new path: by planWriteApproval); fenced code cannot rename components of
+        // such a path. An unfenced process swapping a link in and out between the two checks is residual risk R-f (NP4, R1-F2).
+        if (!unchanged()) {
           getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=realpath errno=unknown`)
           return { outcome: "failed", detail: "workspace path changed" }
         }
@@ -1295,8 +1313,8 @@ export async function spawnLocalServer(
         return stopping
       },
   }
-  // This generation's W1 (the plan's own list) joins the run's writable history before anything can ask about it.
-  if (fence?.workspaces) options.fenceRun?.noteGeneration(listener, fence.workspaces)
+  // This generation's W1 and approved new paths (the plan's own lists) join the run's writable history before anything can ask about it.
+  if (fence?.workspaces) options.fenceRun?.noteGeneration(listener, fence.workspaces, fence.newPaths ?? [])
 
   return {
     listener,

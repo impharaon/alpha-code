@@ -480,6 +480,39 @@ describe("用户打开登记是两个消费者的共同资格", () => {
     }
   })
 
+  // SPEC v8 BR-08 (design v7 NP4): a new path in HOME is issued as itself only while it is still new and nothing of this run
+  // writes it already; it is carried as a new path, never as a workspace, and nothing is created.
+  test("grantNewPath issues a new path in HOME once, as itself; an existing entry, a parent that is not HOME, or a path this run already writes is not issued", async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "fence-new-path-")))
+    try {
+      const home = join(root, "home"), state = join(root, "state")
+      for (const directory of [home, state, join(home, "sub")]) mkdirSync(directory)
+      writeFileSync(join(home, "existing.txt"), "keep")
+      const eligibility = { homeDir: home, appStateRoot: state, configFenceRoots: () => [], realpath: realpathSync.native, isDirectory: (path: string) => statSync(path).isDirectory() }
+      const tracker = bootFenceWorkspaceTruth({ truthPath: join(state, "truth.json"), eligibility, store: {}, fs, log: () => {}, onWritableChanged: () => {} })
+      const issued: [string, string | undefined][] = []
+      let covered = new Set<string>()
+      const generation = () => ({ fenced: true, generationWrites: (path: string) => covered.has(path), grantWrite: async (path: string, kind?: string) => { issued.push([path, kind]); return { outcome: "granted" as const } } }) as unknown as Parameters<typeof tracker.grantNewPath>[1]
+      const first = generation()
+      expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, "note.txt") }, first)).toEqual({ grant: "granted" })
+      expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, "existing.txt") }, first)).toEqual({ grant: "ineligible", reason: "home-or-app-state" })
+      expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, "sub", "new") }, first)).toEqual({ grant: "ineligible", reason: "not-opened-by-you" })
+      expect(await tracker.grantNewPath({ server: "remote", path: join(home, "x") }, first)).toEqual({ grant: "not-local" })
+      covered = new Set([join(home, "covered")])
+      expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, "covered") }, first)).toEqual({ grant: "granted" })
+      // Another generation of this run had note.txt: it is never issued again (the planner carries it instead).
+      const second = generation()
+      tracker.noteGeneration(second, [], [join(home, "later.txt")])
+      expect(await tracker.grantNewPath({ server: "sidecar", path: join(home, "note.txt") }, second)).toEqual({ grant: "granted" })
+      expect(issued).toEqual([[join(home, "note.txt"), "new-path"]])
+      expect(tracker.carriedNewPaths()).toEqual([join(home, "note.txt"), join(home, "later.txt")])
+      expect(tracker.carriedWorkspaces()).toEqual([])
+      expect(readdirSync(home).sort()).toEqual(["existing.txt", "sub"])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("检疫仍挡真源重播;用户具体打开可登记,不会把恢复本身误算成打开", () => withTemp((dir) => {
     const truthPath = join(dir, "truth.json")
     writeWorkspaceTruth(truthPath, [], fs)

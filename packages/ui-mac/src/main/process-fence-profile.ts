@@ -160,6 +160,11 @@ export type ProcessFenceProfileInput = {
   userWritableLocations?: readonly ProcessFenceWriteRule[]
   /** W1:启动时并集,顺序即优先级(裁剪从尾部丢)。 */
   workspaces: readonly string[]
+  /**
+   * SPEC v8 BR-08 (design v7 NP5): new paths directly in HOME the user approved during this run (planner-validated, `stored`),
+   * each rendered right after W1 in the same shape — that one path and everything below it, whether it became a file or a folder.
+   */
+  newPaths?: readonly string[]
   packageManagerCaches?: readonly ProcessFenceWriteRule[]
   /** 当前环境根:W2 删掉之后不再渲染进放行块,它作为 CF-1 的一条由计划器放进 configFence(冻结设计「既有字段不变」)。 */
   codepuppyGlobalRoot: string
@@ -357,6 +362,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     "(deny file-write*)",
     "(allow file-write*",
     ...ws.map((w) => `  (subpath "${w}")                                  ; W1`),
+    ...(input.newPaths ?? []).map((path, i) => `  (subpath "${assertSeatbeltSafePath(path, `newPaths[${i}]`)}") ; NP5 本人批准的主目录下新路径`),
     ...(input.packageManagerCaches ?? []).map((rule) => `  (${rule.kind} ${rule.kind === "regex" ? "#" : ""}"${assertSeatbeltSafePath(rule.value, "package manager cache")}") ; W20`),
     ...(input.userWritableLocations ?? []).map((rule) => {
       if (rule.kind !== "regex") return `  (${rule.kind} "${assertSeatbeltSafePath(rule.value, "user writable location")}") ; W21`
@@ -902,7 +908,9 @@ export type TrialCompile = (profile: string) => { ok: true } | { ok: false; reas
 export type TrimResult = {
   profile: string
   workspaces: string[]
-  /** 因编译失败被丢掉的工作区(尾部起),按丢弃顺序。 */
+  /** 留下的本人批准新路径(design v7 NP5;它们排在 W1 之后,先于工作区被裁)。 */
+  newPaths: string[]
+  /** 因编译失败被丢掉的新路径与工作区(尾部起),按丢弃顺序。 */
   dropped: string[]
   /** 试编译次数(≥ 1)。 */
   attempts: number
@@ -918,14 +926,15 @@ export function trimUntilCompiles(
   compile: TrialCompile,
 ): TrimResult {
   const workspaces = [...input.workspaces]
+  const newPaths = [...(input.newPaths ?? [])]
   const dropped: string[] = []
   let attempts = 0
   let lastFailure: string | undefined
   for (;;) {
-    const profile = renderProcessFenceProfile({ ...input, workspaces })
+    const profile = renderProcessFenceProfile({ ...input, workspaces, newPaths })
     attempts++
     const result = compile(profile)
-    if (result.ok) return { profile, workspaces, dropped, attempts, lastFailure }
+    if (result.ok) return { profile, workspaces, newPaths, dropped, attempts, lastFailure }
     lastFailure = result.reason
     if (!COMPILE_BYTE_WALL.test(result.reason)) {
       // 不是字节墙 ⇒ 丢工作区救不了,别把运维指向并集大小。
@@ -933,11 +942,12 @@ export function trimUntilCompiles(
         `process fence profile does not compile, and the compiler error is not the 65535-byte data-object wall — dropping workspaces cannot fix it, so none were dropped (${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}, ${dropped.length} dropped, ${attempts} attempt${attempts === 1 ? "" : "s"}): ${result.reason}`,
       )
     }
-    if (workspaces.length <= 1) {
+    if (workspaces.length <= 1 && newPaths.length === 0) {
       throw new Error(
         `process fence profile does not compile even with the minimum writable set (${workspaces.length} workspace, ${dropped.length} dropped, ${attempts} attempts): ${result.reason}`,
       )
     }
-    dropped.push(workspaces.pop()!)
+    // The tail of the allow block goes first: approved new paths (after W1), then the carried end of W1.
+    dropped.push(newPaths.length ? newPaths.pop()! : workspaces.pop()!)
   }
 }

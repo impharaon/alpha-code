@@ -950,3 +950,4 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 ### 偏离记录
 
 - 2026-11-27 · 步骤 2：`WriteApprovalKind` 放在 `packages/ui-mac/src/shared/directory-write-approval.ts`（与 `DirectoryAccessTarget` 同处），`process-fence-plan.ts` 原样再导出。原因：R6 线上类型在 `codepuppy-sidecar-messages.ts`，ext 经它做类型检查；从 `process-fence-plan.ts` 取类型会把 main 世界的模块拉进 ext 的类型检查。类型只有一份，含义不变。
+- 2026-11-27 · 顺序：步骤 3 与 4 合成一个提交。原因：`FenceRunWritable` 增 `carriedNewPaths`、`noteGeneration` 增参后，`server.ts` 的接线与 `process-fence-wiring.test.ts` 的替身必须与规划器输出 `newPaths` 同时到位，分开提交会留下一个类型检查不过或携带缺一半的中间态。

@@ -885,6 +885,23 @@ describe("trimUntilCompiles —— 试编译封顶,从尾部丢,丢到底仍失�
     expect(tokens(r.profile).slice(-(CF_LINES.length + C1_LINES.length))).toEqual([...CF_LINES, ...C1_LINES])
   })
 
+  // SPEC v8 BR-08 (design v7 NP5): approved new paths in HOME render right after W1 in W1's shape and are trimmed before it.
+  test("本人批准的主目录下新路径:紧跟 W1 渲染为 subpath、写规则读得回;字节墙先裁新路径、再裁工作区", () => {
+    const newPaths = ["/Users/alpha/note.txt", "/Users/alpha/newfolder"]
+    const counting = (max: number) => (profile: string) =>
+      (profile.match(/; (W1|NP5 .*)$/gm)?.length ?? 0) <= max ? ({ ok: true } as const) : ({ ok: false, reason: "sandbox-exec: data object length 70173 exceeds maximum (65535)" } as const)
+    const all = trimUntilCompiles({ ...base, workspaces: ws, newPaths }, counting(99))
+    const lines = all.profile.split("\n")
+    const after = lines.findLastIndex((line) => line.endsWith("; W1"))
+    expect(lines.slice(after + 1, after + 3)).toEqual(newPaths.map((path) => `  (subpath "${path}") ; NP5 本人批准的主目录下新路径`))
+    expect(processFenceWriteRules(all.profile).allow.slice(ws.length, ws.length + 2)).toEqual(newPaths.map((value) => ({ kind: "subpath", value })))
+    const trimmed = trimUntilCompiles({ ...base, workspaces: ws, newPaths }, counting(3))
+    expect(trimmed.dropped).toEqual(["/Users/alpha/newfolder", "/Users/alpha/note.txt", "/Users/alpha/c"])
+    expect(trimmed.newPaths).toEqual([])
+    expect(trimmed.workspaces).toEqual(ws.slice(0, 3))
+    expect(() => renderProcessFenceProfile({ ...base, workspaces: ws, newPaths: ['/Users/alpha/"quoted'] })).toThrow()
+  })
+
   test("默认工作区不可丢:字节墙丢到只剩 1 个仍失败 ⇒ 抛,消息带编译器原文与账目(fail-closed 到「引擎不起」)", () => {
     expect(() => trimUntilCompiles({ ...base, workspaces: ws }, compileAllowing(0))).toThrow(
       /minimum writable set \(1 workspace, 3 dropped, 4 attempts\): sandbox-exec: data object length 70173 exceeds maximum \(65535\)/,

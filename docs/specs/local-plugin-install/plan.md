@@ -2018,4 +2018,10 @@ U/E 分别在 packages/ui-mac、packages/ext 下执行 `bun test --max-concurren
 
 ### 偏离记录
 
-暂无。
+2026-11-27 · 存放位置：派发要求用现有设置权威、不新增存储。ext 唯一能直接读写的现有持久设置，是 engine 给每个插件的持久存储（`context.storage`，全局节点，按插件命名空间；ext 已用它跨重启缓存识图转写）。main 的应用设置要增加一条 ext→main 写消息才能写，包选项文件关包时不清除、生命周期不符。所以记住的选择存为插件存储的一个键 `output-style`。作用范围是全局：项目只在某个项目启用该包时，只有该包在全局和所有项目都没启用才清除。没有改 engine 源码，不涉及夹具重采。
+
+### I-26 收口（2026-11-27，Claude Opus 5.5）
+
+- 提交：9579aae1db 记录本节并加红臂（记住臂 0/1）；随后的实现提交接通。
+- 证据：样式旅程 1 pass；三个移除臂各 0/1：`default` 不清除记住、关包不清除记住、对已开始的对话也套用。host 整文件 132 pass；ext 注册顺序等六个文件 38 pass；ext-imports 与 registry judge 14 pass；context-injection 45 pass。ext typecheck exit 0，scoped oxlint 0/0，north-star exit 0。`affected-tests --list` 的 scope line：affected tests: 39 of 759 test files。
+- 交编排器：spec BR-24/AC-28 的修订句见本节「BR/AC 变化」；宿主 artifact 与 engine 无变化。

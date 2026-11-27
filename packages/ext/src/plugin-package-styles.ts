@@ -9,29 +9,44 @@ import { readPackageAllowSet } from "./gen-skill-paths"
 import { managedPackageEntryAllowedHere } from "./package-scope"
 import { allInstalledPluginPackages } from "./plugin-package-skills"
 
-/** Session metadata key holding this session's selected package output style. */
+/** Session metadata key holding this session's selected package output style; `null` is the default style. */
 const SELECTED = "codepuppyOutputStyle"
+/** ext's persisted plugin-storage key for the style later new conversations start with (INT-extensions I-26). */
+const REMEMBERED = "output-style"
 /** The engine's marker on its own fallback coding prompt (DESIGN-local-plugin-install S-10). */
 const DEFAULT_CODING = "default-coding"
 export const OUTPUT_STYLE_COMMAND = "output-style"
 
 /**
- * Package output styles (BR-24): one existing slash-command entry selects a style per session; the awaited context
- * hook applies it to that session's next request. Only the marked engine fallback and the exact prompt bytes ext
- * itself injected for the request's agent count as default coding instructions.
+ * Package output styles (BR-24): one existing slash-command entry selects a style for the session and remembers it
+ * for later new conversations (INT-extensions I-26); the awaited context hook applies a session's style to its next
+ * request. Only the marked engine fallback and the exact prompt bytes ext itself injected for the request's agent
+ * count as default coding instructions.
  */
 export async function registerPackageStyles(
   context: Plugin.Context,
   input: { root: string; projectRoot(): string | undefined; ownPrompts(): ReadonlyMap<string, string>; log(line: string): void },
 ) {
-  const active = () =>
+  const styles = (enabled: (installed: ReturnType<typeof allInstalledPluginPackages>[number]) => boolean) =>
     allInstalledPluginPackages(input.root)
-      .filter((installed) =>
-        managedPackageEntryAllowedHere("bundle", installed.key.slice("bundle--".length), readPackageAllowSet(input.root), input.projectRoot()),
-      )
+      .filter(enabled)
       .flatMap((installed) =>
         installed.description.entries.flatMap((entry) => (entry.kind === "output-style" ? [{ installed, entry }] : [])),
       )
+  const active = () =>
+    styles((installed) =>
+      managedPackageEntryAllowedHere("bundle", installed.key.slice("bundle--".length), readPackageAllowSet(input.root), input.projectRoot()),
+    )
+  // The remembered choice outlives a package that is off here but on in another project; only off everywhere ends it.
+  const enabledAnywhere = () => {
+    const allowSet = readPackageAllowSet(input.root)
+    return styles(
+      (installed) =>
+        !!allowSet &&
+        (allowSet.keys.includes(installed.key) ||
+          allowSet.scoped.some((entry) => entry.kind === "bundle" && installed.key === "bundle--" + entry.name)),
+    )
+  }
   type Style = ReturnType<typeof active>[number]
   const qualified = (style: Style) => style.installed.description.name + ":" + style.entry.sourceName
   const names = (styles: Style[]) =>
@@ -46,11 +61,9 @@ export async function registerPackageStyles(
   }
   const select = async (sessionID: Parameters<Plugin.Context["session"]["get"]>[0]["sessionID"], style: Style | undefined) => {
     const { [SELECTED]: _previous, ...metadata } = (await context.session.get({ sessionID })).metadata ?? {}
-    await context.session.update({
-      sessionID,
-      metadata: style ? { ...metadata, [SELECTED]: { package: style.installed.key, entry: style.entry.id } } : metadata,
-    })
+    await context.session.update({ sessionID, metadata: { ...metadata, [SELECTED]: style ? choice(style) : null } })
   }
+  const choice = (style: Style) => ({ package: style.installed.key, entry: style.entry.id })
 
   await context.command.transform((editor) => {
     const styles = active()
@@ -60,14 +73,26 @@ export async function registerPackageStyles(
       description: renderWrapper(PACKAGE_OUTPUT_STYLE_ID, { label: names(styles).join(", "), body: "" }),
       execute: async (invocation) => {
         const wanted = invocation.prompt.text.trim()
-        if (wanted.toLowerCase() === "default") return select(invocation.sessionID, undefined)
+        if (wanted.toLowerCase() === "default") {
+          await select(invocation.sessionID, undefined)
+          return context.storage.remove(REMEMBERED)
+        }
         const current = active()
         const style = pick(current, wanted)
         if (!style)
           throw new Error("runtime-failed: unknown output style " + JSON.stringify(wanted) + "; available: " + [...names(current), "default"].join(", "))
         await select(invocation.sessionID, style)
+        await context.storage.set(REMEMBERED, choice(style))
       },
     })
+  })
+
+  // A new conversation starts with the remembered choice while its package is enabled here; conversations already
+  // under way keep theirs. Every top-level session records its choice at its first prompt, `null` for the default.
+  await context.session.hook("prompt", async (event) => {
+    const session = await context.session.get({ sessionID: event.sessionID }).catch(() => undefined)
+    if (!session || session.parentID || session.metadata?.[SELECTED] !== undefined) return
+    await select(event.sessionID, chosen(active(), await context.storage.get(REMEMBERED)))
   })
 
   await context.session.hook("context", async (event) => {
@@ -94,16 +119,19 @@ export async function registerPackageStyles(
     if (body) event.system.push({ type: "text", text: body })
   })
 
-  // Closing or removing a package withdraws every session's choice of its styles at once, so turning it back on
-  // before the next message does not revive an old choice. Same membership file and cadence as invocation revocation.
+  // Closing or removing a package withdraws every session's choice of its styles at once, and the remembered choice
+  // once it is enabled nowhere, so turning it back on does not revive an old choice; an update keeps both.
+  // Same membership file and cadence as invocation revocation.
   const membership = join(input.root, "skills-enabled.json")
   const withdraw = async () => {
-    const styles = active()
+    const remembered = await context.storage.get(REMEMBERED)
+    if (remembered !== undefined && !chosen(enabledAnywhere(), remembered)) await context.storage.remove(REMEMBERED)
+    const current = active()
     let page = await context.session.list({})
     for (;;) {
       for (const session of page.data) {
         const selected = session.metadata?.[SELECTED]
-        if (selected && !chosen(styles, selected)) await select(session.id, undefined)
+        if (selected && !chosen(current, selected)) await select(session.id, undefined)
       }
       if (!page.cursor.next) break
       page = await context.session.list({ cursor: page.cursor.next })

@@ -91,7 +91,7 @@ review_after: 2027-05-09
 
 `packages/ext/src/plugin-package-invocation.ts` 将已安装包的 command/agent/skill 接到原 command、skill 与 subagent 执行器，沿唯一 PackageAllowSetV3 检查分项和项目范围。调用期工具规则由既有 policy 绑定，下一用户输入/idle 清除；paths 用实际文件工具完成事件，preload 与 memory 在子会话上下文绑定，模型建议/effort 从原模型目录解析。指令模板只经 S-01 的 core renderer，源 shell 规则匹配复用纯 ShellScan，未新增执行循环或模板解释器。包 settings.json 指定的助手在 setup transform 里成为 engine 默认（S-11）；每个会话第一条消息时，当时的默认被钉进会话 metadata，engine-adapter 不带 agent 时回到它，后来的默认只带新会话。
 
-`packages/ext/src/plugin-package-styles.ts` 负责包输出样式：在现有斜杠命令入口注册 `output-style`，选择存进本会话 metadata；在 awaited context hook 里把样式正文加进下一次请求。keep-coding-instructions 为 false 时，只先去掉 engine 标为 default-coding 的 fallback 段和 ext 自己注入的、逐字相同的 agent prompt。只对主会话生效，包关闭后引用即清除。
+`packages/ext/src/plugin-package-styles.ts` 负责包输出样式：在现有斜杠命令入口注册 `output-style`，选择存进本会话 metadata；在 awaited context hook 里把样式正文加进下一次请求。keep-coding-instructions 为 false 时，只先去掉 engine 标为 default-coding 的 fallback 段和 ext 自己注入的、逐字相同的 agent prompt。只对主会话生效，包关闭后引用即清除。这项选择同时记进 engine 为 ext 持久保存的插件存储（I-26），之后新开的会话在第一条消息时沿用它；`default`、包在所有范围都关闭或被移除时清除，包更新保留。
 
 
 会话 monitor 由同一包 runner 在真实 prompt/Invocation 启动，源 when 控制 always 或指定 skill；同包/entry/session 只启动一次。stdout 行（含最后残行）经原 synthetic/inbox 通知本会话，stderr 留在脱敏进程诊断。包/代/会话有效性校验与 hook 共用，关闭或换代取消 AppProcess 资源；安装/开关不自行启动，任务 scope 结束不停止仍属会话的 monitor。

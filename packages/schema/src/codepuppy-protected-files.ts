@@ -289,22 +289,35 @@ export function match(input: { path: string; roots: ProtectedRoots }): Protected
   }
 }
 
-/** The protected files a command or payload names literally; relative paths resolve against `roots.directory`. */
-export function named(input: { text: string; roots: ProtectedRoots }): readonly ProtectedFile[] {
+/** The paths a command or payload names literally, absolute; relative paths resolve against `roots.directory`. */
+export function literalPaths(input: { text: string; roots: ProtectedRoots }): readonly string[] {
   // Keep quoted paths with spaces, while also finding paths inside a quoted command/payload.
   const tokens = [...input.text.matchAll(/"([^"]*)"|'([^']*)'|([^\s"'`|;&()<>]+)/g)].flatMap((token) => {
     const value = token[1] ?? token[2] ?? token[3]
     return [value, ...value.split(/\s+/)]
   })
   const candidates = /^(?:[/\\]|[a-z]:[/\\]|~[/\\])/i.test(input.text) ? [input.text, ...tokens] : tokens
-  const files = new Map<string, ProtectedFile>()
   // Also each word as the shell reads it (`../x/\.env`, `"../x y"/.env`); the pieces above stay candidates as before.
-  for (const token of [...candidates, ...shellWords(input.text)]) {
-    const value = token
-      .replace(/^(?:--?[\w-]+|[a-zA-Z_]\w*)=/, "")
-      .replace(/^@/, "")
-      .replace(/^\$(?:HOME|\{HOME\})(?=[/\\]|$)/, () => input.roots.home)
-    const item = match({ path: value, roots: input.roots })
+  return [
+    ...new Set(
+      [...candidates, ...shellWords(input.text)].map((token) =>
+        normalize(
+          token
+            .replace(/^(?:--?[\w-]+|[a-zA-Z_]\w*)=/, "")
+            .replace(/^@/, "")
+            .replace(/^\$(?:HOME|\{HOME\})(?=[/\\]|$)/, () => input.roots.home),
+          input.roots,
+        ),
+      ),
+    ),
+  ]
+}
+
+/** The protected files among `literalPaths`. */
+export function named(input: { text: string; roots: ProtectedRoots }): readonly ProtectedFile[] {
+  const files = new Map<string, ProtectedFile>()
+  for (const file of literalPaths(input)) {
+    const item = match({ path: file, roots: input.roots })
     if (item && !files.has(item.path)) files.set(item.path, item)
   }
   return [...files.values()]

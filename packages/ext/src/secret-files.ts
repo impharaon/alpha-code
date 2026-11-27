@@ -75,11 +75,7 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   }
   const scan = async () => {
     const sources = ProtectedFiles.sources(roots)
-    const inside = (file: string) =>
-      sources.some((source) => {
-        const relative = path.relative(source.root, file)
-        return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
-      })
+    const inside = (file: string) => withinSources(sources, file)
     for (const [index, source] of sources.entries()) {
       const visited = new Set<string>()
       const walk = async (directory: string): Promise<void> => {
@@ -175,6 +171,20 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
     track: (file: ProtectedFiles.ProtectedFile) => {
       if (!disposed) tracked.set(file.path, file)
     },
+    /**
+     * A path a command names that is a link registers the list file its literal target is (spec v6 BR-05). The walk is the
+     * same hop-by-hop readlink, reading a hop only inside a source or at a list file, so other outside locations (the app's
+     * own fenced credential stores) are never touched; a target that is no list file, or a broken or looping walk, is skipped.
+     */
+    trackLink: async (candidate: string) => {
+      const sources = ProtectedFiles.sources(roots)
+      const readable = (file: string) => withinSources(sources, file) || ProtectedFiles.match({ path: file, roots }) !== undefined
+      if (disposed || !readable(candidate)) return
+      // A word that cannot be read as a link (ENOTDIR, ENAMETOOLONG) names no link; the command itself must still run.
+      const target = await literalTarget(candidate, readable).catch(() => undefined)
+      const file = target === undefined || target === candidate ? undefined : ProtectedFiles.match({ path: target, roots })
+      if (file && !disposed) tracked.set(file.path, file)
+    },
     values: () => snapshot,
     refresh: async () => {
       if (disposed) throw new Error("Secret files released")
@@ -223,6 +233,13 @@ async function literalTarget(link: string, inside: (file: string) => boolean): P
     current = path.resolve(path.dirname(current), next)
     if (!inside(current)) return
   }
+}
+
+function withinSources(sources: ReturnType<typeof ProtectedFiles.sources>, file: string) {
+  return sources.some((source) => {
+    const relative = path.relative(source.root, file)
+    return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
+  })
 }
 
 async function available<T>(run: () => Promise<T>): Promise<T | undefined> {

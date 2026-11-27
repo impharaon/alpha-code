@@ -249,11 +249,14 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       } finally { if (staging) await unlink(staging).catch(() => {}) }
     },
     // Spec v6 BR-05: protected files a shell command names literally join collection before it spawns, so the capture
-    // start's refresh reads them and every chunk is masked. The working directory resolves like the engine's `workdir`.
-    command: (input: { command: string; cwd: string }) => {
+    // start's refresh reads them and every chunk is masked; so does the list file a named link literally points to. The
+    // working directory resolves like the engine's `workdir`.
+    command: async (input: { command: string; cwd: string }) => {
       const api = roots.platform === "win32" ? path.win32 : path.posix
       const directory = api.resolve(roots.directory, /^~(?:[/\\]|$)/.test(input.cwd) ? api.join(roots.home, input.cwd.slice(1)) : input.cwd)
-      for (const file of ProtectedFiles.named({ text: input.command, roots: { ...roots, directory } })) files.track(file)
+      const named = { text: input.command, roots: { ...roots, directory } }
+      for (const file of ProtectedFiles.named(named)) files.track(file)
+      for (const candidate of ProtectedFiles.literalPaths(named)) await files.trackLink(candidate)
     },
     prepareMutation: async (input: EnvMutation): Promise<EnvMutation> => (await prepareMutation(input)).mutation,
     read: async (input: { call: MaskCall; file: ProtectedFiles.ProtectedFile; result: Tool.Result }): Promise<Tool.Result> => {

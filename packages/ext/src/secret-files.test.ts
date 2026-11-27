@@ -191,6 +191,29 @@ console.log(JSON.stringify({captured:files.values().some(v=>Buffer.from(v).toStr
 `)).toEqual({ captured: true })
 })
 
+// Every tool call and shell output chunk refreshes; a later refresh of an unchanged project stats, it does not re-resolve each entry.
+test("later refreshes of an unchanged project resolve no entry again and still see in-place edits", async () => {
+  const { root, roots } = await setup()
+  for (const directory of ["src/a", "src/b", "docs"]) {
+    await mkdir(path.join(roots.project, directory), { recursive: true })
+    for (let index = 0; index < 5; index++) await writeFile(path.join(roots.project, directory, `file${index}.ts`), "export {}\n")
+  }
+  await writeFile(path.join(roots.project, "src", ".env"), "KEY=fixture-unchanged-before\n")
+  await writeFile(path.join(root, "audit.mjs"), `
+import fs from 'node:fs/promises';let resolved=0;export const count=()=>resolved,reset=()=>{resolved=0};
+export const realpath=async (...args)=>{resolved++;return fs.realpath(...args)};
+export const stat=fs.stat,readdir=fs.readdir,readFile=fs.readFile;
+`)
+  expect(await nodeCollector(root, roots, `
+import fs from 'node:fs/promises';import path from 'node:path';import {registerHooks} from 'node:module';
+registerHooks({resolve(name,context,next){return next(name==='node:fs/promises'&&context.parentURL?.endsWith('/collector.mjs')?new URL('./audit.mjs',import.meta.url).href:name,context)}});
+const roots=JSON.parse(process.argv[2]);const {createSecretFiles}=await import('./collector.mjs');const audit=await import('./audit.mjs');
+const files=createSecretFiles(roots);await files.refresh();const first=audit.count();audit.reset();await files.refresh();const later=audit.count();
+await fs.writeFile(path.join(roots.project,'src','.env'),'KEY=fixture-unchanged-after\\n');await files.refresh();
+console.log(JSON.stringify({first:first>0,later,edited:files.values().some(v=>Buffer.from(v).toString()==='fixture-unchanged-after')}));files.dispose();
+`)).toEqual({ first: true, later: 0, edited: true })
+})
+
 test("refresh arriving during capture waits for a fresh generation", async () => {
   const { root, roots } = await setup()
   const target = path.join(root, "external", "adc.json")

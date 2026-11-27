@@ -561,19 +561,28 @@ export function processFenceWriteRules(profile: string): ProcessFenceWriteRules 
 }
 
 /**
+ * The name APFS stores a path under: Unicode normalization (NFD) and full case folding, as measured on APFS (plan.md, slice
+ * seven, fix verification): `σ`/`ς`/`Σ`, `µ`/`μ`, `ß`/`ss`/`ẞ`, `ﬁ`/`fi` and the Kelvin sign/`k` are one name each, dotless
+ * `ı` stays its own. JS has no case fold: lowercase, then each character's upper → lower round trip (which lands `ς`, `µ`,
+ * `ß`, `ﬁ` on their fold) except `ı`, which APFS does not fold. Two paths with the same key are the same entry.
+ */
+export function fenceNameKey(path: string): string {
+  return path.normalize("NFD").toLowerCase().replace(/[^\u0131]/gu, (char) => char.toUpperCase().toLowerCase()).normalize("NFD")
+}
+
+/**
  * 已覆盖 = 某条 allow 盖住 directory 或其祖先(subpath / literal 等于、regex 命中;一个祖先上的 literal 让那个祖先可写,所以其下全算),
- * 且没有 deny 盖住它(subpath / regex 盖住 directory 或其祖先、literal 只在等于 directory 时算)。按 APFS 折叠:大小写与 Unicode
- * 规范化(NFC / NFD)不同的写法是同一个名字(代码审查 R1 #1:NFD 写法的已获准路径不得被判作未覆盖而再签一次)。
+ * 且没有 deny 盖住它(subpath / regex 盖住 directory 或其祖先、literal 只在等于 directory 时算)。按 APFS 折叠(fenceNameKey):
+ * 大小写与 Unicode 规范化不同的写法是同一个名字(代码审查 R1 #1:等价写法的已获准路径不得被判作未覆盖而再签一次)。
  * file 判具体写目标：只有 subpath 沿祖先匹配，literal/regex 都匹配目标本身。
  */
 export function processFenceRulesCover(rules: ProcessFenceWriteRules, directory: string, kind: "directory" | "file" = "directory"): boolean {
   const chain = [resolve(directory)]
   while (chain.at(-1) !== dirname(chain.at(-1)!)) chain.push(dirname(chain.at(-1)!))
-  const fold = (path: string) => path.normalize("NFD").toLowerCase().normalize("NFD")
   const hits = (rule: ProcessFenceWriteRule, path: string) =>
     rule.kind === "regex"
       ? [path, path.normalize("NFC"), path.normalize("NFD")].some((spelled) => new RegExp(rule.value, "i").test(spelled))
-      : fold(resolve(rule.value)) === fold(path)
+      : fenceNameKey(resolve(rule.value)) === fenceNameKey(path)
   if (kind === "file") {
     const matches = (rule: ProcessFenceWriteRule) => rule.kind === "subpath" ? chain.some((path) => hits(rule, path)) : hits(rule, chain[0]!)
     return rules.allow.some(matches) && !rules.deny.some(matches)

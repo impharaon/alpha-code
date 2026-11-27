@@ -563,6 +563,14 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
     }
     expect(processFenceRulesCover({ allow: [{ kind: "regex", value: "^/Users/alpha/caf\u00e9\\.txt$" }], deny: [] }, nfd, "file")).toBe(true)
     expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: nfc }], deny: [] }, "/Users/alpha/cafe.txt")).toBe(false)
+    // APFS folds case fully, beyond JS toLowerCase (fix verification Minor 1; plan.md records the APFS probe): final sigma,
+    // micro sign, sharp s and its capital, a ligature and the Kelvin sign name the same entry; dotless ı stays its own name.
+    for (const [root, spelled] of [["\u03c3", "\u03c2"], ["\u03c3", "\u03a3"], ["\u00b5", "\u03bc"], ["\u00b5", "\u039c"], ["\u00df", "ss"], ["\u00df", "\u1e9e"], ["\ufb01", "FI"], ["k", "\u212a"]] as const) {
+      const rule = { kind: "subpath" as const, value: `/Users/alpha/${root}.txt` }
+      expect(processFenceRulesCover({ allow: [rule], deny: [] }, `/Users/alpha/${spelled}.txt`), spelled).toBe(true)
+      expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/Users" }], deny: [rule] }, `/Users/alpha/${spelled}.txt`), spelled).toBe(false)
+    }
+    expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/Users/alpha/ix.txt" }], deny: [] }, "/Users/alpha/\u0131x.txt")).toBe(false)
   })
 })
 

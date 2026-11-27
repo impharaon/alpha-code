@@ -1511,3 +1511,29 @@ test("external write scope resolves the real directory on disk and marks folders
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+// Fix verification Minor 2: while a grant is in flight, it covers other names only. An equivalent spelling of the same new
+// path (NFD of NFC, another case) is the same entry: it is not read as already writable (which would answer `granted` before
+// the first grant settled) and it joins the in-flight grant instead of issuing a second one. The prebuilt production addon
+// issues to this (unfenced) process; the fake engine never answers, so the grant stays in flight until the engine stops.
+test.skipIf(process.platform !== "darwin")("an in-flight grant covers other names only: an equivalent spelling joins it, never reads as already written", async () => {
+  const { FENCE_ADDON_OUT } = await import("../../scripts/build-fence-addon")
+  const base = join(import.meta.dir, "../../node_modules/.cache")
+  mkdirSync(base, { recursive: true })
+  const home = realpathSync.native(mkdtempSync(join(base, "in-flight-grant-")))
+  const [nfc, nfd, upper, inner] = ["caf\u00e9.txt", "cafe\u0301.txt", "CAF\u00c9.TXT", "cafe\u0301.txt/inner"].map((name) => join(home, name)) as [string, string, string, string]
+  creditDanglingSweepForSpawn()
+  const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: () => ({ ...fakePlanFence(), addonPath: FENCE_ADDON_OUT }), fork: ((file: string, args: string[], options: Record<string, unknown>) => { forkCalls.push({ file, args, options }); return Object.assign(new FakeChild(), { pid: process.pid }) }) as never })
+  try {
+    await result.health.wait
+    const first = result.listener.grantWrite(nfc, "new-path")
+    // The same name in any spelling is not covered by its own in-flight grant; another name under it is (it may already be
+    // consumed), as for any other in-flight grant.
+    expect([nfc, nfd, upper, inner].map((path) => result.listener.generationWrites(path))).toEqual([false, false, false, true])
+    expect(result.listener.grantWrite(nfd, "new-path")).toBe(first)
+    expect(result.listener.grantWrite(upper, "new-path")).toBe(first)
+  } finally {
+    await result.listener.stop()
+    rmSync(home, { recursive: true, force: true })
+  }
+})

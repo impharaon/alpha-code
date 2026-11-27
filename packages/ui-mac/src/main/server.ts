@@ -87,7 +87,7 @@ import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteGrantRequester, createWriteProbeRequester, type WorkspaceWriteGrantReply, type WorkspaceWriteProbeFact } from "./workspace-write-probe"
 import { loadFenceAddon } from "./process-fence-apply"
-import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule, type ProcessFenceWriteRules, type WorkspaceDirectoryInput } from "./process-fence-profile"
+import { configFenceLocations, fenceNameKey, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule, type ProcessFenceWriteRules, type WorkspaceDirectoryInput } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, writableLocationTruthPath, type FenceRunWritable } from "./process-fence-workspaces"
@@ -925,9 +925,11 @@ export async function spawnLocalServer(
     getLogger()?.warn(`process fence: cannot read this generation's write rules — runtime grants are disabled for it: ${serializeError(error).message}`)
   }
   // Another directory's grant in flight counts too: once consumed, its subtree is fenced-writable before main hears
-  // back. The same directory's own in-flight grant is joined instead (grantWrite coalesces; nothing new is issued).
+  // back. The same directory's own in-flight grant — in any spelling naming the same entry (fenceNameKey) — is joined
+  // instead (grantWrite coalesces; nothing new is issued, nothing reads as granted before it settles).
+  const inFlight = (path: string) => [...granting].find(([pending]) => fenceNameKey(pending) === fenceNameKey(path))?.[1]
   const generationWrites: SidecarListener["generationWrites"] = (directory) =>
-    !writeRules || processFenceRulesCover({ allow: [...writeRules.allow, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules.deny }, directory)
+    !writeRules || processFenceRulesCover({ allow: [...writeRules.allow, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => fenceNameKey(pending) !== fenceNameKey(directory))].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules.deny }, directory)
   const grantWrite: SidecarListener["grantWrite"] = (directory, kind = "directory") => {
     if (exited || !child.pid) return Promise.resolve({ outcome: "failed", detail: "engine not running" })
     if (!fence) return Promise.resolve({ outcome: "failed", detail: "engine has no fence" })
@@ -950,7 +952,7 @@ export async function spawnLocalServer(
       return Promise.resolve({ outcome: "failed", detail: "workspace path changed" })
     }
     if (grantedDirectories.has(directory)) return Promise.resolve({ outcome: "granted" })
-    const pending = granting.get(directory)
+    const pending = inFlight(directory)
     if (pending) return pending
     const started = performance.now()
     const grant = (async (): ReturnType<SidecarListener["grantWrite"]> => {

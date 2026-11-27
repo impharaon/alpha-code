@@ -152,6 +152,12 @@ const { createRequire } = require('node:module')
     const prefix = path.join(input.runtimeRoot, 'prepared', input.operation.key)
     fs.mkdirSync(prefix, { recursive: true })
     process.argv = [process.execPath, input.npmCli, 'install', ...serialized, '--prefix', prefix, '--global=false', '--workspaces=false', ...Object.entries(input.defaults).map(([key,value]) => '--' + key + '=' + value), '--', ...input.operation.specs]
+    // The bound authority also carries pnpm's directories under npm's prefix (pnpm reads no
+    // other name). npm itself receives only the bound keys its own definitions declare.
+    for (const key of bound) {
+      if (!key.startsWith('npm_config_') || Object.hasOwn(definitions, key.slice('npm_config_'.length).replace(/(?!^)_/g, '-'))) continue
+      for (const name of Object.keys(process.env)) if (name.toLowerCase() === key) delete process.env[name]
+    }
     require(input.npmCli)
     return
   }

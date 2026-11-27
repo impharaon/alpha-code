@@ -1631,6 +1631,32 @@ test("npm product installer forwards resolved configuration and owned prefix wit
   expect(trace.cache).toBe(cache)
 })
 
+// Integration layer: the CLI dispatch loads the real npm Config with its real definitions.
+// R1 binds pnpm's store/cache/state under npm's prefix (pnpm 10.32.1 reads no other name).
+test("npm product installer gives npm only the bound configuration npm defines", async () => {
+  const input = npmSourceFixture()
+  const npm = path.dirname(path.dirname(input.launchers.npmCli))
+  writeFileSync(path.join(npm, "lib/cli.js"), [
+    "module.exports = async process => {",
+    "  const Config = require('@npmcli/config')",
+    "  const { definitions, shorthands, flatten, nerfDarts } = require('@npmcli/config/lib/definitions')",
+    "  const warnings = []",
+    "  process.on('log', (level, ...args) => { if (level === 'warn') warnings.push(args.join(' ')) })",
+    "  const config = new Config({ definitions, shorthands, flatten, nerfDarts, npmPath: require('node:path').dirname(__dirname), argv: process.argv })",
+    "  await config.load()",
+    "  process.stdout.write(JSON.stringify({ warnings, cache: config.get('cache') }))",
+    "}",
+  ].join("\n"))
+  const cache = path.join(input.root, "bound-cache")
+  const pnpm = Object.fromEntries(["store", "cache", "state"].map(name => [`npm_config_${name}_dir`, path.join(input.root, "pnpm", name)]))
+  const launchers = { ...input.launchers, packageManagerEnv: { npm_config_cache: cache, ...pnpm } }
+  const result = await Effect.runPromise(Effect.scoped(installNpmConnector({ ...input, launchers, cwd: input.root, syntax: "npx", arguments: ["--package=semver@7.8.5", "--call", "must-not-run"], key: input.key, installSpecs: ["semver@7.8.5"], environment: { ...input.environment, npm_config_cache: cache, ...pnpm } })).pipe(Effect.provide(hostEnvironmentLayer)))
+  expect(result.exitCode).toBe(0)
+  const trace = JSON.parse(result.stdout)
+  expect(trace.warnings.filter((line: string) => line.includes("Unknown env config"))).toEqual([])
+  expect(trace.cache).toBe(cache)
+})
+
 // Module layer: actual uv0.13.10 Debug sample, including nested map keys and Rust escapes.
 test("uv resolved settings retain nested resolver semantics without treating display metadata as CLI syntax", () => {
   const declaration = parseUvToolSettings(UV_TOOL_SETTINGS)

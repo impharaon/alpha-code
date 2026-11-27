@@ -886,3 +886,67 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - 2026-11-27 · 代码审查 R1 第 2 项：事后卡的目录主体绑定 main 首次 R6 返回的 `realDirectory`（`directoryAccess.targets[].directory` 与 `resources`/`save` 都用它，`absolute` 保留原文供 main 复查），卡上显示、按真实目录合并与 R4 授予指向同一目录；路径里的软链在首次解析之后被改指（例如到主目录）也不会让主目录出卡。红：`register-policy.test.ts` 新例（假 R6 在首次读取后把 `/project/link/..` 改解析为主目录）在改前卡的 `directory` 是原文 `/project/link/..`（R4 会再解析成主目录并给出批准按钮）；改后为 `/outside-l`，之后的 R6 查询不再带软链原文。整文件 **123 pass**，ext `bun typecheck` exit 0；`gate-files.tsv` 该行 122 → 123。
 - 2026-11-27 · R1 修正后复验（`9332edabd5`）：`gate slot -- bun test --timeout 600000 ./src/main/directory-write-approval.engine.scenario.test.ts` 宿主 **1 pass**，子进程 **7 pass / 0 fail / 48 expect**（`results/run-INngY8*`），main 日志 5 次 `grant granted`；`secret-mask.test.ts` **19 pass**、`register-policy.test.ts` **123 pass**；ext、ui-mac `bun typecheck` exit 0。
 - 2026-11-27 · 合并 origin/alpha（`e71ccc26f7`，slices 6–9 #1825、#1824、#1826）：两处冲突 —— `server.ts` 两侧都保留（import 合并 `checkWritableTarget` 与 alpha 的 `planCredentialStores`/`configureCommandSourceFence`；`PlannedFence` 同时带本切片的 `eligibility` 与 alpha 的 `configFence`），注入库存快照用 `--write` 重生（与 alpha 只差本切片那一条 `sandbox.write-approved-retry`）。复验：`fixture-identity.test.ts` **5 pass**（无需重采样）；`register-policy` **123**、`secret-mask`+`context-injection`+`display`+`identity` **99**、`server.test.ts` **59** pass；ext、ui-mac `bun typecheck` exit 0；`gate slot -- env CODEPUPPY_TEST_FILES=<本切片九个登记文件> bash scripts/assert-gate-files.sh` 九行条数与登记精确一致（含场景宿主 1 条，子进程 **7 pass / 48 expect**，`results/run-0Zuvg9*`，5 次授予）。登记簿 register-policy 行的说明随 R1-1 改为「只保留引擎的拒绝类」，条数不变。
+
+## 交付切片七｜直接在主目录下新建的那一个路径可批准（I-56）
+
+- 依据：#1759；spec v8 BR-08 的 v8 句、BR-11 的 v8 修订、AC-08 第一种情形、AC-13 的 v8 修订、AC-14；design v7 增量 §2 NP-P01–NP-P09、§4.1–§4.8（NP1–NP7）、§5、§6（实施证据 1–16）、§10 送审前裁决 1–11 与「R1 审查及处置」R1-F1、R1-F2 @ `4e5f004f4a`（#1832）。切片六的 AB1/AB4/AB5、R5 与卡片其余部分原样复用。INT-safety I-56（owner U-46）。
+- 核对：待填（首个实施提交按编排者 brief 的 `Phase:` 行填写）。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/main/process-fence-plan.ts` 及 `process-fence-plan.test.ts` | NP1 `planWriteApproval` 与 `WriteApprovalKind`/`WriteApprovalScope`（design §4.1，与 `checkWritableTarget` 同处）；NP5 `PlanProcessFenceInput.carriedNewPaths`，按 NP1 `stored` 复核，保留的进计划输出 `newPaths`，排除的记一行日志。 |
+| `packages/ui-mac/src/main/process-fence-profile.ts` 及 `process-fence-profile.test.ts` | `checkWorkspaceDirectory` 里 Data 卷拼写折叠抽成一个导出的同文件函数，NP1 取主目录规范拼写时复用（K2，不复制）；`ProcessFenceProfileInput.newPaths` 紧跟 W1 渲染为 `(subpath "<p>")`；`trimUntilCompiles` 先从新路径尾部裁剪，再裁 W1，输出余下的 `newPaths`。 |
+| `packages/ui-mac/src/main/codepuppy-sidecar-messages.ts` 及测试 | R6 回答每个 target 由 3 键变 4 键（`kind`），类型、唯一 parser/build 同一提交（design §4.2）。 |
+| `packages/ui-mac/src/main/server.ts` 及 `server.test.ts` | NP2 `readWriteScope` 在前四步之后改用 NP1（`needs-approval` 的新路径 `realDirectory` = root、`kind: "new-path"`）；NP4 `SidecarListener.grantWrite(path, kind)` 的 `"new-path"` 分支签发前后两次断言；`ProductionFenceInput.carriedNewPaths` 由 `fenceRun.carriedNewPaths()` 供给、`noteGeneration(listener, workspaces, newPaths)`。`server.test.ts:1499` 按 v8 翻转并加一条已有文件仍 `ineligible`（design §6 第 10 条）。 |
+| `packages/ui-mac/src/main/process-fence-workspaces.ts` 及测试 | NP4 tracker `grantNewPath`、`carriedNewPaths`，`noteGeneration` 增参，`carried` 条目带 `kind`。 |
+| `packages/ui-mac/src/main/directory-write-approval.ts` 及测试 | NP3：描述与批准按 NP1 分支；R6 已答 `writable`/`fixed` 的目标跳过；新路径不建、不登记，经 `tracker.grantNewPath`；快照记 `kind`。测试里「主目录关闭」一臂改为主目录里已有的文件（v8 规格变化）。 |
+| `packages/ext/src/policy/index.ts` | AB3 对 `kind: "new-path"` 的卡片目标写成 `{ realDirectory, dirname(realDirectory) }`（design §4.2）。 |
+| `packages/ext/src/policy/register-policy.test.ts`、`identity.test.ts`、`hub-bridge.test.ts`、`packages/ui-mac/src/main/hub-view.test.ts` | R6 新形状（假回答加 `kind`）；AB3 新路径卡片目标一例。 |
+| `packages/ext/src/context-injection.ts`、`context-injection-inventory.snapshot.txt` | NP7 措辞「folder … in」→「location … at」；快照用库存脚本 `--write` 重生。 |
+| `packages/ui-mac/src/renderer/codepuppy-ui/PermissionDialog.tsx` 及测试 | NP6：目录写入卡拿到描述后，资源行列描述的 `realDirectory`。 |
+| `packages/ui-mac/src/main/directory-write-approval.engine.cases.ts`、`directory-write-approval.engine.scenario.test.ts` | 场景层 AC-14 各臂（真引擎、真围栏、真 ext、脚本化模型经 `CP-CALL` 发出 shell 与写文件工具调用；main 的 HOME 是测试主目录，在 worktree 的 `node_modules/.cache` 下，不在 W11/W12 下）；`:226` 主目录臂改为改写已有文件（design §6 第 10 条）；换代臂用生产 `planProcessFence`（同 `project-writable.engine.cases.ts` 的做法）；宿主条数随之改。 |
+| `docs/architecture/2026-09-09-req159-process-fence.md` | X1 段的运行内携带一句之后加一句：本人批准的主目录下那一个新路径（不预建、不登记、换代以 `(subpath P)` 携带），design §6 架构约束点名的同一变更。 |
+| `scripts/gate-files.tsv` | 变动的已登记文件按实测改精确条数（只同步事实）。 |
+
+### 顺序
+
+1. 本计划单独提交。
+2. NP1 + R6 两端 + AB3 卡片目标：`planWriteApproval`、`codepuppy-sidecar-messages.ts` 4 键、`readWriteScope`、AB3 一处，以及所有 R6 假回答同一提交。红先：`process-fence-plan.test.ts` 的 NP1 表（真临时目录）、`server.test.ts` 翻转与已有文件一例、sidecar-messages 4 键、`register-policy.test.ts` 新路径卡片目标先在旧码上红。之后整跑 process-fence-plan、server、sidecar-messages、hub-view、hub-bridge、identity、register-policy 各一次。
+3. NP3 + NP4：R4 分支、tracker、listener 断言。红先：`directory-write-approval.test.ts`（新路径不建不登记、四种不退化、并发跳过）与 `process-fence-workspaces.test.ts`（`grantNewPath`、两张携带表）。整跑这两个文件一次。
+4. NP5：规划、渲染、裁剪与 `server.ts` 接线。红先：`process-fence-plan.test.ts` 携带与 stored 排除、`process-fence-profile.test.ts` 渲染位置与裁剪。整跑这两个文件一次。
+5. NP6 + NP7：卡片资源行与重试说明；快照重生。整跑 PermissionDialog、context-injection、display 各一次。
+6. 场景：新增各臂与 `:226` 翻转；经 `gate slot --` 跑宿主一次；去掉臂各在同一入口跑一次、记命令与输出后 `git restore`；探针 13–15 记原始输出。最后：较宽相关集合一次（grep 出 mock R6 回答、`noteGeneration`、`carriedWorkspaces`、`planProcessFence` 的文件）、ext 与 ui-mac `bun typecheck`、`ext-imports.test.ts`、`assert-gate-files.sh`（范围内的行）、`affected-tests --list`，文档一句，提交。
+
+### 风险
+
+- R6 线上形状变了，main 与 ext 两端以及所有假回答必须同一提交，否则 parser 整条拒收、卡片消失；第 2 步用 grep `realDirectory` 列全消费者（design §10 传播核对的清单）。
+- NP1 依赖 APFS 的大小写/Unicode 行为（条件 a 用 lstat、条件 b 用 dev+ino）：单测在真临时目录上跑；内核对不存在路径的变体拼写行为（§6 第 15c 条）只能实测，结果原样记在偏离记录，不加机制。
+- 场景宿主目前只起一代引擎；换代臂需要第二次 `spawnLocalServer`（生产规划器），沿用 `project-writable.engine.cases.ts` 的 `boot()` 写法；换代后 R4 的 `sidecar()` 指向新监听器。
+- §6 第 7 条「签发前在 P 放软链并一直留着」的注入点在 tracker 复核之后、listener 签发之前：场景里给 R4 的 `sidecar()` 一个包了 `grantWrite` 的同一监听器，先放软链再调真监听器。
+- §6 第 16 条需要签名打包（Developer ID 钥匙串、≥8 GiB、约 30 分钟），owner 在机器前且不得弹窗或钥匙串询问：本车道不跑，记为发版验收义务与确切命令，不以未签名替身冒充。
+- 时间：证据面 16 条，预计在 4–6 小时上沿；到 2 倍时按规则返回。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-14 / NP1 判定 | `process-fence-plan.test.ts` NP1 表（真临时目录）：主目录下不存在的 `{P, H}` → `new-path`、root = P；已有文件 → `ineligible`（第 4 条已知坏）；`{P, P}` → 文件夹规则（R1-F1）；父目录不存在、父目录不是主目录 → 文件夹规则；状态根、已存在的受保护目录 → 不合格；已有条目的大小写/NFD 变体 → 不是新路径（15a）；主目录的大小写/NFD 变体 → 新路径、root 用规范拼写（15b）；`stored`：建成文件/文件夹仍保留，换成软链 → 不合格 | integration（真文件系统）；affected PR 与 nightly | 去掉条件 a ⇒ 已有文件一例出 `new-path`；条件 c 接受 `{P, P}` ⇒ 该例出 `new-path`；stored 跟随链接 ⇒ 软链例保留。 |
+| AC-14 / R6（NP2）、AC-08 v8 | `server.test.ts`：`:1499` 翻转为 `needs-approval`、`realDirectory` = `home/file`、`kind: "new-path"`；新增已有 `home/existing` → `ineligible`；其余 `kind: "directory"`；`codepuppy-sidecar-messages.test.ts` 4 键往返、3 键与未知 `kind` 拒收 | fast/integration；affected PR 与 nightly | 去掉 NP1 新路径分支 ⇒ `home/file` 仍 `ineligible`（红）；去掉条件 a ⇒ 已有文件出卡。 |
+| AC-14 / AB3 卡片目标（R1-F1） | `register-policy.test.ts`：假 R6 答 `kind: "new-path"` → 卡的 `directoryAccess.targets` 为 `[{ P, H }]`、resources `P/*`；`kind: "directory"` 照旧 | integration；affected PR 与 nightly | AB3 仍写 `{ P, P }` ⇒ 该例红。 |
+| AC-14 / R4 与 tracker（NP3、NP4） | `directory-write-approval.test.ts`：新路径批准 → listener 以 `(P, "new-path")` 签发一次、P 仍不存在（不预建）、`userOpened.has(P)` 为假、`carriedNewPaths()` 含 P、`carriedWorkspaces()` 不含；`process-fence-workspaces.test.ts`：`grantNewPath` 在 P 已存在/父目录不是主目录时 `ineligible`、本代已覆盖或别代携带过时不签发 | integration；affected PR 与 nightly | 走文件夹路线 ⇒ P 被建成文件夹、进 `userOpened`；只携带文件夹 ⇒ `carriedNewPaths` 为空。 |
+| AC-14 / 不退化（第 12 条） | `directory-write-approval.test.ts` 四臂：P 在描述前或显示后点击前被建成文件夹或文件 → 结果 `failed: home-or-app-state`（显示后那两臂先 `conflict`、刷新后再点）、listener 零签发、P 不进 `userOpened`；对照：同样的请求若是 `{ P, P }` ⇒ 被按文件夹授予（记录 AB3 必须写 `{ P, H }` 的理由）；场景一臂（描述前建成文件夹）真围栏下 `touch P/x` 仍 EPERM，去掉臂「AB3 写 `{ P, P }`」一次性记录 | integration；场景：nightly 与本次一次 | 去掉 NP1 第 5 条（复核失败改按文件夹）⇒ 四臂出 `granted`；AB3 写 `{ P, P }` ⇒ 场景臂落盘。 |
+| AC-14 / 并发（第 9 条） | `directory-write-approval.test.ts`：两张卡同一新路径，A 批准并建出文件后 B 批准 → `granted`、listener 签发仍只一次 | integration；affected PR 与 nightly | 去掉 NP3 第 2 步跳过 ⇒ B 得到 `conflict` 或主目录那句。 |
+| AC-14 / 换代（第 6、8 条） | `process-fence-plan.test.ts`：`carriedNewPaths` 渲染为 W1 之后的 `(subpath P)`；P 不存在、已建成文件都保留；P 被换成软链 → 排除并记一行日志；`process-fence-profile.test.ts` 渲染位置与裁剪；场景换代臂：获准 `H/note.txt` 并写入后换代（生产 `planProcessFence`），再写直接落盘、无卡 | integration；场景：nightly 与本次一次 | 规划器忽略 `carriedNewPaths` ⇒ 换代后 EPERM（一次性去掉臂记录）；stored 跟随链接 ⇒ 软链例保留。 |
+| AC-14 / 签发断言（第 7 条） | 场景：tracker 复核之后、签发之前在 P 放指向项目外的软链并一直留着 → R4 `failed`、项目外 0 落盘 | 场景：nightly 与本次一次 | 去掉 listener 两次断言（一次性）⇒ 经链接写进项目外。 |
+| AC-14 / 卡上点名（NP6，第 11 条） | `PermissionDialog.test.ts`：请求 resources `H/*`、描述 `realDirectory` = `H/note.txt` → 资源行是 `H/note.txt`，不含 `H/*` | fast（DOM）；affected PR 与 nightly | 资源行仍取请求 resources ⇒ 显示 `H`。 |
+| AC-14 / 重试说明（NP7） | `context-injection.test.ts` 库存快照逐字节；场景按常量断言 | fast；affected PR 与 nightly | 快照不一致即红。 |
+| AC-14 真入口（第 1–5 条） | `directory-write-approval.engine.cases.ts`：「全部批准」「请求审批」两档：`mkdir H/newfolder` 被拦 → 卡写明 `H/newfolder` → R4 granted、引擎 pid 不变 → 结果带 NP7 说明 → 重跑 `mkdir` 成功并在里面建子目录、写文件；`echo hi > H/note.txt` 被拦 → 卡写明 `H/note.txt` → 落盘；写文件工具写新文件 → 写前卡描述 `realDirectory` 是该文件 → 落盘；拒绝臂 0 落盘；两者获准后 `H/sibling.txt` 仍 EPERM、另出一张写明它的卡；已有文件经命令与写文件工具各一次：无卡、原说明、内容不变 | 场景：nightly 与本次一次 `gate slot --` | 同一入口只去掉 NP1 新路径分支 ⇒ 无卡、0 落盘（一次性记录）；只去掉条件 a ⇒ 已有文件臂出卡（一次性记录）。 |
+| AC-13 v8 / AC-08 v8（第 10 条） | 场景 `:226` 主目录臂改为改写主目录里已有的文件：无卡、原说明、内容不变 | 场景 | 同上「去掉条件 a」。 |
+| 第 13–15 条（实施探针） | 场景内一次性：获准后硬链接到兄弟、把兄弟改名成获准的名字、获准路径的大小写/NFD 变体写入；原始输出与围栏外实读记在偏离记录，不进套件 | 一次性记录 | 硬链接若落盘：原样交编排者按 delivery-review §5 路由，不加限制。 |
+| 第 16 条（生产形态） | 发版验收：签名 G0（`process-fence-extension-packaged.test.ts`，`CODEPUPPY_TEST_SIGNED_FENCE=1`）；本车道不跑 | 发版验收 | 本车道无证据，如实记为未证。 |
+
+### 偏离记录
+
+暂无。

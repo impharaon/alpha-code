@@ -373,7 +373,10 @@ test("A2 real source-install IPC routes catalog Playwright and a signed package 
   expect(handler).toBeDefined()
   const playwright = await handler!({ sender: { id: 1 } }, { requestId: "catalog_playwright_a2", source: { kind: "catalog", catalogId: "mcp:playwright" }, effect: { kind: "all-projects" }, via: "hub" })
   expect(playwright).toMatchObject({ ok: true, packageId: "mcp:playwright", source: { kind: "catalog" }, installed: [{ kind: "mcp", hostName: "playwright" }] })
-  expect(findRecordV2(getCodePuppyEnvironment().mutableRoot, "mcp", "playwright")?.desiredState).toBe("enabled")
+  // Since #1776 (8acb6e2005) the package is activated right after the install call has returned, not before it returns.
+  const desired = () => findRecordV2(getCodePuppyEnvironment().mutableRoot, "mcp", "playwright")?.desiredState
+  for (const deadline = Date.now() + 5_000; desired() !== "enabled" && Date.now() < deadline; ) await new Promise((resolve) => setTimeout(resolve, 10))
+  expect(desired()).toBe("enabled")
   expect(readMcpLeafStrict("playwright")).toMatchObject({ ok: true, value: { command: ["npx", "-y", "@playwright/mcp@0.0.77"] } })
   const before = builderCalls.agent
   expect(await handler!({ sender: { id: 1 } }, { requestId: "catalog_package_a2", source: { kind: "catalog", catalogId: "package:wired-agent" }, effect: { kind: "all-projects" }, via: "chat" })).toMatchObject({ ok: true, packageId: "package:wired-agent" })

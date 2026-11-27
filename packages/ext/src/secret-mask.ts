@@ -8,9 +8,9 @@ import type { ShellCapture } from "@opencode/plugin/promise/shell"
 import { createSecretSpool, type SecretSpool } from "./secret-spool"
 import { createSecretStream } from "./secret-stream"
 import path from "node:path"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import type { ToolFacts } from "./policy/identity"
-import { AUTOMATION_PROFILES, type UnattendedProfile } from "../../schema/src/codepuppy-unattended"
+import { AUTOMATION_PROFILES, UNATTENDED_DENIAL_KEY, UnattendedDenial, unattendedDenialCopy, type UnattendedProfile } from "../../schema/src/codepuppy-unattended"
 import { credentialValues, envAssignments, envSecret } from "./secret-values"
 import { projectSecretRead } from "./secret-read"
 import { isUtf8 } from "node:buffer"
@@ -100,10 +100,19 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       ...(display === undefined ? {} : { [DISPLAY_KEY]: display }),
     }
   }
-  const hiddenMetadata = (state?: CallState): Tool.Metadata => ({
+  // The policy's own unattended denial survives hiding so the automation still records the run failed; its sentence is
+  // rebuilt from the fixed copy instead of keeping the incoming text.
+  const hiddenDenial = (value?: Tool.Metadata): Tool.Metadata => {
+    const denial = Schema.decodeUnknownOption(UnattendedDenial)(value?.[UNATTENDED_DENIAL_KEY])
+    if (Option.isNone(denial)) return {}
+    const { reason, tool } = denial.value
+    return { [UNATTENDED_DENIAL_KEY]: { version: 1, reason, tool, message: unattendedDenialCopy(reason, tool) } }
+  }
+  const hiddenMetadata = (state?: CallState, terminal?: Tool.Metadata): Tool.Metadata => ({
     output: ProtectedFiles.MASKING_FAILED_TEXT,
     ...(state?.kind === "execute" ? { toolCalls: [] } : {}),
     ...(state?.published?.[DISPLAY_KEY] === undefined ? {} : { [DISPLAY_KEY]: state.published[DISPLAY_KEY] }),
+    ...hiddenDenial(terminal),
   })
   const content = async (item: Tool.Content): Promise<Tool.Content> => {
     if (item.type === "text") return { type: "text", text: text(item.text) }
@@ -277,7 +286,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         return result
       } catch {
         if (state) state.failed = true
-        const safe = hiddenMetadata(state)
+        const safe = hiddenMetadata(state, input.result.metadata)
         try {
           await finishProgress(state, true)
         } catch {
@@ -313,7 +322,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         } catch {
           /* Never recover the previous dynamic progress. */
         }
-        return new Constructor({ message: ProtectedFiles.MASKING_FAILED_TEXT, error: permissionCause(input.error, "hide"), metadata: hiddenMetadata(state) })
+        return new Constructor({ message: ProtectedFiles.MASKING_FAILED_TEXT, error: permissionCause(input.error, "hide"), metadata: hiddenMetadata(state, input.error.metadata) })
       } finally {
         if (state) calls.delete(toolCallKey(input.call))
       }

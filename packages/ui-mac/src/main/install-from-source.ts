@@ -432,7 +432,10 @@ export function createSourceInstaller(deps: Dependencies) {
             : await setPackageStateV1({ packageId: result.packageId, state: "enabled" }, deps)
           if (!enabled.ok) console.warn("[plugin-install] Package activation failed", { packageId: result.packageId })
           await deps.activateMcp(result.packageId)
-          if (nodes.some(node => node.kind !== "mcp")) deps.reloadSkills(result.packageId)
+          // AC-14 keeps each path's existing reload rule: catalog content reloads for any non-MCP node (its cloud startup
+          // refresh, d28545a02e); a source tree only when it carries skills, so an MCP-only package activates without a reload.
+          const reload = result.source.kind === "catalog" ? nodes.some(node => node.kind !== "mcp") : nodes.some(node => node.kind === "skill")
+          if (reload) deps.reloadSkills(result.packageId)
         })().catch(() => console.warn("[plugin-install] Package runtime could not be applied", { packageId: result.packageId }))
       }))
     })

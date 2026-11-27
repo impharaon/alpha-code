@@ -155,7 +155,8 @@ test("A2 marketplace context7 commits one real enabled package and durable decla
   expect(state.ok && state.packageGraphs[0]?.declarations?.[0]?.mcp).toMatchObject({ type: "remote", url: "https://mcp.context7.com/mcp?client=claude-code-plugin" })
   expect(readMcpLeafStrict("context7-de6dee1ccd")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=claude-code-plugin" } })
   expect(h.activation).toEqual(["claude:context7"])
-  expect(h.reloads).toEqual(["claude:context7"])
+  // Ruling on AC-14 ("沿既有 reload 发布"): a source tree reloads only when it carries skills; this MCP-only package activates without one.
+  expect(h.reloads).toEqual([])
   expect(await h.install(input)).toEqual(outcome)
   expect(await h.install(h.request(input.source.candidateId, "request_a2_02"))).toMatchObject({ ok: true, packageId: "claude:context7", alreadyInstalled: true })
   const after = readPackageLedgerStateV1(h.root)
@@ -540,7 +541,8 @@ test("BC2a pinned marketplace prepares opaque choices and only the selected real
   expect(state.ok && state.packageGraphs.map(graph => graph.packageId)).toEqual(["claude:context7"])
   expect(state.ok && state.records.map(record => record.name)).toEqual([state.ok && state.packageGraphs[0]!.root.name, "context7-de6dee1ccd"])
   expect(h.activation).toEqual(["claude:context7"])
-  expect(h.reloads).toEqual(["claude:context7"])
+  // Ruling on AC-14 ("沿既有 reload 发布"): a source tree reloads only when it carries skills; this MCP-only package activates without one.
+  expect(h.reloads).toEqual([])
 }))
 
 test("BC2a captured local bytes remain usable after the original directory moves and source bytes stay unchanged", () => installerHarness(async h => {
@@ -717,7 +719,8 @@ test("review AC11 local marketplace folder installs only the selected real plugi
   expect(state.records.filter(record => record.kind !== "bundle").map(record => record.name)).toEqual(result.installed.map(entry => entry.hostName))
   expect(result.source).toEqual({ kind: "local-folder" })
   expect(h.activation).toEqual([result.packageId])
-  expect(h.reloads).toEqual([result.packageId])
+  // Ruling on AC-14 ("沿既有 reload 发布"): a source tree reloads only when it carries skills; this MCP-only package activates without one.
+  expect(h.reloads).toEqual([])
   expect(state.records.some(record => ["github", "playwright", "frontend-design"].includes(record.name))).toBe(false)
 }))
 

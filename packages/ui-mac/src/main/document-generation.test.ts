@@ -47,6 +47,7 @@ test("one generation answers the ext host, shows its preparation as one launch r
     sidecarGeneration: 3, userData: root, resourcesRoot, packaged: true, platform: "darwin-arm64",
     documents: { python: process.execPath, assets: join(resourcesRoot, "document-assets"), templates: join(resourcesRoot, "document-assets", "templates"), documentRuntimeRoot: join(root, "document-runtime"), verify: "unused", render: "unused", recalculate: "unused", libreoffice: [pin] },
     manifest: { schemaVersion: 1, files: [pin] } satisfies PinnedFiles,
+    diagnosticsRoot: join(root, "connector-runtime"),
     node: async () => process.execPath,
     // The first attempt meets a refused connection; the shared classifier must call it a download the user can retry.
     ensureFile: async (_id, _signal, progress) => {
@@ -87,6 +88,57 @@ test("one generation answers the ext host, shows its preparation as one launch r
   await until(async () => (await row())?.state.phase === "connected")
   expect(downloads).toBe(2)
   expect(verified).toHaveLength(1)
+  await unregister()
+})
+
+test("an unpack failure gives the row's assistant entry the real diagnostic of this attempt", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "document-generation-"))); roots.push(root)
+  const resourcesRoot = join(root, "resources")
+  cpSync(join(import.meta.dir, "fixtures/document-assets"), join(resourcesRoot, "document-assets"), { recursive: true })
+  mkdirSync(join(resourcesRoot, "document-assets", "node_modules"), { recursive: true })
+  mkdirSync(join(resourcesRoot, "office-runtime", "bin"), { recursive: true })
+  cpSync(join(import.meta.dir, "fixtures/office-python-darwin-arm64.header.bin"), officePythonPath(join(resourcesRoot, "office-runtime"), "darwin"))
+  chmodSync(officePythonPath(join(resourcesRoot, "office-runtime"), "darwin"), 0o755)
+  mkdirSync(join(resourcesRoot, "factory-skills", "office-docs"), { recursive: true })
+  cpSync(join(import.meta.dir, "../../resources/document-runtime"), join(resourcesRoot, "document-runtime"), { recursive: true })
+  const workspace = join(root, "workspace"); mkdirSync(workspace)
+  const caller = { location: { directory: workspace }, sessionID: "ses_document" } as DocumentCaller
+  const launches = createConnectorLaunchState("4", {
+    retry: async () => ({ ok: false, error: "unavailable" }),
+    diagnostic: async () => ({ ok: false, error: "unavailable" }),
+    openNetworkApproval: async () => ({ ok: false, error: "unavailable" }),
+    chooseWorkspace: async () => ({ ok: false, error: "unavailable" }),
+  })
+  const generation = openDocumentGeneration({
+    sidecarGeneration: 4, userData: root, resourcesRoot, packaged: true, platform: "darwin-arm64",
+    documents: { python: process.execPath, assets: join(resourcesRoot, "document-assets"), templates: join(resourcesRoot, "document-assets", "templates"), documentRuntimeRoot: join(root, "document-runtime"), verify: "unused", render: "unused", recalculate: "unused", libreoffice: [pin] },
+    manifest: { schemaVersion: 1, files: [pin] } satisfies PinnedFiles,
+    diagnosticsRoot: join(root, "connector-runtime"),
+    node: async () => process.execPath,
+    ensureFile: async (_id, _signal, progress) => { progress(1, 1); return { result: { ok: true, path: join(root, "fixture.dmg"), via: "cache" } } },
+    extract: async () => { throw Error("hdiutil: attach failed - image not recognized") },
+    writable: (directory) => directory === workspace,
+    launches,
+    chromium: async () => { throw Error("not an HTML case") },
+  })
+  generations.push(generation)
+  let listener!: (event: { data: unknown }) => void
+  const port: HubPort = { on: (_event, fn) => { listener = fn }, postMessage: (message) => { generation.receive(message, (reply) => listener({ data: reply })) } }
+  const ext = createDocumentHostBridge(createHubBridge(port, { log: () => {} }), 4)
+  generation.attach((message) => listener({ data: message }))
+  const unregister = ext.host.subscribeRuntimeVerify(caller.location, async (task): Promise<DocumentRuntimeVerifyReceipt> => ({ ...task, status: "failed", error: "not reached" }) as never)
+  await ext.host.environment(caller)
+  const identity = { directory: workspace, server: DOCUMENT_RUNTIME_LAUNCH_SERVER, attempt: "document-runtime:4" }
+  const row = async () => (await launches.api.list(workspace)).find((value) => value.identity.server === DOCUMENT_RUNTIME_LAUNCH_SERVER)
+  await until(async () => (await row())?.state.phase === "failed")
+  expect((await row())?.state).toMatchObject({ phase: "failed", failure: { kind: "unknown" }, diagnostic: "document-runtime:4" })
+  const diagnostic = await generation.diagnostic(identity)
+  if (!diagnostic.ok) throw Error("expected the attempt's diagnostic")
+  expect(diagnostic.value).toMatchObject({ identity, stage: "packages", exitCode: null, signal: null })
+  expect(diagnostic.value.stderr).toContain("hdiutil: attach failed - image not recognized")
+  expect(JSON.parse(readFileSync(diagnostic.value.transcriptFile, "utf8")).stderr).toBe(diagnostic.value.stderr)
+  expect(await generation.diagnostic({ ...identity, directory: root })).toEqual({ ok: false, error: "unavailable" })
+  expect(await generation.diagnostic({ ...identity, attempt: "document-runtime:3" })).toEqual({ ok: false, error: "unavailable" })
   await unregister()
 })
 

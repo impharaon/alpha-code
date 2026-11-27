@@ -1,7 +1,8 @@
-import { realpath } from "node:fs/promises"
+import { mkdir, realpath, writeFile } from "node:fs/promises"
+import { dirname } from "node:path"
 import { classifyStartFailure } from "@opencode/core/mcp/codepuppy-startup"
 import type { DocumentBootstrap } from "../../../util/src/codepuppy-bootstrap"
-import type { ConnectorLaunchState, LauncherPlatform, LaunchIdentity, PinnedFileDelivery } from "../../../util/src/codepuppy-connector-launch"
+import { connectorDiagnosticTranscript, type ConnectorLaunchApi, type ConnectorLaunchDiagnostic, type ConnectorLaunchState, type LauncherPlatform, type LaunchIdentity, type PinnedFileDelivery } from "../../../util/src/codepuppy-connector-launch"
 import { DOCUMENT_RUNTIME_LAUNCH_SERVER, type DocumentHost, type DocumentRuntimeState } from "../../../util/src/codepuppy-document"
 import type { PinnedFileId, PinnedFiles } from "../../../util/src/codepuppy-pinned-files"
 import type { createConnectorLaunchState } from "./connector-launch-state"
@@ -24,6 +25,8 @@ export function openDocumentGeneration(input: {
   platform: LauncherPlatform
   documents: DocumentBootstrap
   manifest: PinnedFiles
+  /** The connector runtime root whose derived `diagnostics/<attempt>/transcript.json` the assistant entry reads. */
+  diagnosticsRoot: string
   /** The launcher authority's resolved Node; documents never derive or download a second one. */
   node: () => Promise<string>
   ensureFile: (id: PinnedFileId, signal: AbortSignal, progress: (received: number, total: number) => void) => Promise<PinnedFileDelivery>
@@ -82,6 +85,27 @@ export function openDocumentGeneration(input: {
   }
   const bridge = createDocumentMainBridge(host, runtime, input.sidecarGeneration, created.cancelChromium)
   return {
+    /** A failed preparation's own facts for the row's 「让助手排查」: the original error, written to the attempt's derived file. */
+    async diagnostic(value: LaunchIdentity): ReturnType<ConnectorLaunchApi["diagnostic"]> {
+      const state = latest?.state
+      if (state?.phase !== "failed" || value.server !== DOCUMENT_RUNTIME_LAUNCH_SERVER || value.attempt !== attempt || !bound.has(value.directory))
+        return { ok: false, error: "unavailable" }
+      const transcriptFile = connectorDiagnosticTranscript(input.diagnosticsRoot, attempt)
+      const facts: ConnectorLaunchDiagnostic = {
+        identity: identity(value.directory),
+        requestedCommand: [],
+        effectiveCommand: [],
+        cwd: input.documents.documentRuntimeRoot,
+        exitCode: null,
+        signal: null,
+        stderr: "detail" in state.failure ? state.failure.detail : JSON.stringify(state.failure),
+        stage: "packages",
+        transcriptFile,
+      }
+      await mkdir(dirname(transcriptFile), { recursive: true })
+      await writeFile(transcriptFile, JSON.stringify(facts, null, 2))
+      return { ok: true, value: facts }
+    },
     receive: bridge.receive,
     attach: bridge.attach,
     async dispose() {

@@ -95,6 +95,7 @@ import { createConnectorLaunchState, installConnectorLaunchState } from "./conne
 import { hostLauncherPlatform } from "./connector-launchers"
 import { forkLauncherAuthority, openConnectorLaunchMain } from "./connector-launch-generation"
 import type { LaunchActionResult } from "../../../util/src/codepuppy-connector-launch"
+import { DOCUMENT_RUNTIME_LAUNCH_SERVER } from "../../../util/src/codepuppy-document"
 import { attributeConnectorEgress } from "./connector-egress-attribution"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { openDocumentGeneration } from "./document-generation"
@@ -972,7 +973,10 @@ export async function spawnLocalServer(
   }
   const launches = createConnectorLaunchState(String(options.generation ?? 0), {
     retry: (identity) => reconnect(identity.server, identity.directory),
-    diagnostic: (identity) => connectorMain?.diagnostic(identity) ?? Promise.resolve({ ok: false, error: "unavailable" }),
+    // The document row has no engine process transcript; its generation answers with the preparation's own facts.
+    diagnostic: (identity) =>
+      (identity.server === DOCUMENT_RUNTIME_LAUNCH_SERVER ? documents?.diagnostic(identity) : connectorMain?.diagnostic(identity)) ??
+      Promise.resolve({ ok: false, error: "unavailable" }),
     // R6: the approval authority keeps no refusal memory (#1757 v3), so a restarted attempt asks again through the same card.
     openNetworkApproval: (identity) => reconnect(identity.server, identity.directory),
     // R8: the system folder picker; an explicit cwd is rewritten by its existing writer and the reload restarts
@@ -1022,6 +1026,7 @@ export async function spawnLocalServer(
         platform: launcherPlatform,
         documents: bootstrap.documents,
         manifest: readPinnedFiles(),
+        diagnosticsRoot: launcher?.environment.runtimeRoot ?? join(options.userDataPath, "connector-runtime"),
         node: () => (launcher ? launcher.resolveAssets().then((assets) => assets.node) : Promise.reject(new Error("this build has no bundled connector launchers"))),
         ensureFile: (id, signal, progress) => spawned.files.ensureFile(id, signal, progress),
         writable: (directory) => generationWrites(directory),

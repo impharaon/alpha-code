@@ -5,13 +5,13 @@ summary: 共享策略代理按运行工具集合投递对话卡片，由 main �
 kind: tech-design
 status: frozen
 spec: SPEC-tool-network-egress
-spec_version: 2
+spec_version: 3
 review:
   rounds: 1
   reviewed_sha: "85b4f6c8e5"
-  verdict: "fix-then-merge; R1 3 Major 4 Minor accepted and corrected"
+  verdict: "fix-then-merge; R1 3 Major 4 Minor accepted and corrected; v2.1 (§4.9, I-46) increment not yet reviewed"
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # DESIGN-tool-network-egress｜对话内联网批准与站点记忆技术设计
@@ -20,6 +20,7 @@ last_reviewed: 2026-11-26
 
 - 批准输入：[SPEC-tool-network-egress v2](spec.md)，固定提交 `adba35744395860dcb736642d9263b5d29d1e1de`，取证命令 `git show adba35744395860dcb736642d9263b5d29d1e1de:docs/specs/tool-network-egress/spec.md`。规格批准记录在该文 §批准记录；设计不代表实现或验收完成。
 - 本增量：#1757；BR-04..BR-10、AC-07..AC-13 及规格「用户会碰到的限制」。BR-01..BR-03 的代理单一出口与进程围栏继续成立。
+- v2.1 增量（2026-11-27）：规格 v3 的 BR-11、AC-14（INT-safety I-46，owner U-43）。基线为切片一、二已合入的 alpha `6b3f4d9803`；本增量的代码事实固定在 `88c88edcee5e5f7793d70287c64cdbc6e5345b6a`，见 §2 末表，决定在 §4.9，裁决在 §10。其余章节只改与它直接相关的句子。
 - 来源：INT-safety I-43、I-44，讨论 P-01..P-05；协调文档固定输入提交 `c1873d69c12a3dbf472c2c3d2063c367c43b37da`。P-01 的展示上下文不作授权依据、P-02 的 main 真源、P-03 的公网放宽分别落在 §4.1、§4.4、§4.2；P-04/P-05 的最新采纳以规格 v2 为准。
 - 体验输入按本次 brief：复用现有组件，不画框架图或新视觉稿。当前规格没有单列名为「体验约定」的小节，故不假称读到了该节；卡片按钮、Windows 隐藏入口和撤销效果直接消费已批条款。
 - 旧[模型即时目的地基线](../../design/2026-09-23-model-chosen-egress-baseline.md)中，native dialog、精确地址记住、重启撤销和无公网通放的局部决定由本增量替代；不改写受保护历史稿，也不撤销其中已经接受的网络边界。
@@ -57,13 +58,24 @@ R1 的纯本地数字地址探针：`bun /private/var/folders/w5/9ltc186j4xx99mf
 
 公共资料仅读取文档和包元数据：[PSL 原始清单](https://publicsuffix.org/list/public_suffix_list.dat)于 2026-11-26 下载到同一临时目录，SHA-256 `9015c5fa9b4b4953dbd47b9f7811ed1b3a577aee627f50b202dc9b491250a6c8`。其中 `github.io`、`s3.amazonaws.com` 在 PRIVATE 段（行 13942、11941），`*.ck`、`!www.ck` 在行 795、796；这些真实样本是租户隔离和通配/例外规则的来源，不手编平台格式。仓内 `bun.lock` 只有 `tldts-icann`（行 5148），不能满足 PRIVATE；[tldts 文档](https://github.com/remusao/tldts#usage)明确提供 `getDomain(host, {allowPrivateDomains:true})`。读取 `https://registry.npmjs.org/tldts/latest` 得到版本 `7.6.0`，未安装。§4.4 决定升为直接依赖；库在本运行时的行为仍未实跑。
 
+**v2.1 增量的地面事实**（固定在 `88c88edcee`；只回答「main 怎样知道用户正看着哪个对话」「卡片怎样送到那里」两个问题，下列事实已到停止条件）
+
+| 已观察事实 | 证据与本增量的含义 |
+| --- | --- |
+| main 没有「正看着哪个对话」的状态 | `rg -n "activeSession\|currentSession\|viewedSession\|focusedSession\|visibleSession" packages/ui-mac/src/main packages/ui-mac/src/preload packages/ui-mac/src/shared` 除测试夹具 `unattended-run.engine.cases.ts` 的局部变量外零命中。`ipc.ts:351` 的 `get-window-focused` 只是窗口焦点，不是对话。 |
+| renderer 的权威是会话页由路由解出的 `current()` 身份 | `codepuppy-session-workspace.tsx:65-75` 从路由与 ServerSync 求 `current`；`:180-181` 把同一身份登记到壳层唯一登记处 `active-session-directory.ts:21-31`（离开会话页注销）。 |
+| 卡片区只挂在这个身份上 | 停靠区 `session-composer-dock.tsx:59` 的 `identity = props.live.current()?.identity`，`:230` 挂 `SessionNetworkEgressCards`；后者 `network-egress-card.tsx:10-22` 把身份换成 `SessionRef`（非本机引擎或未起围栏时为空，不挂）。`listApprovals` 在 renderer 只有这一个调用方：`network-egress.ts:46`。因此「某个会话在 list」等价于「某个产品窗口正显示这个会话」。 |
+| 卡片投递是拉取：main 发失效通知，各窗口重读 | `network-egress-ipc.ts:39-41` 把 approvals 变更广播到全部产品窗口；`network-egress.ts:59-63` 先订阅再读；`network-egress-ipc.ts:12` 只信任产品窗口主 frame。 |
+| 今天没有收件人的请求谁也看不到，到期为 unavailable | `network-egress-approval.ts:127` 只按 `recipients` 过滤；`:43` 无收件人不发 notice；`:231` 到期时无收件人记 `approval-unavailable`。到期后无收件人的组仍留在 `cards` 里但不可见（`:223-225`）。 |
+| 卡片文案假定有对话在运行工具 | `i18n/zh.ts:30`「无法确定发起方；此时正在运行工具的对话都可决定。」、`:36`「这次连接已失败；允许后请让助手重试。」；`en.ts:30`、`:36` 同义。后台连接时这两句不成立。 |
+
 ## 4. 接口契约
 
 ### 4.1 归属与对话卡片：采用真实的“不知道”
 
 **本增量保留单端口，所有普通 CONNECT 的归属为 unknown。** 不从唯一活跃工具、URL、模型解释、TCP 源端口或进程环境推断“是哪一步”。共享 MCP 连接和后台进程不能按会话切换 env；每会话端口还会扩大围栏唯一出口；代理凭据在同一引擎树中也不构成会话隔离。它们不比规格已批准的回退便宜、正确，故不引入。
 
-每条需要批准的实际 CONNECT 由 main 生成 `requestID`，以收到 CONNECT 时的活动集合（含带 sessionID 的 shell）为初始收件人：去重后的每个 session 都有同一请求的卡片，即使当前没有打开该会话。单个收件人仍写「无法确定发起方」，不声称某一步。卡片源地址只取代理解析的实际 host/port；工具名称只可作为“此时运行中的步骤”的展示，不作为发起证据。活动集合为空或不完整时，连接仍在自身既有 45 秒窗口内 pending，main 随 activity/snapshot 更新把新出现的收件人并入同一请求；已有收件人立即可见，未知时不编造会话、不弹系统框。恢复完整的非空集合时再按 §4.2 判定全 allow；到期仍无可承接会话才以 `approval-unavailable` 失败，有卡无人决定则为 `approval-timeout`。不延长原等待期限，也不另选对话之外的投递目标。
+每条需要批准的实际 CONNECT 由 main 生成 `requestID`，以收到 CONNECT 时的活动集合（含带 sessionID 的 shell）为初始收件人：去重后的每个 session 都有同一请求的卡片，即使当前没有打开该会话。单个收件人仍写「无法确定发起方」，不声称某一步。卡片源地址只取代理解析的实际 host/port；工具名称只可作为“此时运行中的步骤”的展示，不作为发起证据。活动集合为空或不完整时，连接仍在自身既有 45 秒窗口内 pending，main 随 activity/snapshot 更新把新出现的收件人并入同一请求；已有收件人立即可见，未知时不编造会话、不弹系统框。恢复完整的非空集合时再按 §4.2 判定全 allow；到期仍无可承接会话才以 `approval-unavailable` 失败，有卡无人决定则为 `approval-timeout`。不延长原等待期限，也不另选对话之外的投递目标。收件人为空期间，卡片按 §4.9 投到用户正看着的对话（v2.1）。
 
 main 对同一 `host:port` 的并发未决连接合并成一个批准请求；收件人为各次 CONNECT 及窗口内新出现活动快照的并集，不让后一次更新覆盖先前收件人。组内每条连接保留自己的 45 秒等待起点，后来的连接不刷新旧连接期限；全部连接过期后新 CONNECT 创建新请求，不把新连接接到已经过期的组。不同目的地不设并发数量上限，不继承旧拒绝记忆。第一个有效决定结算其请求；允许落入授权集合后，main 在同一串行决定点结算所有现已被它覆盖的 pending 请求：本次允许覆盖同一 host:port，记住覆盖该站点的全部子域和端口，成功记住后的其它请求回执标记 remembered=true；记住失败仅按实际已取得的临时精确授权结算。拒绝不扩散到其它请求。被覆盖请求的卡片副本同步 resolved、发布 allowed notice；各连接仍分别检查存活与拨号前授权，不复活过期 socket。并发相反点击返回已有结算结果，不各自执行。卡片在 main 内存中拥有，renderer 重新绑定会话后仍可 list；不持久化待批 socket 或未决卡片。
 
@@ -194,7 +206,7 @@ interface NetworkEgressApi {
 }
 ```
 
-`setTier` 是 N1 在 preload 的实际方法名；内部函数与 wire Result 包装不可各写一套档位语义。所有字段必填，例外仅为类型中明确的 optional；输入严格解码，枚举无默认放宽。sessionID 使用现有 `Session.ID`，messageID 使用 `SessionMessage.ID`，callID 使用 `Tool.CallID`；上面 string 是跨 Electron wire 的序列化形状。directory 为引擎 Location 的绝对目录，main 不据此信任 tier；generation/会话不存在或旧代 list 返回 unavailable，不替换成当前窗口身份。决定命中 main 已生成的请求且属于本应用，不能用传来的 host/site 新建授权；重复决定返回原回执，未知 requestID 为 not-found。
+`setTier` 是 N1 在 preload 的实际方法名；内部函数与 wire Result 包装不可各写一套档位语义。所有字段必填，例外仅为类型中明确的 optional；输入严格解码，枚举无默认放宽。sessionID 使用现有 `Session.ID`，messageID 使用 `SessionMessage.ID`，callID 使用 `Tool.CallID`；上面 string 是跨 Electron wire 的序列化形状。directory 为引擎 Location 的绝对目录，main 不据此信任 tier；generation/会话不存在或旧代 list 返回 unavailable，不替换成当前窗口身份。决定命中 main 已生成的请求且属于本应用，不能用传来的 host/site 新建授权；重复决定返回原回执，未知 requestID 为 not-found。`listApprovals` 返回收件人或 §4.9 观看者包含该 session 的卡片；v2.1 起它同时是「这个会话正被显示」的唯一信号（§4.9），线上类型不变。
 
 subscribe 只发失效通知；消费者先订阅再 list，并按 revision 缓冲/补拉，避免 list 与事件之间漏卡；重绑时移除旧订阅，旧请求结果不进入新会话。main 的 settings revision 在内存判据与持久化操作结算后增长，同步通知所有窗口。复用现有 permission feed 的“先订阅、拉快照、再并增量”模式，不改其权限合同。
 
@@ -322,7 +334,57 @@ AC-13 的证明口径：在真实机器设置系统代理后，以真引擎、�
 | 每次 allow-all 日志与设置聚合 | **raise N5**：EgressPass、EgressPassSummary 与当前环境受保护追加读写；既有 `EgressProxyDeps.log`（`network-egress-proxy.ts:115`）；N7 onPass 在公网检查通过后调用 | main；日志逐次，设置按 host:port 聚合，政策事件和拨号结果分开 |
 | 模型等待/拒绝说明与登记 | **raise N6**：EgressNotice + 两个固定登记 ID；`defineText:169` / `CONTEXT_INJECTIONS:563`；`context.session.hook("context")`（`ext/src/plugin.ts:256`）；`execute.after`（`ext/src/policy/index.ts:273`） | ext 生成模型文本，main 只提供事实，既有注入登记审计出口消费 |
 | 系统代理路线与真实上游隧道 | Electron 42.3.3 `session.fromPartition/setProxy/resolveProxy`；**raise N7**：`resolveEgressRoutes` / `dialEgressUpstream`，协议和就绪语义在 §4.7 定义 | main；Node http/https/net 承载 raw stream，无需 Server/Client 新 API |
+| v2.1 投到正看着的对话 | 既有 `listApprovals`（`network-egress-approval.ts:124-133`）、`decide`（`:134`）、`linearize`（`:112`）；IPC 受信校验 `network-egress-ipc.ts:12`、广播 `:39-41`；renderer 拉取 `network-egress.ts:31-66`、卡片 `network-egress-card.tsx:25-70`、身份来源 `session-composer-dock.tsx:59`/`:230`；`sessionRefKey`（`network-egress-wire.ts:152`）。无新增接缝 | main 私有 viewers 集合；renderer 只加文案判定，不新增 IPC |
 | Windows 不出现入口 | `main/server.ts:581` 的 darwin 启动分支；**raise N3** 的 `available:false` | main 给能力事实，renderer 不挂载不可用组件 |
+
+### 4.9 没有对话在运行工具时：投到用户正看着的对话（v2.1，BR-11、AC-14）
+
+**决定：不新建焦点跟踪，也不新增 IPC。** 「用户正看着的对话」就是某个产品窗口的会话页此刻挂着的会话。renderer 里这件事的唯一权威是会话页的 `current()` 身份（§2 末表），卡片区已经挂在它上面，并且会在每次 approvals 变更后调用 `listApprovals`。main 把「某个受信产品窗口为会话 S 调用 `listApprovals`」当作 S 正被显示的事实，不在 main 另存一份「当前会话」。用户离开会话页时卡片区卸载、不再拉取，main 也就不会再把卡片送到那里。
+
+main 私有的批准组新增观看者集合；线上 `EgressApproval`、`NetworkEgressApi`、notice 与 N2 消息的形状都不变：
+
+```ts
+// network-egress-approval.ts 的私有组，只新增 viewers
+type ApprovalGroup = {
+  approval: EgressApproval                 // 线上形状不变；recipients 仍只来自活动集合
+  generation?: number
+  activities: Map<string, NetworkActivity>
+  waiters: Map<string, { deadline: number; finish(outcome: EgressGrantOutcome): void }>
+  receipt?: EgressDecisionReceipt
+  viewers: Map<string, SessionRef>         // 键 sessionRefKey；只经 listApprovals 加入，不收 notice
+}
+
+// listApprovals 对会话 S 的可见规则（在既有 linearize 内求值，先通过既有 contains(S) 校验）
+//   openToViewer = !group.receipt && group.waiters.size > 0 && group.approval.recipients.length === 0
+//   若 openToViewer，先把 S 记入 group.viewers，再判可见
+//   visible(S)   = recipients 含 S || viewers 含 S
+```
+
+- **投递条件**：只在请求还有等待中的连接、尚无结果、且收件人为空时，才投给正在拉取的会话。这正是 BR-11 的「此时没有对话在运行工具」，也包括活动快照不完整、活动集合为空的情形（§4.1 的回退）。收件人不为空时按 §4.1 原样投递，不额外投到正看着的对话。
+- **多窗口与切换**：两个窗口各显示一个会话时，两个会话都会成为观看者，两处都出卡；这与 BR-04 一张请求多处出卡的语义相同，第一个有效决定结算。等待中用户从 A 切到 B，B 拉取后成为观看者并出卡；A 保留观看者身份，回到 A 仍能看到并作答。
+- **离开或关闭**：用户回到首页或关闭对话时，那里的卡片区卸载，main 不再投递，但组和等待中的连接保持不变，各连接仍按自己 45 秒的期限等待；期满前打开任何会话，卡片就出现在那里。被删除的会话因 `contains` 失败而不再能拉取，不影响其它观看者。
+- **答复与原连接的绑定**：沿用 `decide(requestID)` 的既有语义，不改。requestID 由 main 在第一次 CONNECT 时生成，观看者只得到它的副本，不能凭 host/site 新建授权；第一个有效决定结算整组，重复点击返回原回执，其它副本在下次拉取时消失（`network-egress-approval.ts:129-130` 的读取一次即退休）。允许或记住后，按 §4.1 的同一串行点结算已被覆盖的其它 pending 请求。观看不延长任何期限。
+- **期满**：组内连接全部到期且无结果时，有收件人或有观看者的组记 `approval-timeout`，状态 `connection-expired` 的卡片只留在已经出现过的会话里，照旧接受晚到的允许，供下一次连接使用；不再投给新打开的会话（等待中的连接已经没有了，`openToViewer` 为假）。既无收件人也无观看者的组记 `approval-unavailable`，并在此时从 `cards` 移除，不再留不可见的残组。
+- **模型说明**：notice 仍只发给收件人（`network-egress-approval.ts:43`）。观看者的对话没有发起这次连接，它的助手不收到联网说明，也不登记 AC-12 的注入。观看后又开始运行工具的会话，由既有 `collect` 并入收件人，从那时起按 §4.6 收到说明。
+- **档位**：观看者的档位不参与判定。BR-05 的通放要求有对话在运行工具，空集合时 `pass()` 本来就不放行（`network-egress-approval.ts:99`）；「全部批准」档的对话被看着时，后台连接照样出卡。
+- **换代与撤销**：沿用 `invalidate` 与撤销路径，观看者随组一起清除。
+- **卡片文案**：renderer 判定本会话不在 `request.recipients` 里，即为观看投递，换用两条新文案，按钮和三种选择不变：
+  - `codepuppy.network.viewed`：zh「此时没有对话在运行工具，可能是连接器或语言服务在后台联网。」；en "No conversation is running tools now; a connector or language service may be connecting in the background."
+  - `codepuppy.network.viewedExpired`：zh「这次连接已失败；允许后，下一次连接直接通过。」；en "This connection failed. After you allow it, the next connection goes through."
+  `NetworkEgressCards` 已持有本会话 `SessionRef`，判定用共享的 `sessionRefKey`（`network-egress-wire.ts:152`）。不加新组件、新按钮或确认步骤。
+
+**拿什么证明（实现必须给出，具体用例与文件在 plan.md）**
+
+1. 真入口：真引擎、真围栏。引擎自己启动的、不属于任何工具或 shell 的进程（引擎配置里的 stdio 连接器，或语言服务），在没有任何 prompt 进行中时经策略代理发起名单外 CONNECT（沿用场景用例的 198.18/15 目标与上游夹具）。界面用例用现有 `mount()`（`network-egress.engine.cases.ts:132`）挂载正看着的、「请求审批」档的会话 A：卡片出现，带 viewed 文案；点「允许（到应用退出为止）」后，等待中的 CONNECT 拿到 200；该进程再连同一 host:port 成功，不新建卡片；A 没有收到任何 `codepuppy.network.notice`。
+2. 对照臂：去掉 `openToViewer` 分支后，同一入口下 A 里没有卡片，连接以 `approval-unavailable` 失败（代理日志 detail 可见）。
+3. 服务层：切换（A 看过后 B 拉取，两处可见，B 决定后 A 下次拉取已无该卡）；从未被看过的组到期为 `approval-unavailable` 且被移除；看过后离开的组到期为 `approval-timeout`，卡片仍在 A，晚到允许让下一次连接放行；收件人不为空时观看者拉取不到该卡。既有用例「空集合在原窗口等待后加入活动」（`network-egress-approval.test.ts:169`）里「空集合时拉取为空」的断言由本增量取代，改为断言拉取方成为观看者。
+
+被否决的替代：
+- 新增 IPC，把 `activeSessionIdentity` 镜像到 main：这是第二份当前会话状态，renderer 崩溃或漏注销会和真实显示分叉；卡片区的拉取已经携带同一事实。
+- 用窗口焦点（`ipc.ts:351`、`BrowserWindow.isFocused`）：焦点不等于对话，窗口在前台但没有焦点时会漏卡。
+- 投到最近使用的对话或全部对话：都不是「正看着的」，并且会让无关对话积卡。
+- 显示在「未恢复的问题」入口：owner 在 U-43 选了显示在当前对话里。
+- 没有在看任何对话时回退到系统对话框：v2 的 BR-04 已移除系统对话框，规格 v3 保留等待后失败。
 
 ## 5. 数据与失败
 
@@ -333,6 +395,8 @@ main 单一服务串行处理批准、撤销与 store 更新。同一决定不�
 批准/撤销与并发 CONNECT 在同一 main 决定点线性化。每条请求在真正创建隧道前复核可变记忆授权仍有效；不得拿异步系统路由解析前的过期授权绕过撤销。到期只结束该批旧连接；晚到的新允许来自仍有效卡片则是新的用户操作，取消后的旧 requestID 不能写入。
 
 进程退出丢弃 socket、临时允许、tier/activity 和待批卡片；站点与完整放行记录重启重读。sidecar 换代只清该代活动/会话绑定与该代通知，main 的用户授权与代理继续存在；由旧代产生的未决连接结算为 unavailable，旧卡片不在新代再批准。读坏 sites 不自动覆盖或转换旧格式；已批准地址仍可临时通过，持久化错误明确显示。Windows 无上述生命周期。
+
+v2.1：观看者加入与 `decide`、撤销、换代共用既有 `linearize` 串行点（`network-egress-approval.ts:112-116`、`:126`），所以「先看到、后结算」和「结算后再看到」都有确定顺序；观看者只在内存中，进程退出即丢，不持久化。
 
 策略拒绝沿用 403 与共享 `egressDenialLine`，新增 detail 闭集 `user-denied | approval-timeout | approval-unavailable | non-public`，供日志/卡片/notice 说明；不是靠 incidental 英文正文判断。400/405 仍是请求格式与代理方法错误，503/502/504 仍是拨号层失败。无人决定、无收件人、批准通路失败均有明确原因，绝不退回系统框或直连。
 
@@ -370,6 +434,7 @@ main 单一服务串行处理批准、撤销与 store 更新。同一决定不�
 | 只有有效 notice 才注入 system，保留工具结果说明；授权覆盖结算清除对应 notice | BR-09、AC-12；R1 Major-2；N6 |
 | system 模式只解路由，main 原始隧道串联；实机一次证明系统代理，日常从 resolveEgressRoutes 注入 | BR-10、AC-13；R1 OPTIONAL-9；N7，未声称实机已通过 |
 | 设置按地址聚合 firstAt/lastAt/count，日志仍逐次；移除旧询问数量上限与拒绝冷却 | R1 OPTIONAL-9；v2「用户会碰到的限制」不含旧两项；N5 |
+| v2.1：「正看着的对话」取卡片区的拉取，不新建焦点跟踪或 IPC；只在收件人为空且仍有等待连接时投递；观看者不收 notice、不看档位；期满按是否出过卡分 timeout/unavailable，未出过卡的组移除 | BR-11、AC-14（规格 v3，I-46/U-43）；§2 末表 `codepuppy-session-workspace.tsx:65-75`、`:180-181`，`session-composer-dock.tsx:59`、`:230`，`network-egress.ts:46`，`network-egress-approval.ts:43`、`:127`、`:231`；§4.9 |
 
 **冻结依据与 owner-only 项：** 无新增产品取舍或限制提案。本轮续接 brief 明确要求「set status frozen」，据此冻结修订后的设计；review.rounds=1、reviewed_sha=85b4f6c8e5，verdict 按指定回执填写。R1 的 FIX-THEN-MERGE 是独立审查对原稿的结论，本次是按调度裁决修正设计，未冒称独立复审或执行合并。
 
@@ -385,7 +450,9 @@ main 单一服务串行处理批准、撤销与 store 更新。同一决定不�
 | R1 / `85b4f6c8e5` / §6 | Claude Opus 5.5，只读 | ARCH-8：接受，纠正声称并记录残留 | `hub-bridge.ts:226` 与 `plugin-fanout.ts:1-22` 证明项目插件可达 parentPort；明确其能伪造活动并借用已有 allow 绑定，默认档已是 allow（composer-state.ts:66） | 同进程来源认证未解决；按调度裁决留档，不扩出隔离/许可机制 |
 | R1 / `85b4f6c8e5` / §4.3、§4.5、§4.7 | Claude Opus 5.5，只读 | OPTIONAL-9：接受并纳入设计 | EgressPassSummary 按 host:port 聚合首次/最近时间、次数，日志仍逐次；AC-13 一次真实系统代理证明、日常注入 resolveEgressRoutes | 执行安排留给 plan.md，不声称已有实机证据 |
 
-**已转出、不得据此扩设计：** 连接器/LSP 在没有对话运行工具时，规格没有可展示卡片的对话。调度方已将此缺口退回意图作为 pending 项，本轮未给出其编号；本设计只沿用 §4.1 原 45 秒内等待收件人的行为，到期如实失败，不增加其它投递目标。
+**已转出项的结果：** R1 转出的缺口（连接器/LSP 在没有对话运行工具时无处出卡）就是 INT-safety I-46；owner 2026-11-27 批准补上（U-43），规格 v3 写为 BR-11、AC-14，设计 v2.1 落在 §4.9。用户没有在看任何对话时，仍沿用 §4.1 的 45 秒等待后如实失败。
+
+**v2.1 作者交接回执：** 输入为规格 v3（BR-11、AC-14）与 §2 末表固定在 `88c88edcee` 的代码事实；作者 Claude Opus 5.5。本增量没有新增接缝，没有改线上类型，没有新增用户步骤或限制；未经独立审查，审查范围为 §4.9 及其在 §4.1、§4.3、§4.8、§5 的直接改动。仍属推断：引擎能否在没有会话时由配置启动一个会发起 CONNECT 的连接器（证明 1 的入口），以及连接器失败后在界面上怎样显示原因，均未实跑；多窗口同时出卡只按代码推断，未在真实 Electron 窗口里验证。
 
 **作者交接回执：** 依据为规格 v2、§2 固定代码 SHA 及 R1 原稿 `85b4f6c8e5`；R1 由 Claude Opus 5.5 只读审查，3 Major、4 Minor 接受并修正，ARCH 残留如实记录，OPTIONAL-9 已采纳。修订作者为 Codex（GPT-6），自查仅覆盖本轮裁决与直接后果，未重开其它已定事项；N1..N7 接缝映射已随改动更新。下一阶段从本冻结版写 plan.md，不再把本稿当实施或验收证据。
 

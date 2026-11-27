@@ -814,7 +814,7 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 
 ## ⑥ 规格 v5：项目外读到的名单文件、env 只遮凭据字段
 
-- 依据：[规格 v5](spec.md) @ `5d56d0cae1`：BR-05、BR-06 的 v5 句与 AC-11、AC-12（来源 impharaon/alpha-work INT-safety U-43「intent 全部按照你的建议。」对 I-50、I-51 的批准）；[冻结设计](design.md) v3.3 §4.1、§4.3、§4.4、§4.5 的入口与契约不改签名；#1758。代码基线 `88c88edcee`（origin/alpha，含已合入的 `6a55937acd`）。继承 ①..⑤ 与 r9..r15 收据，不重审已定范围。
+- 依据：[规格 v5](spec.md) @ `5d56d0cae1`：BR-05、BR-06 的 v5 句与 AC-11、AC-12（来源：协调仓安全意图 U-43，owner 2026-11-27「intent 全部按照你的建议。」对 I-50、I-51 的批准）；[冻结设计](design.md) v3.3 §4.1、§4.3、§4.4、§4.5 的入口与契约不改签名；#1758。代码基线 `88c88edcee`（origin/alpha，含已合入的 `6a55937acd`）。继承 ①..⑤ 与 r9..r15 收据，不重审已定范围。
 - 核对：2026-11-27 编排器派单（Claude Opus 5.5）要求先改规格、写本节，再由同一会话先红后实施；规格 v5 与本节的编排器核对结果待回填。
 
 ### 改动
@@ -861,3 +861,17 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 ### 偏离记录
 
 2026-11-27 · 冻结设计 v3.3 有三处正文与规格 v5 不一致，需要设计方出 v3.4 增量（入口签名不变）：§4.1「match、sources、probe 消费相同范围」——v5 起 `match`/`probe` 另含项目外按项目规则的判定，`sources` 不含；§4.1 env 行与「env 保留每个值默认是秘密」「env 的其它非空值仍默认是秘密」——v5 起 env 只取凭据名字段；§4.3「按名单 profile 读取项目/主目录」——另含读文件工具读过的项目外名单文件。本节按规格 v5 实施，未改设计文档。
+
+2026-11-27 · 追加必要范围：Schema 改动使 17 份 engine-adapter 夹具的引擎身份失效（fixture-identity 4 pass / 1 fail），按 r12 先例用原采样器重采（`73fad5bf77`）；`events.json` 记录本工作树的 CLI 路径，`scripts/old-name-exceptions.tsv` 里旧工作树的失效键换为当前实测键（21 行、user-content 不变）。其余文件与顺序同本节。
+
+### ⑥ 实施收据
+
+- 已核：Claude Opus 5.5 作者自查；开始 2026-11-27 09:28 CST，检查完成约 09:58 CST。提交：规格 `5d56d0cae1`、计划 `c13977efab`；I-50 红 `5b8927b790` → 修 `1ef55f26f9`；I-51 红 `def84a4b33` → 修 `165c027d24`；场景与计数 `e1c8e7e046`；夹具重采 `73fad5bf77`。红例提交后未改其断言。
+- 红例（未修改实现）：Schema `outside project files follow the published project rules` 0/1（`/fixture/other/.env` 未命中）；secret-files `outside protected files are tracked without scanning a realistic home` 0/1；register-policy `outside project protected reads keep later outputs masked` 0/1（读结果含原值）；secret-values `env files collect only credential-named values` 0/1（多出 db、us-east-1）；secret-read `env read view keeps ordinary values visible` 0/1；register-policy `env files mask only credential-named values` 0/1。secret-read 红例在提交前修正了自身预期（小文件页是带结尾换行的 file 输出），提交后未再改。日志 `/tmp/secrets-i50-*-red.log`、`/tmp/secrets-i51-*-red.log`。
+- 步骤结束完整文件：Schema `bun test src/codepuppy-protected-files.test.ts` 8 pass；ext `bun test --max-concurrency 2` 逐文件：secret-files 10、secret-mask 11、risk 23、register-policy 99、secret-values 5、secret-read 4、secret-diff 2、secret-mutations 9，均 exit 0。临时还原两处旧样本（`BASIC_TOKEN`→`BASIC`、`NEW_TOKEN`→`NEW`）后 secret-files 3 FAIL、secret-mask 1 FAIL，确认它们编码的是被替换的行为。
+- 场景（ui-mac，`gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/composer-tier-matrix.engine.cases.ts -t 'protected files (read (build|ask|readonly)|outside project read shell and card|ordinary env values stay visible)'`）：5 pass / 45 filtered / 0 fail（注册共 50）。同时回退两条规则后只跑两条新行：0 pass / 2 fail（AC-11 行在读取处出现一张 read 询问；AC-12 行 `DB_HOST=db` 不在）。日志 `/tmp/secrets-v5-scenario{,-removal}.log`。
+- 移除臂（工作树临时改写、跑具名例、`git restore`，生产文件与 HEAD 一致）：Schema 去掉项目外判定 → Schema、secret-files、register-policy 外读例、risk 例各 0/1；SecretMask.read 去掉 `track` → register-policy 外读例 0/1（读后改写的新值在 shell 输出出现，断言行 1820）；采集器忽略已 track 文件 → secret-files 例与 register-policy 外读例各 0/1；env 采集恢复旧判定 → secret-values 例、register-policy env 例各 0/1；read 视图恢复旧判定 → secret-read 例、register-policy env 例各 0/1。日志 `/tmp/secrets-v5-arm-*.log`。
+- 一次扩大相关集：ext authority-registry 5、plugin-host 56；ui-mac gate-file-registry 25；经 slot 的 fixture-identity + old-name-scan 15，14 个直接夹具消费者与 PermissionDialog、permission-risk、RiskTag 共 260。均 exit 0。Core 只引用未改的 `MASKING_FAILED_TEXT`，不在相关集。
+- 静态：schema `bun typecheck` 145 files 无错；ext `bun typecheck` exit 0；ui-mac `bun typecheck` exit 0；14 个改动 TS 的 oxlint 0 warnings / 0 errors；ext `bun run build` exit 0；`git diff --check` 通过；`core.hooksPath` 仍为 `.githooks`，未安装依赖。
+- `affected-tests --list` exit 0：`affected tests: 138 of 746 test files`；含本节改动的 ext 六个测试文件、fixture-identity、old-name-scan、permission-risk。Schema 的 `packages/schema/src/codepuppy-protected-files.test.ts` 不在任何 `.gate-tests` runner 根下（schema 根为 `packages/schema/test/codepuppy-*.test.ts`），PR 门与夜间都不跑它；本节行为另由 ext 的受选用例覆盖。
+- 观察：生产「全部批准」档在 v5 前读项目外 `.env` 并非不问——引擎底座 `read *.env` ask 会出一张卡，批准后原值交给模型；`credentials.json`、`*.pem`、`.envrc` 等不带 `.env` 后缀的名单文件则不问且原样。v5 后两者都不问、返回安全视图（AC-11「读取没有批准卡片」）。

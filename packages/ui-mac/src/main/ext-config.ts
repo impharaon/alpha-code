@@ -1,3 +1,4 @@
+import { INSTALLED_PLUGIN_SETTINGS_FILE, validInstalledPluginSettings } from "../shared/installed-plugin-settings"
 // Extension Hub config writer (main process). Persists MCP servers to the user's global opencode
 // config so they survive restart — opencode reads config once and caches it, so the renderer's live
 // sdk.mcp.add covers "this session" while this covers "next launch". We replicate the CLI's
@@ -71,8 +72,8 @@ const SAFE_MCP_FIELDS = new Set([
   "disabled",
   "enabled",
   "cwd",
-  "timeout",
-  "oauth",
+  "timeout", "timeouts", "forwardEnvironment",
+  "oauth", "transport",
 ])
 // Command heads we allow for local (stdio) MCP servers. Absolute paths under the standard mac
 // package-manager bin dirs are also accepted (Homebrew / system). REQ-076 T2:win32 上 head 经
@@ -280,7 +281,7 @@ const MCP_ADDRESS_REJECTION_REASON: Record<ProviderAddressRejection, string> = {
   port: "the server URL port is out of range",
 }
 
-export function validateServer(server: Record<string, unknown>): ConfigResult {
+export function validateServer(server: Record<string, unknown>, source: "plugin" | "connector" = "connector"): ConfigResult {
   for (const key of Object.keys(server)) {
     if (!SAFE_MCP_FIELDS.has(key)) return { ok: false, reason: `field not allowed: ${key}` }
   }
@@ -289,12 +290,12 @@ export function validateServer(server: Record<string, unknown>): ConfigResult {
     const head = String(command[0])
     const base = commandHeadBase(head)
     const allowed = SAFE_COMMAND_HEADS.has(base) || SAFE_ABS_PREFIXES.some((p) => head.startsWith(p))
-    if (!allowed) return { ok: false, reason: `command not allowed: ${head}` }
+    if (source !== "plugin" && !allowed) return { ok: false, reason: `command not allowed: ${head}` }
     // A whitelisted head with arbitrary args is still config-time RCE — the command-head check alone
     // doesn't cover `node -e <payload>`. Reject inline-eval flags in the args (C2).
     for (const arg of command.slice(1)) {
       if (typeof arg !== "string") return { ok: false, reason: "command args must be strings" }
-      if (EVAL_FLAGS.has(arg)) return { ok: false, reason: `command arg not allowed: ${arg}` }
+      if (source !== "plugin" && EVAL_FLAGS.has(arg)) return { ok: false, reason: `command arg not allowed: ${arg}` }
     }
   }
   const url = (server as { url?: unknown }).url
@@ -302,7 +303,8 @@ export function validateServer(server: Record<string, unknown>): ConfigResult {
     // `#1381`(基线 I4):远程 MCP 的地址准入与出网准入**同一个函数**(network-egress-derived.ts classifyBaseUrl:https、
     // 非 loopback、DNS 名或 IPv4 字面量、端口在范围内)—— 出网派生收不进放行集合的地址,添加那一刻就拒。此前这里放行
     // loopback `http://`,而出网侧拒 ⇒「加得进、连不上」(与 `#1383` 自定义节点的症状同形)。拒绝带类别 `code`,renderer 据此说人话。
-    const address = classifyBaseUrl(url, "mcp")
+    const portable = source === "plugin" && typeof url === "string" && (url.includes("${") || url.includes("{file:") || URL.canParse(url) && ["http:", "https:"].includes(new URL(url).protocol))
+    const address = portable ? { ok: true as const } : classifyBaseUrl(url, "mcp")
     if (!address.ok) return { ok: false, reason: MCP_ADDRESS_REJECTION_REASON[address.code], code: address.code }
   }
   // environment / headers were previously accepted by field-name only — their VALUES were unvalidated
@@ -312,7 +314,7 @@ export function validateServer(server: Record<string, unknown>): ConfigResult {
     if (typeof environment !== "object" || environment === null || Array.isArray(environment))
       return { ok: false, reason: "environment must be an object" }
     for (const [k, v] of Object.entries(environment as Record<string, unknown>)) {
-      if (DANGEROUS_ENV.has(k)) return { ok: false, reason: `env var not allowed: ${k}` }
+      if (source !== "plugin" && DANGEROUS_ENV.has(k)) return { ok: false, reason: `env var not allowed: ${k}` }
       if (typeof v !== "string") return { ok: false, reason: `env value must be a string: ${k}` }
     }
   }
@@ -472,7 +474,10 @@ export function persistMcp(name: string, server: Record<string, unknown>, meta?:
   if (name === "github-official" || name === "dbhub-readonly")
     return { ok: false, reason: `server name "${name}" is reserved by an official connector recipe` }
   if (!server || typeof server !== "object") return { ok: false, reason: "invalid server config" }
-  const valid = validateServer(server)
+  const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+  const record = state.ok ? state.records.find(record => record.kind === "mcp" && record.name === name) : undefined
+  const source = record && record.origin !== "created" && state.ok && state.packageGraphs.some(graph => graph.pluginTree && graph.children.some(node => node.kind === "mcp" && node.name === record.name && node.componentId === record.id)) ? "plugin" : "connector"
+  const valid = validateServer(server, source)
   if (!valid.ok) return valid
   // `#1381`(基线 I1):远程 MCP 的记录住在围栏写不到的真源里(mcp-server-truth.ts);配置文件里的 `mcp.*` 远程条目对注入面与
   // 放行集合一概不算数。所以 type:"remote" 一条都不再写进 codepuppy.jsonc:先把配置文件(主 + legacy)里同名的副本清掉(重加即替换;
@@ -728,6 +733,14 @@ export function collectMergedMcpRefPathsStrict(
   const legacy = collectLegacyMcpRefPathsStrict(name)
   if (!legacy.ok) return legacy
   refs.push(...legacy.refs)
+  const settingsPath = path.join(codepuppyGlobalRoot(), "ext-store", "bundle--" + name, INSTALLED_PLUGIN_SETTINGS_FILE)
+  try {
+    const settings: unknown = JSON.parse(fs.readFileSync(settingsPath, "utf8"))
+    if (!validInstalledPluginSettings(settings)) return { ok: false, reason: "plugin settings references are unreadable" }
+    refs.push(...Object.values(settings.secretRefs).map(ref => ref.slice(6, -1)))
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") return { ok: false, reason: "plugin settings references are unreadable" }
+  }
   return { ok: true, refs }
 }
 

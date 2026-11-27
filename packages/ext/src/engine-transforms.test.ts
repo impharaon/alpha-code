@@ -8,7 +8,7 @@ import { join } from "node:path"
 import { ConfigNormalize } from "../../core/src/config/normalize.ts"
 import { ConfigMigrateV1 } from "../../core/src/v1/config/migrate.ts"
 import { Permission } from "../../core/src/permission.ts"
-import { agentSampling, applyAgents, projectServerConfig, removeAgents, RETIRED_PROVIDER_IDS } from "./engine-transforms"
+import { agentSampling, applyAgents, projectServerConfig, toServerConfig, removeAgents, RETIRED_PROVIDER_IDS } from "./engine-transforms"
 
 /**
  * `applyAgents` 写进编辑器的结果(编辑器按 2.x `AgentEditor` 的 get / update / remove 形状;新 agent 从 `Agent.Info.default` 的
@@ -283,4 +283,19 @@ describe("助手的采样参数(#1700 BR-04)", () => {
     expect(agentSampling({ temperature: "0.2", top_p: null }, true)).toEqual({})
     expect(agentSampling(undefined, true)).toEqual({})
   })
+})
+
+
+test("phase MCP timeouts override the shared timeout without losing cwd or OAuth", () => {
+  expect(projectServerConfig({ type: "local", command: ["program with spaces", "-p", "literal argument"], cwd: "/workspace", timeout: 9000, timeouts: { startupMs: 30000, executionMs: 120000 } })).toEqual({ type: "local", command: ["program with spaces", "-p", "literal argument"], cwd: "/workspace", timeout: { startup: 30000, catalog: 9000, execution: 120000 } })
+  expect(projectServerConfig({ type: "remote", url: "https://mcp.example/mcp", oauth: { clientId: "client" }, timeouts: { catalogMs: 20000 } })).toEqual({ type: "remote", url: "https://mcp.example/mcp", oauth: { client_id: "client" }, timeout: { catalog: 20000 } })
+})
+
+
+test("remote MCP projection preserves explicit transport without inventing a default", () => {
+  for (const transport of [undefined, "http", "sse"]) {
+    const source = { type: "remote", url: "https://example.invalid/mcp", ...(transport ? { transport } : {}) }
+    expect(projectServerConfig(source)).toEqual(source)
+    expect(toServerConfig(source)).toEqual(source)
+  }
 })

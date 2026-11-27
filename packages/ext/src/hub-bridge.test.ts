@@ -312,6 +312,36 @@ describe("hub-bridge — tool policy writer (I-13)", () => {
   })
 })
 
+test("private package SessionEnd awaits the owning Location and replies only after cleanup", async () => {
+  const wire = fakePort()
+  const logs: string[] = []
+  const bridge = createHubBridge(wire.port, { log: line => logs.push(line) })
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  const seen: string[] = []
+  const dispose = bridge.onPackageSession(async message => {
+    if (message.sessionId !== "ses_owned") return false
+    seen.push(message.action)
+    await held
+    return true
+  })
+  // DESIGN v3.1 §6 fixed main-only parentPort message, not an engine/public event.
+  wire.deliver({ type: "codepuppy.plugin.session", id: 7, sessionId: "ses_owned", action: "leave", reason: "clear" })
+  await Promise.resolve()
+  expect(seen).toEqual(["leave"])
+  expect(wire.sent).toEqual([])
+  release()
+  await Bun.sleep(0)
+  expect(wire.sent).toEqual([{ id: 7, ok: true }])
+  dispose()
+  wire.deliver({ type: "codepuppy.plugin.session", id: 8, sessionId: "ses_other", action: "leave", reason: "other" })
+  await Bun.sleep(0)
+  expect(wire.sent.at(-1)).toMatchObject({ id: 8, ok: false, error: expect.stringContaining("runtime-failed") })
+  wire.deliver({ type: "codepuppy.plugin.session", id: 9, sessionId: "ses_owned", action: "leave", reason: "invented" })
+  expect(logs.some(line => line.includes("malformed package session"))).toBe(true)
+  expect(wire.sent).toHaveLength(2)
+})
+
 
 test("external write scope uses the existing parent port and has no registration operation", async () => {
   const wire = fakePort()

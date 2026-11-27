@@ -8,6 +8,8 @@ import { Instructions } from "../instructions/index.js"
 import { SessionEvent } from "./event.js"
 import { SessionSchema } from "./schema.js"
 import { InstructionBlobTable, InstructionStateTable } from "./sql.js"
+import { InstructionDiscovery } from "../instruction-discovery.js" // codepuppy(S-05)
+import { notifyInstructionsLoaded } from "./codepuppy-instructions-loaded.js"
 
 type DatabaseService = Database.Interface["db"]
 
@@ -45,7 +47,7 @@ export const commit = Effect.fn("InstructionState.commit")(function* (
   // The rendered text is frozen into the durable event because re-rendering it
   // later would require the original Location-scoped instruction sources.
   const text = observation.initial ? "" : yield* renderUpdateText(db, instructions, observation)
-  yield* bus.publish(
+  const event = yield* bus.publish(
     SessionEvent.InstructionsUpdated,
     {
       sessionID: observation.sessionID,
@@ -58,6 +60,15 @@ export const commit = Effect.fn("InstructionState.commit")(function* (
       commit: () => insertBlobs(db, observation.blobs),
     },
   )
+  // codepuppy(S-05): observe only newly admitted source values, after durable publication.
+  const hash = observation.delta[InstructionDiscovery.key]
+  if (!hash || hash === "removed") return
+  const decode = Schema.decodeUnknownOption(Schema.Array(InstructionDiscovery.File))
+  const files = Option.getOrUndefined(decode(observation.blobs[hash])) ?? []
+  const previousHash = observation.previous[InstructionDiscovery.key]
+  const previous = previousHash ? (yield* loadBlobs(db, [previousHash])).get(previousHash) : undefined
+  const before = new Map((Option.getOrUndefined(decode(previous)) ?? []).map(file => [file.path, JSON.stringify(file)]))
+  yield* notifyInstructionsLoaded(db, observation.sessionID, files.filter(file => before.get(file.path) !== JSON.stringify(file)), event.id, observation.initial ? "session_start" : "nested_traversal")
 })
 
 const renderUpdateText = Effect.fnUntraced(function* (

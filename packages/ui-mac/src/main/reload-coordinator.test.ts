@@ -226,3 +226,14 @@ test("runtime package reapplication follows only a successful non-restart reload
   coordinator.receiveReport({ generation, scope: "global", outcome: "reloaded", directories: ["/project"] })
   expect(applied).toHaveLength(1)
 })
+
+
+test("each ready engine rebinds installed package MCP even without a pending reload", () => {
+  const applied: unknown[] = []
+  const coordinator = createReloadCoordinator({ log: () => {}, onChange: () => {}, applyPackageMcp: async items => { applied.push(items) } })
+  const first = coordinator.attach(() => {})
+  expect(applied).toEqual([[]])
+  first("engine stopped")
+  coordinator.attach(() => {})
+  expect(applied).toEqual([[], []])
+})

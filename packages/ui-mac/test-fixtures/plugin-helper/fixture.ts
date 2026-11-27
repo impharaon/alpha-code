@@ -7,6 +7,7 @@ import provenance from "./provenance.json"
 import codex from "./codex/provenance.json"
 import opencode from "./opencode/provenance.json"
 import whole from "./whole/provenance.json"
+import standard from "./standard/provenance.json"
 
 // Keep foreign Markdown only in pinned archives; all consumers read the same temporary tree.
 export const fixtureRoot = mkdtempSync(join(tmpdir(), "plugin-helper-samples-"))
@@ -16,6 +17,7 @@ for (const tree of [
   { root: "", archive: provenance.archive },
   { root: "codex", archive: codex.archive },
   { root: "whole", archive: whole.archive },
+  { root: "standard", archive: standard.archive },
   ...opencode.trees.map(tree => ({ root: join("opencode", tree.root), archive: tree.archive })),
 ]) {
   const target = join(fixtureRoot, tree.root)
@@ -61,5 +63,20 @@ export async function captureFixture(plugin: string, changes: Record<string, str
       if (!bytes) throw new Error(`fixture file missing: ${path}`)
       return bytes
     },
+  }
+}
+
+/** Pinned compatibility-report samples; only recorded source members and explicit controlled variants. */
+export async function captureStandardFixture(name: string, changes: Record<string, string | null> = {}): Promise<Capture> {
+  const sample = standard.samples.find(sample => sample.name === name)!
+  const files = new Map(await Promise.all(sample.files.map(async file => [file.path, await Bun.file(join(fixtureRoot, "standard", sample.root, file.path)).bytes()] as const)))
+  for (const [path, value] of Object.entries(changes)) {
+    if (value === null) files.delete(path)
+    else files.set(path, new TextEncoder().encode(value))
+  }
+  return {
+    source: { kind: "marketplace", locator: sample.repository, repository: sample.repository, commit: sample.commit, pluginPath: sample.pluginPath, entryName: name.split(":")[1], ecosystem: sample.ecosystem as "claude" | "codex" },
+    nodes: [...files].map(([path, bytes]) => ({ kind: "file", path, mode: sample.files.find(file => file.path === path)?.mode ?? 0o644, bytes: bytes.length, digest: digest(bytes) })),
+    readFile: async path => { const bytes = files.get(path); if (!bytes) throw Error("Missing sample file"); return bytes },
   }
 }

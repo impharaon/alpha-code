@@ -2452,6 +2452,7 @@ export type ConfigEntry =
                 }
               | {
                   type: "remote"
+                  transport?: "http" | "sse"
                   url: string
                   headers?: { [x: string]: string }
                   oauth?:
@@ -4117,6 +4118,7 @@ export type ExperimentalMcpAddInput = {
       }
     | {
         readonly type: "remote"
+        readonly transport?: "http" | "sse"
         readonly url: string
         readonly headers?: { readonly [x: string]: string }
         readonly oauth?:

@@ -12,6 +12,8 @@ import { Watcher } from "../../filesystem/watcher.js"
 import { InstructionDiscovery } from "../../instruction-discovery.js"
 import { Instructions } from "../../instructions/index.js"
 import { Location } from "../../location.js"
+import { ConfigDiscovery } from "../discovery.js" // codepuppy(S-05)
+import { pluginInstructionSource } from "../codepuppy-instruction-source.js"
 
 type Loaded =
   | { readonly type: "available"; readonly files: InstructionDiscovery.File[] }
@@ -64,7 +66,7 @@ export const Plugin = define({
       // A missing file may be mid-save and is transient; a denied file (e.g. outside a sandbox grant) stays absent.
       const read = Effect.fn("ConfigInstructionPlugin.read")(function* (filepath: string) {
         return yield* fs.readFileString(filepath).pipe(
-          Effect.map((content) => new InstructionDiscovery.File({ path: filepath, content })),
+          Effect.map((content) => new InstructionDiscovery.File({ path: filepath, content, source: pluginInstructionSource(filepath, FSUtil.contains(root, filepath) ? "Project" : FSUtil.contains(ConfigDiscovery.systemDirectory(), filepath) ? "Managed" : "User") })),
           Effect.catchIf(
             (error) => error.reason._tag === "NotFound" || FSUtil.isAccessDenied(error),
             (error) =>

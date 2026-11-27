@@ -9,7 +9,7 @@ import type { InstallReceiptType } from "../../preload/types"
 import type { PackageListingV1 } from "../../shared/host-extension-package-contract/decoder"
 import { packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { t } from "../i18n"
-import { isNetFailureLayer } from "@opencode/schema/codepuppy-net-failure"
+import { isNetFailureLayer, PLUGIN_MCP_SERVICE_UNAVAILABLE } from "@opencode/schema/codepuppy-net-failure"
 import { netFailureCopy } from "../codepuppy-ui/net-failure-copy"
 
 // Presentational only — the catalog carries no icon glyph/color. Keyed by id, falling back to the
@@ -510,7 +510,8 @@ const MCP_START_FAILURE: Record<string, Parameters<typeof t>[0]> = {
   protocol: "codepuppy.ext.mcpFailure.protocol",
   transport: "codepuppy.ext.mcpFailure.transport",
 }
-export function mcpFailureReason(code: string | undefined): string {
+export function mcpFailureReason(code: string | undefined, detail?: string): string {
+  if (code === "tcp" && detail?.includes(PLUGIN_MCP_SERVICE_UNAVAILABLE)) return t("codepuppy.ext.mcpFailure.localServiceUnavailable")
   if (code && isNetFailureLayer(code)) return netFailureCopy(code)
   return t(code && MCP_START_FAILURE[code] ? MCP_START_FAILURE[code] : "codepuppy.ext.hubReasonFailed")
 }

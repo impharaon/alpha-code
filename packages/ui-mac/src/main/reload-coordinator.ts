@@ -44,6 +44,7 @@ export type ReloadCoordinator = {
   request(input: ReloadRequestInput): { generation: number }
   /** ext 的报告。未知 generation ⇒ 记一行、忽略。 */
   receiveReport(report: ReloadReportMessage): void
+  locationReady(directory: string): void
   /** sidecar ready:接上发送口,重发全部在途 generation。返回**这一次**连接的断开函数(sidecar 退出时调):
    *  在途的保留(下一次 attach 重发),它们已收到的 waiting/failed 作废;晚到的旧连接断开不影响新连接。 */
   attach(post: (message: ReloadRequestMessage) => void): (reason: string) => void
@@ -68,7 +69,7 @@ export function createReloadCoordinator(deps: {
   /** 任何会改变「待重载」原因的事件之后调用(hub-view 据此推 `ext-hub-view-changed`)。 */
   onChange: () => void
   restartConnectors?: () => Promise<boolean>
-  applyPackageMcp?: (items: readonly ReloadItem[]) => Promise<void>
+  applyPackageMcp?: (items: readonly ReloadItem[], phase: "engine-ready" | "reload") => Promise<void>
   now?: () => number
 }): ReloadCoordinator {
   const now = deps.now ?? Date.now
@@ -168,16 +169,22 @@ export function createReloadCoordinator(deps: {
           ` after ${record.reportedAt - record.requestedAt}ms`,
       )
       if (report.outcome === "reloaded") {
-        void deps.applyPackageMcp?.(record.items).catch(() => deps.log("reload: package connectors could not be reapplied"))
+        void deps.applyPackageMcp?.(record.items, "reload").catch(() => deps.log("reload: package connectors could not be reapplied"))
         for (const other of [...inFlight.values()])
           if (other.generation <= record.generation && coversScope(record.scope, other.scope)) inFlight.delete(other.generation)
       }
       deps.onChange()
     },
 
+    locationReady(directory: string) {
+      void deps.applyPackageMcp?.([], "engine-ready").catch(() => deps.log(`reload: package connectors could not be bound for Location ${directory}`))
+    },
+
     attach(next) {
       post = next
       detachedBecause = undefined
+      // Runtime bindings belong to this engine generation, even when main has no pending install/reload.
+      void deps.applyPackageMcp?.([], "engine-ready").catch(() => deps.log("reload: package connectors could not be bound after engine ready"))
       for (const record of [...inFlight.values()].sort((a, b) => a.generation - b.generation)) send(record)
       if (inFlight.size > 0) deps.log(`reload: engine ready — re-sent ${inFlight.size} pending generation(s)`)
       deps.onChange()

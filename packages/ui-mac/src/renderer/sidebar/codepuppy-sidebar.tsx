@@ -8,7 +8,7 @@ import { recordWorkspaceOpen } from "../codepuppy-ui/workspace-writable"
 
 import { createEffect, createMemo, createRoot, createSignal, For, onCleanup, Show } from "solid-js"
 import { Portal } from "solid-js/web"
-import { useLocation, useNavigate, type NavigateOptions } from "@solidjs/router"
+import { useBeforeLeave, useLocation, useNavigate, type NavigateOptions } from "@solidjs/router"
 import { ServerConnection, useCommand, useServer, useTabs } from "../codepuppy-ui/providers"
 import { createDefaultWorkspaceDir, workspaceDisplayName } from "../codepuppy-ui/default-workspace"
 import { beginLaunchDraftHandoff, endLaunchDraftHandoff } from "../codepuppy-ui/launch-draft-handoff"
@@ -616,6 +616,29 @@ export function CodePuppySidebar(props: {
     return {}
   })
 
+  const pluginSession = () => {
+    const source = parseRoute(location.pathname)
+    return source.kind === "session" && source.serverKey === EMBEDDED_SIDECAR_KEY ? source.id : undefined
+  }
+  createEffect(() => { void window.api.pluginSessionViewed(pluginSession()).catch(error => console.warn("runtime-failed: package session view", error)) })
+  onCleanup(() => { void window.api.pluginSessionViewed(undefined).catch(error => console.warn("runtime-failed: package session view", error)) })
+  let retryingPluginLeave = false
+  useBeforeLeave(event => {
+    if (retryingPluginLeave) { retryingPluginLeave = false; return }
+    if (event.defaultPrevented) return
+    const sessionId = pluginSession()
+    if (!sessionId) return
+    const destination = typeof event.to === "string" ? parseRoute(event.to) : undefined
+    if (destination?.kind === "session" && destination.id === sessionId && destination.serverKey === EMBEDDED_SIDECAR_KEY) return
+    const from = location.pathname
+    event.preventDefault()
+    void window.api.pluginSessionLeave({ sessionId, action: "leave", reason: typeof event.to === "number" || destination?.kind === "session" ? "resume" : "clear" }).catch(error => console.warn("runtime-failed: package session leave", error)).finally(() => {
+      if (location.pathname !== from) return
+      retryingPluginLeave = true
+      event.retry()
+    })
+  })
+
   // REQ-126 AC2 兜底轨(#655):非点击的导航 —— 深链、程序化导航、自动化面板内「回跳会话」——
   // 不经上面那个 navigate 咽喉点,靠这条 effect 收口。两点订正:
   //   · 从「只关定制中心」扩到关**全部**已登记覆盖层(自动化以前根本没人关);
@@ -1096,6 +1119,8 @@ export function CodePuppySidebar(props: {
                   const id = m().id
                   dismissMenu(() => setSessionMenu(null), sessionMenuTrigger)
                   void (async () => {
+                    if (props.serverKey() === EMBEDDED_SIDECAR_KEY)
+                      await window.api.pluginSessionLeave({ sessionId: id, action: "leave", reason: "clear" })
                     const ok = await deleteSession(id)
                     if (!ok) pushToast({ kind: "error", title: t("codepuppy.sidebar.deleteFailed") })
                   })()

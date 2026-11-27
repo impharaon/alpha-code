@@ -15,6 +15,7 @@ import { SkillDiscovery } from "../../skill/discovery.js"
 import { CodePuppyProjectGate } from "../codepuppy-project-gate.js" // codepuppy(ADR-049)
 import { SkillFile } from "./skill-file.js"
 import { SkillScan } from "./skill-scan.js"
+import { createPluginConfigRevisionReader } from "../codepuppy-plugin-config-change.js" // codepuppy(S-04)
 
 type Source = Skill.DirectorySource | Skill.UrlSource
 
@@ -34,6 +35,8 @@ export const Plugin = define({
     const watches = yield* FiberMap.make<string>()
     const changes = yield* PubSub.sliding<string>(1)
     const lock = Semaphore.makeUnsafe(1)
+    const pluginRevisions = createPluginConfigRevisionReader(location) // codepuppy(S-04)
+    const scanned = new Map<AbsolutePath, Set<string>>() // codepuppy(S-04): retain rejected deletions only within current native sources.
 
     const watch = Effect.fn("ConfigSkillPlugin.watch")(function* (directory: string, type: "file" | "directory") {
       const target = path.resolve(directory)
@@ -121,11 +124,14 @@ export const Plugin = define({
       const roots = (yield* Effect.forEach(directories, watchDirectory)).flat()
       const skills: Skill.Info[] = []
       for (const directory of directories) {
-        for (const filepath of yield* SkillScan.scan(directory)) {
+        const paths = new Set([...(scanned.get(directory) ?? []), ...(yield* SkillScan.scan(directory))]) // codepuppy(S-04)
+        const retained = new Set<string>() // codepuppy(S-04)
+        for (const filepath of paths) {
           const resolved = yield* fs.realPath(filepath).pipe(Effect.orElseSucceed(() => filepath))
           if (!roots.some((root) => FSUtil.contains(root, resolved))) yield* watch(resolved, "file")
-          const content = yield* fs.readFileStringSafe(filepath).pipe(Effect.orElseSucceed(() => undefined))
+          const content = yield* pluginRevisions.select(filepath, "skills", yield* fs.readFileStringSafe(filepath).pipe(Effect.orElseSucceed(() => undefined))) // codepuppy(S-04)
           if (!content) continue
+          retained.add(filepath) // codepuppy(S-04)
           // codepuppy(ADR-049) ── 项目技能只暂缓可执行文件头,正文逐字保留。
           const text = gated ? CodePuppyProjectGate.frontmatter(location.directory, filepath, content, "skill") : content
           if (text === undefined) continue
@@ -141,6 +147,7 @@ export const Plugin = define({
           }
           skills.push(parsed.skill)
         }
+        scanned.set(directory, retained) // codepuppy(S-04)
       }
       yield* Effect.logDebug("skill source loaded", {
         source: Skill.Source.key(source),
@@ -181,6 +188,7 @@ export const Plugin = define({
       Effect.forkScoped({ startImmediately: true }),
     )
     yield* refresh()
+    pluginRevisions.ready() // codepuppy(S-04)
     yield* ctx.skill.transform((editor) => {
       for (const skill of loaded.skills) editor.add(skill)
     })

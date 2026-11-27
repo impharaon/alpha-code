@@ -130,7 +130,7 @@ beforeAll(async () => {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (published = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust },
+    { onDispatch: (dispatch) => (published = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust, packageManagerEnvironment: {} },
   )
   // sidecar:ready 之前对初始目录(main 给的 codepuppyUserWorkspaceDir())做预热。
   await prewarmInitialLocation({ request: published! }, codepuppyUserWorkspaceDir(), { password: PASSWORD })

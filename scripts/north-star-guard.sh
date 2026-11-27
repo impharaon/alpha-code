@@ -122,6 +122,10 @@ done
 # 等),随之出清单(能力清点表 §9)。M0 把这 15 个文件也取成了上游原样;L4 逐条重判「退回 L0 / 重新接管」,
 # 定出最终清单并在 ADR-047「精确接管面」写理由。
 UPSTREAM_EXCLUDES=(
+  # #1776 S-01 / r22: native Effect cancellation reaches the approved promise command/hook callback context.
+  ':(exclude)packages/plugin/src/promise/adapter.ts'
+  ':(exclude)packages/plugin/src/promise/command.ts'
+  ':(exclude)packages/plugin/src/promise/registration.ts'
   # ADR-050 / SC-01 (U-38/U-39): capture lifecycle, matching hook surfaces and their proofs.
   ':(exclude)packages/core/src/shell.ts'
   ':(exclude)packages/plugin/src/effect/shell.ts'
@@ -129,11 +133,11 @@ UPSTREAM_EXCLUDES=(
   ':(exclude)packages/core/test/tool-shell.test.ts'
   ':(exclude)packages/core/test/shell-cleanup.test.ts'
 
-  # ADR-050 / SC-02 (U-40): root progress and the matching Effect/Promise hook surface.
+  # ADR-050 / SC-02 (U-40): root progress and the matching Effect/Promise hook surface
+  # (packages/plugin/src/promise/adapter.ts is also SC-02; its single entry is the #1776 S-01 row above).
   ':(exclude)packages/core/src/tool.ts'
   ':(exclude)packages/plugin/src/effect/tool.ts'
   ':(exclude)packages/plugin/src/promise/tool.ts'
-  ':(exclude)packages/plugin/src/promise/adapter.ts'
   ':(exclude)packages/core/test/tool-registry.test.ts'
   ':(exclude)packages/core/test/plugin/promise-tool.test.ts'
   ':(exclude)packages/core/test/plugin/tool-input-repair.test.ts'
@@ -158,6 +162,11 @@ UPSTREAM_EXCLUDES=(
   # 判据 packages/core/test/codepuppy-mcp-runtime.test.ts。
   # INT-safety I-20(SPEC-stored-credentials-fence,owner 2026-11-20「两份都批准」):client.ts 的 codepuppy(#1562, I-20) 块里,治理云连接器每个
   # 请求的凭据改读进程内凭据表(readCodePuppyCredential),不读文件;判据 packages/ui-mac/src/main/engine-cases.test.ts。
+  # #1776 S-12 / ADR-047: one optional RemoteConfig transport field; SDK selection stays in the existing client.
+  ':(exclude)packages/schema/src/mcp.ts'
+  # #1776 S-12 companion schema regression and generated public API projection; same approved transport field.
+  ':(exclude)packages/schema/test/mcp.test.ts'
+  ':(exclude)packages/client/src/promise/generated/types.ts'
   ':(exclude)packages/core/src/mcp/client.ts'
   ':(exclude)packages/core/src/mcp/connection.ts'
   ':(exclude)packages/core/src/mcp/index.ts'
@@ -201,12 +210,26 @@ UPSTREAM_EXCLUDES=(
   ':(exclude)packages/core/src/config.ts'
   # #1713 / ADR-049:md 读取点只调用同一闸门;判据与复核清单同上。
   ':(exclude)packages/core/src/config/plugin/skill.ts'
+  # S-05 r16: optional provenance in the native value/codec, with its existing module proof.
+  ':(exclude)packages/core/src/instruction-discovery.ts'
+  ':(exclude)packages/core/test/instruction-discovery.test.ts'
+  ':(exclude)packages/core/src/config/plugin/instruction.ts'
+  ':(exclude)packages/core/src/session/instruction-state.ts'
+  ':(exclude)packages/core/src/session/instructions.ts'
+  ':(exclude)packages/core/test/instruction-state.test.ts'
+  ':(exclude)packages/core/test/session-instructions.test.ts'
   ':(exclude)packages/core/src/config/plugin/agent.ts'
   # INT-safety I-13 L2 / DESIGN-engine-config-fence D16(owner 2026-11-20 经编排器转达:「两件都同意」):会话行上的规则只有 deny 参与。
   # 会话上下文在 select 内部把会话行并进决定本次请求有哪些工具、技能与连接器说明的规则,插件钩子在那之后才拿到工具表,改不了这次合并;
   # 接管面只有 :136 那一行的 `codepuppy(I-13 L2)` 行尾标注。判据 packages/ext/src/policy/session-row-rules.test.ts 的会话上下文三条
   # (上游原文件 ⇒ E4 第二臂红)。
   ':(exclude)packages/core/src/session/context.ts'
+  # #1776 S-06, DESIGN-local-plugin-install v3.1 §10: awaited before-commit / after-publication hooks only.
+  ':(exclude)packages/core/src/session/compaction.ts'
+  # Paired existing-module S-04/S-06 regression tests (same approved lifecycle authority).
+  ':(exclude)packages/core/test/config/reload.test.ts'
+  ':(exclude)packages/core/test/session-compaction.test.ts'
+  ':(exclude)packages/core/test/session-native-compaction.test.ts'
   # INT-safety I-13 D13 / SPEC-engine-config-fence BR-07(owner 2026-11-20 在编排器给的三个选项里选 A,原话:「我建议 A：改存到引擎数据目录」):
   # 计划助手的计划文件放在引擎数据目录(global.data/plan),~/.opencode 整个受保护、谁都不建。目录在插件内部算出,同一个值写进存档的提醒、编辑放行
   # 与拒绝文案;插件能另加一条放行,改不了告诉模型往哪写的那句提醒。接管面只有 plan.ts:31 那一个值(`codepuppy(I-13 D13)` 行尾标注);上游

@@ -87,6 +87,7 @@ export type HubViewDeps = {
   /** 项目 MCP 的既有 D-scoped 判据(信任门 + probeProjectMcpActivation);`active` 才算可用。 */
   projectMcpState(name: string, projectDir: string): Promise<string>
   awaitServer(): Promise<EngineConnection>
+  mcpDependencyError(directory: string, name: string): string | undefined
   /** reload-coordinator.pendingFor。 */
   pendingFor(directory: string, itemID?: string): HubStateReason | undefined
   fetch?: typeof fetch
@@ -295,6 +296,8 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
       }
       const status = await verifyInstalledMcp(row.name, directory, deps.awaitServer, fetchImpl, { awaitServer: timeoutMs, status: timeoutMs })
       if (status.status === "connected") return { ok: true }
+      const dependency = deps.mcpDependencyError(directory, row.name)
+      if (dependency) return { ok: false, detail: dependency, reloadable: false }
       // `#1563`:pending = 引擎还在后台启动它(准备中),不是失败;与要授权一样,重载修不好,不出重载入口。
       if (status.status === "needs_auth" || status.status === "needs_client_registration" || status.status === "pending")
         return { ok: false, detail: mcpDetail("MCP", status), reloadable: false }
@@ -572,6 +575,10 @@ export function createCodePuppySidecarHost(deps: {
       }
       if (inbound.type === "codepuppy.unattended.ack") {
         unattendedRuns.acknowledge(inbound)
+        return true
+      }
+      if (inbound.type === "codepuppy.package.location.ready") {
+        deps.reloads.locationReady(inbound.directory)
         return true
       }
       deps.reloads.receiveReport(inbound)

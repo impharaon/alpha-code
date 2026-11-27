@@ -49,7 +49,7 @@ export type McpServerTruthReadDeps = {
 
 export type McpServerTruthRead = { ok: true; absent: boolean; servers: McpServerRecord[] } | { ok: false; reason: string }
 
-const RECORD_KEYS: readonly string[] = ["name", "url", "headers", "timeout", "oauth"]
+const RECORD_KEYS: readonly string[] = ["name", "url", "headers", "timeout", "timeouts", "oauth", "transport"]
 const TOP_KEYS: readonly string[] = ["v", "servers"]
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -79,7 +79,7 @@ export function invalidMcpServerRecord(entry: unknown, label: string): string | 
   const unexpected = Object.keys(entry).filter((k) => !RECORD_KEYS.includes(k))
   if (unexpected.length) return `${label} has unexpected key(s): ${unexpected.join(", ")}`
   if (typeof entry.name !== "string" || !isExtensionName(entry.name)) return `${label}.name is not an extension name: ${JSON.stringify(entry.name)}`
-  if (typeof entry.url !== "string" || !parsesAsUrl(entry.url)) return `${label}.url is not a URL: ${JSON.stringify(entry.url)}`
+  if (typeof entry.url !== "string" || !parsesAsUrl(entry.url) && !/\$\{[^}]+\}/.test(entry.url)) return `${label}.url is not a URL: ${JSON.stringify(entry.url)}`
   if (entry.headers !== undefined) {
     if (!isRecord(entry.headers)) return `${label}.headers is not an object`
     for (const [k, v] of Object.entries(entry.headers)) if (typeof v !== "string") return `${label}.headers[${JSON.stringify(k)}] is not a string`
@@ -106,7 +106,7 @@ export function invalidMcpServerList(entries: unknown, label = "servers"): strin
 
 /** 固定键序 + headers 拷贝:读回的对象不带文件里的键序,写端用同一个函数得到确定的字节。没有 headers 就没有这个键。 */
 export function canonicalMcpServerRecord(r: McpServerRecord): McpServerRecord {
-  return { name: r.name, url: r.url, ...(r.headers ? { headers: { ...r.headers } } : {}), ...(r.timeout === undefined ? {} : { timeout: r.timeout }), ...(r.oauth === undefined ? {} : { oauth: r.oauth === false ? false : { ...r.oauth } }) }
+  return { name: r.name, url: r.url, ...(r.transport === undefined ? {} : { transport: r.transport }), ...(r.headers ? { headers: { ...r.headers } } : {}), ...(r.timeout === undefined ? {} : { timeout: r.timeout }), ...(r.timeouts === undefined ? {} : { timeouts: { ...r.timeouts } }), ...(r.oauth === undefined ? {} : { oauth: r.oauth === false ? false : { ...r.oauth } }) }
 }
 
 /** 严格读(见文件头)。缺失 ⇒ ok + absent + 空清单;其余任何不对 ⇒ ok:false + 一行日志。 */

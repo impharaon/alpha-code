@@ -94,7 +94,8 @@ export function recordingContext(directory: string) {
             if (method === "transform") (transforms[name] ??= []).push(args[0] as never)
             if (method === "hook") (hooks[`${name}.${String(args[0])}`] ??= []).push(args[1] as never)
             // 读类调用回真宿主的空形状(工具表是数组,客户端 API 回 `{ data }`):L4 的 registerPolicy 在 setup / seal 里读它们。
-            if (method === "list") return name === "tool" ? [] : { data: [] }
+            // session.list 是分页接口(protocol groups/session.ts 的 SessionsResponse:`{ data, cursor }`,cursor 必有)。
+            if (method === "list") return name === "tool" ? [] : name === "session" ? { data: [], cursor: {} } : { data: [] }
             return { dispose: async () => {} }
           }
         },
@@ -106,3 +107,47 @@ export function recordingContext(directory: string) {
   )
   return { context: context as never, calls, invocations, transforms, hooks }
 }
+
+// Real package invocation journeys use an offline model client; all registry/session/job services remain production.
+import { AppNodeBuilder } from "../../core/src/effect/app-node-builder"
+import { LayerNode } from "../../util/src/effect/layer-node"
+import { LayerNodePlatform } from "../../core/src/effect/app-node-platform"
+import { AppProcess } from "../../util/src/process"
+import { FSUtil } from "../../util/src/fs-util"
+import { Config } from "../../core/src/config"
+import { Global } from "../../util/src/global"
+import { Location } from "../../core/src/location"
+import { ShellSelect } from "../../core/src/shell/select"
+import { Job } from "../../core/src/job"
+import { SdkPlugins } from "../../core/src/plugin/sdk"
+import { SubagentJob } from "../../core/src/session/subagent-job"
+import { SessionRunnerModel } from "../../core/src/session/runner/model"
+import { LanguageModel } from "../../ai/src/effect"
+import { OpenAIChat } from "../../ai/src/protocols/openai-chat"
+import { TestLLM } from "../../ai/src/testing"
+import { Layer } from "effect"
+import { tempGlobalLayer } from "../../core/test/fixture/global"
+import { tempLocationLayer } from "../../core/test/fixture/location"
+import { offlineModels } from "../../core/test/fixture/models"
+
+import { ReadToolFileSystem } from "../../core/src/tool/read-filesystem"
+import { FileAccess } from "../../core/src/file-access"
+import { SessionInstructions } from "../../core/src/session/instructions"
+import { Environment } from "../../core/src/environment/index"
+import { SkillDiscovery } from "../../core/src/skill/discovery"
+const packageLlm = TestLLM.testLayer({ fallback: TestLLM.text("Package child result", "package-child") })
+export const packageIt = testEffect(Layer.merge(packageLlm, AppNodeBuilder.build(
+  LayerNode.group([PluginHost.requirements, SdkPlugins.node, ReadToolFileSystem.node, FileAccess.node, SessionInstructions.node, Environment.node, SkillDiscovery.node, Config.node, Job.node, Plugin.node, SubagentJob.node, ShellSelect.node, AppProcess.node, FSUtil.node]),
+  [
+    Config.node.replace(Config.testLayer([])),
+    Global.node.replace(tempGlobalLayer),
+    Location.node.replace(tempLocationLayer),
+    offlineModels,
+    LayerNodePlatform.llmClient.replace(packageLlm),
+    SessionRunnerModel.node.replace(Layer.succeed(SessionRunnerModel.Service, {
+      resolve: session => Effect.succeed(SessionRunnerModel.resolved(LanguageModel.make({ id: session.model?.id ?? "source", provider: "test", route: OpenAIChat.route }), {
+        capabilities: { tools: true, input: ["text"], output: ["text"] }, cost: [], limit: { context: 200_000, output: 32_000 }, ...(session.model?.variant ? { variant: session.model.variant } : {}),
+      })),
+    })),
+  ],
+)))

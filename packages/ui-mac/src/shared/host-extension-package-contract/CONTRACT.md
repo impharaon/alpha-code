@@ -393,8 +393,9 @@ for ciphertext, ephemeral projections, rollback and uninstall ownership.
 `plugin-package@1` carries `{schema, description, blobs}`. The schema token is
 `codepuppy.host-extension-package.payload.plugin-package.v1`; `description` is
 the normalized `PluginPackage` contract. Its authoritative types and validation
-are in `plugin-package.ts`; the converter re-exports those types and remains a
-separately generated desktop module outside this artifact. Normalized contract
+are in `plugin-package.ts`; the converter re-exports those types. Its self-contained `plugin-conversion.mjs`
+and declarations are included in this same artifact for desktop and publisher
+consumers; `generate-plugin-conversion.ts` remains their sole build owner. Normalized contract
 validation does not interpret provider manifests.
 
 The description binds every directory, file mode, symlink target, entry and tree
@@ -406,5 +407,35 @@ limits and payload/asset byte caps do not constrain this aggregate description
 or its blobs. The envelope header and network timeout checks still apply. Package paths never become public URL paths.
 
 The root maps to the existing `bundle` ledger kind and owns one tree generation;
-skills refer to their real directories in that tree. Commands, agents and hooks
-can be retained as package content without claiming their runtime is connected.
+skills refer to their real directories in that tree. Commands and agents carry
+Invocation metadata for the host runtime; agent entries use literal instruction
+syntax, preserving dollar amounts and shell examples. Content retention alone does not
+establish that a runtime entry is active.
+
+Standard plugin definitions use the frozen plugin installation design v3
+contracts (§4.8/4.10/4.13). Source provider selection precedes discovery; root
+portable and Claude declarations merge with the selected provider taking
+precedence. `Text` retains environment/default, option, secret and DATA bindings
+until the consuming runtime binds them. Nested defaults keep their environment precedence;
+credential-field default literals are private secret resources, while public tree
+rewrites retain each binding node once. Options retain their declared scalar
+types; sensitive defaults are replaced with package-owned secret references.
+MCP names use their original server key, independent of the definition file.
+The desktop allocates host identities once and persists the same mapping in
+its package declarations. Portable HTTP aliases normalize to HTTP; explicit SSE
+remains SSE. Forwarded environment declarations contain names and source only.
+
+
+Hook declarations normalize to a command/prompt union with source order,
+package/skill/agent scope, timeout and failure policy. Command hooks retain
+optional argv and async/rewake fields; prompt hooks retain model hints and
+continue-on-block. Monitor declarations retain their command, description and
+always/skill trigger. `plugin-hook-events.ts` owns the event vocabulary and the
+five specific unavailable-trigger reasons. Normalized definitions alone do not
+establish runtime activity. The desktop's
+capability projection connects package command hooks at the awaited SessionStart
+and UserPromptSubmit phases; other hook scopes/events and monitor declarations
+retain their entry-specific not-running annotation. Installing content does not
+execute these hooks.
+
+指令正文（skill/command/agent 与 prompt handler）保留普通 shell 环境表达式，仅识别包路径/userConfig 绑定；进程字段继续按 Text 的环境节点求值。

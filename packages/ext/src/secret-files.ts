@@ -1,4 +1,4 @@
-import { readdir, readFile, realpath, stat } from "node:fs/promises"
+import { readdir, readFile, readlink, realpath, stat } from "node:fs/promises"
 import type { BigIntStats, Dirent } from "node:fs"
 import path from "node:path"
 import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
@@ -74,7 +74,13 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
     files.set(key, version)
   }
   const scan = async () => {
-    for (const [index, source] of ProtectedFiles.sources(roots).entries()) {
+    const sources = ProtectedFiles.sources(roots)
+    const inside = (file: string) =>
+      sources.some((source) => {
+        const relative = path.relative(source.root, file)
+        return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
+      })
+    for (const [index, source] of sources.entries()) {
       const visited = new Set<string>()
       const walk = async (directory: string): Promise<void> => {
         if (disposed) return
@@ -115,6 +121,8 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
         for (const item of plan.entries) {
           if (disposed) return
           const candidate = item.candidate
+          // Design §10 SPEC5-04: a link is walked or resolved only while its literal target stays inside a source.
+          if (item.link && (await literalTarget(candidate, inside)) === undefined) continue
           if (item.descend) await walk(candidate)
           let matches = item.resolved
           if (!matches) {
@@ -189,6 +197,29 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
       encrypted.clear()
       snapshot = []
     },
+  }
+}
+
+/**
+ * A link's target worked out literally, hop by hop with readlink: each hop reads only the link itself, never what it points
+ * to. Undefined once a hop leaves every source, dangles or loops; otherwise the first path that is not a link.
+ */
+async function literalTarget(link: string, inside: (file: string) => boolean): Promise<string | undefined> {
+  const seen = new Set<string>()
+  let current = link
+  while (!seen.has(current)) {
+    seen.add(current)
+    let next: string
+    try {
+      next = await readlink(current)
+    } catch (cause) {
+      const code = String((cause as NodeJS.ErrnoException | undefined)?.code)
+      if (code === "EINVAL") return current
+      if (["ENOENT", "EACCES", "EPERM"].includes(code)) return
+      throw cause
+    }
+    current = path.resolve(path.dirname(current), next)
+    if (!inside(current)) return
   }
 }
 

@@ -168,7 +168,7 @@ test("realistic home collection never visits unrelated deep directories", async 
 import fs from 'node:fs/promises';export const visited=[];
 export const stat=async (...args)=>{visited.push(String(args[0]));return fs.stat(...args)};
 export const readdir=async (...args)=>{visited.push(String(args[0]));return fs.readdir(...args)};
-export const readFile=fs.readFile,realpath=fs.realpath;
+export const readFile=fs.readFile,realpath=fs.realpath,readlink=fs.readlink;
 `)
   expect(await nodeCollector(root, roots, `
 import {registerHooks} from 'node:module';
@@ -193,7 +193,7 @@ test("outside protected files are tracked without scanning a realistic home", as
 import fs from 'node:fs/promises';export const stats=[],reads=[];
 export const stat=async (...args)=>{stats.push(String(args[0]));return fs.stat(...args)};
 export const readdir=async (...args)=>{reads.push(String(args[0]));return fs.readdir(...args)};
-export const readFile=fs.readFile,realpath=fs.realpath;
+export const readFile=fs.readFile,realpath=fs.realpath,readlink=fs.readlink;
 `)
   expect(await nodeCollector(root, roots, `
 import {registerHooks} from 'node:module';
@@ -228,7 +228,7 @@ test("later refreshes of an unchanged project resolve no entry again and still s
   await writeFile(path.join(root, "audit.mjs"), `
 import fs from 'node:fs/promises';let resolved=0;export const count=()=>resolved,reset=()=>{resolved=0};
 export const realpath=async (...args)=>{resolved++;return fs.realpath(...args)};
-export const stat=fs.stat,readdir=fs.readdir,readFile=fs.readFile;
+export const stat=fs.stat,readdir=fs.readdir,readFile=fs.readFile,readlink=fs.readlink;
 `)
   expect(await nodeCollector(root, roots, `
 import fs from 'node:fs/promises';import path from 'node:path';import {registerHooks} from 'node:module';
@@ -238,6 +238,37 @@ const files=createSecretFiles(roots);await files.refresh();const first=audit.cou
 await fs.writeFile(path.join(roots.project,'src','.env'),'KEY=fixture-unchanged-after\\n');await files.refresh();
 console.log(JSON.stringify({first:first>0,later,edited:files.values().some(v=>Buffer.from(v).toString()==='fixture-unchanged-after')}));files.dispose();
 `)).toEqual({ first: true, later: 0, edited: true })
+})
+
+// Design §10 SPEC5-04: a link whose literal target (readlink, hop by hop) leaves every source is never walked, resolved or
+// read — e.g. a workspace link into the app's own fenced credential stores; links that stay inside a source still alias.
+test("links whose literal target leaves every source are not followed, also through several hops", async () => {
+  const { root, roots } = await setup()
+  const outside = path.join(root, "outside")
+  await mkdir(outside)
+  await writeFile(path.join(outside, "store.json"), "{}")
+  await writeFile(path.join(outside, "far.json"), "{}")
+  await symlink(path.join(outside, "store.json"), path.join(roots.project, "link-store"))
+  await symlink(path.join(roots.project, "hop-b"), path.join(roots.project, "hop-a"))
+  await symlink(path.join(outside, "far.json"), path.join(roots.project, "hop-b"))
+  await mkdir(path.join(roots.project, "data"))
+  await writeFile(path.join(roots.project, "data", "env.txt"), "API_KEY=fixture-chain-token\n")
+  await symlink(path.join(roots.project, "data", "env.txt"), path.join(roots.project, "hop-c"))
+  await symlink(path.join(roots.project, "hop-c"), path.join(roots.project, ".env.chain"))
+  const followed = [path.join(roots.project, "link-store"), path.join(roots.project, "hop-a"), path.join(roots.project, "hop-b")]
+  await writeFile(path.join(root, "audit.mjs"), `
+import fs from 'node:fs/promises';export const touched=[];
+const followed=${JSON.stringify(followed)},outside=${JSON.stringify(outside + path.sep)};
+const audit=(name,run)=>async (...args)=>{const file=String(args[0]);if(followed.includes(file)||file.startsWith(outside))touched.push(name+' '+file);return run(...args)};
+export const stat=audit('stat',fs.stat),realpath=audit('realpath',fs.realpath),readFile=audit('readFile',fs.readFile),readdir=fs.readdir,readlink=fs.readlink;
+`)
+  expect(await nodeCollector(root, roots, `
+import {registerHooks} from 'node:module';
+registerHooks({resolve(name,context,next){return next(name==='node:fs/promises'&&context.parentURL?.endsWith('/collector.mjs')?new URL('./audit.mjs',import.meta.url).href:name,context)}});
+const {createSecretFiles}=await import('./collector.mjs');const audit=await import('./audit.mjs');
+const files=createSecretFiles(JSON.parse(process.argv[2]));await files.refresh();await files.refresh();
+console.log(JSON.stringify({touched:audit.touched,chain:files.values().some(v=>Buffer.from(v).toString()==='fixture-chain-token')}));files.dispose();
+`)).toEqual({ touched: [], chain: true })
 })
 
 test("refresh arriving during capture waits for a fresh generation", async () => {
@@ -251,7 +282,7 @@ test("refresh arriving during capture waits for a fresh generation", async () =>
 import fs from 'node:fs/promises';
 let release,ready;export const blocked=new Promise(r=>ready=r);const resumed=new Promise(r=>release=r);export const resume=()=>release();let first=true;
 export const readFile=async (...args)=>{const bytes=await fs.readFile(...args);if(first&&String(args[0]).endsWith('/adc.json')){first=false;ready();await resumed}return bytes};
-export const stat=fs.stat,readdir=fs.readdir,realpath=fs.realpath;
+export const stat=fs.stat,readdir=fs.readdir,realpath=fs.realpath,readlink=fs.readlink;
 `)
   expect(await nodeCollector(root, roots, `
 import fs from 'node:fs/promises';import path from 'node:path';import {registerHooks} from 'node:module';

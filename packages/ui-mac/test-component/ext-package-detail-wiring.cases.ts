@@ -607,6 +607,9 @@ async function mountHarness(options?: {
             ? { ...result, warning: injectUninstallWarning }
             : result
         },
+        // D6 片 6b:本机文件条目(preload 的生产形状);本文件不验它,给空列表。
+        nativeSources: async (_projectDir?: string) => ({ ok: true as const, rows: [] }),
+        setNativeSourceState: async () => ({ ok: true as const }),
         inventoryView: async () => undefined,
         advisoryActive: async () => ({ ids: [], fresh: true }),
         migrateScan: async () => ({

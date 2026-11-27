@@ -1,5 +1,7 @@
 import { registerPackageHooks } from "./plugin-package-hooks"
 import { registerPackageInvocations } from "./plugin-package-invocation"
+import { createPackageLanguageServices, languageResultText, type LanguageFileResult } from "./plugin-package-language"
+import { registerPackageStyles } from "./plugin-package-styles"
 import { aliasPluginMcpTools } from "./plugin-package-tools"
 import { DOCUMENT_PYTHON_HOST, documentHost, documentPythonEnvironmentFor } from "../../util/src/codepuppy-document"
 import { declaredFirstPartyTools } from "../../core/src/mcp/codepuppy-first-party-mcp"
@@ -7,7 +9,7 @@ import { checkCodePuppyOfficeMcpSafety } from "../../ui-mac/src/shared/office-ad
 import { videoUnderstandingTransform } from "./video-understanding"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { dirname, join } from "node:path"
-import { pathToFileURL } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import type { Plugin } from "@opencode/plugin"
 import { codepuppyBootstrap, routePlatformUrl } from "../../util/src/codepuppy-bootstrap"
 import { registerPolicy } from "./policy/index"
@@ -32,7 +34,7 @@ import { byokOutputCap } from "./byok-output-cap"
 // REQ-157 `#1284`:alpha 送进模型上下文的每段字都在 context-injection.ts 登记并声明上限。import 本身就是
 // 一道闸 —— 任何片段超限,登记簿在模块装载时抛出,ext 整个装不上(2.x 记该插件 failed,`#1665` I4 让 sidecar 不报 ready),
 // 而不是悄悄截一段发出去。
-import { CLOUD_CONTRACT_REFUSED_ID, renderInventory, renderTemplate } from "./context-injection"
+import { CLOUD_CONTRACT_REFUSED_ID, PACKAGE_LANGUAGE_CONTEXT_ID, PACKAGE_LANGUAGE_RESULT_ID, renderInventory, renderTemplate, renderWrapper } from "./context-injection"
 import {
   assertWebSearchToolAllowed,
   computeMcpOwnership,
@@ -64,6 +66,7 @@ import { createAgentMentionHooks } from "./agent-mention-hooks"
 import { providerAllowList, providerAllowTail, refuseOutsideProviderAllowList } from "./provider-allow"
 import { inProcessEngine } from "../../ui-mac/src/main/in-process-engine"
 import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
+import { nativeFileBlocked, nativeFileKey, type NativeFileSource } from "../../schema/src/codepuppy-project-config"
 
 // ── `#1665` I2:进程级对象(定制中心桥 + 重载调度器)──────────────────────────────────────────────
 // OpenCode 2 给**每个 Location** 各求值一次本模块(开工实测:两个目录 ⇒ 求值 2 次、setup 2 次;重载后再各 1 次;Node 下
@@ -104,6 +107,9 @@ const DEFAULT_WEBSEARCH_PROVIDER = "exa"
  * 在 2.x 的事件清单里还登记着,但 core 里没有任何地方发 —— 订它们 = 调度器永远等不到"空闲了"(审计 R1 Blocker)。
  */
 const RELOAD_POKE_EVENTS = ["session.execution.succeeded", "session.execution.failed", "session.execution.interrupted"] as const
+
+/** 引擎继承的 Claude / Agents 技能目录(core config/plugin/compatibility.ts 读 `<根>/.claude/skills`、`<根>/.agents/skills`)。 */
+const INHERITED_SKILL = /[\\/]\.(claude|agents)[\\/]skills[\\/]/
 
 const log = (line: string) => console.log(line)
 const error = (line: string) => console.error(line)
@@ -204,6 +210,17 @@ export const CodePuppyExt: Plugin.Plugin = {
       cleanups.push(async () => { releasePackageSessions(); await packageHooks.dispose() })
       const packageInvocations = await registerPackageInvocations(context, { root: bootstrap.paths.globalRoot, projectRoot: () => projectRootFor(directory)?.directory, policy, log: error, hooks: packageHooks })
       cleanups.push(() => packageInvocations.dispose())
+      // Design §4.11 / S-02: package language servers start lazily from real file tool calls and app preview opens.
+      const languages = createPackageLanguageServices({ root: bootstrap.paths.globalRoot, directory, projectRoot: () => projectRootFor(directory)?.directory, report: status => hubBridge.languageStatus(status), log: error })
+      const previewDiagnostics = new Map<string, LanguageFileResult>()
+      const releaseLanguageOpens = hubBridge.onLanguageOpen(message => {
+        // The app may name the project by another path to the same real directory.
+        if ((projectRootFor(message.projectRoot)?.directory ?? message.projectRoot) !== (projectRootFor(directory)?.directory ?? directory)) return
+        void languages.sync(fileURLToPath(message.fileUri)).then(results => {
+          for (const result of results) previewDiagnostics.set(result.status.entryId + "\0" + result.file, result)
+        }, cause => error(`[@codepuppy/ext] package language preview failed: ${describe(cause)}`))
+      })
+      cleanups.push(async () => { releaseLanguageOpens(); previewDiagnostics.clear(); await languages.dispose() })
       const vision = createCloudVisionHooks({
         directory,
         documentPageView: (sessionID, view) => recordDocumentPageView(context.location, sessionID, view),
@@ -267,6 +284,20 @@ export const CodePuppyExt: Plugin.Plugin = {
         const agent = (event.input as { agent?: unknown } | undefined)?.agent
         if (event.tool === "subagent" && typeof agent === "string" && disabledAgents.has(agent) && !(await agentRegistered(agent)))
           throw new Error(`Agent "${agent}" is disabled in this project (${PROJECT_HIDDEN_DIR}/codepuppy.jsonc sets "disable": true)`)
+      })
+      await context.tool.hook("execute.after", async (event) => {
+        if (event.status !== "completed" || !["read", "edit", "write", "patch"].includes(event.tool)) return
+        const input = event.input as { path?: unknown } | undefined
+        const applied = (event.result.output as { applied?: Array<{ target?: unknown }> } | undefined)?.applied
+        const files = event.tool === "patch" ? (applied ?? []).flatMap(item => typeof item.target === "string" ? [item.target] : []) : typeof input?.path === "string" ? [input.path] : []
+        try {
+          const blocks = (await Promise.all(files.map(file => languages.sync(file)))).flat().map(result => renderWrapper(PACKAGE_LANGUAGE_RESULT_ID, languageResultText(result)))
+          if (!blocks.length) return
+          const content = event.result.content
+          event.result = { ...event.result, content: typeof content === "string" ? [content, ...blocks].join("\n\n") : [...(content ?? []), ...blocks.map(text => ({ type: "text" as const, text }))] }
+        } catch (cause) {
+          error(`[@codepuppy/ext] package language diagnostics skipped: ${describe(cause)}`)
+        }
       })
       await context.tool.hook("execute.after", (event) => {
         if (event.status === "error") {
@@ -358,6 +389,16 @@ export const CodePuppyExt: Plugin.Plugin = {
         if (bootstrap.network.egressProxy) processState().hubBridge.network.context(context.location.directory, event)
       })
       for (const name of ["context", "compaction", "generate", "title"] as const) await context.session.hook(name, assembleRequest)
+      await context.session.hook("context", event => {
+        for (const result of previewDiagnostics.values()) event.system.push({ type: "text", text: renderWrapper(PACKAGE_LANGUAGE_CONTEXT_ID, languageResultText(result)) })
+        previewDiagnostics.clear()
+      })
+      // S-10: the agent prompts ext itself injected (applyPromptTakeover), by agent, with their exact bytes. An output style
+      // that drops default coding instructions replaces only these and the engine's marked fallback. Registered after request
+      // assembly, so the style body is sent as its source wrote it.
+      const ownPrompts = new Map<string, string>()
+      const packageStyles = await registerPackageStyles(context, { root: bootstrap.paths.globalRoot, projectRoot: () => projectRootFor(directory)?.directory, ownPrompts: () => ownPrompts, log: error })
+      cleanups.push(() => packageStyles.dispose())
       await context.session.hook("context", async event => {
         const servers = allInstalledPluginPackages(bootstrap.paths.globalRoot).flatMap(installed => installed.description.entries.flatMap(entry => {
           const hostName = installed.hostNames[entry.id]
@@ -406,9 +447,13 @@ export const CodePuppyExt: Plugin.Plugin = {
           // REQ-062 T3/T6:alpha 内容层接管(general/explore/docs prompt),置于项目合并之后 ⇒ 项目同名让位。
           // 出厂 /init 与 /review 不在这里注册(编排器裁决 2026-11-09):L5 用同一个纯函数把它们写进主进程的内联配置文档,
           // 由上游 `opencode.config.command` 实现模板文法与 `review` 的子任务语义 —— 插件的 CommandEditor 给不了这两样。
+          ownPrompts.clear()
           if (!bootstrap.switches.promptRebrandDisabled)
-            for (const applied of applyPromptTakeover(cfg).applied)
+            for (const applied of applyPromptTakeover(cfg).applied) {
               if (applied.startsWith("command.")) delete (cfg.command as Record<string, unknown>)[applied.slice("command.".length)]
+              const agent = /^agent\.(.+)\.prompt$/.exec(applied)?.[1]
+              if (agent) ownPrompts.set(agent, (cfg.agent as Record<string, { prompt: string }>)[agent]!.prompt)
+            }
         } catch (cause) {
           error(`[@codepuppy/ext] project config failed: ${describe(cause)}`)
         }
@@ -536,6 +581,11 @@ export const CodePuppyExt: Plugin.Plugin = {
       const events = new AbortController()
       cleanups.push(() => events.abort())
       void (async () => {
+        for await (const event of context.event.subscribe({ types: ["filesystem.changed"], signal: events.signal })) await languages.refresh(event.data.file)
+      })().catch((cause) => {
+        if (!events.signal.aborted) error(`[@codepuppy/ext] file change subscription ended: ${describe(cause)}`)
+      })
+      void (async () => {
         for await (const event of context.event.subscribe({ types: [...RELOAD_POKE_EVENTS], signal: events.signal })) {
           if (bootstrap.switches.extVerbose) log(`[@codepuppy/ext] event: ${event.type}`)
           reloads.poke()
@@ -586,9 +636,22 @@ export const CodePuppyExt: Plugin.Plugin = {
       const skillTail = postActivationTail<SkillEditor>({
         transform: (callback) => context.skill.transform(callback),
         apply: (editor) => {
+          // D6 / R-n:继承的 `.claude` / `.agents` 技能不经项目配置闸 —— 按技能文件路径对照 main 的绑定状态拿掉关闭 / 已移除的,
+          // 并把本次见到的交给 main 落账(首次出现按原生开启)。
+          const states = new Map(hubBridge.nativeStates().map((state) => [nativeFileKey(state), state]))
+          const inherited: NativeFileSource[] = []
           for (const skill of editor.list()) {
+            if (INHERITED_SKILL.test(skill.path)) {
+              const source: NativeFileSource = { file: skill.path, kind: "skill", entry: skill.id, active: true }
+              inherited.push(source)
+              if (nativeFileBlocked(states.get(nativeFileKey(source)))) {
+                editor.remove(skill.id)
+                continue
+              }
+            }
             if (!skillAllowed(skill) || installedPluginSkill(skill.path, bootstrap.paths.globalRoot)) editor.remove(skill.id)
           }
+          if (inherited.length) void hubBridge.syncNativeSources({ directory, sources: inherited })
           for (const skill of allInstalledPluginSkills(bootstrap.paths.globalRoot)) {
             if (!skillAllowed(skill)) continue
             // Native directory ids may also occupy the managed key; keep their registrations intact.

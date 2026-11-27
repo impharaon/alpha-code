@@ -135,6 +135,9 @@ UPSTREAM_EXCLUDES=(
 
   # ADR-050 / SC-02 (U-40): root progress and the matching Effect/Promise hook surface
   # (packages/plugin/src/promise/adapter.ts is also SC-02; its single entry is the #1776 S-01 row above).
+  # #1804 / U-45 (owner 2026-11-27「允许改这一处（推荐）」): the same file's `codepuppy(#1804, U-45)` blocks let a started
+  # execute.after chain finish before a stopping engine interrupts the turn and record its result as the last snapshot;
+  # judge packages/core/test/tool-registry.test.ts and the #1647 AC1 row of packages/ui-mac/src/main/engine-cases.test.ts.
   ':(exclude)packages/core/src/tool.ts'
   ':(exclude)packages/plugin/src/effect/tool.ts'
   ':(exclude)packages/plugin/src/promise/tool.ts'
@@ -226,6 +229,8 @@ UPSTREAM_EXCLUDES=(
   ':(exclude)packages/core/src/session/context.ts'
   # #1776 S-06, DESIGN-local-plugin-install v3.1 §10: awaited before-commit / after-publication hooks only.
   ':(exclude)packages/core/src/session/compaction.ts'
+  # #1776 S-10, DESIGN-local-plugin-install v3.4 §6: only the default-coding mark on the engine fallback system part.
+  ':(exclude)packages/core/src/session/model-request.ts'
   # Paired existing-module S-04/S-06 regression tests (same approved lifecycle authority).
   ':(exclude)packages/core/test/config/reload.test.ts'
   ':(exclude)packages/core/test/session-compaction.test.ts'

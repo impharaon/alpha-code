@@ -398,6 +398,11 @@ and declarations are included in this same artifact for desktop and publisher
 consumers; `generate-plugin-conversion.ts` remains their sole build owner. Normalized contract
 validation does not interpret provider manifests.
 
+A public description is always `materialization: "copy"`: a re-captured tree. The
+`materialization: "link"` form (a machine-local binding of a marketplace command
+source's printed directory, carrying only `link.bindingId` and its top-level
+entries) is a desktop install record and is rejected as a payload.
+
 The description binds every directory, file mode, symlink target, entry and tree
 digest. Every distinct nonempty file digest has exactly one existing payload
 reference with the same byte count. Empty files need no blob reference. The
@@ -437,5 +442,25 @@ capability projection connects package command hooks at the awaited SessionStart
 and UserPromptSubmit phases; other hook scopes/events and monitor declarations
 retain their entry-specific not-running annotation. Installing content does not
 execute these hooks.
+
+Language server declarations (`kind: "lsp"`) are read from the root `.lsp.json`
+and then each manifest `lspServers` declaration (inline map, file path or array)
+in order; a later declaration with the same name replaces the earlier one, and
+the entry keeps the file that declared it. `command`, `args`, `env` and
+`workspaceFolder` are Text; `settings` and `initializationOptions` are a
+`JsonTemplate` whose bindings are RFC 6901 pointers to string leaves carrying
+package values. Defaults are only `transport: "stdio"`, `restartOnCrash: true`
+and `diagnostics: true`; absent timeouts and restart counts stay absent. A
+definition without a command or a non-empty dotted `extensionToLanguage` map is
+a named invalid-definition diagnostic and the other entries remain. Installing
+content never starts a language server.
+Output styles come from `output-styles/*.md`, or from the manifest's
+`outputStyles` paths, which replace that directory. Each style keeps its source
+name (the file name when `name` is absent), optional description and
+instruction text; `keepCodingInstructions` is true only when the source says so.
+Package defaults come only from the root `settings.json`: `agent` resolves to
+this package's agent entry ID by path or source name. A missing target and
+other keys are diagnosed on that field; `.claude/settings.json` is not a
+plugin default.
 
 指令正文（skill/command/agent 与 prompt handler）保留普通 shell 环境表达式，仅识别包路径/userConfig 绑定；进程字段继续按 Text 的环境节点求值。

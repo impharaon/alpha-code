@@ -32,6 +32,7 @@ import { packageComponentEntries, installedPackagePresentation, packageComponent
 import { packageListingListV1, packageListingTextV1 } from "../../shared/host-extension-package-contract/decoder"
 import { PackageAccountDialog } from "./package-account-dialog"
 import { extIpc } from "./ext-ipc"
+import type { NativeSourceRowV1 } from "../../shared/native-source-view"
 
 /** What the detail page shows: a legacy catalog entry, a host-projected package, an engine agent
  *  (no catalog identity), or the injected platform cloud connector. */
@@ -46,6 +47,107 @@ export type DetailTarget =
   | { kind: "cloud-connector" }
 
 /** The installed graph owns this page, including after an account dialog is closed. */
+/**
+ * D6 片 6b(活稿 `#hub-native-manage`):本机文件条目的管理页 —— 与包管理页同一副返回、头部与「关于」;
+ * 来源写「本机文件」与完整路径,生效范围按目录写「我的所有项目」/「仅当前项目」,没有版本与账户;
+ * 连接器另带现有的「权限」段(同一工具策略编辑入口)。头部「…」与列表同一个菜单。
+ */
+export function NativeSourceDetail(props: {
+  row: NativeSourceRowV1
+  label: string
+  description: string
+  status?: JSX.Element
+  directory?: string
+  menu: JSX.Element
+  error?: string
+  crumb?: string
+  onBack: () => void
+}) {
+  const [editingPolicy, setEditingPolicy] = createSignal(false)
+  const [policy] = createResource(
+    () => (props.row.kind === "mcp" ? props.directory : undefined),
+    (directory) => window.api.toolPolicy.inventory({ directory }),
+  )
+  const toolStates = () => {
+    const result = policy()
+    if (!result?.ok) return []
+    return result.inventory.services
+      .filter((service) => service.source === "mcp" && service.origin === props.row.entry)
+      .flatMap((service) => service.tools.map((tool) => tool.effective.state))
+  }
+  const policyText = () => {
+    const states = toolStates()
+    if (!states.length) return t("codepuppy.ext.packagePolicyUnavailable")
+    return [...new Set(states)]
+      .map((state) => (state === "ask" ? t("codepuppy.ext.packageAskEachTime") : state === "enabled" ? t("codepuppy.settings.toolsStateEnabled") : t("codepuppy.settings.toolsStateDisabled")))
+      .join(" · ")
+  }
+  return (
+    <div class="codepuppy-ext-detail" data-native-detail={props.row.file}>
+      <nav class="codepuppy-ext-crumbs">
+        <button class="codepuppy-ext-crumb-link" onClick={props.onBack}>
+          <HubIc name="left" size={14} />
+          {props.crumb ?? t("codepuppy.ext.back")}
+        </button>
+      </nav>
+      <header class="codepuppy-ext-dhead">
+        <span class="codepuppy-ext-dhead-ic">{props.row.kind === "command" ? "/" : props.row.kind === "mcp" ? <HubIc name="db" size={18} /> : (props.row.entry[0] ?? "?").toUpperCase()}</span>
+        <div class="codepuppy-ext-dhead-body">
+          <div class="codepuppy-ext-dhead-t">
+            <h2>{props.label}</h2>
+          </div>
+          <p class="codepuppy-ext-dabout">{props.description}</p>
+        </div>
+        {props.status}
+        <div class="codepuppy-ext-dhead-act">{props.menu}</div>
+      </header>
+      <Show when={props.row.kind === "mcp"}>
+        <section class="codepuppy-ext-kv-sec">
+          <h3>{t("codepuppy.ext.packagePermissions")}</h3>
+          <div class="codepuppy-ext-kv-row">
+            <span class="k">{t("codepuppy.ext.packageUseTools")}</span>
+            <span class="v">
+              <Show when={toolStates().length} fallback={policyText()}>
+                {t("codepuppy.settings.toolsServiceSummary", { count: toolStates().length })}
+                <small>{policyText()}</small>
+              </Show>
+            </span>
+            <span class="act">
+              <button class="codepuppy-ext-add" data-variant="ghost" onClick={() => setEditingPolicy(!editingPolicy())}>
+                {t("codepuppy.ext.packageChange")}
+              </button>
+            </span>
+          </div>
+          <Show when={editingPolicy()}>
+            <CodePuppySettingsTools open active directory={props.directory} api={window.api.toolPolicy} />
+          </Show>
+        </section>
+      </Show>
+      <section class="codepuppy-ext-kv-sec">
+        <h3>{t("codepuppy.ext.packageAbout")}</h3>
+        <div class="codepuppy-ext-kv-row">
+          <span class="k">{t("codepuppy.ext.packageIncludes")}</span>
+          <span class="v">{t("codepuppy.ext.packageComponentCount", { count: 1, kind: typeLabel(props.row.kind) })}</span>
+        </div>
+        <div class="codepuppy-ext-kv-row">
+          <span class="k">{t("codepuppy.ext.packageSource")}</span>
+          <span class="v" data-native-source-path="">
+            {t("codepuppy.ext.nativeSourceValue")}
+            <small>{props.row.file}</small>
+          </span>
+        </div>
+        <div class="codepuppy-ext-kv-row">
+          <span class="k">{t("codepuppy.ext.packageEffect")}</span>
+          <span class="v">{t(props.row.scope === "project" ? "codepuppy.ext.packageEffectProject" : "codepuppy.ext.packageEffectAll")}</span>
+        </div>
+      </section>
+      <Show when={props.error}>
+        <p role="alert">{props.error}</p>
+      </Show>
+    </div>
+  )
+}
+
 export function InstalledPackageDetail(props: {
   pack: InstalledPackageV1
   label: string

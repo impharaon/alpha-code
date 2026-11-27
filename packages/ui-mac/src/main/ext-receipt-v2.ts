@@ -30,6 +30,7 @@ import type { AppEnvironment } from "./codepuppy-environment"
 import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
 import { validateReceipt } from "./codepuppy-installs"
 import { writeFileAtomicSync } from "./ext-atomic-fs"
+import { NATIVE_FILE_KINDS, nativeFileBlocked, nativeFileKey, type NativeFileRef, type NativeFileSource, type NativeFileState } from "../../../schema/src/codepuppy-project-config"
 import {
   LEGACY_PROTECTED_OWNER,
   PACKAGE_LEDGER_ENVELOPE_VERSION,
@@ -47,6 +48,7 @@ import {
   withOwner,
   withoutClaim,
   withoutOwner,
+  pluginPackageStoreKey,
   type PackageClaimV1,
   type PackageGraphV1,
   type PackageLedgerMutationV1,
@@ -339,6 +341,8 @@ type ParsedLedger = {
   /** REQ-128 `#706`:V3 段。空 = 本账本还没装过 package(信封仍写 v:2)。 */
   packageGraphs: PackageGraphV1[]
   claims: PackageClaimV1[]
+  /** D6(DESIGN-local-plugin-install §4.6):原生文件来源的绑定与开关。只记文件、入口身份与状态,不记内容。 */
+  nativeSources: NativeFileState[]
 }
 
 /** 从损坏 record 原始对象里独立提取 kind:name(不经严格 decoder)。两者都是合法字符串且 kind 已知
@@ -461,6 +465,7 @@ function parseLedger(root: string, sideEffectFree = false): { parsed: ParsedLedg
     rawCorruptRecords: [],
     packageGraphs: [],
     claims: [],
+    nativeSources: [],
   }
   let text: string
   try {
@@ -490,6 +495,8 @@ function parseLedger(root: string, sideEffectFree = false): { parsed: ParsedLedg
   // 走 quarantine 会把 owner 事实连同证据一起搬走,而 claim 恰恰是「这东西还能不能删」的唯一凭据。
   const v3 = envelopeV3Sections(raw, ledgerPath(root))
   if (!v3.ok) return { parsed: empty, corrupt: false, readError: v3.reason }
+  const nativeSources = decodeNativeSources(raw.nativeSources)
+  if (!nativeSources) return { parsed: empty, corrupt: false, readError: `install ledger native source bindings rejected (fail closed): ${ledgerPath(root)}` }
   const receipts: InstallReceipt[] = []
   const receiptWarnings: string[] = []
   const rawInvalidReceipts: unknown[] = []
@@ -568,9 +575,91 @@ function parseLedger(root: string, sideEffectFree = false): { parsed: ParsedLedg
       rawCorruptRecords,
       packageGraphs: v3.packageGraphs,
       claims: v3.claims,
+      nativeSources,
     },
     corrupt: false,
   }
+}
+
+/** D6 段的严格读取:任何一条解不开就整本拒(与 V3 段同一纪律,坏绑定不能被悄悄当成「没关」)。 */
+function decodeNativeSources(value: unknown): NativeFileState[] | undefined {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) return
+  const out: NativeFileState[] = []
+  for (const item of value) {
+    if (!isObj(item) || !Object.keys(item).every((k) => ["file", "kind", "entry", "target", "desiredState", "removed"].includes(k))) return
+    if (typeof item.file !== "string" || !item.file || !NATIVE_FILE_KINDS.includes(item.kind as never) || typeof item.entry !== "string" || !item.entry) return
+    if (item.target !== undefined && (typeof item.target !== "string" || !item.target)) return
+    if ((item.desiredState !== "enabled" && item.desiredState !== "disabled") || typeof item.removed !== "boolean") return
+    out.push({ file: item.file, kind: item.kind as NativeFileRef["kind"], entry: item.entry, ...(item.target !== undefined ? { target: item.target as string } : {}), desiredState: item.desiredState, removed: item.removed })
+  }
+  return out
+}
+
+/** 写路径透传:其他写者不认识 D6 段,落盘时原样带上当前文件里那一份(main 是唯一写者,读写同一同步段内)。 */
+function currentNativeSources(root: string): NativeFileState[] {
+  try {
+    const raw: unknown = JSON.parse(fs.readFileSync(ledgerPath(root), "utf8"))
+    return (isObj(raw) && decodeNativeSources(raw.nativeSources)) || []
+  } catch {
+    return []
+  }
+}
+
+/** D6 片 6b:定制中心读取的全部原生绑定(只读、零写盘)。 */
+export function readNativeSourcesV2(root: string): { ok: true; bindings: NativeFileState[] } | { ok: false; reason: string } {
+  const { parsed, corrupt, readError } = parseLedger(root, true)
+  if (readError) return { ok: false, reason: readError }
+  if (corrupt) return { ok: false, reason: `install ledger corrupt: ${ledgerPath(root)}` }
+  return { ok: true, bindings: parsed.nativeSources }
+}
+
+export type NativeSourceSyncWrite = { ok: true; states: NativeFileState[] } | { ok: false; reason: string }
+
+/**
+ * D6 sync:引擎发现的来源落账。首次出现的来源按原生声明(active)绑定;已有绑定的状态不因 sync 或文件编辑改变
+ * (§4.6「绑定与移除」)。交回本次来源与全部关闭 / 已移除绑定的状态 —— 闸门据此过滤本代视图。不读、不改来源文件。
+ */
+export function syncNativeSourcesV2(root: string, sources: readonly NativeFileSource[]): NativeSourceSyncWrite {
+  const { parsed, corrupt, readError } = parseLedger(root)
+  if (readError) return { ok: false, reason: readError }
+  if (corrupt) return { ok: false, reason: `install ledger corrupt — native source bindings not written: ${ledgerPath(root)}` }
+  const bindings = [...parsed.nativeSources]
+  const known = new Map(bindings.map((binding) => [nativeFileKey(binding), binding]))
+  const sent = new Set<string>()
+  for (const source of sources) {
+    const id = nativeFileKey(source)
+    sent.add(id)
+    if (known.has(id)) continue
+    const binding: NativeFileState = { file: source.file, kind: source.kind, entry: source.entry, ...(source.target !== undefined ? { target: source.target } : {}), desiredState: source.active ? "enabled" : "disabled", removed: false }
+    known.set(id, binding)
+    bindings.push(binding)
+  }
+  if (bindings.length !== parsed.nativeSources.length) {
+    const written = writeLedgerFile(root, [...parsed.receipts, ...parsed.rawInvalidReceipts], [...parsed.records, ...parsed.rawCorruptRecords], { packageGraphs: parsed.packageGraphs, claims: parsed.claims }, undefined, bindings)
+    if (!written.ok) return written
+  }
+  return { ok: true, states: bindings.filter((binding) => sent.has(nativeFileKey(binding)) || nativeFileBlocked(binding)) }
+}
+
+/**
+ * D6 定制中心动作的账本一侧:开关、移除(只打 removed 标记并按关闭处理,原文件不动)、重新加入(清标记并开启)。
+ * 生效由调用方随后的引擎重载完成。
+ */
+export function setNativeSourceStateV2(root: string, ref: NativeFileRef, action: "enable" | "disable" | "remove" | "rejoin"): NativeSourceSyncWrite {
+  const { parsed, corrupt, readError } = parseLedger(root)
+  if (readError) return { ok: false, reason: readError }
+  if (corrupt) return { ok: false, reason: `install ledger corrupt — native source state not written: ${ledgerPath(root)}` }
+  const id = nativeFileKey(ref)
+  const current = parsed.nativeSources.find((binding) => nativeFileKey(binding) === id)
+  if (!current) return { ok: false, reason: "no native source binding for this entry" }
+  const next: NativeFileState =
+    action === "remove" ? { ...current, removed: true }
+      : action === "rejoin" ? { ...current, removed: false, desiredState: "enabled" }
+        : { ...current, desiredState: action === "enable" ? "enabled" : "disabled" }
+  const bindings = parsed.nativeSources.map((binding) => (binding === current ? next : binding))
+  const written = writeLedgerFile(root, [...parsed.receipts, ...parsed.rawInvalidReceipts], [...parsed.records, ...parsed.rawCorruptRecords], { packageGraphs: parsed.packageGraphs, claims: parsed.claims }, undefined, bindings)
+  return written.ok ? { ok: true, states: [next] } : written
 }
 
 function quarantineCorrupt(root: string): string | null {
@@ -624,7 +713,7 @@ function enabledPackageAllowSet(records: readonly unknown[], graphs: readonly Pa
       const parsed = parseOwnerToken(owner)
       return parsed?.kind === "standalone" || parsed?.kind === "legacy-protected"
     })
-    const activeOwners = owners.filter(graph => graph.pluginTree
+    const activeOwners = owners.filter(graph => pluginPackageStoreKey(graph)
       ? valid.some(root => root.kind === graph.root.kind && root.name === graph.root.name && root.desiredState === "enabled")
       : record.desiredState === "enabled")
     if (!(independent && record.desiredState === "enabled") && activeOwners.length === 0) continue
@@ -725,6 +814,7 @@ function writeLedgerFile(
   records: readonly unknown[],
   v3: { packageGraphs: readonly PackageGraphV1[]; claims: readonly PackageClaimV1[] },
   publishFinal: SkillsFinalPublish = writeFileAtomicSync,
+  nativeSources: readonly NativeFileState[] = currentNativeSources(root),
 ): { ok: true; projectionLag?: string } | { ok: false; reason: string } {
   // REQ-128 `#706`:V3 不变量在**落盘之前**判 —— 一次校验、一次 rename。dangling claim /
   // unknown child / 孤儿 owner 一旦 durable 就再也无法自证,所以这里宁可整次拒写。
@@ -763,9 +853,10 @@ function writeLedgerFile(
     // 一旦有图/claim 就写 v:3,而只懂 V2 的构建对 v:3 早已 fail-closed(downgrade 不会
     // 悄悄把 claims 抹掉,它压根不敢动这个文件)。
     const active = isV3Active(v3.packageGraphs, v3.claims)
+    const native = nativeSources.length ? { nativeSources } : {}
     const payload = active
-      ? { v: PACKAGE_LEDGER_ENVELOPE_VERSION, receipts, records, packageGraphs: v3.packageGraphs, claims: v3.claims }
-      : { v: 2, receipts, records }
+      ? { v: PACKAGE_LEDGER_ENVELOPE_VERSION, receipts, records, packageGraphs: v3.packageGraphs, claims: v3.claims, ...native }
+      : { v: 2, receipts, records, ...native }
     writeFileAtomicSync(file, JSON.stringify(payload, null, 2) + "\n") // 账本 durable
     // 完整 next 发布(新增在账本之后):absent 首建、pre 后补新增、纯扩容都需要;已相等则跳过。
     const alreadyFinal = cur !== "absent" && cur !== "unknown" && canonicalJson(cur) === canonicalJson(next)

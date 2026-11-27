@@ -233,8 +233,13 @@ export const IDENTITY_FRAGMENT_ID = "instruction.codepuppy-identity"
 export const BEHAVIOR_FRAGMENT_ID = "instruction.codepuppy-behavior"
 export const PACKAGE_TOOL_DEPENDENCY_ID = "package.tool-dependency"
 export const PACKAGE_HOOK_CONTEXT_ID = "package.hook-context"
+/** Package language server state and diagnostics attached to a matching file tool result (design §4.11). */
+export const PACKAGE_LANGUAGE_RESULT_ID = "package.language-result"
+/** Diagnostics from an app preview open, consumed by the next request of that project. */
+export const PACKAGE_LANGUAGE_CONTEXT_ID = "package.language-context"
 export const PACKAGE_MEMORY_ID = "package.agent-memory"
 export const PACKAGE_PARTIAL_ID = "package.partial-task"
+export const PACKAGE_OUTPUT_STYLE_ID = "package.output-style-command"
 
 /** 由 identity 变体 id 反推它登记时用的 caps(咽喉测试用它把「解释出的 id」翻回能力事实)。 */
 export function identityCapsFromId(id: string): CodePuppyCapabilities | undefined {
@@ -600,8 +605,11 @@ function rebrandFragments(): RebrandFragment[] {
 export const CONTEXT_INJECTIONS: readonly ContextInjection[] = Object.freeze([
   defineWrapper({ id: PACKAGE_TOOL_DEPENDENCY_ID, sink: "system", template: "Unavailable declared tools for {label}:\n{body}", maxBytes: CAP_DESCRIPTION }),
   defineWrapper({ id: PACKAGE_HOOK_CONTEXT_ID, sink: "system", template: "Package hook context: {label}\n{body}", maxBytes: CAP_DESCRIPTION }),
+  defineWrapper({ id: PACKAGE_LANGUAGE_RESULT_ID, sink: "tool-output", template: "Language server {label}\n{body}", maxBytes: CAP_DESCRIPTION }),
+  defineWrapper({ id: PACKAGE_LANGUAGE_CONTEXT_ID, sink: "system", template: "Language server diagnostics from a file opened in the app: {label}\n{body}", maxBytes: CAP_DESCRIPTION }),
   defineWrapper({ id: PACKAGE_MEMORY_ID, sink: "system", template: "Agent memory file: {label}\nUse the existing file tools and permissions to read and update durable notes there.\n{body}", maxBytes: CAP_DESCRIPTION }),
   defineTemplate({ id: PACKAGE_PARTIAL_ID, sink: "tool-output", template: "Partial task: {name}. Continue the child session for remaining work.", maxBytes: CAP_DESCRIPTION }),
+  defineWrapper({ id: PACKAGE_OUTPUT_STYLE_ID, sink: "command-description", template: "Set this conversation's output style: {label}{body}, or default", maxBytes: CAP_DESCRIPTION }),
   // ── codepuppy-prompts.ts:config hook set-if-absent 接管 ─────────────────────────
   defineText({ id: "command.init.template", sink: "command-template", text: CODEPUPPY_INIT_TEMPLATE, maxBytes: CAP_BODY }),
   defineText({ id: "command.init.description", sink: "command-description", text: CODEPUPPY_INIT_DESCRIPTION, maxBytes: CAP_DESCRIPTION }),

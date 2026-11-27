@@ -2145,12 +2145,20 @@
       },
       "mechanism": {
         "file": "packages/core/src/config/codepuppy-project-gate.ts",
-        "ladder": "L3 (四个读取点只调用同一项目配置闸门); #1776 S-04 (orchestrator ruling 2026-11-27): Config file load and the skill watcher/rescan select a revision before the same native project-trust filters and parsers. Rejection retains prior bytes only within currently eligible sources; managed policy remains authoritative."
+        "ladder": "L3 (四个读取点只调用同一项目配置闸门); #1776 S-04 (orchestrator ruling 2026-11-27): Config file load and the skill watcher/rescan select a revision before the same native project-trust filters and parsers. Rejection retains prior bytes only within currently eligible sources; managed policy remains authoritative. #1776 D6 (design v3.5 R-m/R-n, slice 6a): the same gate's finish awaits contract C's optional nativeSources hook at every load and filters disabled/removed native bindings in place (MCP disabled, inline agent/command entries dropped, plugin.use deny before load); the existing agent/command/skill call points only consult that view, skill.ts adds one nativeSkill call and config.ts passes Code Puppy's own explicit/inline documents to finish; no new upstream file, inherited .claude/.agents skills are filtered by ext's skill.transform (L0)."
       },
       "tests": [
         {
           "file": "packages/core/test/codepuppy-project-gate.test.ts",
           "name": "未允许:暂缓的顶层键"
+        },
+        {
+          "file": "packages/core/test/codepuppy-project-gate.test.ts",
+          "name": "native file view filters disabled entries and keeps siblings"
+        },
+        {
+          "file": "packages/ui-mac/src/main/project-config-view.engine.cases.ts",
+          "name": "hub switch stops a native skill, command, agent, plugin and MCP in place"
         },
         {
           "file": "packages/core/test/codepuppy-project-gate-upgrade.test.ts",
@@ -2826,6 +2834,98 @@
         {
           "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
           "name": "explicit SSE keeps a session-owned stream until SessionEnd without closing its Location stream"
+        }
+      ]
+    },
+    {
+      "id": "plugin-language-services",
+      "decision": "DESIGN-local-plugin-install v3.4 §4.11/§6 S-02 and R-l: plugin language servers run in one ext Location runtime keyed by packageId, entryId and project root. Real read/edit/write/patch tool results and main's successful workspace preview opens are the only lazy start triggers; non-matching files and enabling start nothing. Diagnostics are kept per URI and document version (late or unversioned notifications never replace a newer explicit version) and attached to the same tool result. The runtime is the only status source (enabled, dependency-missing naming the command, start-error, protocol-error, diagnostics-ready) over the private sidecar channel; package off, update, removal and Location disposal shut servers down.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 7",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-package-language.ts",
+        "ladder": "L0: existing tool.hook execute.after, filesystem.changed events, session.hook context, AppProcess spawn and the private parentPort bridge. No callable core LSP exists (design P-18); no engine file is taken over."
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package language server diagnostics reach the edit result and stop with the package"
+        },
+        {
+          "file": "packages/ext/src/plugin-package-language.test.ts",
+          "name": "late or unversioned diagnostics never replace a newer version"
+        }
+      ]
+    },
+    {
+      "id": "plugin-output-style",
+      "decision": "DESIGN-local-plugin-install v3.4 §4.14/§6 S-10: a package output style is chosen per conversation through the existing slash-command entry (output-style <name>|default) and applied by the awaited context hook of that session next request. keep-coding-instructions true appends the source body; false first drops only the engine fallback coding prompt marked default-coding and the exact prompt bytes ext itself injected for the request agent (applyPromptTakeover), so user-owned systems, governance prompts, instructions and environment stay. Child sessions are unaffected. Closing or removing the package withdraws the command choice and clears the session reference; the next request is default.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 8",
+      "takeovers": [
+        "packages/core/src/session/model-request.ts"
+      ],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-package-styles.ts",
+        "ladder": "New exact L3 for the fallback mark only: SessionModelRequest.baseTranscript builds the fallback coding prompt privately and no L0 API carries its source; text matching would guess. L1/L2 would add the same one-line mark through another source/build transform. ext-owned prompts use L0 exact match on recorded bytes (P-34); no Agent.Info, schema or ConfigAgent field."
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package output styles select through the command entry and leave with their package"
+        }
+      ]
+    },
+    {
+      "id": "plugin-default-settings",
+      "decision": "DESIGN-local-plugin-install v3.4 §4.14/§6 S-11: the package root settings.json agent resolves to that package agent entry; while it is enabled it is the engine default (AgentEditor.default) and selectable as a primary agent, so a new session without an explicit agent runs it with the same prepared body, preload and call rules as a delegated child. An explicit session agent and the user default_agent (applied by the post-phase configuration plugin after ext setup) win; several packages resolve last in store-key order; closing or removing the package withdraws the default on the next rebuild without changing user settings. Review r1: at a session's first prompt ext pins the then-current default in its metadata (SESSION_DEFAULT_AGENT_KEY) and switches an agent-less session to it, so a later default never takes over a running session; the engine adapter returns a turn without an explicit agent to that pin (from a tier or picked agent) and falls back to the current default only when the pinned agent no longer exists.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 8",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-package-invocation.ts",
+        "ladder": "L0: AgentEditor.default in the ext setup agent transform (not the post-activation tail), the existing awaited context and prompt hooks (the prompt hook pins each session's first default) and the existing new-session selection (engine adapter routes.ts selectAgent), which returns to that pin. No engine takeover."
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a package default agent leads new sessions until the user chooses or the package closes"
+        },
+        {
+          "file": "packages/ui-mac/src/engine-adapter/default-agent.fast.test.ts",
+          "name": "a session keeps the default it started with when a later default appears"
+        }
+      ]
+    },
+    {
+      "id": "tool-post-hook-settles-before-stop",
+      "decision": "U-45（owner 2026-11-27「允许改这一处（推荐）」）：停引擎时先让已经开始的工具收尾钩子链（execute.after）跑完再中断这一轮；中断若在钩子链期间到达，钩子返回的结果成为这次调用最后的快照，被中断的记录保留它（#1647 AC1 在负载下不再记成 running）。",
+      "lane": "#1804 U-45",
+      "takeovers": [
+        "packages/core/src/tool.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/tool.ts",
+        "ladder": "L2 (owner-approved U-45; codepuppy(#1804, U-45) blocks in Tool.executeTool and the snapshot root wrapper)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/tool-registry.test.ts",
+          "name": "an interrupted call keeps its running post-hook chain's result as its last snapshot"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
+          "name": "#1647 AC1:等审批时停引擎 ⇒ 这一轮被释放、工具零执行(sidecar-stop-pending-approval.engine.cases.ts,3 条)"
         }
       ]
     }

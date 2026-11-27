@@ -349,13 +349,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
   const stateHome = assertSeatbeltSafePath(input.stateHome, "XDG_STATE_HOME")
   const egressProxyPort = assertEgressProxyPort(input.egressProxyPort)
   const homeRe = regexLiteral(home)
-  const configFence = input.configFence.map((rule, i): ConfigFenceRule => {
-    const via = rule.via?.length ? { via: rule.via.map((node) => assertSeatbeltSafePath(node, `configFence[${i}]`)) } : {}
-    return rule.kind === "dat-files"
-      ? { kind: "dat-files", dir: assertSeatbeltSafePath(rule.dir, `configFence[${i}]`), ...via }
-      : { kind: rule.kind, path: assertSeatbeltSafePath(rule.path, `configFence[${i}]`), ...via }
-  })
-  const credentialStores = input.credentialStores.map((rule, i): CredentialStoreRule => ({ kind: rule.kind, path: assertSeatbeltSafePath(rule.path, `credentialStores[${i}]`) }))
+  const { configFence, credentialStores } = seatbeltSafeFenceRules(input)
 
   const lines: string[] = [
     "(version 1)",
@@ -393,6 +387,37 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     ...renderCredentialFence(credentialStores),
   ]
   return lines.join("\n") + "\n"
+}
+
+/** 受保护集与凭据存放点进 profile 之前逐条过同一道字面量校验(两份 profile 共用)。 */
+function seatbeltSafeFenceRules(input: Pick<ProcessFenceProfileInput, "configFence" | "credentialStores">) {
+  return {
+    configFence: input.configFence.map((rule, i): ConfigFenceRule => {
+      const via = rule.via?.length ? { via: rule.via.map((node) => assertSeatbeltSafePath(node, `configFence[${i}]`)) } : {}
+      return rule.kind === "dat-files"
+        ? { kind: "dat-files", dir: assertSeatbeltSafePath(rule.dir, `configFence[${i}]`), ...via }
+        : { kind: rule.kind, path: assertSeatbeltSafePath(rule.path, `configFence[${i}]`), ...via }
+    }),
+    credentialStores: input.credentialStores.map((rule, i): CredentialStoreRule => ({ kind: rule.kind, path: assertSeatbeltSafePath(rule.path, `credentialStores[${i}]`) })),
+  }
+}
+
+/**
+ * DESIGN-local-plugin-install §4.16(R1-M3):市场 `source: command` 的查找子进程在 exec `/bin/sh` 之前由 `sandbox-exec` 套上这份 profile。
+ * 普通文件访问照旧(查找工具要在它自己的目录里生成插件目录),不复制引擎的写目录白名单;保护面与引擎围栏同一权威:N1/N4 出网 + 受保护配置
+ * 两块拒写 + 凭据 C1 两块,渲染函数与 renderProcessFenceProfile 共用,规则由同一计划器给出(含真实路径与上级节点)。
+ */
+export function renderCommandSourceProfile(input: Pick<ProcessFenceProfileInput, "egressProxyPort" | "configFence" | "credentialStores">): string {
+  const egressProxyPort = assertEgressProxyPort(input.egressProxyPort)
+  const { configFence, credentialStores } = seatbeltSafeFenceRules(input)
+  return [
+    "(version 1)",
+    "(allow default)",
+    "(deny network*)                                          ; N1 出网默认全拒",
+    `(allow network-outbound (remote ip "localhost:${egressProxyPort}"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)`,
+    ...renderConfigFence(configFence),
+    ...renderCredentialFence(credentialStores),
+  ].join("\n") + "\n"
 }
 
 /**

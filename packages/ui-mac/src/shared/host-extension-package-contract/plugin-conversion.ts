@@ -1,11 +1,11 @@
 import { UNAVAILABLE_PLUGIN_HOOKS } from "./plugin-hook-events"
-import { PLUGIN_HOOK_EVENTS, pluginRelativePath, pluginText, renderPluginText, pluginOptionEnvironmentName, pluginTreeDigest } from "./plugin-package"
+import { PLUGIN_HOOK_EVENTS, pluginRelativePath, pluginText, renderPluginText, pluginOptionEnvironmentName, pluginTreeDigest, validLinkedNode } from "./plugin-package"
 import { createHash } from "node:crypto"
 import { parse, type ParseError } from "jsonc-parser/lib/esm/main.js"
 import { ConfigMarkdown } from "@opencode/core/config/markdown"
 
-export type { Sha256, RelPath, Json, Source, Provider, TreeNode, Capture, Text, ToolRule, ModelHint, ArgumentSyntax, SkillDisplay, McpToolDependency, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
-import type { Sha256, RelPath, Json, Source, TreeNode, Capture, Text, ToolRule, Invocation, McpToolDependency, SkillDisplay, ArgumentSyntax, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginPackage, MarketplaceEntry } from "./plugin-package"
+export type { Sha256, RelPath, Json, JsonTemplate, LanguageServer, Source, Provider, TreeNode, LinkedNode, Capture, Text, ToolRule, ModelHint, ArgumentSyntax, SkillDisplay, McpToolDependency, Invocation, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginDefaults, PluginPackage, CopiedPluginPackage, CommandPluginSource, MarketplaceEntry } from "./plugin-package"
+import type { Sha256, RelPath, Json, JsonTemplate, LanguageServer, Source, TreeNode, LinkedNode, Capture, Text, ToolRule, Invocation, McpToolDependency, SkillDisplay, ArgumentSyntax, SecretNeed, LoginNeed, HookEvent, Hook, Entry, Diagnostic, PluginDefaults, PluginPackage, MarketplaceEntry } from "./plugin-package"
 
 export class CaptureError extends Error {
   constructor(readonly code: "invalid-path" | "duplicate-path" | "invalid-node" | "read-failed" | "digest-mismatch", readonly path: string) {
@@ -42,8 +42,12 @@ export function readMarketplace(bytes: Uint8Array, ecosystem: "claude" | "codex"
   return { name: string(document.name) ?? "", entries, diagnostics }
 }
 
+type ConvertedPlugin = { package: PluginPackage; replacements: ReadonlyMap<RelPath, Uint8Array>; privateCredentials: ReadonlyMap<string, Uint8Array> }
+type PluginDefinitions = { package: Omit<Extract<PluginPackage, { materialization: "copy" }>, "materialization" | "tree" | "treeDigest">; replacements: Map<RelPath, Uint8Array>; privateCredentials: ReadonlyMap<string, Uint8Array> }
+
 /** Validate the captured bytes before interpreting any definition; only sanitized bytes leave the converter. */
-export async function convertPluginTree(input: Capture): Promise<{ package: PluginPackage; replacements: ReadonlyMap<RelPath, Uint8Array>; privateCredentials: ReadonlyMap<string, Uint8Array> }> {
+export async function convertPluginTree(input: Capture): Promise<ConvertedPlugin> {
+  if (input.materialization === "link") return convertLinkedPlugin(input)
   const files = new Map<string, Uint8Array>()
   const seen = new Set<string>()
   for (const node of input.nodes) {
@@ -56,6 +60,77 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     if (!Number.isInteger(node.bytes) || node.bytes < 0 || bytes.length !== node.bytes || sha256(bytes) !== node.digest) throw new CaptureError("digest-mismatch", node.path)
     files.set(node.path, bytes)
   }
+  const converted = pluginDefinitions(files, input.source)
+  const tree = input.nodes.map((node): TreeNode => {
+    const replacement = converted.replacements.get(node.path)
+    return node.kind === "file" && replacement ? { ...node, bytes: replacement.length, digest: sha256(replacement) } : { ...node }
+  })
+  return { ...converted, package: { ...converted.package, materialization: "copy", tree, treeDigest: pluginTreeDigest(tree) } }
+}
+
+/** Fixed control-definition files the interpreter below reads; a linked directory is never walked beyond them. */
+const LINKED_DEFINITION_FILES = ["plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json", "package.json", "SKILL.md", "mcp.json", ".mcp.json", ".app.json", "hooks/hooks.json", "monitors/monitors.json", ".lsp.json", "settings.json"]
+
+/**
+ * DESIGN-local-plugin-install §4.16 link: only top-level entries are enumerated; standard entry directories and manifest-declared
+ * paths are listed to find the definitions the interpreter actually reads. Other resources stay reachable through the links and are
+ * never read or hashed. Link captures come from Claude/Codex marketplaces only, so OpenCode locations are not looked up.
+ */
+async function convertLinkedPlugin(input: Extract<Capture, { materialization: "link" }>): Promise<ConvertedPlugin> {
+  const top = new Map<string, LinkedNode>()
+  for (const node of input.topLevel) {
+    if (!validLinkedNode(node) || node.path.includes("/")) throw new CaptureError("invalid-node", String(node.path))
+    if (top.has(node.path)) throw new CaptureError("duplicate-path", node.path)
+    top.set(node.path, node)
+  }
+  const files = new Map<string, Uint8Array>()
+  const attempted = new Set<string>()
+  const read = async (path: string) => {
+    if (attempted.has(path) || !pluginRelativePath(path) || !top.has(path.split("/")[0]!)) return
+    attempted.add(path)
+    // An absent declaration stays absent; the interpreter reports it as the definition's missing entry.
+    const bytes = await input.readFile(path).catch(() => undefined)
+    if (bytes) files.set(path, bytes)
+  }
+  // A top-level component directory may itself be a link (e.g. into the producing tool's bundle); the capture guards where it resolves.
+  const walk = async (directory: string, wanted: (path: string) => boolean, nested = true): Promise<void> => {
+    const kind = top.get(directory.split("/")[0]!)?.kind
+    if (kind !== "directory" && kind !== "symlink") return
+    for (const node of await input.readDirectory(directory).catch(() => [])) {
+      if (node.kind === "directory" && nested) await walk(node.path, wanted)
+      if (node.kind === "file" && wanted(node.path)) await read(node.path)
+    }
+  }
+  const skill = (path: string) => path.endsWith("/SKILL.md") || path.endsWith("/agents/openai.yaml")
+  for (const path of LINKED_DEFINITION_FILES) await read(path)
+  for (const node of input.topLevel) if (node.kind === "directory") await read(node.path + "/SKILL.md")
+  await walk("skills", skill)
+  await walk("commands", path => path.endsWith(".md"))
+  await walk("agents", path => path.endsWith(".md"))
+  let styleRoots: string[] | undefined
+  for (const path of ["plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json"]) {
+    const manifest = (() => { try { return files.has(path) ? parseJson(files.get(path)!, false) : undefined } catch { return undefined } })()
+    if (object(manifest)) for (const root of declaredPaths(manifest.skills, path, "skills", [])) await walk(root, skill)
+    if (object(manifest) && manifest.outputStyles !== undefined) (styleRoots ??= []).push(...declaredPaths(manifest.outputStyles, path, "outputStyles", []))
+  }
+  // Output styles: Markdown files directly inside output-styles/, or inside (or named by) the manifest's outputStyles paths.
+  for (const root of styleRoots ?? ["output-styles"]) {
+    if (root.endsWith(".md")) await read(root)
+    await walk(root, path => path.endsWith(".md"), false)
+  }
+  // Language server file declarations and the root settings.json agent are read through LINKED_DEFINITION_FILES and missing-entry.
+  for (;;) {
+    // Same path order as a sorted directory walk, so a linked package's entry order does not depend on lookup order.
+    const converted = pluginDefinitions(new Map([...files].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)), input.source)
+    const missing = converted.package.diagnostics.flatMap(item => item.code === "missing-entry" && !attempted.has(item.path) ? [item.path] : [])
+    if (!missing.length) return { ...converted, package: { ...converted.package, materialization: "link", link: { bindingId: input.bindingId, topLevel: [...input.topLevel] } } }
+    for (const path of missing) await read(path)
+    for (const path of missing) attempted.add(path)
+  }
+}
+
+/** The one interpretation of a plugin's control definitions, shared by copied and linked captures. */
+function pluginDefinitions(files: ReadonlyMap<string, Uint8Array>, source: Source): PluginDefinitions {
   const diagnostics: Diagnostic[] = []
   const documents = new Map<string, Record<string, unknown>>()
   const json = (path: string) => {
@@ -71,8 +146,8 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
   const portable = files.has("plugin.json") ? json("plugin.json") : undefined
   const claude = files.has(".claude-plugin/plugin.json") ? json(".claude-plugin/plugin.json") : undefined
   const codexManifest = files.has(".codex-plugin/plugin.json") ? json(".codex-plugin/plugin.json") : undefined
-  const opencode = input.source.ecosystem === "opencode" || (!input.source.ecosystem && !portable && !claude && !codexManifest && ([...files.keys()].some(path => /^(?:\.opencode\/|opencode\.jsonc?$)/.test(path)) || files.has("package.json")))
-  const codex = !opencode && (input.source.ecosystem === "codex" || (!input.source.ecosystem && (!!portable || !claude && !!codexManifest)))
+  const opencode = source.ecosystem === "opencode" || (!source.ecosystem && !portable && !claude && !codexManifest && ([...files.keys()].some(path => /^(?:\.opencode\/|opencode\.jsonc?$)/.test(path)) || files.has("package.json")))
+  const codex = !opencode && (source.ecosystem === "codex" || (!source.ecosystem && (!!portable || !claude && !!codexManifest)))
   const manifestPath = opencode ? "package.json" : codex ? portable ? "plugin.json" : ".codex-plugin/plugin.json" : ".claude-plugin/plugin.json"
   const primary = opencode ? files.has("package.json") ? json("package.json") : undefined : codex ? portable ?? codexManifest : claude
   const secondary = opencode ? undefined : codex ? portable ? claude : undefined : portable
@@ -114,7 +189,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     if (!parsed || !object(parsed.data)) { diagnostics.push({ path, code: "invalid-definition", message: "Skill frontmatter is invalid" }); continue }
     const data: Record<string, unknown> = parsed.data
     const directory = path === "SKILL.md" ? "" : path.slice(0, -"/SKILL.md".length)
-    const name = string(data.name) ?? directory.split("/").at(-1) ?? input.source.entryName ?? "skill"
+    const name = string(data.name) ?? directory.split("/").at(-1) ?? source.entryName ?? "skill"
     const sidecarPath = (directory ? directory + "/" : "") + "agents/openai.yaml"
     const sidecar = codex && files.has(sidecarPath) ? ConfigMarkdown.parseOption("---\n" + decode(files.get(sidecarPath)!) + "\n---") : undefined
     if (codex && files.has(sidecarPath) && !sidecar) diagnostics.push({ path: sidecarPath, code: "invalid-definition", message: "Skill YAML could not be parsed" })
@@ -179,6 +254,7 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     if (kind === "agent" && parsed.data.hooks !== undefined) scopedHooks.push({ path, value: parsed.data.hooks, scope: { kind, entryId: kind + ":" + path } })
     entries.push({ kind, id: kind + ":" + path, sourcePath: path, sourceName: match[2]!, instruction: pluginText(instruction, "instruction"), invocation: invocation(parsed.data, kind === "agent" ? "literal" : opencode ? "opencode" : codex ? "codex" : "claude", path, diagnostics) })
   }
+  const defaults: PluginDefaults = {}
   const hookFiles = new Set<string>()
   let hookOrder = 0
   const addHooks = (path: string, value: unknown, scope: Hook["scope"]): void => {
@@ -240,6 +316,43 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
       }
     }
     entries.push(...monitors.values())
+    // Root .lsp.json first, then each manifest declaration in order; the selected manifest is last and wins a shared name.
+    const servers = new Map<string, Extract<Entry, { kind: "lsp" }>>()
+    const addLanguageServers = (path: string, value: unknown, pointer: string): void => {
+      if (typeof value === "string") {
+        const file = value.replace(/^\.\//, "")
+        if (!pluginRelativePath(file)) { diagnostics.push({ path, field: pointer, code: "invalid-definition", message: "Language server file must be package-relative" }); return }
+        const definition = json(file)
+        if (definition) addLanguageServers(file, definition, "")
+        return
+      }
+      if (Array.isArray(value)) { value.forEach((item, index) => addLanguageServers(path, item, pointer + "/" + index)); return }
+      if (!object(value)) { diagnostics.push({ path, field: pointer, code: "invalid-definition", message: "Language server definition must be an object" }); return }
+      for (const [name, definition] of Object.entries(value)) {
+        const field = pointer + "/" + escapePointer(name)
+        const server = languageServer(definition)
+        if (!server) { diagnostics.push({ path, field, sourceName: name, code: "invalid-definition", message: "Language server command, extensions or protocol fields are invalid" }); continue }
+        servers.set(name, { kind: "lsp", id: "lsp:" + path + "#" + name, sourcePath: path, sourceName: name, server })
+      }
+    }
+    if (files.has(".lsp.json")) addLanguageServers(".lsp.json", ".lsp.json", "")
+    for (const item of manifests) if (item.value?.lspServers !== undefined) addLanguageServers(item.path, item.value.lspServers, "/lspServers")
+    entries.push(...servers.values())
+    // A declared outputStyles path replaces output-styles/; each Markdown file directly inside it is one style.
+    const styleRoots = manifests.some(item => item.value?.outputStyles !== undefined) ? manifests.flatMap(item => declaredPaths(item.value?.outputStyles, item.path, "outputStyles", diagnostics)) : ["output-styles"]
+    for (const path of [...files.keys()].filter(path => path.endsWith(".md") && styleRoots.some(root => path === root || path.startsWith(root + "/") && !path.slice(root.length + 1).includes("/")))) {
+      const source = decode(files.get(path)!)
+      const parsed = ConfigMarkdown.parseOption(source)
+      if (!parsed || !object(parsed.data)) { diagnostics.push({ path, code: "invalid-definition", message: "Output style frontmatter is invalid" }); continue }
+      entries.push({ kind: "output-style", id: "output-style:" + path, sourcePath: path, sourceName: string(parsed.data.name) ?? path.split("/").at(-1)!.slice(0, -".md".length), ...(typeof parsed.data.description === "string" ? { description: parsed.data.description } : {}), instruction: pluginText(source, "instruction"), keepCodingInstructions: parsed.data["keep-coding-instructions"] === true })
+    }
+    // Only the package root settings.json holds plugin defaults; .claude/settings.json is ordinary project configuration.
+    for (const [key, value] of Object.entries(files.has("settings.json") ? json("settings.json") ?? {} : {})) {
+      if (key !== "agent") { diagnostics.push({ path: "settings.json", field: "/" + escapePointer(key), code: "unsupported-setting", message: "Plugin setting is not applied by Claude Code" }); continue }
+      const target = typeof value === "string" ? entries.find(entry => entry.kind === "agent" && (entry.sourcePath === value.replace(/^\.\//, "") || entry.sourceName === value)) : undefined
+      if (target) defaults.agent = target.id
+      else diagnostics.push({ path: "settings.json", field: "/agent", code: "missing-entry", message: "Default agent is not an agent of this package" })
+    }
   }
   definitions.push(...dependencyDefinitions.filter(item => !definitions.some(existing => existing.name === item.name)))
   const unique = [...new Map(definitions.map((definition) => [definition.path + "#" + definition.pointer, definition])).values()]
@@ -270,16 +383,12 @@ export async function convertPluginTree(input: Capture): Promise<{ package: Plug
     visit(document, "")
   }
   const replacements = new Map<string, Uint8Array>([...changed].map((path) => [path, new TextEncoder().encode(JSON.stringify(documents.get(path), null, 2) + "\n")]))
-  const tree = input.nodes.map((node): TreeNode => {
-    const replacement = replacements.get(node.path)
-    return node.kind === "file" && replacement ? { ...node, bytes: replacement.length, digest: sha256(replacement) } : { ...node }
-  })
   return {
     package: {
       schema: "codepuppy.plugin-package.v1", provider: opencode ? "opencode" : codex ? "codex" : !manifest && files.has("SKILL.md") ? "skill" : "claude-code",
-      name: string(manifest?.name) ?? input.source.entryName ?? entries.find((entry) => entry.kind === "skill")?.sourceName ?? input.source.pluginPath?.split("/").at(-1) ?? "plugin",
-      ...(typeof (manifest?.version ?? input.source.version) === "string" ? { version: String(manifest?.version ?? input.source.version) } : {}), ...(typeof manifest?.description === "string" ? { description: manifest.description } : {}),
-      source: input.source, tree, treeDigest: pluginTreeDigest(tree), entries, secrets: [...needs.values()], options, defaults: {}, diagnostics,
+      name: string(manifest?.name) ?? source.entryName ?? entries.find((entry) => entry.kind === "skill")?.sourceName ?? source.pluginPath?.split("/").at(-1) ?? "plugin",
+      ...(typeof (manifest?.version ?? source.version) === "string" ? { version: String(manifest?.version ?? source.version) } : {}), ...(typeof manifest?.description === "string" ? { description: manifest.description } : {}),
+      source, entries, secrets: [...needs.values()], options, defaults, diagnostics,
     },
     replacements, privateCredentials: credentials,
   }
@@ -346,13 +455,19 @@ export function convertMcpServerDefinition(server: Json, source: Source): { pack
   return { package: { schema: "codepuppy.plugin-package.v1", provider: "mcp-registry", name: sourceName,
     ...(object(server) && typeof server.version === "string" ? { version: server.version } : {}),
     ...(object(server) && typeof server.description === "string" ? { description: server.description } : {}),
-    source, tree: [], treeDigest: pluginTreeDigest([]), entries, secrets: [...needs.values()], diagnostics }, privateCredentials: credentials }
+    source, materialization: "copy", tree: [], treeDigest: pluginTreeDigest([]), entries, secrets: [...needs.values()], diagnostics }, privateCredentials: credentials }
 }
 
 function marketplaceSource(value: unknown): MarketplaceEntry["source"] {
   if (typeof value === "string") {
     const path = value === "." || value === "./" ? "." : value.replace(/^\.\//, "").replace(/\/$/, "")
     return path === "." || pluginRelativePath(path) ? { kind: "path", path } : { kind: "unsupported", detail: "Invalid marketplace path" }
+  }
+  if (object(value) && value.source === "command") {
+    if (typeof value.command !== "string" || !value.command.trim()) return { kind: "unsupported", detail: "Command source has no command" }
+    if (value.mode !== undefined && value.mode !== "copy" && value.mode !== "link") return { kind: "unsupported", detail: "Command source mode is unknown" }
+    // Official defaults: copy, 60 seconds; an explicit positive whole number of seconds wins.
+    return { kind: "command", command: value.command, timeoutSeconds: Number.isSafeInteger(value.timeout) && Number(value.timeout) > 0 ? Number(value.timeout) : 60, mode: value.mode === "link" ? "link" : "copy" }
   }
   if (!object(value) || (value.source !== "url" && value.source !== "git-subdir") || typeof value.url !== "string") return { kind: "unsupported", detail: "Source is not a Git repository or local path" }
   const path = typeof value.path === "string" ? value.path.replace(/^\.\//, "").replace(/\/$/, "") : undefined
@@ -408,6 +523,46 @@ function mcpEntry(definition: { name: string; path: string; pointer: string; val
     } } : {}),
   }
   return { ...base, transport: value.type === "sse" ? "sse" : "http", url: text(value.url, definition.pointer + "/url"), headers, ...(value.oauth === false ? { oauth: false } : !Object.keys(headers).some((key) => /authorization|token|secret|api[_-]?key|cookie/i.test(key)) || oauth ? { oauth: login } : {}) }
+}
+
+/** Source protocol shape; absent fields stay absent except the documented protocol defaults. */
+function languageServer(value: unknown): LanguageServer | undefined {
+  if (!object(value) || typeof value.command !== "string" || !value.command) return
+  if (value.args !== undefined && (!Array.isArray(value.args) || !value.args.every(arg => typeof arg === "string"))) return
+  if (!object(value.extensionToLanguage) || !Object.keys(value.extensionToLanguage).length || !Object.entries(value.extensionToLanguage).every(([extension, language]) => extension.length > 1 && extension.startsWith(".") && typeof language === "string" && !!language)) return
+  if (value.transport !== undefined && value.transport !== "stdio" && value.transport !== "socket") return
+  if (value.env !== undefined && !stringMap(value.env)) return
+  if (value.workspaceFolder !== undefined && typeof value.workspaceFolder !== "string") return
+  const positive = (field: string) => value[field] === undefined || Number.isSafeInteger(value[field]) && Number(value[field]) > 0
+  if (!["startupTimeout", "shutdownTimeout", "requestTimeout"].every(positive)) return
+  if (value.maxRestarts !== undefined && (!Number.isSafeInteger(value.maxRestarts) || Number(value.maxRestarts) < 0)) return
+  if (value.restartOnCrash !== undefined && typeof value.restartOnCrash !== "boolean") return
+  if (value.diagnostics !== undefined && typeof value.diagnostics !== "boolean") return
+  const template = (source: unknown): JsonTemplate | undefined => {
+    if (source === undefined) return
+    const bindings: Record<string, Text> = {}
+    const visit = (item: unknown, pointer: string) => {
+      if (typeof item === "string") { const text = pluginText(item); if (text.some(part => typeof part !== "string")) bindings[pointer] = text }
+      else if (Array.isArray(item)) item.forEach((child, index) => visit(child, pointer + "/" + index))
+      else if (object(item)) for (const [key, child] of Object.entries(item)) visit(child, pointer + "/" + escapePointer(key))
+    }
+    visit(source, "")
+    return { value: JSON.parse(JSON.stringify(source)) as Json, bindings }
+  }
+  const initializationOptions = template(value.initializationOptions)
+  const settings = template(value.settings)
+  return {
+    command: pluginText(value.command), args: strings(value.args).map(arg => pluginText(arg)),
+    extensionToLanguage: { ...(value.extensionToLanguage as Record<string, string>) },
+    transport: value.transport === "socket" ? "socket" : "stdio",
+    env: Object.fromEntries(Object.entries(stringMap(value.env) ? value.env : {}).map(([key, part]) => [key, pluginText(part)])),
+    ...(initializationOptions ? { initializationOptions } : {}), ...(settings ? { settings } : {}),
+    ...(typeof value.workspaceFolder === "string" ? { workspaceFolder: pluginText(value.workspaceFolder) } : {}),
+    ...Object.fromEntries((["startupTimeout", "shutdownTimeout", "requestTimeout"] as const).flatMap(field => value[field] === undefined ? [] : [[field, Number(value[field])]])),
+    restartOnCrash: value.restartOnCrash !== false,
+    ...(value.maxRestarts === undefined ? {} : { maxRestarts: Number(value.maxRestarts) }),
+    diagnostics: value.diagnostics !== false,
+  }
 }
 
 function mcpLogin(componentId: string, serviceId: string, serverUrl: string): LoginNeed {

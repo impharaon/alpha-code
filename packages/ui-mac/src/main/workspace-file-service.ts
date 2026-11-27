@@ -73,7 +73,8 @@ function closeSession(session: ReadSession) {
   }
 }
 
-export function openWorkspaceRead(workspaceDir: string, relPath: string, senderId: number): WorkspaceFileOpenResult {
+/** `opened` receives the resolved file after a successful open (S-02: the package language runtime's preview input). */
+export function openWorkspaceRead(workspaceDir: string, relPath: string, senderId: number, opened?: (file: string) => void): WorkspaceFileOpenResult {
   if (countReadsFor(senderId) >= FILE_VIEWER_MAX_READS) return { ok: false, code: "busy" }
   const resolved = resolveWorkspaceFile(workspaceDir, relPath)
   if (!resolved.ok) return { ok: false, code: resolved.code }
@@ -108,6 +109,7 @@ export function openWorkspaceRead(workspaceDir: string, relPath: string, senderI
 
   const readId = `wfr_${crypto.randomBytes(8).toString("hex")}`
   reads.set(readId, { readId, fd, size: st.size, senderId, delivered: 0 })
+  opened?.(resolved.file.abs)
   return { ok: true, readId, totalBytes: st.size }
 }
 
@@ -208,11 +210,11 @@ function trackSender(sender: WebContents) {
 const str = (v: unknown): v is string => typeof v === "string" && v.length > 0
 const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v)
 
-export function registerWorkspaceFileIpcHandlers() {
+export function registerWorkspaceFileIpcHandlers(opened: (workspaceDir: string, file: string) => void) {
   electronRef.ipcMain.handle("workspace-file-open-read", (e: IpcMainInvokeEvent, dir: unknown, rel: unknown) => {
     if (!str(dir) || !str(rel)) return { ok: false, code: "invalid-path" } satisfies WorkspaceFileOpenResult
     trackSender(e.sender)
-    return openWorkspaceRead(dir, rel, e.sender.id)
+    return openWorkspaceRead(dir, rel, e.sender.id, file => opened(dir, file))
   })
   electronRef.ipcMain.handle(
     "workspace-file-read-chunk",

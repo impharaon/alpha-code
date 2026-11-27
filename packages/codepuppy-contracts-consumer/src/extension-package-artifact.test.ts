@@ -45,9 +45,9 @@ describe("alpha-web extension package producer artifact pin", () => {
 
     expect(lock).toMatchObject({
       repo: "jinjunnn/alpha-web",
-      commit: "d3c97254a11fe50c3f76ea95e1184e04e576e1cc",
+      commit: "29b2937178a0324ed9e425ec1e13b4fadb02ed58",
       artifactPath: "contracts/extension-package/artifact",
-      artifactSha256: "2e378ff5b88e7a70f8f0f0ba0c6454a77db0e350eea3f27ffae256d35d1df7a4",
+      artifactSha256: "8cff37b2699bf438825681f2bc0e3685ed370962940c3abcf6610ce169e81743",
     })
     // 固定条数,不留余量:上游悄悄少发一个语料文件时,只比对「lock ↔ manifest 两边一致」是
     // 抓不到的 —— 两边会一起变小并保持自洽。

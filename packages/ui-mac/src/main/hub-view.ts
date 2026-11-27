@@ -1,5 +1,6 @@
 import { buildPackageManagerControlReply, buildWriteScopeReply, type PackageManagerControlHandler, type WriteScopeRequest, type WriteScopeReply } from "./codepuppy-sidecar-messages"
 import type { VideoBridgeRequest, VideoBridgeReply } from "../shared/video-understanding"
+import { linkedPluginSourceGap } from "./plugin-package-config"
 import { networkEgressActivity, type NetworkInspection } from "./network-egress-activity"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import type { InstallOutcomeV1 } from "../shared/plugin-install"
@@ -41,10 +42,13 @@ import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { installableCatalogEntries, installableCatalogPackages } from "../renderer/extensions/catalog-installable-view"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
+import type { NativeFileState } from "../../../schema/src/codepuppy-project-config"
 import { packageAppliesAt } from "./package-mcp-activation"
 import { LEGACY_PROTECTED_OWNER, standaloneOwner, type PackageGraphV1 } from "./ext-package-ledger-v3"
 import {
   buildPackageAuthorizationReply,
+  buildPackageLanguageOpen,
+  type PackageLanguageStatusMessage,
   AGENT_NOTE_DENIED,
   AGENT_NOTE_UNVERIFIED,
   buildHubRequestReply,
@@ -52,6 +56,8 @@ import {
   buildHubInstallReply,
   type HubInstallRequest,
   buildHubViewReply,
+  buildNativeFileSyncReply,
+  type NativeFileSync,
   isCodePuppySidecarMessage,
   isHubRequestId,
   parseCodePuppySidecarInbound,
@@ -185,7 +191,7 @@ export function skillActionFor(name: string, agentRules: readonly Rule[], sessio
   return rule?.effect ?? "ask"
 }
 
-function packageRowsFor(views: CatalogPackageViewV1[], rows: HubViewRow[], graphs: PackageGraphV1[], directory: string): HubViewRow[] {
+function packageRowsFor(views: CatalogPackageViewV1[], rows: HubViewRow[], graphs: PackageGraphV1[], directory: string, root: string): HubViewRow[] {
   const definitions = views.map((view) => ({
     id: view.catalogId, name: view.catalogId, kind: "package", displayName: view.presentation.displayName, description: view.presentation.description,
     authorization: view.prerequisites.items.length ? "secret:" + view.prerequisites.items.map((item) => item.prerequisiteId).sort().join(",") : "none",
@@ -205,6 +211,9 @@ function packageRowsFor(views: CatalogPackageViewV1[], rows: HubViewRow[], graph
     const enabled = components.every((component) => component.row?.enabled === true)
     if (!packageAppliesAt(graph, directory))
       return { ...base, scope: "global", installed: true, enabled, state: "installed", stateReason: { code: "not-loaded", detail: "This package applies to another project" } }
+    // DESIGN-local-plugin-install §4.16 / BR-11: a linked package whose printed directory went away names that dependency.
+    const gap = linkedPluginSourceGap(root, graph)
+    if (gap) return { ...base, scope: "global", installed: true, enabled, state: "installed", stateReason: { code: "not-loaded", detail: gap } }
     const blocking = components.find((component) => component.row?.state !== "available")
     if (!blocking) return { ...base, scope: "global", installed: true, enabled, state: "available" }
     const label = `${blocking.node.kind} ${blocking.node.name}`
@@ -417,6 +426,7 @@ export function createHubViewService(deps: HubViewDeps): HubViewService {
       rows,
       graphs,
       directory,
+      deps.globalRoot(),
     )
     return { view: { directory, rows: [...rows, ...packageRows], warnings }, reads }
   }
@@ -502,6 +512,10 @@ export type CodePuppySidecarHost = {
   receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void, readWriteScope: (request: Pick<WriteScopeRequest, "access" | "targets">) => Promise<WriteScopeReply["result"]>, packageManager: PackageManagerControlHandler): boolean
   /** sidecar ready:返回该次连接的断开函数(只断开自己那一次,晚到的旧 exit 不会断开新连接)。 */
   attach(post: (message: CodePuppySidecarOutbound) => void, generation?: number, inspect?: NetworkInspection): (reason: string) => void
+  /** S-02: forward one successful workspace preview open to the attached sidecar; main runs no language server. */
+  openLanguageFile(projectRoot: string, fileUri: string): void
+  /** Design v3.4 R-l: latest state per package language server, only for the package's current installed tree. */
+  languageServers(packageId: string, treeDigest: string | undefined): { sourceName: string; state: PackageLanguageStatusMessage["state"]; detail?: string }[]
 }
 
 export function createCodePuppySidecarHost(deps: {
@@ -514,14 +528,21 @@ export function createCodePuppySidecarHost(deps: {
   searchSources(query: string): Promise<SourceSearchResultV1>
   install(request: HubInstallRequest): Promise<InstallOutcomeV1>
   reloads: ReloadCoordinator
+  /** A package language server state changed; the installed package view should be read again. */
+  languageStatusChanged(): void
+  /** D6(§4.6):原生来源 sync 落账;缺席(测试宿主)⇒ 答 unavailable。 */
+  nativeSources?: (directory: string, sources: NativeFileSync["sources"]) => Promise<{ ok: true; states: NativeFileState[] } | { ok: false; reason: string }>
   log: (line: string) => void
 }): CodePuppySidecarHost {
   let videoConnection: object | undefined
+  const posts = new Set<(message: CodePuppySidecarOutbound) => void>()
+  // Latest value per packageId + entryId; a state computed for another installed tree is not the package's state.
+  const languageStates = new Map<string, Map<string, PackageLanguageStatusMessage>>()
   const reply = (post: (message: CodePuppySidecarOutbound) => void, message: CodePuppySidecarOutbound) => {
     try {
       post(message)
     } catch (error) {
-      deps.log(`alpha sidecar: reply ${message.type} could not be delivered: ${error instanceof Error ? error.message : String(error)}`)
+      deps.log(`alpha sidecar: reply ${"type" in message ? message.type : `#${message.id}`} could not be delivered: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
   return {
@@ -577,6 +598,26 @@ export function createCodePuppySidecarHost(deps: {
         unattendedRuns.acknowledge(inbound)
         return true
       }
+      if (inbound.type === "codepuppy.package.lsp.status") {
+        const states = languageStates.get(inbound.packageId) ?? new Map<string, PackageLanguageStatusMessage>()
+        for (const [entryId, state] of states) if (state.treeDigest !== inbound.treeDigest) states.delete(entryId)
+        states.set(inbound.entryId, inbound)
+        languageStates.set(inbound.packageId, states)
+        deps.languageStatusChanged()
+        return true
+      }
+      if (inbound.type === "codepuppy.package.source") {
+        const write = deps.nativeSources
+        if (!write) { reply(post, buildNativeFileSyncReply(inbound.id, { code: "unavailable", message: "native source bindings are unavailable in this host" })); return true }
+        write(inbound.directory, inbound.sources).then(
+          (written) => {
+            if (!written.ok) deps.log(`alpha sidecar: native source sync not written: ${written.reason}`)
+            reply(post, buildNativeFileSyncReply(inbound.id, written.ok ? { states: written.states } : { code: "write-failed", message: "native source bindings could not be written" }))
+          },
+          () => reply(post, buildNativeFileSyncReply(inbound.id, { code: "write-failed", message: "native source bindings could not be written" })),
+        )
+        return true
+      }
       if (inbound.type === "codepuppy.package.location.ready") {
         deps.reloads.locationReady(inbound.directory)
         return true
@@ -584,13 +625,25 @@ export function createCodePuppySidecarHost(deps: {
       deps.reloads.receiveReport(inbound)
       return true
     },
+    openLanguageFile(projectRoot, fileUri) {
+      for (const post of posts) reply(post, buildPackageLanguageOpen(projectRoot, fileUri))
+    },
+    languageServers(packageId, treeDigest) {
+      const states = languageStates.get(packageId)
+      if (!states) return []
+      for (const [entryId, state] of states) if (state.treeDigest !== treeDigest) states.delete(entryId)
+      if (!states.size) languageStates.delete(packageId)
+      return [...states.values()].map(({ sourceName, state, detail }) => ({ sourceName, state, ...(detail === undefined ? {} : { detail }) }))
+    },
     attach(post, generation, inspect) {
       const connection={}
       videoConnection=connection
       const detachNetwork = process.platform === "darwin" && generation !== undefined && inspect ? networkEgressActivity.attach(generation, post, inspect) : undefined
       const detachUnattended = unattendedRuns.attach(post)
       const detachReloads = deps.reloads.attach(post)
+      posts.add(post)
       return (reason) => {
+        posts.delete(post)
         detachNetwork?.()
         detachUnattended(reason)
         detachReloads(reason)

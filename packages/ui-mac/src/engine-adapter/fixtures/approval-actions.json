@@ -1,11 +1,11 @@
 {
- "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at b2159eddb7: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Approval action parity: POST /api/session/:id/permission, under a sampler-only agent whose rules ask for every request (added to the global config after every other scenario; a session-row ask no longer decides anything since I-13 L2), creates shell and subagent capability requests without policy metadata, plus a shell request with the frozen I7a metadata.policy keys supplied to the public API; each request here is the raw GET /api/session/:id/permission/:requestID response. This samples the engine's public permission API, as permission-reply does, not a model/tool invocation; no ext runs here. The comparison's expected v1 actions come from the Code Puppy command/delegation cards, never from the translator's response.",
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at 07c48fa108: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Approval action parity: POST /api/session/:id/permission, under a sampler-only agent whose rules ask for every request (added to the global config after every other scenario; a session-row ask no longer decides anything since I-13 L2), creates shell and subagent capability requests without policy metadata, plus a shell request with the frozen I7a metadata.policy keys supplied to the public API; each request here is the raw GET /api/session/:id/permission/:requestID response. This samples the engine's public permission API, as permission-reply does, not a model/tool invocation; no ext runs here. The comparison's expected v1 actions come from the Code Puppy command/delegation cards, never from the translator's response.",
  "cases": [
   {
    "name": "shell",
    "request": {
-    "id": "per_21bd10e8e001RFJrYR9O3JHMBZ",
-    "sessionID": "ses_de42f9921ffeA4f4TqUxgxWjz9",
+    "id": "per_21c07b4e5001A7zUFhr7an2Z9N",
+    "sessionID": "ses_de3f8fa1affevNRGqdjm9J1mmo",
     "action": "shell",
     "resources": [
      "echo parity"
@@ -18,8 +18,8 @@
   {
    "name": "subagent",
    "request": {
-    "id": "per_21bd10e8f0012y1JSHvPcLFFIM",
-    "sessionID": "ses_de42f9921ffeA4f4TqUxgxWjz9",
+    "id": "per_21c07b4e5003TC8NDH0IAH5DJc",
+    "sessionID": "ses_de3f8fa1affevNRGqdjm9J1mmo",
     "action": "subagent",
     "resources": [
      "general"
@@ -32,8 +32,8 @@
   {
    "name": "policy",
    "request": {
-    "id": "per_21bd10e90001nAevYeEl41Kf3G",
-    "sessionID": "ses_de42f9921ffeA4f4TqUxgxWjz9",
+    "id": "per_21c07b4e7001trD9d5dXiyX7lM",
+    "sessionID": "ses_de3f8fa1affevNRGqdjm9J1mmo",
     "action": "shell",
     "resources": [
      "echo policy"
@@ -65,13 +65,13 @@
    "packages/cli": "544883d154af3d90d64f2638bef467852fe252aa",
    "packages/client": "e26577f3039069a20df20d8c12f792a3531418e8",
    "packages/codemode": "eb7ca2279c0d93a2e967709e18346f3aa31a8e23",
-   "packages/core": "76f28ea0899dfd15a3250331072336ff4b378df2",
+   "packages/core": "6b1fa786e22b3b1c186211ff2e9ed9c334f353bf",
    "packages/latex": "abcd38e17eb09d996d975964f46be0a2e758fdf4",
    "packages/merman": "3feaef89d940956096deb30e2b9f85f3fabdfe15",
    "packages/plugin": "48a38c34119cadafea4aa24dc0b24e4562e9065f",
    "packages/plugin-browser": "a3fd121205a803d1a82d97514cc09245010656cb",
    "packages/protocol": "3117071f374c96909ccc2250cd5333a11d521854",
-   "packages/schema": "4cd8daa401b367558abcef152d86240b94e4d8f5",
+   "packages/schema": "935f6d8a0da4e68ffb7fec8b8002b2431e7155d1",
    "packages/server": "48bfa1e931af6e4c7d973119e173d28124aaa53d",
    "packages/simulation": "7b707eb9b69aa826e91677a8416cfb8cda3efcf5",
    "packages/theme": "0afba31d85d03fa7e34f8a98a38ccf355d6ec6c5",

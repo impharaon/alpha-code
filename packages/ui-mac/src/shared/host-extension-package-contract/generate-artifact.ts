@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import pluginDescription from "./testvectors/plugin-package-description.v1.json"
+import languageServerDescription from "./testvectors/plugin-package-lsp-description.v1.json"
 
 import { createHash } from "node:crypto"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
@@ -32,6 +33,7 @@ export const HOST_EXTENSION_PACKAGE_ARTIFACT_FILES = [
   "registry.ts",
   "synthetic-decoder.ts",
   "testvectors/plugin-package-description.v1.json",
+  "testvectors/plugin-package-lsp-description.v1.json",
   HOST_EXTENSION_PACKAGE_CORPUS,
 ] as const
 
@@ -207,6 +209,7 @@ const mcpRemotePayload = (
 export function decoderCorpusBytesV1(): Uint8Array {
   const cases: CorpusCase[] = [
     single("plugin-package-real-superpowers-v1", "plugin-package", [], { schema: "codepuppy.host-extension-package.payload.plugin-package.v1", description: pluginDescription, blobs: [...new Map(pluginDescription.tree.filter(node => node.kind === "file" && node.bytes > 0).map(node => [node.digest, { sha256: node.digest.slice(7), bytes: node.bytes, mediaType: "application/octet-stream", url: "https://example.invalid/blobs/" + node.digest.slice(7) }])).values()] }),
+    single("plugin-package-real-pyright-lsp-v1", "plugin-package", [], { schema: "codepuppy.host-extension-package.payload.plugin-package.v1", description: languageServerDescription, blobs: languageServerDescription.tree.map(node => ({ sha256: node.digest.slice(7), bytes: node.bytes, mediaType: "application/octet-stream", url: "https://example.invalid/blobs/" + node.digest.slice(7) })) }),
     single("skill-v1", "skill", [], skillPayload("skill")),
     // `#828`:多文件技能是**正向**语料的一等成员,不是边角。消费方(发布端)据此知道
     // 「这条路今天能装多文件」——只发一条单文件语料时,那件事对下游是不可见的。

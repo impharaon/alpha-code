@@ -11,7 +11,7 @@ import { convertPluginTree } from "../../ui-mac/src/shared/host-extension-packag
 import { fixtureRoot, captureWholeFixture, captureStandardFixture } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
 import { afterEach, beforeAll, expect } from "bun:test"
 import { createHash } from "node:crypto"
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
@@ -44,8 +44,9 @@ import { codePuppyWebSearchFailureOf } from "./exa-websearch"
 import { buildHubInstallReply, buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { activate, it, packageIt, recordingMcp } from "./plugin-host.harness"
 import { testEffect } from "../../core/test/lib/effect.ts"
+import { tempGlobalLayer } from "../../core/test/fixture/global"
 import { makePluginTestLayer } from "../../core/test/plugin/fixture.ts"
-import { CODEPUPPY_EXPLORE_PROMPT } from "./codepuppy-prompts"
+import { CODEPUPPY_DOCS_PROMPT, CODEPUPPY_EXPLORE_PROMPT } from "./codepuppy-prompts"
 import { TOOL_TEXT, explainAttachmentBlock, explainVisionBlock } from "./context-injection"
 import { STAGED_ATTACHMENT_PART_NAME, stagedAttachmentPart } from "./staged-attachment-part"
 import { canonicalToolIdentity } from "../../schema/src/tool-identity"
@@ -1721,7 +1722,7 @@ const invocationSample = (name: string, changes: Record<string, string | null> =
   writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: converted.package.entries.filter(entry => ["skill", "command", "agent"].includes(entry.kind)).map(entry => entry.kind + "--" + hostNames[entry.id]), scoped: [], mcp: converted.package.entries.filter(entry => entry.kind === "mcp").map(entry => ({ name: hostNames[entry.id], enabled: true })) }))
   return { root, key, live, description: converted.package, hostNames }
 })
-const packageJourney = <A, E, R>(program: Effect.Effect<A, E, R>, before?: Plugin.Plugin) => Effect.gen(function* () {
+const packageJourney = <A, E, R>(program: Effect.Effect<A, E, R>, before?: Plugin.Plugin, alias?: string) => Effect.gen(function* () {
   env({})
   const sdk = yield* SdkPlugins.Service
   yield* sdk.register(PluginPromise.fromPromise(providerPlugin("test", "https://test.invalid", "picked", "source-sonnet")))
@@ -1737,7 +1738,9 @@ const packageJourney = <A, E, R>(program: Effect.Effect<A, E, R>, before?: Plugi
   yield* sdk.register(PluginPromise.fromPromise(CodePuppyExt))
   const location = yield* Location.Service
   const locations = yield* LocationServiceMap.Service
-  return yield* program.pipe(Effect.provide(locations.get({ directory: location.directory })))
+  // An alias opens the same real project through a symbolic link, as a user-chosen path can.
+  if (alias) symlinkSync(location.directory, alias)
+  return yield* program.pipe(Effect.provide(locations.get({ directory: alias ?? location.directory })))
 })
 const invocationNativeServices = Effect.gen(function* () {
   yield* (yield* Plugins.Service).awaitActivation
@@ -2049,6 +2052,260 @@ packageIt.live("package SessionStart hooks run before the first model request an
   yield* sessions.prompt({ sessionID: second.id, text: "Package is disabled" })
   yield* sessions.wait(second.id)
   expect(JSON.stringify((yield* llm.requests())[1])).not.toContain("You are in 'learning' output style mode")
+})))
+
+// Pinned pyright-lsp declaration with its command replaced by the controlled stdio protocol server.
+const languageSample = Effect.gen(function* () {
+  const record = join(scratch, "language-server-" + Math.random().toString(36).slice(2) + ".jsonl")
+  const original = yield* Effect.promise(() => captureStandardFixture("claude:pyright-lsp"))
+  const manifest = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => original.readFile(".claude-plugin/plugin.json"))))
+  manifest.lspServers.pyright = { ...manifest.lspServers.pyright, command: process.execPath, args: [join(import.meta.dir, "plugin-package-language.server.ts")], env: { LSP_FIXTURE_RECORD: record } }
+  const sample = yield* invocationSample("claude:pyright-lsp", { ".claude-plugin/plugin.json": JSON.stringify(manifest) })
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [sample.key], scoped: [], mcp: [] }))
+  const events = () => { try { return readFileSync(record, "utf8").trim().split("\n").map(line => JSON.parse(line) as { pid: number; event: string }) } catch { return [] } }
+  return { ...sample, events }
+})
+const fakeBridge = Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const sent: unknown[] = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge: createHubBridge({ postMessage: message => { sent.push(message) }, on: (_, listener) => { listeners.push(listener) } }) }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  return { sent, deliver: (data: unknown) => listeners.forEach(listener => listener({ data })) }
+})
+
+packageIt.live("package language server diagnostics reach the edit result and stop with the package", () => Effect.gen(function* () {
+  const bridge = yield* fakeBridge
+  yield* packageJourney(Effect.gen(function* () {
+    const sample = yield* languageSample
+    yield* invocationNativeServices
+    yield* activateExtUntilFinished
+    const location = yield* Location.Service
+    const session = yield* (yield* Sessions.Service).create({ location: { directory: location.directory }, title: "Language diagnostics", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    const write = (id: string, path: string, content: string) => snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: ("msg_" + id) as never, call: { type: "tool-call", name: "write", id, input: { path, content } } })
+    const notes = yield* write("language_notes", "notes.md", 'count: int = "not a number"\n')
+    expect(JSON.stringify(notes.content)).not.toContain("Language server")
+    expect(sample.events()).toEqual([])
+    const typed = yield* write("language_typed", "typed.py", 'import os\ncount: int = "not a number"\n')
+    expect(JSON.stringify(typed.content)).toContain('typed.py:2:1 error Type \\"str\\" is not assignable to declared type \\"int\\" [reportAssignmentType]')
+    const [started] = sample.events().filter(event => event.event === "start")
+    expect(started).toBeDefined()
+    expect(bridge.sent.filter(message => (message as { type?: string }).type === "codepuppy.package.lsp.status").map(message => (message as { state: string }).state)).toEqual(["enabled", "diagnostics-ready"])
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+    const alive = () => { try { process.kill(started!.pid, 0); return true } catch { return false } }
+    for (let waited = 0; waited < 5000 && alive(); waited += 20) yield* Effect.sleep("20 millis")
+    expect(alive()).toBe(false)
+  }))
+}))
+
+packageIt.live("an aliased project Location runs its project-scoped language server", () => Effect.gen(function* () {
+  yield* fakeBridge
+  yield* packageJourney(Effect.gen(function* () {
+    const sample = yield* languageSample
+    const location = yield* Location.Service
+    // Receipts carry the project's real path; this Location was opened through an alias of it.
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [{ kind: "bundle", name: sample.key.slice("bundle--".length), projectPath: realpathSync(location.directory) }], mcp: [] }))
+    yield* invocationNativeServices
+    yield* activateExtUntilFinished
+    const session = yield* (yield* Sessions.Service).create({ location: { directory: location.directory }, title: "Aliased project", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    const typed = yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_alias_typed" as never, call: { type: "tool-call", name: "write", id: "language_alias", input: { path: "typed.py", content: 'count: int = "x"\n' } } })
+    expect(JSON.stringify(typed.content)).toContain("typed.py:1:1 error")
+  }), undefined, join(scratch, "aliased-project-" + Math.random().toString(36).slice(2)))
+}))
+
+packageIt.live("patch results get diagnostics for each applied file", () => Effect.gen(function* () {
+  yield* fakeBridge
+  yield* packageJourney(Effect.gen(function* () {
+    yield* languageSample
+    yield* invocationNativeServices
+    yield* activateExtUntilFinished
+    const location = yield* Location.Service
+    writeFileSync(join(location.directory, "existing.py"), "value = 1\n")
+    const session = yield* (yield* Sessions.Service).create({ location: { directory: location.directory }, title: "Patch diagnostics", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    const patchText = ["*** Begin Patch", "*** Add File: added.py", '+count: int = "added"', "*** Update File: existing.py", "@@", "-value = 1", '+total: int = "updated"', "*** Add File: notes.md", "+plain text", "*** End Patch"].join("\n")
+    const patched = yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_patch_language" as never, call: { type: "tool-call", name: "patch", id: "language_patch", input: { patchText } } })
+    const text = JSON.stringify(patched.content)
+    expect(text).toContain("added.py:1:1 error")
+    expect(text).toContain("existing.py:1:1 error")
+    expect(text).not.toContain("for notes.md")
+  }))
+}))
+
+packageIt.live("preview diagnostics reach the next request of that project once", () => Effect.gen(function* () {
+  const bridge = yield* fakeBridge
+  yield* packageJourney(Effect.gen(function* () {
+    const sample = yield* languageSample
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const location = yield* Location.Service
+    writeFileSync(join(location.directory, "opened.py"), 'count: int = "not a number"\n')
+    const { pathToFileURL } = yield* Effect.promise(() => import("node:url"))
+    bridge.deliver({ type: "codepuppy.package.lsp.open", projectRoot: location.directory, fileUri: pathToFileURL(join(location.directory, "opened.py")).href })
+    yield* ext.finish(Effect.sync(() => bridge.sent.some(message => (message as { state?: string }).state === "diagnostics-ready")))
+    const sessions = yield* Sessions.Service
+    const llm = yield* TestLLM.Test
+    for (const [id, text] of [["first", "Look at the open file"], ["second", "Again"]] as const) {
+      const session = yield* sessions.create({ location: { directory: location.directory }, title: "Preview " + id, agent: "build", model: { providerID: "test", id: "picked" } } as never)
+      yield* llm.push(TestLLM.text("Answer " + id, "preview-" + id))
+      yield* sessions.prompt({ sessionID: session.id, text })
+      yield* sessions.wait(session.id)
+    }
+    const [first, second] = yield* llm.requests()
+    expect(JSON.stringify(first!.system)).toContain("Language server diagnostics from a file opened in the app: pyright (diagnostics-ready) for opened.py")
+    expect(JSON.stringify(first!.system)).toContain("opened.py:1:1 error")
+    expect(JSON.stringify(second!.system)).not.toContain("Language server diagnostics")
+    expect(sample.events().filter(event => event.event === "start")).toHaveLength(1)
+  }))
+}))
+
+const USER_SYSTEM = "USER OWNED PRIMARY SYSTEM"
+packageIt.live("package output styles select through the command entry and leave with their package", () => packageJourney(Effect.gen(function* () {
+  const original = yield* Effect.promise(() => captureStandardFixture("claude:dominodatalab"))
+  const learning = new TextDecoder().decode(yield* Effect.promise(() => original.readFile("output-styles/domino-learning.md")))
+  const install = (changes: Record<string, string> = {}) => Effect.gen(function* () {
+    const sample = yield* invocationSample("claude:dominodatalab", changes)
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [sample.key], scoped: [], mcp: [] }))
+    return sample
+  })
+  const sample = yield* install()
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const styleCommand = commands.list().pipe(Effect.map(list => list.find(item => item.name === "output-style")?.description ?? ""))
+  yield* ext.finish(styleCommand.pipe(Effect.map(description => description.includes("Domino Learning") && description.includes("Domino MLOps"))))
+  const sessions = yield* Sessions.Service
+  const llm = yield* TestLLM.Test
+  const location = yield* Location.Service
+  const select = (sessionID: Session.ID, text: string) => commands.execute({ name: "output-style", invocation: { sessionID, prompt: { text }, delivery: "queue" } })
+  const turn = (sessionID: Session.ID, label: string) => Effect.gen(function* () {
+    yield* llm.push(TestLLM.text("Styled " + label, "style-" + label))
+    yield* sessions.prompt({ sessionID, text: "Work on " + label })
+    yield* sessions.wait(sessionID)
+    return JSON.stringify((yield* llm.requests()).at(-1)?.system)
+  })
+  const STYLE = "# Domino Learning Mode"
+  const CODING = "a coding agent harness"
+  // The instructions part carries user/project instruction sources and the real environment; it is not a coding prompt.
+  const INSTRUCTIONS = '"key":"core/environment"'
+  const main = yield* sessions.create({ location: { directory: location.directory }, title: "Styled session", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const unstyled = yield* turn(main.id, "default")
+  expect(unstyled).toContain(CODING)
+  expect(unstyled).not.toContain(STYLE)
+  expect(Exit.isFailure(yield* select(main.id, "Missing Style").pipe(Effect.exit))).toBe(true)
+  yield* select(main.id, "Domino Learning")
+  const kept = yield* turn(main.id, "kept")
+  expect(kept).toContain(STYLE)
+  expect(kept).toContain(CODING)
+
+  // The copy differs from the pinned source only in keep-coding-instructions.
+  yield* install({ "output-styles/domino-learning.md": learning.replace("keep-coding-instructions: true", "keep-coding-instructions: false") })
+  yield* select(main.id, "Domino Learning")
+  const replaced = yield* turn(main.id, "replaced")
+  expect(replaced).toContain(STYLE)
+  expect(replaced).not.toContain(CODING)
+  expect(replaced).toContain("# Your Model")
+  expect(replaced).toContain(INSTRUCTIONS)
+  const docs = yield* sessions.create({ location: { directory: location.directory }, title: "Styled docs", agent: "docs", model: { providerID: "test", id: "picked" } } as never)
+  yield* select(docs.id, "Domino Learning")
+  const docsSystem = yield* turn(docs.id, "docs")
+  expect(docsSystem).toContain(STYLE)
+  expect(docsSystem).not.toContain(CODEPUPPY_DOCS_PROMPT.split("\n")[0]!)
+  // The user's own docs prompt, written by the engine's configuration plugin after ext, is not ext's bytes: it stays.
+  const USER_DOCS = "USER REWRITTEN DOCS PROMPT"
+  yield* configAgents({ agent: { docs: { prompt: USER_DOCS } } }).pipe(Effect.provide(tempGlobalLayer))
+  const userDocs = yield* sessions.create({ location: { directory: location.directory }, title: "Styled user docs", agent: "docs", model: { providerID: "test", id: "picked" } } as never)
+  yield* select(userDocs.id, "Domino Learning")
+  const userDocsSystem = yield* turn(userDocs.id, "user-docs")
+  expect(userDocsSystem).toContain(STYLE)
+  expect(userDocsSystem).toContain(USER_DOCS)
+  const owned = yield* sessions.create({ location: { directory: location.directory }, title: "Styled user agent", agent: "user-primary", model: { providerID: "test", id: "picked" } } as never)
+  yield* select(owned.id, "Domino Learning")
+  const ownedSystem = yield* turn(owned.id, "owned")
+  expect(ownedSystem).toContain(STYLE)
+  expect(ownedSystem).toContain(USER_SYSTEM)
+
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  yield* commands.reload()
+  expect(yield* styleCommand).not.toContain("Domino Learning")
+  expect(Exit.isFailure(yield* select(main.id, "Domino MLOps").pipe(Effect.exit))).toBe(true)
+  const closed = yield* turn(main.id, "closed")
+  expect(closed).not.toContain(STYLE)
+  expect(closed).toContain(CODING)
+  expect(JSON.stringify((yield* sessions.get(main.id)).metadata ?? {})).not.toContain(sample.key)
+
+  // Off then on again before the next message: closing already withdrew the choice, so it does not come back.
+  const enable = (on: boolean) => writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: on ? [sample.key] : [], scoped: [], mcp: [] }))
+  enable(true)
+  yield* commands.reload()
+  yield* select(main.id, "Domino Learning")
+  expect(JSON.stringify((yield* sessions.get(main.id)).metadata)).toContain(sample.key)
+  enable(false)
+  const withdrawn = sessions.get(main.id).pipe(Effect.map(session => !JSON.stringify(session.metadata ?? {}).includes(sample.key)))
+  for (let waited = 0; waited < 3000 && !(yield* withdrawn); waited += 20) yield* Effect.sleep("20 millis")
+  expect(yield* withdrawn).toBe(true)
+  enable(true)
+  expect(yield* turn(main.id, "reopened")).not.toContain(STYLE)
+}), { id: "test.user-primary-agent", async setup(context) {
+  await context.agent.transform(editor => editor.update("user-primary", agent => { agent.mode = "primary"; agent.system = USER_SYSTEM }))
+} }))
+
+packageIt.live("a package default agent leads new sessions until the user chooses or the package closes", () => packageJourney(Effect.gen(function* () {
+  const sample = yield* invocationSample("claude:agentforce-adlc")
+  const allowed = readFileSync(join(sample.root, "skills-enabled.json"), "utf8")
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const agents = yield* Agent.Service
+  const orchestrator = sample.hostNames["agent:agents/adlc-orchestrator.md"]!
+  const selected = agents.select().pipe(Effect.map(selection => selection.id))
+  yield* ext.finish(selected.pipe(Effect.map(id => id === orchestrator)))
+  const sessions = yield* Sessions.Service
+  const llm = yield* TestLLM.Test
+  const location = yield* Location.Service
+  const turn = (agent: string | undefined, label: string) => Effect.gen(function* () {
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Main agent " + label, ...(agent ? { agent } : {}), model: { providerID: "test", id: "picked" } } as never)
+    yield* llm.push(TestLLM.text("Main " + label, "main-" + label))
+    yield* sessions.prompt({ sessionID: session.id, text: "Plan an agent " + label })
+    yield* sessions.wait(session.id)
+    const request = (yield* llm.requests()).at(-1)!
+    return { system: JSON.stringify(request.system), tools: JSON.stringify(request.tools) }
+  })
+  const BODY = "You are the **ADLC Orchestrator**"
+  const led = yield* turn(undefined, "default")
+  expect(led.system).toContain(BODY)
+  expect(led.system).toContain("Automated testing for Agentforce agents")
+  expect(led.tools).toContain('"name":"read"')
+  expect(led.tools).not.toContain('"name":"write"')
+  const chosen = yield* turn("build", "chosen")
+  expect(chosen.system).not.toContain(BODY)
+  expect(chosen.tools).toContain('"name":"write"')
+
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  yield* agents.reload()
+  expect(yield* selected).toBe("build")
+  expect((yield* turn(undefined, "closed")).system).not.toContain(BODY)
+  // A session running before the package is enabled keeps the default it started with.
+  const running = yield* sessions.create({ location: { directory: location.directory }, title: "Running before enable", model: { providerID: "test", id: "picked" } } as never)
+  const next = (label: string) => Effect.gen(function* () {
+    yield* llm.push(TestLLM.text("Running " + label, "running-" + label))
+    yield* sessions.prompt({ sessionID: running.id, text: "Continue " + label })
+    yield* sessions.wait(running.id)
+    return JSON.stringify((yield* llm.requests()).at(-1)!.system)
+  })
+  expect(yield* next("before")).not.toContain(BODY)
+  writeFileSync(join(sample.root, "skills-enabled.json"), allowed)
+  yield* agents.reload()
+  expect(yield* selected).toBe(orchestrator)
+  expect(yield* next("after")).not.toContain(BODY)
+  expect((yield* sessions.get(running.id)).agent).toBe("build")
+  // The engine's own configuration plugin applies the user's default_agent after ext's setup transform.
+  yield* configAgents({ default_agent: "build" }).pipe(Effect.provide(tempGlobalLayer))
+  expect(yield* selected).toBe("build")
 })))
 
 packageIt.live("unmatched package model hints use the existing default for commands and delegation", () => packageJourney(Effect.gen(function* () {

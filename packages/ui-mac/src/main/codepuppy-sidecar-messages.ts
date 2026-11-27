@@ -5,6 +5,7 @@ import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
 import type { ToolPolicyPartition, ToolPolicyRecord } from "../../../schema/src/codepuppy-tool-policy"
+import { NATIVE_FILE_KINDS, type NativeFileRef, type NativeFileSource, type NativeFileState } from "../../../schema/src/codepuppy-project-config"
 import type { PackageManagerExecutionLease, PreparedShellExecution } from "@opencode/plugin/codepuppy-package-manager"
 
 export const PACKAGE_MANAGER_CANCEL_REASONS = ["cancelled", "timeout", "engine-disconnected", "app-quitting"] as const
@@ -181,7 +182,79 @@ export function buildPackageLocationReady(directory: string): PackageLocationRea
   return { type: "codepuppy.package.location.ready", directory }
 }
 
+/** Design v3.4 R-l: the ext language-server runtime is the only producer of an lsp entry's runtime state. */
+export const LANGUAGE_SERVER_STATES_V1 = ["enabled", "dependency-missing", "start-error", "protocol-error", "diagnostics-ready"] as const
+export type LanguageServerStateV1 = (typeof LANGUAGE_SERVER_STATES_V1)[number]
+/** treeDigest is the installed package tree the state was computed for; main shows it only while that tree is current. */
+export type PackageLanguageStatusMessage = { type: "codepuppy.package.lsp.status"; packageId: string; entryId: string; sourceName: string; treeDigest: string; state: LanguageServerStateV1; detail?: string }
+export function buildPackageLanguageStatus(input: Omit<PackageLanguageStatusMessage, "type">): PackageLanguageStatusMessage {
+  return { type: "codepuppy.package.lsp.status", packageId: input.packageId, entryId: input.entryId, sourceName: input.sourceName, treeDigest: input.treeDigest, state: input.state, ...(input.detail === undefined ? {} : { detail: input.detail }) }
+}
+/** main → ext: a successful workspace preview open, carrying only the project root and file URI (S-02). */
+export type PackageLanguageOpenMessage = { type: "codepuppy.package.lsp.open"; projectRoot: string; fileUri: string }
+export function buildPackageLanguageOpen(projectRoot: string, fileUri: string): PackageLanguageOpenMessage {
+  return { type: "codepuppy.package.lsp.open", projectRoot, fileUri }
+}
+export function parsePackageLanguageOpen(value: unknown): PackageLanguageOpenMessage | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.package.lsp.open" || !Object.keys(value).every(key => ["type", "projectRoot", "fileUri"].includes(key))) return
+  return isText(value.projectRoot) && isText(value.fileUri) && value.fileUri.startsWith("file://") ? buildPackageLanguageOpen(value.projectRoot, value.fileUri) : undefined
+}
+
+// ── D6 原生文件来源同步(DESIGN-local-plugin-install §4.6,形状逐字)──────────────────────────────────────────────
+// ext → main:本代发现的原生文件来源;main 只落账并交回绑定状态。应答按 §4.6 不带 type,按 id 结算。
+export type NativeFileSync = { type: "codepuppy.package.source"; operation: "sync"; id: number; directory: string; sources: NativeFileSource[] }
+export type NativeFileSyncReply =
+  | { id: number; ok: true; states: NativeFileState[] }
+  | { id: number; ok: false; code: "write-failed" | "unavailable"; message: string }
+
+export function buildNativeFileSync(input: { id: number; directory: string; sources: NativeFileSource[] }): NativeFileSync {
+  return { type: "codepuppy.package.source", operation: "sync", id: input.id, directory: input.directory, sources: input.sources }
+}
+
+export function buildNativeFileSyncReply(id: number, result: { states: NativeFileState[] } | { code: "write-failed" | "unavailable"; message: string }): NativeFileSyncReply {
+  return "states" in result ? { id, ok: true, states: result.states } : { id, ok: false, code: result.code, message: result.message }
+}
+
+function parseNativeFileRef(value: unknown, extra: readonly string[]): NativeFileRef | undefined {
+  if (!isRecord(value) || !Object.keys(value).every((key) => ["file", "kind", "entry", "target", ...extra].includes(key))) return
+  if (!isText(value.file) || !NATIVE_FILE_KINDS.includes(value.kind as never) || !isText(value.entry)) return
+  if (value.target !== undefined && !isText(value.target)) return
+  return { file: value.file, kind: value.kind as NativeFileRef["kind"], entry: value.entry, ...(value.target !== undefined ? { target: value.target as string } : {}) }
+}
+
+export function parseNativeFileSync(value: unknown): NativeFileSync | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.package.source" || value.operation !== "sync") return
+  if (!Object.keys(value).every((key) => ["type", "operation", "id", "directory", "sources"].includes(key))) return
+  if (!isId(value.id) || !isText(value.directory) || !Array.isArray(value.sources)) return
+  const sources: NativeFileSource[] = []
+  for (const item of value.sources) {
+    const ref = parseNativeFileRef(item, ["active"])
+    if (!ref || typeof (item as { active?: unknown }).active !== "boolean") return
+    sources.push({ ...ref, active: (item as { active: boolean }).active })
+  }
+  return buildNativeFileSync({ id: value.id, directory: value.directory, sources })
+}
+
+export function parseNativeFileSyncReply(value: unknown): NativeFileSyncReply | undefined {
+  if (!isRecord(value) || !isId(value.id)) return
+  if (value.ok === false)
+    return Object.keys(value).every((key) => ["id", "ok", "code", "message"].includes(key)) && (value.code === "write-failed" || value.code === "unavailable") && isOptionalText(value.message) && typeof value.message === "string"
+      ? { id: value.id, ok: false, code: value.code, message: value.message }
+      : undefined
+  if (value.ok !== true || !Object.keys(value).every((key) => ["id", "ok", "states"].includes(key)) || !Array.isArray(value.states)) return
+  const states: NativeFileState[] = []
+  for (const item of value.states) {
+    const ref = parseNativeFileRef(item, ["desiredState", "removed"])
+    const state = item as { desiredState?: unknown; removed?: unknown }
+    if (!ref || (state.desiredState !== "enabled" && state.desiredState !== "disabled") || typeof state.removed !== "boolean") return
+    states.push({ ...ref, desiredState: state.desiredState, removed: state.removed })
+  }
+  return { id: value.id, ok: true, states }
+}
+
 export type CodePuppySidecarInbound =
+  | PackageLanguageStatusMessage
+  | NativeFileSync
   | PackageLocationReadyMessage
   | PackageManagerControlRequest
   | WriteScopeRequest
@@ -197,6 +270,8 @@ export type CodePuppySidecarOutbound =
   | PackageManagerControlReply
   | WriteScopeReply
   | VideoBridgeReply
+  | PackageLanguageOpenMessage
+  | NativeFileSyncReply
   | NetworkOutbound
   | ReloadRequestMessage
   | PackageAuthorizationReply
@@ -247,6 +322,14 @@ export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarIn
   const video=parseVideoBridgeRequest(value)
   if(video)return video
   if (!isRecord(value)) return
+  if (value.type === "codepuppy.package.lsp.status")
+    return isText(value.packageId, 512) && isText(value.entryId, 1024) && typeof value.sourceName === "string" && value.sourceName.length <= 512 &&
+      (LANGUAGE_SERVER_STATES_V1 as readonly unknown[]).includes(value.state) && (value.detail === undefined || isText(value.detail, 512)) &&
+      typeof value.treeDigest === "string" && /^sha256:[a-f0-9]{64}$/.test(value.treeDigest) &&
+      Object.keys(value).every(key => ["type", "packageId", "entryId", "sourceName", "treeDigest", "state", "detail"].includes(key))
+      ? buildPackageLanguageStatus({ packageId: value.packageId, entryId: value.entryId, sourceName: value.sourceName, treeDigest: value.treeDigest, state: value.state as LanguageServerStateV1, ...(typeof value.detail === "string" ? { detail: value.detail } : {}) })
+      : undefined
+  if (value.type === "codepuppy.package.source") return parseNativeFileSync(value)
   if (value.type === "codepuppy.package.location.ready")
     return isText(value.directory) && Object.keys(value).every(key => ["type", "directory"].includes(key)) ? buildPackageLocationReady(value.directory) : undefined
   if (value.type === "codepuppy.package-manager.request") return parsePackageManagerControlRequest(value)

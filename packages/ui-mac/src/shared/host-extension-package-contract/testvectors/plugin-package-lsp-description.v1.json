@@ -1,0 +1,57 @@
+{
+  "schema": "codepuppy.plugin-package.v1",
+  "provider": "claude-code",
+  "name": "pyright-lsp",
+  "version": "1.0.0",
+  "description": "Python language server (Pyright) for type checking and code intelligence",
+  "source": {
+    "kind": "marketplace",
+    "locator": "https://github.com/anthropics/claude-plugins-official",
+    "repository": "https://github.com/anthropics/claude-plugins-official",
+    "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+    "pluginPath": "plugins/pyright-lsp",
+    "entryName": "pyright-lsp",
+    "ecosystem": "claude"
+  },
+  "materialization": "copy",
+  "tree": [
+    {
+      "kind": "file",
+      "path": ".claude-plugin/plugin.json",
+      "mode": 420,
+      "bytes": 441,
+      "digest": "sha256:2cf083ce0ec6aa27c25ba7dd3b1cc37868f899f1bd77a9431949703e888c4c1d"
+    }
+  ],
+  "treeDigest": "sha256:7c70284c1d59560a34fb8919fa34c90da19fddd4dad7907af7d7440b635751e7",
+  "entries": [
+    {
+      "kind": "lsp",
+      "id": "lsp:.claude-plugin/plugin.json#pyright",
+      "sourcePath": ".claude-plugin/plugin.json",
+      "sourceName": "pyright",
+      "server": {
+        "command": [
+          "pyright-langserver"
+        ],
+        "args": [
+          [
+            "--stdio"
+          ]
+        ],
+        "extensionToLanguage": {
+          ".py": "python",
+          ".pyi": "python"
+        },
+        "transport": "stdio",
+        "env": {},
+        "restartOnCrash": true,
+        "diagnostics": true
+      }
+    }
+  ],
+  "secrets": [],
+  "options": {},
+  "defaults": {},
+  "diagnostics": []
+}

@@ -119,6 +119,22 @@ const layer = Layer.effect(
       ]
     })
 
+    // codepuppy(#1804, U-45) ── owner 2026-11-27 「允许改这一处（推荐）」: stopping the engine interrupts the turn after rejecting
+    // pending approvals. A post-hook chain that has started finishes first; an interruption that arrived meanwhile takes
+    // effect right after it, recording the hooks' result as the call's last snapshot, so the interrupted record keeps what
+    // the hooks returned instead of the progress before them. A call that is not interrupted publishes nothing extra.
+    const afterHooks = (
+      event: PluginHooks.Domains["tool"]["execute.after"],
+      metadata: () => Tool.Metadata | undefined,
+      settle: ((metadata: Tool.Metadata | undefined) => Effect.Effect<void>) | undefined,
+    ) =>
+      Effect.uninterruptibleMask((restore) =>
+        hooks.trigger("tool", "execute.after", event).pipe(
+          Effect.andThen(restore(Effect.yieldNow).pipe(Effect.onInterrupt(() => settle?.(metadata()) ?? Effect.void))),
+        ),
+      )
+    // codepuppy ── end
+
     const beforeExecute = (name: string, input: unknown, context: Tool.Context) =>
       hooks.trigger("tool", "execute.before", {
         tool: name,
@@ -134,6 +150,8 @@ const layer = Layer.effect(
       name: string,
       input: unknown,
       context: Tool.Context,
+      // codepuppy(#1804, U-45): records the post-hook chain's result as the call's last snapshot.
+      settle?: (metadata: Tool.Metadata | undefined) => Effect.Effect<void>,
     ) {
       yield* Effect.annotateCurrentSpan({
         "gen_ai.tool.name": name,
@@ -158,7 +176,7 @@ const layer = Layer.effect(
           status: "error",
           error: execution.failure,
         }
-        yield* hooks.trigger("tool", "execute.after", afterEvent)
+        yield* afterHooks(afterEvent, () => afterEvent.error.metadata, settle)
         return yield* afterEvent.error
       }
       const afterEvent: PluginHooks.Domains["tool"]["execute.after"] = {
@@ -170,7 +188,7 @@ const layer = Layer.effect(
           ...(execution.value.metadata === undefined ? {} : { metadata: execution.value.metadata }),
         },
       }
-      yield* hooks.trigger("tool", "execute.after", afterEvent)
+      yield* afterHooks(afterEvent, () => afterEvent.result.metadata, settle)
       const afterContent = yield* normalizeImages(normalizeContent(afterEvent.result.content, afterEvent.result.output))
       return {
         ...(afterEvent.result.output === undefined ? {} : { output: afterEvent.result.output }),
@@ -320,6 +338,8 @@ const layer = Layer.effect(
                   output: ProtectedFiles.MASKING_FAILED_TEXT,
                   ...(name === "execute" ? { toolCalls: [] } : {}),
                 })
+                // codepuppy(#1804, U-45): what the publisher last holds for this call; the terminal is recorded only if it differs.
+                let last: string | undefined
                 const progress = Effect.fnUntraced(function* (metadata: Tool.Metadata) {
                   const present = yield* hooks.has("tool", "execute.progress")
                   required ||= present
@@ -330,9 +350,17 @@ const layer = Layer.effect(
                     if (Exit.isFailure(exit)) withheld = true
                   }
                   const safe = withheld ? hidden() : update.metadata
+                  last = JSON.stringify(safe)
                   yield* context.progress(safe)
                 })
-                return yield* executeTool(tool, name, event.input, { ...context, progress }).pipe(
+                // codepuppy(#1804, U-45): the post-hook result is already masked by the hooks; withheld keeps it hidden.
+                const settle = (metadata: Tool.Metadata | undefined) => Effect.suspend(() => {
+                  const safe = withheld ? hidden() : metadata
+                  if (safe === undefined || JSON.stringify(safe) === last) return Effect.void
+                  last = JSON.stringify(safe)
+                  return context.progress(safe)
+                })
+                return yield* executeTool(tool, name, event.input, { ...context, progress }, settle).pipe(
                   Effect.map((result) => withheld
                     ? { content: [{ type: "text" as const, text: ProtectedFiles.MASKING_FAILED_TEXT }], metadata: hidden() }
                     : result),

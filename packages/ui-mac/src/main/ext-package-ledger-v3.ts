@@ -110,6 +110,13 @@ export type PackageGraphV1 = PackageGraphAnnotationsV1 & {
   root: PackageGraphNodeV1
   children: PackageGraphNodeV1[]
   pluginTree?: { treeDigest: string; storeKey: string }
+  /** DESIGN-local-plugin-install §4.16: a linked package's root resource; exclusive with pluginTree. */
+  pluginLink?: { bindingId: string; storeKey: string }
+}
+
+/** The bundle store key of a whole plugin package, copied or linked; absent for other packages. */
+export function pluginPackageStoreKey(graph: Pick<PackageGraphV1, "pluginTree" | "pluginLink">): string | undefined {
+  return graph.pluginTree?.storeKey ?? graph.pluginLink?.storeKey
 }
 
 /** 显示名的长度帽。够长到装得下真实插件名,短到不能被当成一个载荷通道。
@@ -236,7 +243,7 @@ export function parseOwnerToken(token: unknown): OwnerToken | null {
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v)
 
 const GRAPH_NODE_KEYS = new Set(["componentId", "kind", "name", "required", "manifestDigest"])
-const GRAPH_KEYS = new Set(["packageId", "envelopeDigest", "displayName", "installedGraphDigest", "root", "children", "source", "effect", "notRunning", "declarations", "pluginTree"])
+const GRAPH_KEYS = new Set(["packageId", "envelopeDigest", "displayName", "installedGraphDigest", "root", "children", "source", "effect", "notRunning", "declarations", "pluginTree", "pluginLink"])
 
 function graphAnnotations(graph: PackageGraphAnnotationsV1): PackageGraphAnnotationsV1 {
   return {
@@ -297,6 +304,7 @@ export function computeInstalledGraphDigest(graph: Omit<PackageGraphV1, "install
       ...(graph.displayName === undefined ? {} : { displayName: graph.displayName }),
       ...graphAnnotations(graph),
       ...(graph.pluginTree ? { pluginTree: graph.pluginTree } : {}),
+      ...(graph.pluginLink ? { pluginLink: graph.pluginLink } : {}),
       root: graph.root,
       children: [...graph.children].sort((a, b) => (a.componentId < b.componentId ? -1 : a.componentId > b.componentId ? 1 : 0)),
     }),
@@ -331,6 +339,7 @@ export function decodePackageGraphV1(input: unknown): Decoded<PackageGraphV1> {
       if (node) children.push(node)
     }
   if (input.pluginTree !== undefined && (!isObj(input.pluginTree) || Object.keys(input.pluginTree).some(key => !["treeDigest", "storeKey"].includes(key)) || typeof input.pluginTree.treeDigest !== "string" || !DIGEST_RE.test(input.pluginTree.treeDigest) || root?.kind !== "bundle" || input.pluginTree.storeKey !== "bundle--" + root?.name)) errors.push("packageGraph.pluginTree: invalid tree resource")
+  if (input.pluginLink !== undefined && (input.pluginTree !== undefined || !isObj(input.pluginLink) || Object.keys(input.pluginLink).some(key => !["bindingId", "storeKey"].includes(key)) || typeof input.pluginLink.bindingId !== "string" || !DIGEST_RE.test(input.pluginLink.bindingId) || root?.kind !== "bundle" || input.pluginLink.storeKey !== "bundle--" + root?.name)) errors.push("packageGraph.pluginLink: invalid link resource")
   if (errors.length > 0 || !root) return { ok: false, errors: errors.length ? errors : ["packageGraph.root: invalid"] }
   // root 必须是 required(基线:非 required 的 root 无意义 —— 整包可跳过就不是一个包)。
   if (!root.required) return { ok: false, errors: ["packageGraph.root.required: root component must be required"] }
@@ -353,6 +362,7 @@ export function decodePackageGraphV1(input: unknown): Decoded<PackageGraphV1> {
     ...(displayName === undefined ? {} : { displayName: displayName as string }),
     ...graphAnnotations(input as PackageGraphAnnotationsV1),
     ...(input.pluginTree ? { pluginTree: input.pluginTree as PackageGraphV1["pluginTree"] } : {}),
+    ...(input.pluginLink ? { pluginLink: input.pluginLink as PackageGraphV1["pluginLink"] } : {}),
     installedGraphDigest: installedGraphDigest as string,
     root,
     children,

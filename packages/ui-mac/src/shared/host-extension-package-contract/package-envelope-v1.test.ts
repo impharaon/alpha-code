@@ -746,6 +746,7 @@ describe("CodePuppyPackageEnvelopeV1 synthetic decoder corpus", () => {
     const cases = corpus.cases.filter((item) => item.expect === "accepted")
     expect(cases.map((item) => item.name)).toEqual([
       "plugin-package-real-superpowers-v1",
+      "plugin-package-real-pyright-lsp-v1",
       "skill-v1",
       "skill-multifile-v1",
       "agent-v1",
@@ -1367,6 +1368,17 @@ function errorsOf(result: ReturnType<typeof decodePackageEnvelopeHeaderV1>): str
   return result.ok ? "" : result.errors.join("\n")
 }
 
+test("plugin-package payloads accept only copied package trees", () => {
+  const payload = caseNamed("plugin-package-real-superpowers-v1").components[0]!.payload! as { description: Record<string, unknown> }
+  expect(decodePackageProfilePayloadV1("plugin-package", jsonBytes(payload), []).ok).toBe(true)
+  // A local link binding never enters a public payload (DESIGN-local-plugin-install §4.16), nor a description without its materialization.
+  const { tree: _tree, treeDigest: _digest, ...declarations } = payload.description
+  const linked = { ...declarations, materialization: "link", link: { bindingId: `sha256:${"0".repeat(64)}`, topLevel: [{ kind: "directory", path: "skills", mode: 0o755 }] } }
+  expect(decodePackageProfilePayloadV1("plugin-package", jsonBytes({ ...payload, description: linked, blobs: [] }), []).ok).toBe(false)
+  const { materialization: _materialization, ...unmarked } = payload.description
+  expect(decodePackageProfilePayloadV1("plugin-package", jsonBytes({ ...payload, description: unmarked }), []).ok).toBe(false)
+})
+
 describe("CodePuppyPackageEnvelopeV1 listing section", () => {
   /**
    * `#1287` AC2:**缺这一段的既有条目仍可解码、仍可安装。**
@@ -1385,7 +1397,7 @@ describe("CodePuppyPackageEnvelopeV1 listing section", () => {
     const withListing = corpus.cases.filter((item) => "listing" in item.envelope)
     expect(withListing.map((item) => item.name)).toEqual(["listing-full-v1"])
     // 下界式的 `> 0` 会在有人把语料删剩一条时仍然绿。数出真实条数。
-    expect(withoutListing.length).toBe(19)
+    expect(withoutListing.length).toBe(20)
 
     for (const item of withoutListing) {
       const decoded = decodePackageEnvelopeHeaderV1(jsonBytes(item.envelope))

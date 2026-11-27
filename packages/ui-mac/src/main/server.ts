@@ -67,7 +67,8 @@ import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
 // sidecar 在 import 引擎之前 apply。计划做不出来 = 拒绝 fork(fail-closed,原因可读),不静默无围栏。
-import { checkWritableTarget, plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
+import { checkWritableTarget, planCredentialStores, plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
+import { configureCommandSourceFence } from "./plugin-command-source"
 import { trialCompileProfile } from "./process-fence-compile"
 import type { ProcessFenceStartInput } from "./process-fence-apply"
 // REQ-137 `#1337`:网络出网的强制半场接线。围栏(profile N1–N4)把 sidecar 那棵树的出网收成 loopback 上**一个**端口,
@@ -316,7 +317,7 @@ function capturePackageManagerUserEnvironment(userDataPath: string, source: Reco
 }
 
 /** `eligibility`: the planner's identity/eligibility input (the same one R4 uses); R6 answers `ineligible` from it. */
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; eligibility?: WorkspaceDirectoryInput; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; roots?: ProcessFencePlan["roots"] }
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; eligibility?: WorkspaceDirectoryInput; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; configFence?: ProcessFencePlan["configFence"]; roots?: ProcessFencePlan["roots"] }
 
 type ProductionFenceInput = {
   userDataPath: string
@@ -765,6 +766,16 @@ export async function spawnLocalServer(
   if (!fence && process.platform === "darwin")
     throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
   if (fence?.configFenceRoots) plannedConfigFenceRoots = fence.configFenceRoots
+  // DESIGN-local-plugin-install §4.16:命令来源的查找子进程用这一代的同一组 CF 规则与同一个代理端口;C1 另含主进程实际加载的自定义 env 文件。
+  if (fence?.configFence && egressProxyPort !== undefined) {
+    const envFile = userEnvFile(process.env)
+    // 求不出凭据存放点的真实路径时不影响本代引擎;查找命令随后如实报「围栏未就绪」,不退回无围栏执行。
+    try {
+      configureCommandSourceFence({ egressProxyPort, configFence: fence.configFence, credentialStores: planCredentialStores([...mainCredentialStores(options.userDataPath), ...(envFile ? [{ path: envFile, kind: "file" as const }] : [])], { realpath: realpathSync.native }) })
+    } catch (error) {
+      getLogger()?.warn(`plugin command source fence could not be prepared: ${serializeError(error).message}`)
+    }
+  }
 
   const packageManagerEnvironment = { ...sidecarEnv, ...fence?.cacheEnv }
   for (const [key, value] of Object.entries(originalProxies)) {

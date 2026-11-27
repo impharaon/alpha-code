@@ -14,6 +14,7 @@
 
 import { codepuppyVideoDefinition } from "./codepuppy-video"
 import { VIDEO_MCP_NAME } from "../shared/media-attachment"
+import { pluginPackageStoreKey } from "./ext-package-ledger-v3"
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { ASK_AGENT, READONLY_AGENT } from "../shared/permission-tier"
 import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
@@ -613,7 +614,7 @@ export function injectCodePuppyConfig(
 
     // Plugin definitions on disk are templates. Only main's post-ready convergence may bind and connect them.
     const packages = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
-    if (packages.ok) for (const graph of packages.packageGraphs.filter(graph => graph.pluginTree))
+    if (packages.ok) for (const graph of packages.packageGraphs.filter(graph => pluginPackageStoreKey(graph)))
       for (const node of [graph.root, ...graph.children].filter(node => node.kind === "mcp"))
         config.mcp = { ...config.mcp, servers: { ...config.mcp?.servers, [node.name]: { ...NEUTRALIZED_MCP_SERVER } } }
 

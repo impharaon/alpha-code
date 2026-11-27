@@ -1,11 +1,11 @@
 {
   "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-  "artifactSha256": "9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7",
+  "artifactSha256": "254dee98bd8480cb55de26d1bbf85a8eb17cfd2b1dc3736bedeaf67b171f23c9",
   "files": [
     {
-      "bytes": 23920,
+      "bytes": 25586,
       "path": "CONTRACT.md",
-      "sha256": "9ea49149110289508cdaca92799915af6188e1eb66d8655527f176390c1a0efb"
+      "sha256": "5709ae3935a3e2a8b5150509af7b6bcd31a40f6d7e60b1e687ef52b309fb4d62"
     },
     {
       "bytes": 7251,
@@ -13,14 +13,14 @@
       "sha256": "c18373e331755b5b1e328199ca73fc637a70591b18f1c4054f84efd21549122e"
     },
     {
-      "bytes": 73834,
+      "bytes": 73882,
       "path": "decoder.ts",
-      "sha256": "2e50222a6af86ce4e415f63019067d452aa2d5e2cf61c5013f021a3d0ed2a11e"
+      "sha256": "415dffc6993c776671848642daa795afc1cc5ec6bb38c1f224655e560fe7409a"
     },
     {
-      "bytes": 25034,
+      "bytes": 30860,
       "path": "plugin-package.ts",
-      "sha256": "96b264b18cfa846c81ed931804fe2b5fbe223f27239537cf9d5ba989d7124b05"
+      "sha256": "ee73ac863ed35a98e78170ebc0cc4009866721f4d800e335abc70702d94927e2"
     },
     {
       "bytes": 884,
@@ -28,19 +28,19 @@
       "sha256": "48a0219dd28692f659d85471a8457491ec602efc56501181ee825944479c44dc"
     },
     {
-      "bytes": 95082,
+      "bytes": 101871,
       "path": "plugin-conversion.mjs",
-      "sha256": "2871a8a819f0567145192b4e0cbb57e8c5a458f8d95019be19baace60148dcdd"
+      "sha256": "4319857d7536141e27d240bc2d8bdc2e07f5c74ff2d555499e4ffa47df8d40eb"
     },
     {
-      "bytes": 2062,
+      "bytes": 2202,
       "path": "plugin-conversion.d.mts",
-      "sha256": "8d77e0499824688f91efffae084c497fe52102f0bb50769b810b1f4e4fd1554a"
+      "sha256": "ef30fe5a1755261209ec5850ce4d40f1d10c0985406ab3521c5ede31fdcd1218"
     },
     {
-      "bytes": 21185,
+      "bytes": 21727,
       "path": "generate-artifact.ts",
-      "sha256": "b90cd80d6cdba726c0b4e1d0fdfb460157e6f15565e1b1e395b7cd85b51f8bce"
+      "sha256": "090f6b7d83fd7acf5c148aed89fe589e1b4f8aec51c11392fa0fde71f24e3059"
     },
     {
       "bytes": 2737,
@@ -73,9 +73,9 @@
       "sha256": "4f78b77c5fd575a64cd3ffd5ac0422c47f38b84c15a3a6942b3b30a1d6be9d81"
     },
     {
-      "bytes": 57008,
+      "bytes": 63175,
       "path": "profiles/plugin-package.v1.schema.json",
-      "sha256": "d174a233d442ba4bed26cb384ef27d7468dedabeff676d8cb07492320dc5372b"
+      "sha256": "98c0d9f16c582a222c0d6e707c0bbfa4199ad3e4961053011e3d4d03eb65e31d"
     },
     {
       "bytes": 1550,
@@ -93,14 +93,19 @@
       "sha256": "8a316b97066b180fcb3b286e67936137ad3bd5fd0327340f625804383d4c1db0"
     },
     {
-      "bytes": 5069,
+      "bytes": 5098,
       "path": "testvectors/plugin-package-description.v1.json",
-      "sha256": "55e1434b1a319a8fe8f74c7b975adc868318b13b45dbf7be17c59aaecec9dd3d"
+      "sha256": "1d272b7e265d29331780023516e8f33b0753a69931d65af2e6756253770c34ff"
     },
     {
-      "bytes": 47614,
+      "bytes": 1541,
+      "path": "testvectors/plugin-package-lsp-description.v1.json",
+      "sha256": "fe23929d17fd43edb412df34159f6c3dfb681e652b7889d65c2334158572d43f"
+    },
+    {
+      "bytes": 51791,
       "path": "testvectors/decoder-corpus.v1.json",
-      "sha256": "9103a131ec4e3d7a2f4bc6a52936eb9eb624f8d5750b71c2b861a10095467fb2"
+      "sha256": "6a906561ca5da0be6bf4eb73f8a01864b3407f1a99a5d66ef317c41472b77f37"
     }
   ],
   "schema": "codepuppy.host-extension-package.artifact.v1"

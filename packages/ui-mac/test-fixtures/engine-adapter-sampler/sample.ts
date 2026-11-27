@@ -200,8 +200,11 @@ const recordsOf = (sessionID: string) =>
   }))
 const create = async () => (await call("POST", "/api/session", { location: { directory: project } })).data.id as string
 const finalOf = async (sessionID: string) => (await call("GET", `/api/session/${sessionID}/message?order=asc&limit=200`)).data
+// The engine runs with this checkout's packages/cli as its working directory, which becomes the location of its global
+// events. It is written as a fixed placeholder, so a re-sample from another checkout records the same path.
+const REPO_PLACEHOLDER = "/repo"
 const write = (name: string, value: Record<string, unknown>) =>
-  writeFileSync(join(OUT, name), JSON.stringify({ ...value, _engine: ENGINE }, null, 1))
+  writeFileSync(join(OUT, name), JSON.stringify({ ...value, _engine: ENGINE }, null, 1).replaceAll(REPO, REPO_PLACEHOLDER))
 
 try {
   // `#1697` 放回 r4:与 permission-reply 剧本同样走真引擎公开的创建/读取审批 API,不手写上游响应。

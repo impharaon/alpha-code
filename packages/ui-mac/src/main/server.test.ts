@@ -906,6 +906,28 @@ describe("spawnLocalServer", () => {
     }
   })
 
+  // DESIGN-local-plugin-install §4.16 (R1-M3): the marketplace source-command locator is fenced with the protected configuration
+  // rules of the ProcessFencePlan this fork just planned, and the same egress proxy port.
+  test("§4.16 the command-source locator uses this generation's planned configuration fence", async () => {
+    const { locateCommandSource } = await import("./plugin-command-source")
+    const protectedDir = realpathSync.native(mkdtempSync(join(tmpdir(), "planned-protected-")))
+    const printed = realpathSync.native(mkdtempSync(join(tmpdir(), "planned-printed-")))
+    const planFence = () => ({ ...fakePlanFence(), configFence: [{ kind: "subpath" as const, path: protectedDir }] })
+    try {
+      const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence, fork: fakeFork })
+      await result.health.wait
+      const report = join(printed, "report")
+      const directory = await locateCommandSource({ kind: "command", command: `touch '${protectedDir}/written' 2>/dev/null; echo "write=$?" > '${report}'; printf '%s\\n' '${printed}'`, timeoutSeconds: 60, mode: "link" })
+      expect(directory).toBe(printed)
+      expect(readFileSync(report, "utf8").trim()).not.toBe("write=0")
+      expect(existsSync(join(protectedDir, "written"))).toBe(false)
+      await result.listener.stop()
+    } finally {
+      rmSync(protectedDir, { recursive: true, force: true })
+      rmSync(printed, { recursive: true, force: true })
+    }
+  })
+
   // SPEC-engine-config-fence BR-03 / AC-05 第一句(DESIGN-engine-config-fence §4.4、§5):显式文件、模型底表与种子由 main 在 fork 前写;
   // 写不进或该删的 models.json 删不掉 ⇒ 与密钥文件、已应用目录同一条路径拒绝 fork,留一行具名日志,不退回 sidecar 里去写。
   test("AC-05:引擎配置目录写不进 ⇒ 拒绝 fork,日志恰一行 [I-13] 并点名路径", async () => {

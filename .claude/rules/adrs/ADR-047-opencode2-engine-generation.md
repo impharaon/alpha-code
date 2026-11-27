@@ -318,3 +318,7 @@ S-05 的 r16 orchestrator ruling 2026-11-27 接受 `core/src/instruction-discove
 S-12 配套登记（#1776 r15）：`packages/schema/test/mcp.test.ts` 的 transport round-trip 反例和 `packages/client/src/promise/generated/types.ts` 两处由 schema 生成的可选 transport 字段随同原 S-12 权威登记。基线 1db6a3bbf5 不含这两处，提交 513e35a7c6 / 27595818cb 属本车道；r15 修正登记遗漏，不更改生成物、断言、协议值或守卫算法。它们是已批准 RemoteConfig 的配套 artifact/proof，不增加 runtime 接管点。
 
 S-07 依据 design v3.1 §6 与 r17 orchestrator ruling：既有 MCP index/client 接管的窄增量持有匹配 HTTP/SSE 的 Session 连接，复用 McpConnection 的创建、认证、fetch、重连与 stop；stdio 保持 Location 连接，从真实在途调用冻结归属至 Result，跨会话歧义只诊断并保留 native Form。同一 Location 反向回调把 SessionEnd 释放交回该 MCP authority；native archive/delete 与 Location scope 关闭沿同一生命周期收尾。L0 无 inbound elicitation/连接归属口，L1/L2 仍改同一点并增加同步入口；无新增上游 runtime 文件接管，登记 `plugin-hook-elicitation` 与原 MCP test proof。
+
+### #1776 S-10 / S-11 输出样式与插件默认主助手
+
+依据 DESIGN-local-plugin-install v3.4 §4.14/§6/§10 与 #1776 片 8 派发：S-10 的精确新 L3 只有 `packages/core/src/session/model-request.ts` baseTranscript 的 fallback 段，在 engine 私下调用 `SessionSystemPrompt.make` 时加 `metadata.codepuppyRole="default-coding"`；有 `agent.system` 的分支、Agent.Info、schema 与 ConfigAgent 都不动。L0 拿不到这段的来源，按文字猜会误删；L1/L2 要为同一行另建源码/产物变换，故沿 ADR-029 选这一处 L3。ext 自有注入沿 P-34 用 L0：只替换 applyPromptTakeover 实际写入、agent 与整段字节都相同的 prompt。登记 `plugin-output-style`；north-star 只加这个单文件。S-11 为 L0（`AgentEditor.default` 与既有新会话选择），登记 `plugin-default-settings`，没有新增接管。判据是 ext 原 host 文件的两条具名旅程，撤掉标记或默认设置即红。

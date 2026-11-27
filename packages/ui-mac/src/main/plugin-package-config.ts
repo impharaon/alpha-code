@@ -5,19 +5,35 @@ import { join } from "node:path"
 import { createHash } from "node:crypto"
 import { INSTALLED_PLUGIN_SETTINGS_FILE, pluginOptionValue, storedPluginOption, readInstalledPluginSettings, validInstalledPluginSettings, type InstalledPluginSettingsV1 } from "../shared/installed-plugin-settings"
 import { INSTALLED_PLUGIN_PACKAGE_FILE, validInstalledPluginPackage } from "../shared/installed-plugin-package"
-import type { PluginPackage } from "../shared/host-extension-package-contract/plugin-package"
+import type { PluginPackage, TreeNode } from "../shared/host-extension-package-contract/plugin-package"
 import type { PackageAuthorizationItemV1 } from "../shared/package-admission"
 import { resolveLiveGenerationDir, runExtensionTransaction, type TxPlanItem, type HealthProbe } from "./ext-transaction"
-import type { PackageGraphV1 } from "./ext-package-ledger-v3"
+import { pluginPackageStoreKey, type PackageGraphV1 } from "./ext-package-ledger-v3"
 import type { PackageAdmissionDeps } from "./package-admission"
 import type { PreparedMcpSecretVersionV1 } from "./ext-package-tx-builders"
 import { claimMcpSecretVersionDir, mcpSecretVersionedRef, newMcpSecretVersionId, writeMcpSecretVersioned } from "./codepuppy-mcp-secrets"
 import { releasePreparedTxResources, releasePreparedMcpSecretVersion } from "./ext-config"
 import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
 
+/**
+ * BR-11 / DESIGN §4.16: a linked package loads in place, so a printed directory that went away is named by the first managed link
+ * whose target is gone. Nothing is uninstalled or copied back; the package works again once the source returns.
+ */
+export function missingLinkedPluginSource(view: readonly TreeNode[]): string | undefined {
+  const target = view.find(node => node.kind === "symlink" && !existsSync(node.target))
+  return target?.kind === "symlink" ? "Linked plugin source is missing: " + target.target : undefined
+}
+
+/** The missing source of an installed linked package, read from its live generation; copied packages have none. */
+export function linkedPluginSourceGap(root: string, graph: PackageGraphV1): string | undefined {
+  const view = graph.pluginLink ? installedPluginDescription(root, graph)?.view : undefined
+  return view ? missingLinkedPluginSource(view) : undefined
+}
+
 export function installedPluginDescription(root: string, graph: PackageGraphV1) {
-  if (!graph.pluginTree) return
-  const live = resolveLiveGenerationDir(root, graph.pluginTree.storeKey)
+  const storeKey = pluginPackageStoreKey(graph)
+  if (!storeKey) return
+  const live = resolveLiveGenerationDir(root, storeKey)
   if (!live) return
   try {
     const value: unknown = JSON.parse(readFileSync(join(live, INSTALLED_PLUGIN_PACKAGE_FILE), "utf8"))
@@ -45,7 +61,7 @@ export function preparePluginSettings(input: { root: string; storeKey: string; p
 
 export function pluginOptionAuthorization(root: string, graph: PackageGraphV1): PackageAuthorizationItemV1[] {
   const installed = installedPluginDescription(root, graph)
-  const settings = graph.pluginTree && readInstalledPluginSettings(root, graph.pluginTree.storeKey)
+  const settings = pluginPackageStoreKey(graph) && readInstalledPluginSettings(root, pluginPackageStoreKey(graph)!)
   if (!installed || !settings) return []
   return Object.entries(installed.description.options ?? {}).map(([key, option]) => {
     const value = pluginOptionValue(option, storedPluginOption(settings, key))
@@ -61,7 +77,7 @@ const versionHints = new WeakMap<typeof suggestPluginVersion, Map<string, string
 
 export async function pluginVersionAuthorization(root: string, graph: PackageGraphV1, suggestion = suggestPluginVersion): Promise<PackageAuthorizationItemV1[]> {
   const installed = installedPluginDescription(root, graph)
-  const settings = graph.pluginTree && readInstalledPluginSettings(root, graph.pluginTree.storeKey)
+  const settings = pluginPackageStoreKey(graph) && readInstalledPluginSettings(root, pluginPackageStoreKey(graph)!)
   if (!installed || !settings) return []
   const hints = versionHints.get(suggestion) ?? new Map<string, string | undefined>()
   versionHints.set(suggestion, hints)
@@ -109,7 +125,8 @@ export function preparePluginOptionSecrets(input: { description: PluginPackage; 
 
 export async function savePluginOptions(graph: PackageGraphV1, options: unknown, deps: PackageAdmissionDeps, mcpVersions?: unknown) {
   const installed = installedPluginDescription(deps.root(), graph)
-  const before = graph.pluginTree && readInstalledPluginSettings(deps.root(), graph.pluginTree.storeKey)
+  const storeKey = pluginPackageStoreKey(graph)
+  const before = storeKey && readInstalledPluginSettings(deps.root(), storeKey)
   if (!installed || !before || !options || typeof options !== "object" || Array.isArray(options)) return { ok: false as const, reason: "invalid plugin settings" }
   const settings = structuredClone(before)
   if (mcpVersions !== undefined) {
@@ -135,14 +152,14 @@ export async function savePluginOptions(graph: PackageGraphV1, options: unknown,
   if (!Object.keys(options).length && mcpVersions === undefined) return { ok: true as const }
   const prepared = preparePluginOptionSecrets({ description: installed.description, settings, server: graph.root.name, userDataPath: deps.userDataPath, values: sensitive, version: deps.secretVersionId?.() })
   const result = await (deps.transaction ?? runExtensionTransaction)(deps.root(), {
-    items: [pluginSettingsItem(graph.pluginTree!.storeKey, settings)], prepared: prepared ? [prepared.descriptor] : [],
-    authorization: { confirmed: { [graph.pluginTree!.storeKey + "--settings"]: [] }, decidedAt: (deps.now?.() ?? new Date()).toISOString() },
+    items: [pluginSettingsItem(storeKey!, settings)], prepared: prepared ? [prepared.descriptor] : [],
+    authorization: { confirmed: { [storeKey! + "--settings"]: [] }, decidedAt: (deps.now?.() ?? new Date()).toISOString() },
   }, {
     populate: () => {}, populatePrepared: () => prepared?.populate(), probePrepared: () => prepared?.probe() ?? { healthy: true },
     releasePrepared: resources => releasePreparedTxResources(deps.userDataPath, resources),
     precondition: () => {
       const current = readPackageLedgerStateV1(deps.root(), { sideEffectFree: true })
-      return current.ok && current.packageGraphs.some(item => item.packageId === graph.packageId && item.installedGraphDigest === graph.installedGraphDigest) && JSON.stringify(readInstalledPluginSettings(deps.root(), graph.pluginTree!.storeKey)) === JSON.stringify(before)
+      return current.ok && current.packageGraphs.some(item => item.packageId === graph.packageId && item.installedGraphDigest === graph.installedGraphDigest) && JSON.stringify(readInstalledPluginSettings(deps.root(), storeKey!)) === JSON.stringify(before)
         ? { ok: true } : { ok: false, reason: "Package changed while saving settings" }
     }, probe: pluginSettingsProbe,
   })

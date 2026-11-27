@@ -226,6 +226,8 @@ UPSTREAM_EXCLUDES=(
   ':(exclude)packages/core/src/session/context.ts'
   # #1776 S-06, DESIGN-local-plugin-install v3.1 §10: awaited before-commit / after-publication hooks only.
   ':(exclude)packages/core/src/session/compaction.ts'
+  # #1776 S-10, DESIGN-local-plugin-install v3.4 §6: only the default-coding mark on the engine fallback system part.
+  ':(exclude)packages/core/src/session/model-request.ts'
   # Paired existing-module S-04/S-06 regression tests (same approved lifecycle authority).
   ':(exclude)packages/core/test/config/reload.test.ts'
   ':(exclude)packages/core/test/session-compaction.test.ts'

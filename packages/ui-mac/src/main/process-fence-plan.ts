@@ -246,6 +246,8 @@ export type ProcessFencePlan = {
   roots: EngineRoots & { codepuppyGlobalRoot: string; userDataPath: string; stateHome: string }
   /** 受保护配置集里的目录位置(含真实目标),与渲染进 profile 的同一份;资格判定的 configFenceRoots 用它(server.ts)。 */
   configFenceRoots: string[]
+  /** 渲染进 profile 的同一组受保护配置规则;市场命令来源的查找子进程复用它(DESIGN-local-plugin-install §4.16)。 */
+  configFence: ConfigFenceRule[]
 }
 
 export type PlanProcessFenceInput = {
@@ -502,6 +504,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     profileBytes: Buffer.byteLength(trimmed.profile),
     roots: { ...roots, codepuppyGlobalRoot, userDataPath: input.userDataPath, stateHome },
     configFenceRoots: fenceSet.configFenceRoots,
+    configFence: fenceSet.configFence,
   }
   deps.log(
     `process fence planned: workspaces=${plan.workspaces.length} (candidates=${union.candidates}, excluded=${plan.excluded.length}, dropped=${plan.dropped.length}), egressProxyPort=${input.egressProxyPort}, configFence=${fenceSet.configFence.length} rules, credentialStores=${credentialRules.length} rules, profile=${plan.profileBytes}B, compile attempts=${plan.attempts}` +

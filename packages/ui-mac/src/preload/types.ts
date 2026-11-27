@@ -591,7 +591,7 @@ export type {
 // REQ-103(#195):governance 只读视图形状(真源 main/ext-inventory.ts;shared/ext-ownership +
 // ext-states 的五维/三态纯值)。
 import type { ExtInventory } from "../main/ext-inventory"
-import type { HubRequestRecord, HubView, ReloadItem } from "../main/codepuppy-sidecar-messages"
+import type { HubRequestRecord, HubView, LanguageServerStateV1, ReloadItem } from "../main/codepuppy-sidecar-messages"
 export type { InventoryRow, ExtInventory } from "../main/ext-inventory"
 
 /**
@@ -630,8 +630,11 @@ export type InstalledPackageV1 = {
   source?: PackageSourceV1
   effect?: PackageEffectV1
   notRunning?: PackageNotRunningV1[]
+  /** Design v3.4 R-l: latest runtime state of each package language server, state and safe reason only. */
+  languageServers?: InstalledPackageLanguageServerV1[]
   components: InstalledPackageComponentV1[]
 }
+export type InstalledPackageLanguageServerV1 = { sourceName: string; state: LanguageServerStateV1; detail?: string }
 export type InstalledPackagesResultV1 =
   | { ok: true; packages: InstalledPackageV1[] }
   /** 「读不出」**不许**折叠成「没装」:折叠会让用户在一本损坏的账本上看到「什么都没装」,
@@ -902,6 +905,9 @@ export type ElectronAPI = {
      *  分支,只有远程 catalog 进得去)。
      *  **「读不出」与「没装」是两件事**,合并成一句「暂无扩展包」会让用户以为东西丢了。 */
     installedPackages: () => Promise<InstalledPackagesResultV1>
+    /** D6 片 6b:本机文件条目行(main 的安全视图);`projectDir` 缺席 = 没打开项目,只列全局目录。 */
+    nativeSources: (projectDir?: string) => Promise<import("../shared/native-source-view").NativeSourceRowsResultV1>
+    setNativeSourceState: (intent: import("../shared/native-source-view").NativeSourceActionV1) => Promise<import("../shared/native-source-view").NativeSourceActionResultV1>
     installPackage: (packageId: string) => Promise<PackageActionResultV1>
     setPackageState: (intent: { packageId: string; state: "enabled" | "disabled" }) => Promise<PackageActionResultV1>
     packageAuthorization: (packageId: string) => Promise<PackageAuthorizationResultV1>

@@ -1,7 +1,7 @@
 import type { Entry } from "./host-extension-package-contract/plugin-package"
 
 export function pluginEntryRuntimeAvailable(entry: Entry): boolean {
-  if (["skill", "command", "agent", "mcp", "monitor"].includes(entry.kind)) return true
+  if (["skill", "command", "agent", "mcp", "monitor", "lsp", "output-style"].includes(entry.kind)) return true
   return (
     entry.kind === "hook" &&
     ((entry.hook.type === "command" &&

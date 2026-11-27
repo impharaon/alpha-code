@@ -183,6 +183,27 @@ test("BC1 an empty failed source does not claim a completed no-match search", as
   expect(empty.textContent).toContain("本次查询没有匹配条目")
 })
 
+test("a failed marketplace source command is shown with the command and its actual error", async () => {
+  // main's detail for the recorded xcode entry on a Mac without Xcode (install-from-source.test.ts real-xcrun case).
+  const detail = 'Command "xcrun agent plugin path --plugin-format claude" exited with 72: xcrun: error: unable to find utility "agent", not a developer tool or in PATH'
+  const node = mount({ install: async () => ({ ok: false, code: "source-unreachable", detail }) })
+  await flush()
+  node.querySelectorAll<HTMLButtonElement>("button")[1]!.click()
+  await flush()
+  const row = node.querySelector(".codepuppy-ext-card-err")!
+  expect(row.textContent).toContain("未能读取插件来源，请重试。")
+  expect(row.textContent).toContain(detail)
+  expect(node.querySelectorAll('[role="dialog"]')).toHaveLength(0)
+})
+
+test("other source failures keep only the localized sentence", async () => {
+  const node = mount({ install: async () => ({ ok: false, code: "source-unreachable", detail: "Selected source could not be captured" }) })
+  await flush()
+  node.querySelectorAll<HTMLButtonElement>("button")[1]!.click()
+  await flush()
+  expect(node.querySelector(".codepuppy-ext-card-err")!.textContent).toBe("未能读取插件来源，请重试。")
+})
+
 test("BC1 an IPC rejection stays an inline failure and never renders an old result", async () => {
   const failed = mount({ search: async () => { throw Error("transport unavailable") } })
   await flush()

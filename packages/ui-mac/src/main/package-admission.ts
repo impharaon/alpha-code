@@ -25,6 +25,7 @@ import { computeGrantDigest, readPackageLedgerStateV1, type UpsertInput } from "
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import {
   computeInstalledGraphDigest,
+  pluginPackageStoreKey,
   type PackageGraphV1,
   type PackageMutationEnvelopeV1,
 } from "./ext-package-ledger-v3"
@@ -239,7 +240,7 @@ type PreparedComponent = {
   agentEntry?: Record<string, unknown>
   /** `#840` command:payload 字段 + template asset 字节合成的引擎叶(builder 只落 config)。 */
   commandEntry?: Record<string, unknown>
-  pluginPackage?: { notRunning: PackageNotRunningV1[]; description: PluginPackage; build: PackageTxBuildV1; names: Map<string, string>; nodes: import("./ext-package-ledger-v3").PackageGraphNodeV1[]; records: UpsertInput[]; mcps: Extract<Entry, { kind: "mcp" }>[] }
+  pluginPackage?: { notRunning: PackageNotRunningV1[]; description: import("../shared/host-extension-package-contract/plugin-package").CopiedPluginPackage; build: PackageTxBuildV1; names: Map<string, string>; nodes: import("./ext-package-ledger-v3").PackageGraphNodeV1[]; records: UpsertInput[]; mcps: Extract<Entry, { kind: "mcp" }>[] }
   itemDigest: string
 }
 
@@ -563,7 +564,7 @@ export async function savePackageSecretsV1(input: unknown, deps: PackageAdmissio
     const built = buildMcpTxItems({
       effect: resolved.graph.effect,
       root: deps.root(), key: packageChildTxKeyV1("mcp", record.name), name: record.name,
-      source: resolved.graph.pluginTree ? "plugin" : "connector",
+      source: pluginPackageStoreKey(resolved.graph) ? "plugin" : "connector",
       ...component.definition, manifestDigest: record.manifestDigest!, receipt: { ...record },
       userDataPath: deps.userDataPath,
       secretValues: secrets, newSecretVersionId: deps.secretVersionId ?? newMcpSecretVersionId,

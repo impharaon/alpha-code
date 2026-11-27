@@ -145,6 +145,9 @@ Object.defineProperty(window, "api", {
       onSessionGrantsEnded: () => () => {},
       inventoryView: async () => undefined,
       installedPackages: async () => ({ ok: true as const, packages: [] }),
+      // D6 片 6b:本机文件条目(preload 的生产形状);本文件不验它,给空列表。
+      nativeSources: async (_projectDir?: string) => ({ ok: true as const, rows: [] }),
+      setNativeSourceState: async () => ({ ok: true as const }),
       advisoryActive: async () => ({ ids: [], fresh: true }),
       migrateScan: async () => ({ enabled: false, inventory: { skills: [], mcp: [], plugins: [] } }),
       remoteCatalog: async () => ({ ok: false as const, reason: "not used by this case file" }),

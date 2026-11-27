@@ -145,6 +145,7 @@ export const Plugin = define({
             })
             continue
           }
+          if (source.type === "directory" && !CodePuppyProjectGate.nativeSkill(location.directory, filepath, parsed.skill.id)) continue // codepuppy(D6): HTTP skill indexes keep today's behaviour
           skills.push(parsed.skill)
         }
         scanned.set(directory, retained) // codepuppy(S-04)

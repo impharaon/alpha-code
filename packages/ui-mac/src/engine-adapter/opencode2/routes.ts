@@ -24,6 +24,7 @@ import { approvals } from "./approvals"
 import type { EngineInternalDirectories } from "../../preload/types"
 import { isListedProject } from "./internal-projects"
 import { MESSAGE_PAGE, recentMessages, sessionDirectory } from "./session-cache"
+import { SESSION_DEFAULT_AGENT_KEY } from "../../shared/permission-tier"
 import {
   baseID,
   queuedUserMessage,
@@ -120,8 +121,11 @@ async function questionOf(context: SharedContext, requestID: string) {
 /**
  * v1 的档位随每条消息走;2.x 落在会话上 —— 发送前切到这条消息要的档位。`#1669`:v1 里不带 agent = 默认助手(0.1.26
  * prompt.ts createUserMessage 的 `agents.defaultInfo()`,命令 `cmd.agent ?? input.agent` 同),界面据此在「全部批准」+
- * 默认助手时不带 agent;所以不带时把会话切回默认助手,否则沿用上一条的只读 / 请求审批 / 手选助手。默认助手取会话目录的
- * 助手列表第一项(引擎 Agent.list 把默认排第一,与会话没选过助手时引擎选的是同一个);会话没选过或已经是它就不切。
+ * 默认助手时不带 agent;所以不带时把会话切回默认助手,否则沿用上一条的只读 / 请求审批 / 手选助手。
+ * #1776 S-11:会话第一条消息时 ext 已把当时的默认助手钉进会话(metadata 的 SESSION_DEFAULT_AGENT_KEY,没选过助手的会话
+ * 同时 switchAgent),所以「默认助手」= 这个钉住的助手,不跟随后来的默认(包默认、用户 default_agent 只带新会话)。钉住的
+ * 助手已不在列表里(它的包被移除)或没有钉住记录时,取会话目录助手列表的第一项(引擎 Agent.list 把默认排第一)。
+ * 会话没选过助手或已经是它就不切。
  */
 async function selectAgent(context: SharedContext, sessionID: string, agent: string | undefined) {
   if (agent) {
@@ -130,7 +134,9 @@ async function selectAgent(context: SharedContext, sessionID: string, agent: str
   }
   const session = await context.api.session.get({ sessionID })
   if (!session.agent) return
-  const [fallback] = (await context.api.agent.list({ location: { directory: session.location.directory } })).data
+  const agents = (await context.api.agent.list({ location: { directory: session.location.directory } })).data
+  const pinned = session.metadata?.[SESSION_DEFAULT_AGENT_KEY]
+  const fallback = agents.find((item) => item.id === pinned) ?? agents[0]
   if (fallback && fallback.id !== session.agent) await context.api.session.switchAgent({ sessionID, agent: fallback.id })
 }
 

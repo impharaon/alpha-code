@@ -1804,7 +1804,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function decodePluginPackagePayload(value: unknown): PackageProfilePayloadDecodeV1 {
   const errors: string[] = []
-  if (!isObject(value) || value.schema !== "codepuppy.host-extension-package.payload.plugin-package.v1" || Object.keys(value).some(key => !["schema", "description", "blobs"].includes(key)) || !validPluginPackage(value.description) || !Array.isArray(value.blobs)) return { ok: false, errors: ["payload: invalid plugin package description or tree digest"] }
+  if (!isObject(value) || value.schema !== "codepuppy.host-extension-package.payload.plugin-package.v1" || Object.keys(value).some(key => !["schema", "description", "blobs"].includes(key)) || !validPluginPackage(value.description) || value.description.materialization !== "copy" || !Array.isArray(value.blobs)) return { ok: false, errors: ["payload: invalid plugin package description or tree digest"] }
   const blobs = value.blobs.flatMap((blob, index) => {
     const ref = decodePayloadRef(blob, `payload.blobs[${index}]`, errors, { maxBytes: Number.MAX_SAFE_INTEGER })
     return ref ? [ref] : []

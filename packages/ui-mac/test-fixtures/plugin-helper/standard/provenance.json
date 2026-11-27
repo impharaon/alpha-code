@@ -1,7 +1,7 @@
 {
   "archive": {
     "path": "selection.tar.gz",
-    "sha256": "0780bf0818b171e27a0cee862007314854c800a3cb6e9144e18d04989f6b4b3d"
+    "sha256": "757a6343c374d2e22268e24f67ead729948095e7ec8cb170b43e25d8016a4e04"
   },
   "samples": [
     {
@@ -10536,6 +10536,127 @@
           "mode": 420,
           "bytes": 21311,
           "sha256": "8345a8b586c341e2872b0c61009c7f0d56759fb6001b875ae5d7b2aad00a4b30"
+        }
+      ]
+    },
+    {
+      "name": "claude:pyright-lsp",
+      "root": "claude-pyright-lsp",
+      "repository": "https://github.com/anthropics/claude-plugins-official",
+      "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+      "pluginPath": "plugins/pyright-lsp",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 441,
+          "sha256": "2cf083ce0ec6aa27c25ba7dd3b1cc37868f899f1bd77a9431949703e888c4c1d"
+        }
+      ]
+    },
+    {
+      "name": "claude:dominodatalab",
+      "root": "claude-dominodatalab",
+      "repository": "https://github.com/dominodatalab/domino-claude-plugin",
+      "commit": "7949e3ac470cf2f3b1c97a790c571032c844a5a3",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 644,
+          "sha256": "99d6bd3e1bbc94f024979648781218d51daed2cb191aad6f8aa8ce2ee6d02beb"
+        },
+        {
+          "path": "output-styles/domino-learning.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 1724,
+          "sha256": "44f5f2d2c3f9d058f5506d646199149f19f6309052749d08dddb10a56b28cf80"
+        },
+        {
+          "path": "output-styles/domino-mlops.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 2067,
+          "sha256": "16ebac1bcdae7bc13d5e201c22153616e49730c2a03f192c394b9a28dc8e45d6"
+        }
+      ]
+    },
+    {
+      "name": "claude:agentforce-adlc",
+      "root": "claude-agentforce-adlc",
+      "repository": "https://github.com/SalesforceAIResearch/agentforce-adlc",
+      "commit": "09bf1539d41f9ff355ba3eb5d05d4a75813423bb",
+      "pluginPath": "",
+      "ecosystem": "claude",
+      "files": [
+        {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 392,
+          "sha256": "88532620ea62c41bf3b7a4a6d7aa9bbc9b4a4c63203919abbda9de10711fab43"
+        },
+        {
+          "path": "settings.json",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 45,
+          "sha256": "c71066f225fb39937012a154acfce3759810741caf063d31963177254d37bc6b"
+        },
+        {
+          "path": "agents/adlc-author.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4237,
+          "sha256": "2b54e342a5ddfa3d62540fedeaae49eaf9b0ffbea1673b566d51077d32f8cf25"
+        },
+        {
+          "path": "agents/adlc-engineer.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 4436,
+          "sha256": "20f54caff2eab1388c7a5c406e330d17499866c2031058cfaaf8a5751db33c7c"
+        },
+        {
+          "path": "agents/adlc-orchestrator.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 3672,
+          "sha256": "41be30a6cbb50e598431ffd6046e0ce748657df521cf1f661c9a24951d3ab140"
+        },
+        {
+          "path": "agents/adlc-qa.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 6834,
+          "sha256": "9305225395e7e4264c75bcb178b24522f6e0b5fd9d5fe8b62e8edce760cec22d"
+        },
+        {
+          "path": "skills/agentforce-generate/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 29505,
+          "sha256": "5ce3d95247bd9c21ddf179d43fc710557df0880d29e01b4c92839a9dbafb89cf"
+        },
+        {
+          "path": "skills/agentforce-observe/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 22490,
+          "sha256": "bd1cf13b86d2754e94225608e95c3faedefd767a7e6efd90a2561392a0e76eb4"
+        },
+        {
+          "path": "skills/agentforce-test/SKILL.md",
+          "kind": "file",
+          "mode": 420,
+          "bytes": 40371,
+          "sha256": "72fe8e3a9fb0d5ed7b6e0c5c65a8b3cf6d15fd74781f1d1d74c3ea74808ba2a9"
         }
       ]
     }

@@ -1,5 +1,5 @@
 // #1713:复用段 0 / 段 2 的实际 OpenCode 配置与 md 样本,沙箱真引擎 → sidecar 作答 → 生产视图。
-import { afterAll, beforeAll, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import fs from "node:fs"
 import path from "node:path"
 import { assertEngineSandboxed, engineSandbox } from "../../test-component/engine-sandbox"
@@ -18,7 +18,9 @@ import { engineProjectTrust } from "./engine-project-trust"
 const trustReads = new Map<string, number>()
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { createEngineFetch } from "../engine-adapter"
-import { WITHHELD_KINDS } from "@opencode/schema/codepuppy-project-config"
+import { WITHHELD_KINDS, type NativeFileState } from "@opencode/schema/codepuppy-project-config"
+import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { testNativeMain } from "../../test-component/codepuppy-engine"
 const sandbox = engineSandbox()
 const model = scriptedModel()
 const write = (file: string, text: string) => {
@@ -266,4 +268,126 @@ test("审查10:桌面适配器未选 agent 创建会话时,不选项目名字最
   const agentsUsed = messages.filter((message) => message.type === "assistant").map((message) => message.agent)
   expect(agentsUsed).toEqual(["build"])
   expect(agentsUsed).not.toContain("000-first")
+})
+
+// ── D6(DESIGN-local-plugin-install §4.6,R-m / R-n):原生文件来源按引用管理 ──────────────────────────────────────────────
+// 这一组自己起一台像 sidecar 那样装了契约 C 原生来源钩子的引擎(闸门安装是进程级的,前面几条用例的宿主不带钩子):真 ext 的
+// hub bridge 经 parentPort 问 main,main 的作答是生产的 syncNativeSourcesV2;继承开关按已开启(R-n 的前提)。
+// 定制中心的动作在 6b;这里直接调同一个账本写者 setNativeSourceStateV2,再经引擎自己的 location/reload 生效。
+let native: Running
+let nativeHost: ReturnType<typeof codepuppyEngine>
+const at = async (directory: string, route: string, method = "GET") =>
+  (await (await native.fetch(new Request(`http://codepuppy-sidecar.invalid${route}`, { method, headers: { "x-opencode-directory": encodeURIComponent(directory) } }))).json()) as { data?: Array<Record<string, any>> }
+const names = async (directory: string, route: string) => ((await at(directory, route)).data ?? []).map((item) => String(item.name ?? item.id))
+const bindings = () => (JSON.parse(fs.readFileSync(path.join(codepuppyBootstrap().paths.globalRoot, "installs.json"), "utf8")).nativeSources ?? []) as NativeFileState[]
+const binding = (kind: NativeFileState["kind"], entry: string) => {
+  const found = bindings().find((item) => item.kind === kind && item.entry === entry)
+  if (!found) throw new Error(`no ${kind} binding ${entry}: ${JSON.stringify(bindings())}`)
+  return found
+}
+// 定制中心的写通道 body(ext-ipc 的 setNativeSourceState 就是这一个函数),经它写账本
+const act = async (state: NativeFileState, action: "enable" | "disable" | "remove" | "rejoin") => {
+  const written = await testNativeMain().setState({ file: state.file, kind: state.kind, entry: state.entry, ...(state.target ? { target: state.target } : {}), action })
+  if (!written.ok) throw new Error(written.reason)
+}
+const reloadAll = async () => {
+  const reply = await native.fetch(new Request("http://codepuppy-sidecar.invalid/api/location/reload", { method: "POST" }))
+  expect(reply.ok).toBe(true)
+}
+const until = async (check: () => Promise<boolean>, label: string) => {
+  for (let i = 0; i < 100; i++) if (await check()) return
+  else await Bun.sleep(100)
+  throw new Error(`timed out waiting for ${label}`)
+}
+
+describe("D6 native file sources", () => {
+beforeAll(async () => {
+  nativeHost = codepuppyEngine({ sandbox, name: "native-view", modelBaseURL: model.baseURL, filewatcher: true, nativeSources: true, switches: { ecosystemInherit: true } })
+  native = await nativeHost.start()
+})
+afterAll(async () => {
+  await native?.close()
+})
+
+test("hub switch stops a native skill, command, agent, plugin and MCP in place; removed entries stay out after an edit and rejoin in place", async () => {
+  const directory = path.join(sandbox.root, "native-switch")
+  const probe = path.join(sandbox.root, "native-plugin-loads")
+  const files: Record<string, string> = {
+    "opencode.json": JSON.stringify({ mcp: { servers: { natmcp: { type: "local", command: [process.execPath, MCP_FIXTURE] } } } }),
+    ".opencode/skills/natskill/SKILL.md": "---\nname: natskill\ndescription: native skill\n---\nsee ../shared/notes.md\n",
+    ".opencode/skills/sibling/SKILL.md": "---\nname: sibling\ndescription: stays\n---\nbody\n",
+    ".opencode/commands/natcmd.md": "run native",
+    ".opencode/agents/natagent.md": "---\ndescription: native agent\nmode: subagent\n---\nA",
+    ".opencode/plugins/natplug.js": `import fs from "node:fs"\nfs.appendFileSync(${JSON.stringify(probe)}, "loaded\\n")\nexport default { id: "natplug.test", setup: async () => {} }\n`,
+    ".claude/skills/inherited/SKILL.md": "---\nname: inherited\ndescription: claude skill\n---\nbody\n",
+  }
+  for (const [file, text] of Object.entries(files)) write(path.join(directory, file), text)
+  allowProject(directory)
+  const plugins = async () => ((await at(directory, "/api/plugin")).data ?? []).filter((item) => item.id === "natplug.test" && item.state?.status === "active").length
+  const mcpStatus = async () => ((await at(directory, "/api/mcp")).data ?? []).find((item) => item.name === "natmcp")?.status?.status
+  await until(async () => (await names(directory, "/api/skill")).includes("natskill") && (await names(directory, "/api/agent")).includes("natagent") && (await plugins()) === 1, "native entries to load")
+  expect(await names(directory, "/api/command")).toContain("natcmd")
+  expect(await names(directory, "/api/skill")).toEqual(expect.arrayContaining(["sibling", "inherited"]))
+  expect(await mcpStatus()).not.toBe("disabled")
+  // 来源按原生声明开启绑定;Code Puppy 自己的显式层(出厂 /init、/review)不当原生来源
+  for (const [kind, entry] of [["skill", "natskill"], ["command", "natcmd"], ["agent", "natagent"], ["plugin", "natplug.js"], ["mcp", "natmcp"], ["skill", "inherited"]] as const)
+    expect(binding(kind, entry)).toMatchObject({ desiredState: "enabled", removed: false })
+  expect(bindings().some((item) => item.kind === "command" && (item.entry === "init" || item.entry === "review"))).toBe(false)
+  // 定制中心读到的行:项目里的条目在「本项目」并写相对目录;继承的 .claude 技能也是这一项目的
+  const listed = async () => await testNativeMain().rows(directory)
+  expect((await listed()).find((row) => row.entry === "natskill")).toMatchObject({ scope: "project", directoryLabel: ".opencode", removed: false })
+  expect((await listed()).find((row) => row.entry === "inherited")).toMatchObject({ scope: "project", directoryLabel: ".claude/skills" })
+  const loads = fs.readFileSync(probe, "utf8").length
+
+  await act(binding("skill", "natskill"), "remove")
+  await act(binding("skill", "inherited"), "disable")
+  await act(binding("command", "natcmd"), "disable")
+  await act(binding("agent", "natagent"), "disable")
+  await act(binding("plugin", "natplug.js"), "disable")
+  await act(binding("mcp", "natmcp"), "disable")
+  await reloadAll()
+  await until(async () => !(await names(directory, "/api/skill")).includes("natskill") && (await mcpStatus()) === "disabled", "native entries to stop")
+  expect(await names(directory, "/api/skill")).toContain("sibling")
+  expect(await names(directory, "/api/skill")).not.toContain("inherited")
+  expect(await names(directory, "/api/command")).not.toContain("natcmd")
+  expect(await names(directory, "/api/agent")).not.toContain("natagent")
+  expect(await plugins()).toBe(0)
+  expect(fs.readFileSync(probe, "utf8").length).toBe(loads)
+
+  // 原处编辑:引擎原 watcher 重新扫描,同一绑定仍按 removed 不加载
+  write(path.join(directory, ".opencode/skills/natskill/SKILL.md"), "---\nname: natskill\ndescription: edited\n---\nedited\n")
+  await Bun.sleep(1500)
+  expect(await names(directory, "/api/skill")).not.toContain("natskill")
+  expect(bindings().filter((item) => item.kind === "skill" && item.entry === "natskill")).toEqual([expect.objectContaining({ removed: true })])
+  expect((await listed()).find((row) => row.entry === "natskill")).toMatchObject({ removed: true })
+
+  await act(binding("skill", "natskill"), "rejoin")
+  await act(binding("skill", "inherited"), "enable")
+  await act(binding("command", "natcmd"), "enable")
+  await act(binding("agent", "natagent"), "enable")
+  await act(binding("plugin", "natplug.js"), "enable")
+  await act(binding("mcp", "natmcp"), "enable")
+  await reloadAll()
+  await until(async () => (await names(directory, "/api/skill")).includes("natskill") && (await plugins()) === 1, "native entries to rejoin")
+  expect(await names(directory, "/api/skill")).toContain("inherited")
+  expect(await names(directory, "/api/command")).toContain("natcmd")
+  expect(await names(directory, "/api/agent")).toContain("natagent")
+  expect(await mcpStatus()).not.toBe("disabled")
+  // 来源文件从未被改写(编辑是用户自己做的那一次)
+  for (const [file, text] of Object.entries(files)) if (file !== ".opencode/skills/natskill/SKILL.md") expect(fs.readFileSync(path.join(directory, file), "utf8")).toBe(text)
+}, 90_000)
+
+test("untrusted project native plugin stays off while a global enabled native skill works, and trust is not recorded as a user switch", async () => {
+  const directory = path.join(sandbox.root, "native-untrusted")
+  const probe = path.join(sandbox.root, "native-untrusted-plugin-loads")
+  write(path.join(directory, ".opencode/plugins/projplug.js"), `import fs from "node:fs"\nfs.appendFileSync(${JSON.stringify(probe)}, "loaded\\n")\nexport default { id: "projplug.test", setup: async () => {} }\n`)
+  write(path.join(nativeHost.slot.configDirectory, "skills/globalnative/SKILL.md"), "---\nname: globalnative\ndescription: global\n---\nbody\n")
+  await until(async () => (await names(directory, "/api/skill")).includes("globalnative"), "the global native skill")
+  expect(fs.existsSync(probe)).toBe(false)
+  expect(binding("plugin", "projplug.js")).toMatchObject({ desiredState: "enabled", removed: false })
+  allowProject(directory)
+  await reloadAll()
+  await until(async () => fs.existsSync(probe), "the allowed project plugin to load")
+  expect(binding("plugin", "projplug.js")).toMatchObject({ desiredState: "enabled", removed: false })
+}, 60_000)
 })

@@ -1,9 +1,9 @@
 import { pluginDataDirectory } from "../shared/installed-plugin-settings"
 import { sha256Hex } from "./ext-manifest-v2"
 import { expect, spyOn, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, statSync, symlinkSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { cpSync, lstatSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, renameSync, rmSync, writeFileSync, statSync, symlinkSync } from "node:fs"
+import { homedir, tmpdir } from "node:os"
+import { basename, join } from "node:path"
 import { captureFixture, captureWholeFixture, captureStandardFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
 import { convertPluginTree } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import { buildSkillTxItems } from "./ext-package-tx-builders"
@@ -15,6 +15,8 @@ import { readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
 import { runExtensionTransaction } from "./ext-transaction"
 import { persistMcp, readMcpLeafStrict } from "./ext-config"
 import { createPluginSources } from "./plugin-sources"
+import { locateCommandSource } from "./plugin-command-source"
+import { locatedFiles } from "./plugin-command-fence"
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
 import { makeRecoveryGate } from "./ext-recovery-gate"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
@@ -38,7 +40,7 @@ async function installerHarness(run: (h: Awaited<ReturnType<typeof sourceHarness
 async function sourceHarness(temporary: string) {
   const { createSourceInstaller } = await import("./install-from-source")
   const fetched: string[] = []
-  const sources = createPluginSources({ catalog: async () => [], fetch: (url) => { fetched.push(String(url)); return fixtureFetch(url) } })
+  const sources = createPluginSources({ locateCommand: locateCommandSource, locatedFiles, catalog: async () => [], fetch: (url) => { fetched.push(String(url)); return fixtureFetch(url) } })
   const root = join(temporary, "env", "dev")
   const activation: string[] = []
   const reloads: string[] = []
@@ -803,6 +805,17 @@ test("standard plugin content installs before configuration programs or local se
 })
 
 
+test("language-server-only package installs as a whole package", () => installerHarness(async h => {
+  const capture = await captureStandardFixture("claude:pyright-lsp")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const result = await h.install(h.request("claude:pyright-lsp", "standard_content_pyright_lsp"))
+  expect(result).toMatchObject({ ok: true, installed: [], notRunning: [] })
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  expect(state.packageGraphs.map(graph => [graph.root.kind, graph.children.length, graph.notRunning ?? []])).toEqual([["bundle", 0, []]])
+}))
+
 test("plugin service settings save typed values and keep sensitive values out of public state", () => installerHarness(async h => {
   const { readPackageAuthorizationV1, savePackageSecretsV1 } = await import("./package-admission")
   const deps = { root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => { throw Error("Direct package never loads catalog") } }
@@ -1036,4 +1049,177 @@ test("catalog cloud content requests its startup refresh after installation has 
   expect(reloads).toEqual([])
   await new Promise<void>(resolve => setImmediate(resolve))
   expect(reloads).toEqual([cloud.envelope.prelude.packageId])
+}))
+
+/** DESIGN-local-plugin-install §4.16: the locator runs under the real fence renderers; rules come from the same planners. */
+async function commandSourceFence(h: { temporary: string }) {
+  const { configureCommandSourceFence } = await import("./plugin-command-source")
+  const { planCredentialStores } = await import("./process-fence-plan")
+  const { credentialStores } = await import("./codepuppy-secret-files")
+  configureCommandSourceFence({ egressProxyPort: 47124, configFence: [], credentialStores: planCredentialStores(credentialStores({ userDataPath: h.temporary }), { realpath: path => realpathSync.native(path) }) })
+}
+
+/** The recorded official marketplace with only the xcode entry's command replaced (controlled variant of the real entry). */
+function commandMarketplace(directory: string, command: string, mode = "link") {
+  const document = JSON.parse(readFileSync(join(fixtureRoot, ".claude-plugin/marketplace.json"), "utf8")) as { plugins: { name: string; source: Record<string, unknown> }[] }
+  const xcode = document.plugins.find(entry => entry.name === "xcode")!
+  xcode.source = { ...xcode.source, command, mode }
+  mkdirSync(join(directory, ".claude-plugin"), { recursive: true })
+  writeFileSync(join(directory, ".claude-plugin/marketplace.json"), JSON.stringify(document, null, 2))
+}
+
+const listTree = (directory: string): string[] => readdirSync(directory, { recursive: true, withFileTypes: true }).map(entry => join(entry.parentPath, entry.name)).sort()
+
+test("command marketplace source installs the printed plugin in place", () => installerHarness(async h => {
+  await commandSourceFence(h)
+  const { uninstallPackageV1 } = await import("./ext-package-uninstall")
+  // Real plugin-dev tree (claude-plugins-official@0fbfda5a) stands in for the directory Xcode would print on a machine with Xcode.
+  const printed = realpathSync.native(mkdtempSync(join(h.temporary, "xcode-output-")))
+  cpSync(join(fixtureRoot, "standard", "claude-plugin-dev"), printed, { recursive: true })
+  const runs = join(h.temporary, "locator-runs")
+  const market = join(h.temporary, "market")
+  commandMarketplace(market, `echo run >> '${runs}'; printf '%s\\n' '${printed}'`)
+  const choose = async () => {
+    const prepared = await h.sources.prepareCapture(await h.sources.captureFolder(market))
+    if (prepared.kind !== "marketplace") throw Error("expected marketplace entries")
+    return prepared.entries.find(entry => entry.displayName === "xcode")!.id
+  }
+  const first = await choose()
+  expect(existsSync(runs)).toBe(false)
+  // Preview conversion and installation share the one capture of the chosen entry.
+  expect((await h.sources.convertCandidate(first)).ok).toBe(true)
+  const outcome = await h.install(h.request(first, "request_xcode_link"))
+  if (!outcome.ok) throw Error(outcome.detail)
+  expect(readFileSync(runs, "utf8")).toBe("run\n")
+  expect(outcome.installed.filter(entry => entry.kind === "skill")).toHaveLength(7)
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs.find(graph => graph.packageId === outcome.packageId)!
+  expect(graph.pluginTree).toBeUndefined()
+  expect(graph.pluginLink).toEqual({ storeKey: "bundle--" + graph.root.name, bindingId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/) })
+  const live = resolveLiveGenerationDir(h.root, graph.pluginLink!.storeKey)!
+  expect(lstatSync(join(live, "tree/skills")).isSymbolicLink()).toBe(true)
+  expect(readlinkSync(join(live, "tree/skills"))).toBe(join(printed, "skills"))
+  // Ordinary files run in place: the installed script is the printed one, and an in-place change is what the package sees.
+  const script = "skills/hook-development/scripts/hook-linter.sh"
+  expect(realpathSync.native(join(live, "tree", script))).toBe(join(printed, script))
+  writeFileSync(join(printed, script), "#!/bin/sh\necho changed in place\n")
+  expect(readFileSync(join(live, "tree", script), "utf8")).toBe("#!/bin/sh\necho changed in place\n")
+  // A changed control declaration with the same printed path and top-level entries keeps the binding but updates the package.
+  const skill = join(printed, "skills/hook-development/SKILL.md")
+  writeFileSync(skill, readFileSync(skill, "utf8").replace("description:", "description: Updated in place."))
+  const updated = await h.install(h.request(await choose(), "request_xcode_update"))
+  if (!updated.ok) throw Error(updated.detail)
+  expect(updated.alreadyInstalled).toBeUndefined()
+  expect(readFileSync(runs, "utf8")).toBe("run\nrun\n")
+  const after = readPackageLedgerStateV1(h.root)
+  if (!after.ok) throw Error(after.reason)
+  const changed = after.packageGraphs.find(graph => graph.packageId === outcome.packageId)!
+  expect(changed.pluginLink!.bindingId).toBe(graph.pluginLink!.bindingId)
+  expect(changed.envelopeDigest).not.toBe(graph.envelopeDigest)
+  // Removal deletes only the managed view and registrations; nothing is followed into the printed directory.
+  const original = listTree(printed)
+  expect((await setPackageStateV1({ packageId: outcome.packageId, state: "disabled" }, { globalRoot: () => h.root, environment: () => "dev", advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("not catalog") } })).ok).toBe(true)
+  const unused = () => { throw Error("No connector or plugin path belongs to this package") }
+  // Command/agent registrations are config entries outside the view; their removal is the existing installers' concern.
+  expect(uninstallPackageV1(outcome.packageId, { globalRoot: () => h.root, installers: { removeFsInstall: () => ({ ok: true as const, files: [] }), removeMcpConfig: unused, removeCommandConfig: () => ({ ok: true as const }), removeMcpSecretsStrict: unused, releaseCodePuppyConnectionBindings: unused, removePluginPath: unused, removeInstallGrants } })).toMatchObject({ ok: true })
+  expect(existsSync(join(h.root, "ext-store", graph.pluginLink!.storeKey))).toBe(false)
+  expect(listTree(printed)).toEqual(original)
+  expect(readFileSync(join(printed, script), "utf8")).toBe("#!/bin/sh\necho changed in place\n")
+}))
+
+test("a removed printed directory is named as the missing source while the linked package stays installed", () => installerHarness(async h => {
+  await commandSourceFence(h)
+  const { extensionHealthProbeRouter } = await import("./ext-health-probe-router")
+  const printed = realpathSync.native(mkdtempSync(join(h.temporary, "xcode-output-")))
+  cpSync(join(fixtureRoot, "standard", "claude-plugin-dev"), printed, { recursive: true })
+  const market = join(h.temporary, "market")
+  commandMarketplace(market, `printf '%s\\n' '${printed}'`)
+  const prepared = await h.sources.prepareCapture(await h.sources.captureFolder(market))
+  if (prepared.kind !== "marketplace") throw Error("expected marketplace entries")
+  const outcome = await h.install(h.request(prepared.entries.find(entry => entry.displayName === "xcode")!.id, "request_xcode_gone"))
+  if (!outcome.ok) throw Error(outcome.detail)
+  const graph = (() => { const state = readPackageLedgerStateV1(h.root); if (!state.ok) throw Error(state.reason); return state.packageGraphs.find(graph => graph.packageId === outcome.packageId)! })()
+  const live = resolveLiveGenerationDir(h.root, graph.pluginLink!.storeKey)!
+  const probe = () => extensionHealthProbeRouter(h.root)({ key: graph.pluginLink!.storeKey, action: "generation", genId: basename(live), generationDir: live, phase: "recovery" })
+  expect(await probe()).toEqual({ healthy: true })
+  renameSync(printed, printed + "-moved")
+  expect(await probe()).toEqual({ healthy: false, reason: "Linked plugin source is missing: " + join(printed, ".claude-plugin") })
+  // Nothing is uninstalled or rolled back: the graph and its records stay, ready for the source to come back.
+  const after = readPackageLedgerStateV1(h.root)
+  expect(after.ok && after.packageGraphs.some(item => item.installedGraphDigest === graph.installedGraphDigest)).toBe(true)
+  expect(after.ok && after.records.filter(record => record.kind === "skill")).toHaveLength(7)
+  renameSync(printed + "-moved", printed)
+  expect(await probe()).toEqual({ healthy: true })
+}))
+
+test("a linked package serves redacted connector declarations from overlays only", () => installerHarness(async h => {
+  await commandSourceFence(h)
+  const printed = realpathSync.native(mkdtempSync(join(h.temporary, "xcode-output-")))
+  cpSync(join(fixtureRoot, "standard", "claude-plugin-dev"), printed, { recursive: true })
+  // Real github connector definition (claude-plugins-official@b5b01ac4), its Authorization replaced by an invalid canary token,
+  // declared from a nested file so its ancestor becomes an overlay while siblings stay linked.
+  const canary = "ghp_" + "0123456789abcdefghijklmnopqrstuvwxyzAB"
+  const connector = JSON.parse(readFileSync(join(fixtureRoot, "external_plugins/github/.mcp.json"), "utf8")) as Record<string, { headers: Record<string, string> }>
+  connector.github!.headers.Authorization = "Bearer " + canary
+  mkdirSync(join(printed, "config"))
+  writeFileSync(join(printed, "config/connectors.json"), JSON.stringify(connector, null, 2))
+  writeFileSync(join(printed, "config/notes.md"), "ordinary sibling")
+  const manifest = JSON.parse(readFileSync(join(printed, ".claude-plugin/plugin.json"), "utf8"))
+  writeFileSync(join(printed, ".claude-plugin/plugin.json"), JSON.stringify({ ...manifest, mcpServers: "./config/connectors.json" }, null, 2))
+  const market = join(h.temporary, "market")
+  commandMarketplace(market, `printf '%s\\n' '${printed}'`)
+  const prepared = await h.sources.prepareCapture(await h.sources.captureFolder(market))
+  if (prepared.kind !== "marketplace") throw Error("expected marketplace entries")
+  const outcome = await h.install(h.request(prepared.entries.find(entry => entry.displayName === "xcode")!.id, "request_xcode_secret"))
+  if (!outcome.ok) throw Error(outcome.detail)
+  expect(outcome.installed).toContainEqual(expect.objectContaining({ kind: "mcp", sourceName: "github" }))
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const live = resolveLiveGenerationDir(h.root, state.packageGraphs.find(graph => graph.packageId === outcome.packageId)!.pluginLink!.storeKey)!
+  expect(lstatSync(join(live, "tree/config")).isDirectory()).toBe(true)
+  expect(lstatSync(join(live, "tree/config/connectors.json")).isFile()).toBe(true)
+  expect(readlinkSync(join(live, "tree/config/notes.md"))).toBe(join(printed, "config/notes.md"))
+  expect(readlinkSync(join(live, "tree/skills"))).toBe(join(printed, "skills"))
+  const installedFiles = listTree(live).filter(path => lstatSync(path).isFile())
+  expect(installedFiles.some(path => readFileSync(path, "utf8").includes(canary))).toBe(false)
+  expect(readFileSync(join(live, "tree/config/connectors.json"), "utf8")).toContain("{secret:")
+  expect(readFileSync(join(printed, "config/connectors.json"), "utf8")).toContain(canary)
+}))
+
+test("a copy-mode command source installs a snapshot that survives the printed directory", () => installerHarness(async h => {
+  await commandSourceFence(h)
+  const printed = realpathSync.native(mkdtempSync(join(h.temporary, "copied-output-")))
+  cpSync(join(fixtureRoot, "standard", "claude-plugin-dev"), printed, { recursive: true })
+  const market = join(h.temporary, "market")
+  commandMarketplace(market, `printf '%s\\n' '${printed}'`, "copy")
+  const prepared = await h.sources.prepareCapture(await h.sources.captureFolder(market))
+  if (prepared.kind !== "marketplace") throw Error("expected marketplace entries")
+  const outcome = await h.install(h.request(prepared.entries.find(entry => entry.displayName === "xcode")!.id, "request_xcode_copy"))
+  if (!outcome.ok) throw Error(outcome.detail)
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs.find(graph => graph.packageId === outcome.packageId)!
+  expect(graph.pluginLink).toBeUndefined()
+  const live = resolveLiveGenerationDir(h.root, graph.pluginTree!.storeKey)!
+  const script = "skills/hook-development/scripts/hook-linter.sh"
+  const bytes = readFileSync(join(printed, script))
+  rmSync(printed, { recursive: true, force: true })
+  expect(lstatSync(join(live, "tree", script)).isFile()).toBe(true)
+  expect(readFileSync(join(live, "tree", script))).toEqual(bytes)
+}))
+
+test("real xcode command failure names the command and its error while the marketplace's other entries install", () => installerHarness(async h => {
+  await commandSourceFence(h)
+  const command = "xcrun agent plugin path --plugin-format claude"
+  // Observe this machine's actual outcome of the recorded command first; the assertion follows reality, never a stand-in.
+  const observed = Bun.spawnSync(["/bin/sh", "-c", command], { cwd: homedir(), env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: homedir() } })
+  const xcode = await h.candidate("xcode")
+  const outcome = await h.install(h.request(xcode, "request_real_xcode"))
+  if (observed.exitCode !== 0)
+    expect(outcome).toEqual({ ok: false, code: "source-unreachable", detail: `Command "${command}" exited with ${observed.exitCode}: ${observed.stderr.toString().trim()}` })
+  else expect(outcome.ok).toBe(true)
+  const other = await h.candidate("frontend-design")
+  const installed = await h.install(h.request(other, "request_same_market"))
+  expect(installed.ok && installed.installed.map(entry => entry.sourceName)).toEqual(["frontend-design"])
 }))

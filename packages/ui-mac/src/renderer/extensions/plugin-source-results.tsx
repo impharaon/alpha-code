@@ -3,7 +3,7 @@ import type { CandidateV1, SourceSearchResultV1 } from "../../main/plugin-source
 import type { InstallOutcomeV1 } from "../../shared/plugin-install"
 import { t } from "../i18n"
 import { iconForRow, PackageLogo } from "./ext-presentation"
-import { pluginSourceLabelKey, pluginInstallFailureKey, pluginSourceFailureKey } from "./ext-package-presentation"
+import { pluginSourceLabelKey, pluginInstallFailureDetail, pluginInstallFailureKey, pluginSourceFailureKey } from "./ext-package-presentation"
 
 /** Search owns pending selection only; main owns order, identity, installation and status. */
 export function PluginSourceResults(props: {
@@ -87,7 +87,7 @@ export function PluginSourceChoices<C extends Pick<CandidateV1, "id" | "displayN
     try {
       const outcome = await props.install(candidate)
       if (!outcome.ok) {
-        setErrors((errors) => ({ ...errors, [candidate.id]: t(pluginInstallFailureKey(outcome.code)) }))
+        setErrors((errors) => ({ ...errors, [candidate.id]: [t(pluginInstallFailureKey(outcome.code)), pluginInstallFailureDetail(outcome)].filter(Boolean).join(" ") }))
         return
       }
       setInstalled((current) => ({ ...current, [candidate.id]: outcome.packageId }))

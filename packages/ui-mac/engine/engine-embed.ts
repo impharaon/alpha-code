@@ -24,6 +24,7 @@ import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
 import { AppProcess } from "@opencode/util/process"
 import { Effect, Exit, Scope } from "effect"
+import type { NativeSourceSync } from "@opencode/schema/codepuppy-project-config"
 import { HttpEffect, HttpServer } from "effect/http"
 import { installPackageManagerEnvironment, type PackageManagerEnvironment } from "../src/shared/package-manager-environment"
 
@@ -69,6 +70,10 @@ const layers = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
  * `#1713`(DESIGN-project-engine-config-takeover 契约 C):`projectTrust` 必填 —— 回答「用户是否对这个项目文件夹点过允许」,
  * 实现是 `#1709` 的同一个读法(src/main/engine-project-trust.ts)。在上游 `start()` 之前装进项目配置闸门;缺失就抛错,
  * sidecar 走既有的失败路径,不报 ready。
+ *
+ * 契约 C 增量(DESIGN-local-plugin-install v3.5 R-m,#1776 片 6a):`nativeSources` 可选 —— 闸门在每次配置装载(首次与每次 reload)
+ * 结束前 await 它,取得原生文件来源绑定的开关状态;sidecar 的实现等 ext 预载完,经 hub bridge 的 `codepuppy.package.source` sync
+ * 问 main。答不出 ⇒ undefined,闸门沿用上一代(首次装载按原生声明并记一行)。缺席 ⇒ 原生来源不作用。
  */
 export async function startEngine(
   options: EngineServerOptions,
@@ -77,11 +82,12 @@ export async function startEngine(
     projectTrust: (directory: string) => boolean
     packageManagerEnvironment: PackageManagerEnvironment
     refreshPackageManagerEnvironment?: () => Promise<PackageManagerEnvironment>
+    nativeSources?: NativeSourceSync
   },
 ): Promise<EmbeddedEngine> {
   if (typeof hooks?.projectTrust !== "function")
     throw new Error("startEngine: hooks.projectTrust is required — the project config gate cannot run without the trust reader (#1713)")
-  CodePuppyProjectGate.install({ trusted: hooks.projectTrust })
+  CodePuppyProjectGate.install({ trusted: hooks.projectTrust, ...(hooks.nativeSources ? { nativeSources: hooks.nativeSources } : {}) })
   installPackageManagerEnvironment(hooks.packageManagerEnvironment, hooks.refreshPackageManagerEnvironment)
   const scope = Scope.makeUnsafe()
   let dispatch: EmbeddedEngine["dispatch"] | undefined

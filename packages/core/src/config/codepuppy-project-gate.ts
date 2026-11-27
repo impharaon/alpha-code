@@ -18,6 +18,7 @@ export * as CodePuppyProjectGate from "./codepuppy-project-gate.js"
 
 import { realpathSync } from "node:fs"
 import path from "path"
+import { fileURLToPath } from "url"
 import { Effect, Exit } from "effect"
 import matter from "gray-matter"
 import { Skill } from "@opencode/schema/skill"
@@ -26,12 +27,23 @@ import { parse, type ParseError } from "jsonc-parser"
 import { Document, Info, type Entry } from "@opencode/schema/config"
 import { ConfigAgent } from "@opencode/schema/config/agent"
 import { ConfigCommand } from "@opencode/schema/config/command"
+import { ConfigMCP } from "@opencode/schema/config/mcp"
+import type { ConfigPlugin } from "@opencode/schema/config/plugin"
+import { Mcp } from "@opencode/schema/mcp"
 import {
   WITHHELD_KINDS,
   type GatePointState,
   type ProjectConfigView,
   type WithheldItem,
+  nativeFileBlocked,
+  nativeFileKey,
+  type NativeFileRef,
+  type NativeFileSource,
+  type NativeFileState,
+  type NativeSourceSync,
 } from "@opencode/schema/codepuppy-project-config"
+import { ConfigIntegration } from "./integration.js"
+import { ConfigManaged } from "./managed.js"
 import { ConfigNormalize } from "./normalize.js"
 import { ConfigMarkdown } from "./markdown.js"
 import { PluginSourceDirectory } from "../plugin/source-directory.js"
@@ -91,20 +103,28 @@ export function classificationsForTest() {
 }
 
 // ── 安装与状态 ────────────────────────────────────────────────────────────────────────────────────────────────
-let installed: { readonly trusted: (directory: string) => boolean } | undefined
+let installed: { readonly trusted: (directory: string) => boolean; readonly nativeSources?: NativeSourceSync } | undefined
 /** 每个 Location(按 `location.directory`)最近一代的视图记录。 */
 const views = new Map<string, { directory: string; trusted: boolean; points: Map<string, GatePointState>; withheld: WithheldItem[]; reads: Map<ReadPoint, WithheldItem[]> }>()
 /** 未允许的一代里属于项目内容的条目(项目文档与项目 `.opencode` 目录)。 */
 const projectEntries = new WeakSet<Entry>()
+/**
+ * D6(DESIGN-local-plugin-install §4.6,R-m):每个 Location 的原生来源状态。`states` 是最近一次 sync 应答(main 账本的绑定状态),
+ * Location 重建后沿用(失败时就是「上一代」);`owned` 是非原生文档给出的技能根(main 写的显式层、内联注入、托管层),那里的文件
+ * 不是原生来源;`found` 收读取点在 observe 期间发现的文件来源,读完一次交给 main。
+ */
+const natives = new Map<string, { states: Map<string, NativeFileState> | undefined; owned: string[]; found: Map<ReadPoint, NativeFileSource[]> }>()
 
-export function install(input: { readonly trusted: (directory: string) => boolean }): void {
-  installed = { trusted: input.trusted }
+/** 契约 C:`trusted` 必填;`nativeSources` 是 R-m 的可选同步钩子,缺席时原生来源不作用。 */
+export function install(input: { readonly trusted: (directory: string) => boolean; readonly nativeSources?: NativeSourceSync }): void {
+  installed = { trusted: input.trusted, ...(input.nativeSources ? { nativeSources: input.nativeSources } : {}) }
 }
 
 /** 只给测试用:回到未安装、清空记录(同一进程里上游测试照旧按上游行为跑)。不属于契约 C。 */
 export function resetForTest(): void {
   installed = undefined
   views.clear()
+  natives.clear()
 }
 
 /** 这个条目是否是未允许的一代里的项目内容。 */
@@ -144,7 +164,10 @@ export function observe<A, E, R>(
     if (!record) return effect
     record.points.set(point, "pending")
     record.reads.set(point, [])
+    const native = installed?.nativeSources ? natives.get(directory) : undefined
+    native?.found.set(point, [])
     return effect.pipe(
+      Effect.tap(() => (native ? flushNative(directory, point, native) : Effect.void)),
       Effect.onExit((exit) => Effect.sync(() => record.points.set(point, Exit.isSuccess(exit) ? "done" : "failed"))),
       Effect.tap(() => {
         const items = record.reads.get(point) ?? []
@@ -173,8 +196,17 @@ export function skillSources(directory: string, current: readonly Skill.Source[]
 
 /** 给目录读取点用的文件头函数;用户全局与未安装时原样交出。 */
 export function markdown(directory: string, entry: Entry, point: "agent" | "command", legacyAgent?: (data: Record<string, unknown>) => boolean) {
-  return (filepath: string, content: string) =>
-    projectEntry(entry) ? frontmatter(directory, filepath, content, point, entry.path, legacyAgent) : content
+  return (filepath: string, content: string) => {
+    // D6:关闭 / 已移除的原生命令文件不交给解码(同目录其他文件照常)。
+    if (point === "command" && entry.path !== undefined && !nativeAllowed(directory, "command", { file: filepath, kind: "command", entry: markdownName(entry.path, filepath), active: true }))
+      return undefined
+    return projectEntry(entry) ? frontmatter(directory, filepath, content, point, entry.path, legacyAgent) : content
+  }
+}
+
+/** D6:技能读取点的原生过滤(解析出技能 id 之后);非原生根下的文件、未装钩子时恒 true。 */
+export function nativeSkill(directory: string, filepath: string, id: string): boolean {
+  return nativeAllowed(directory, "skill", { file: filepath, kind: "skill", entry: id, active: true })
 }
 
 export const agent = Effect.fnUntraced(function* (
@@ -191,7 +223,8 @@ export const agent = Effect.fnUntraced(function* (
   if (!content) return
   const text = markdown(directory, entry, "agent", legacyAgent)(file.filepath, content)
   if (text === undefined) return
-  const document = yield* decode(file, text)
+  const decoded = yield* decode(file, text)
+  const document = decoded && nativeAgents(directory, file.filepath, decoded)
   if (!document || !projectEntry(entry)) return document
   const filtered = new Document({
     ...document,
@@ -226,14 +259,7 @@ export function frontmatter(
 ): string | undefined {
   if (!installed || views.get(directory)?.trusted !== false) return content
   const file = relativeFile(directory, filepath)
-  const name =
-    root === undefined
-      ? file
-      : path
-          .relative(root, filepath)
-          .replaceAll("\\", "/")
-          .replace(/^(agent|agents|mode|modes|command|commands)\//, "")
-          .replace(/\.md$/, "")
+  const name = root === undefined ? file : markdownName(root, filepath)
   const options = {
     engines: {
       javascript: () => {
@@ -290,6 +316,72 @@ function parseFrontmatter(content: string, options: Parameters<typeof matter>[1]
   }
 }
 
+/** 目录读取点给 md 文件起的名字(与上游 agent / command 解码同一算法)。 */
+function markdownName(root: string, filepath: string) {
+  return path
+    .relative(root, filepath)
+    .replaceAll("\\", "/")
+    .replace(/^(agent|agents|mode|modes|command|commands)\//, "")
+    .replace(/\.md$/, "")
+}
+
+// ── D6 原生来源(§4.6:状态由 main 应答;文件只在原处读,关闭项按入口过滤)────────────────────────────────────────
+function nativeAllowed(directory: string, point: ReadPoint, source: NativeFileSource): boolean {
+  const record = installed?.nativeSources ? natives.get(directory) : undefined
+  if (!record || record.owned.some((root) => FSUtil.contains(root, source.file))) return true
+  record.found.get(point)?.push(source)
+  return !nativeFileBlocked(record.states?.get(nativeFileKey(source)))
+}
+
+function nativeAgents(directory: string, filepath: string, document: Document): Document {
+  const agents = Object.entries(document.info.agents ?? {})
+  const kept = agents.filter(([name, item]) => nativeAllowed(directory, "agent", { file: filepath, kind: "agent", entry: name, active: item.disabled !== true }))
+  if (kept.length === agents.length) return document
+  return new Document({ ...document, info: new Info({ ...document.info, agents: Object.fromEntries(kept) }) })
+}
+
+const nativeSync = (directory: string, sources: NativeFileSource[]) =>
+  Effect.promise(async () => {
+    const sync = installed?.nativeSources
+    if (!sync) return undefined
+    try {
+      return await sync({ directory, sources })
+    } catch {
+      return undefined
+    }
+  })
+
+const flushNative = (directory: string, point: ReadPoint, record: NonNullable<ReturnType<typeof natives.get>>) =>
+  Effect.gen(function* () {
+    const found = record.found.get(point) ?? []
+    record.found.delete(point)
+    if (!found.length) return
+    const states = yield* nativeSync(directory, found)
+    if (states) record.states = new Map(states.map((state) => [nativeFileKey(state), state]))
+    else yield* Effect.logWarning("native source sync failed; keeping the previous states", { directory, point })
+  })
+
+function pluginTarget(spec: ConfigPlugin.Plugin, file: string) {
+  const raw = typeof spec === "string" ? spec : spec.package
+  if (raw.startsWith("-")) return
+  const target = raw.startsWith("file://")
+    ? fileURLToPath(raw)
+    : raw.startsWith("./") || raw.startsWith("../")
+      ? path.resolve(path.dirname(file), raw)
+      : raw
+  return { spec: raw, target }
+}
+
+/** 与插件模块装载前的 plugin.use 判定同一个资源名(module.ts:51–53:包名去掉版本,路径原样)。 */
+function pluginResource(target: string) {
+  const version = target.lastIndexOf("@")
+  return path.isAbsolute(target) || version <= 0 ? target : target.slice(0, version)
+}
+
+function disabledServer(server: Mcp.ServerConfig): Mcp.ServerConfig {
+  return server.type === "local" ? new Mcp.LocalConfig({ ...server, disabled: true }) : new Mcp.RemoteConfig({ ...server, disabled: true })
+}
+
 function recordRead(directory: string, point: ReadPoint, item: WithheldItem) {
   if (item.fields?.length === 0) return
   views.get(directory)?.reads.get(point)?.push(item)
@@ -313,8 +405,12 @@ export interface Generation {
   readonly directory: (root: string) => Filter | undefined
   /** 插在托管策略之后的文档(未允许时一份闸门文档,否则没有)。 */
   readonly documents: () => Document[]
-  /** 装载结束:标记项目条目、记下视图、记日志。交回同一份条目。 */
-  readonly finish: (entries: Entry[]) => Effect.Effect<Entry[]>
+  /**
+   * 装载结束:标记项目条目、记下视图、记日志。`owned` 是 Code Puppy 自己交给引擎的文档(显式层、内联注入)与系统 / MDM 托管层
+   * (含其目录条目),不当原生来源(design §4.6:288 维持今天的行为)。
+   * 装了 R-m 的钩子时交回原生来源视图(关闭项按入口过滤),否则交回同一份条目。
+   */
+  readonly finish: (entries: Entry[], owned?: readonly Entry[]) => Effect.Effect<Entry[]>
 }
 
 const passThrough: Generation = {
@@ -415,6 +511,82 @@ export const begin = Effect.fnUntraced(function* (input: { readonly directory: s
         },
       }
 
+  /**
+   * D6 过滤边界(§4.6「过滤边界」):文档级来源(原生文档里的 MCP、内联 agent / command、配置的插件 target,目录里的插件)交 main
+   * 换回状态;关闭 / 已移除的 MCP 在原处改成 disabled(同名后来的原生定义照常覆盖),内联 agent / command 按条目拿掉,插件在装载前
+   * 经 plugin.use 拒绝(与未允许项目的闸门文档同一机制,排在托管策略之后)。文件级来源由各读取点按同一份状态过滤。
+   */
+  const nativeView = Effect.fnUntraced(function* (entries: Entry[], owned: readonly Entry[]) {
+    const native = (entry: Entry): entry is Document & { path: string } =>
+      entry.type === "document" && entry.path !== undefined && !(entry instanceof ConfigManaged.Document) &&
+      !(entry instanceof ConfigIntegration.Document) && !owned.includes(entry)
+    const sources: NativeFileSource[] = []
+    for (const entry of entries) {
+      if (entry.type === "directory") {
+        if (owned.includes(entry)) continue
+        for (const target of yield* PluginSourceDirectory.discover(fs, entry.path))
+          sources.push({ file: target, kind: "plugin", entry: path.basename(target), target, active: true })
+        continue
+      }
+      if (!native(entry)) continue
+      const info = entry.info
+      for (const [name, server] of Object.entries(info.mcp?.servers ?? {})) sources.push({ file: entry.path, kind: "mcp", entry: name, active: server.disabled !== true })
+      for (const [name, item] of Object.entries(info.agents ?? {})) sources.push({ file: entry.path, kind: "agent", entry: name, active: item.disabled !== true })
+      for (const name of Object.keys(info.commands ?? {})) sources.push({ file: entry.path, kind: "command", entry: name, active: true })
+      for (const spec of info.plugins ?? []) {
+        const plugin = pluginTarget(spec, entry.path)
+        if (plugin) sources.push({ file: entry.path, kind: "plugin", entry: plugin.spec, target: plugin.target, active: true })
+      }
+    }
+    const record = natives.get(input.directory) ?? { states: undefined, owned: [], found: new Map() }
+    natives.set(input.directory, record)
+    record.owned = entries.flatMap((entry) =>
+      entry.type === "directory"
+        ? (owned.includes(entry) ? [entry.path] : [])
+        : native(entry)
+          ? []
+          : (entry.info.skills ?? []).flatMap((item) => {
+              if (URL.canParse(item) && /^(https?:)$/.test(new URL(item).protocol)) return []
+              const expanded = item.startsWith("~/") ? path.join(input.home, item.slice(2)) : item
+              return [path.isAbsolute(expanded) ? expanded : path.join(input.directory, expanded)]
+            }),
+    )
+    const states = yield* nativeSync(input.directory, sources)
+    if (states) record.states = new Map(states.map((state) => [nativeFileKey(state), state]))
+    else if (record.states) yield* Effect.logWarning("native source sync failed; keeping the previous generation's states", { directory })
+    else yield* Effect.logWarning("native source states unavailable on the first load; native declarations apply", { directory })
+    const blocked = (ref: NativeFileRef) => nativeFileBlocked(record.states?.get(nativeFileKey(ref)))
+    const denied = sources.flatMap((source) => (source.kind === "plugin" && source.target !== undefined && blocked(source) ? [pluginResource(source.target)] : []))
+    const view = entries.map((entry) => {
+      if (!native(entry)) return entry
+      const file = entry.path
+      const info = entry.info
+      const servers = Object.entries(info.mcp?.servers ?? {})
+      const agents = Object.entries(info.agents ?? {})
+      const commands = Object.entries(info.commands ?? {})
+      const off = (kind: NativeFileRef["kind"], name: string) => blocked({ file, kind, entry: name })
+      if (!servers.some(([name]) => off("mcp", name)) && !agents.some(([name]) => off("agent", name)) && !commands.some(([name]) => off("command", name)))
+        return entry
+      const replaced = new Document({
+        ...entry,
+        info: new Info({
+          ...info,
+          ...(info.mcp?.servers
+            ? { mcp: new ConfigMCP.Info({ ...info.mcp, servers: Object.fromEntries(servers.map(([name, server]) => [name, off("mcp", name) ? disabledServer(server) : server])) }) }
+            : {}),
+          ...(info.agents ? { agents: Object.fromEntries(agents.filter(([name]) => !off("agent", name))) } : {}),
+          ...(info.commands ? { commands: Object.fromEntries(commands.filter(([name]) => !off("command", name))) } : {}),
+        }),
+      })
+      if (projectEntries.has(entry)) projectEntries.add(replaced)
+      return replaced
+    })
+    if (!denied.length) return view
+    const at = view.findIndex((entry) => !(entry instanceof ConfigManaged.Document))
+    const deny = new Document({ type: "document", info: new Info({ policies: denied.map((resource) => ({ action: "plugin.use" as const, resource, effect: "deny" as const })) }) })
+    return at < 0 ? [...view, deny] : [...view.slice(0, at), deny, ...view.slice(at)]
+  })
+
   const generation: Generation = {
     document: (filepath) => (userGlobal(filepath) ? undefined : filter),
     directory: (root) => {
@@ -434,7 +606,7 @@ export const begin = Effect.fnUntraced(function* (input: { readonly directory: s
       })
       return [gateDocument]
     },
-    finish: Effect.fnUntraced(function* (entries: Entry[]) {
+    finish: Effect.fnUntraced(function* (entries: Entry[], owned: readonly Entry[] = []) {
       if (!trusted) {
         for (const root of roots) {
           for (const target of yield* PluginSourceDirectory.discover(fs, root)) {
@@ -458,7 +630,7 @@ export const begin = Effect.fnUntraced(function* (input: { readonly directory: s
         yield* Effect.logWarning("project removal directives for built-in plugins are ignored", { directory, count: removedDirectives })
       if (!trusted && withheld.length)
         yield* Effect.logWarning("project config withheld until the project is allowed", { directory, kinds: countKinds(withheld) })
-      return entries
+      return hook.nativeSources ? yield* nativeView(entries, owned) : entries
     }),
   }
   return generation

@@ -2,7 +2,7 @@ import { pluginEntryRuntimeAvailable } from "../shared/plugin-package-runtime"
 import { preparePluginSettings } from "./plugin-package-config"
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { convertCreatedPlugin } from "./created-plugin"
-import { renderPluginText } from "../shared/host-extension-package-contract/plugin-package"
+import { canonicalPluginJson, renderPluginText, type PluginPackage } from "../shared/host-extension-package-contract/plugin-package"
 import { renderInstalledSkill, pluginInstructionDefinition } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import type { Capture, Entry, Text } from "../shared/host-extension-package-contract/plugin-conversion"
 import {
@@ -100,6 +100,8 @@ export function createSourceInstaller(deps: Dependencies) {
       if (!projectMatches())
         return { ok: false, code: "transaction-failed", detail: "Project identity changed during source capture" }
       const captured = { capture: converted.capture }
+      const contentDigest = pluginContentDigest(converted.package)
+      const tree = converted.package.materialization === "copy" ? converted.package.tree : []
       const wholePackage = ["folder", "git", "listing", "marketplace"].includes(captured.capture.source.kind) && converted.package.provider !== "opencode"
       const before = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
       if (!before.ok)
@@ -127,7 +129,7 @@ export function createSourceInstaller(deps: Dependencies) {
           (graph) =>
             graph.declarations &&
             installedPackageIdentity(graph).runtimeIdentity === identity &&
-            (graph.packageId !== fromSource?.packageId || graph.envelopeDigest === converted.package.treeDigest),
+            (graph.packageId !== fromSource?.packageId || graph.envelopeDigest === contentDigest),
         )
       if (duplicate && canonicalJson(duplicate.effect ?? null) === canonicalJson(project?.ok ? project.scope : null))
         return outcomeOf(duplicate, true)
@@ -169,7 +171,7 @@ export function createSourceInstaller(deps: Dependencies) {
           if (
             !wholePackage && (entry.kind === "skill" || entry.kind === "mcp") && needsPluginFiles(
               entry,
-              converted.package.tree.map((node) => node.path),
+              tree.map((node) => node.path),
             )
           ) {
             notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "needs-plugin-files" })
@@ -188,7 +190,8 @@ export function createSourceInstaller(deps: Dependencies) {
       const installedNames = new Map(mapped.map(item => [item.entry.id, item.hostName]))
       const declarations: PackageDeclarationV1[] = []
       const nodes: PackageGraphNodeV1[] = []
-      const version = converted.package.version ?? "content." + converted.package.treeDigest.slice(7, 23)
+      // A linked package's version follows its binding (printed path and top-level entries), never file contents.
+      const version = converted.package.version ?? (converted.package.materialization === "copy" ? "content." + converted.package.treeDigest.slice(7, 23) : "link." + converted.package.link.bindingId.slice(7, 23))
       for (const item of mapped) {
         const componentId = pluginComponentId(packageId, item.entry, item.hostName)
         const receipt: UpsertInput = {
@@ -208,7 +211,7 @@ export function createSourceInstaller(deps: Dependencies) {
           name: item.hostName,
           receipt,
           capabilities: [],
-          manifestDigest: converted.package.treeDigest,
+          manifestDigest: contentDigest,
         }
         const declaration: PackageDeclarationV1 = {
           componentId,
@@ -222,7 +225,7 @@ export function createSourceInstaller(deps: Dependencies) {
         if (item.entry.kind === "skill" && !wholePackage) {
           const prefix = item.entry.directory ? item.entry.directory + "/" : ""
           const files = await Promise.all(
-            converted.package.tree
+            tree
               .filter((node) => node.kind === "file" && node.path.startsWith(prefix))
               .map(async (node) => ({
                 path: node.path.slice(prefix.length),
@@ -290,13 +293,16 @@ export function createSourceInstaller(deps: Dependencies) {
           kind: item.entry.kind,
           name: item.hostName,
           required: true,
-          manifestDigest: converted.package.treeDigest,
+          manifestDigest: contentDigest,
         })
       }
       const rootBuild = wholePackage ? await buildPluginPackageTxItems({
         root: deps.globalRoot(), casBaseRoot: deps.casBaseRoot(), key: rootKey,
         description: converted.package, hostNames: installedNames, skillReceipts,
         readFile: async path => converted.replacements.get(path) ?? captured.capture.readFile(path),
+        replacements: converted.replacements,
+        ...(captured.capture.materialization === "link" ? { readDirectory: captured.capture.readDirectory } : {}),
+        ...("commandSource" in converted && converted.commandSource ? { commandSource: converted.commandSource } : {}),
         receipt: { id: "user:" + rootName, kind: "bundle", name: rootName, scope: { kind: "global" }, environment: deps.environment(), origin: converted.package.provider === "claude-code" ? "imported-claude" : "imported", desiredState: "disabled", version, installedAt: new Date().toISOString() },
       }) : undefined
       if (rootBuild && !rootBuild.ok) return { ok: false, code: "transaction-failed", detail: rootBuild.reason }
@@ -304,12 +310,12 @@ export function createSourceInstaller(deps: Dependencies) {
       if (pluginSettings && rootBuild?.ok) rootBuild.build.items.push(pluginSettings.item)
       const graph: PackageGraphV1 = {
         packageId,
-        envelopeDigest: converted.package.treeDigest,
+        envelopeDigest: contentDigest,
         displayName: converted.package.name,
         installedGraphDigest: "",
         root: rootBuild?.ok ? { componentId: "bundle:" + sha256Hex(packageId).slice(0, 32), kind: "bundle", name: rootName, required: true, manifestDigest: rootBuild.manifestDigest } : nodes[0]!,
         children: rootBuild?.ok ? nodes : nodes.slice(1),
-        ...(rootBuild?.ok ? { pluginTree: { storeKey: rootKey, treeDigest: rootBuild.description.treeDigest } } : {}),
+        ...(rootBuild?.ok ? rootBuild.description.materialization === "copy" ? { pluginTree: { storeKey: rootKey, treeDigest: rootBuild.description.treeDigest } } : { pluginLink: { storeKey: rootKey, bindingId: rootBuild.description.link.bindingId } } : {}),
         source,
         ...(project?.ok ? { effect: project.scope } : {}),
         notRunning,
@@ -406,7 +412,7 @@ export function createSourceInstaller(deps: Dependencies) {
             return { ok: false, code: "transaction-failed", detail: "Installed connector could not be published" }
         }
       }
-      if (departing.length) await deps.removeDeparting(departing.filter(child => !sameSource?.pluginTree || child.kind !== "skill"))
+      if (departing.length) await deps.removeDeparting(departing.filter(child => !(sameSource?.pluginTree || sameSource?.pluginLink) || child.kind !== "skill"))
       return outcomeOf(graph)
     })().catch(
       (): InstallOutcomeV1 => ({
@@ -444,6 +450,14 @@ export function createSourceInstaller(deps: Dependencies) {
     return pending
   }
   return Object.assign(installFromSource, { cancelActivation })
+}
+
+/**
+ * The content identity a graph and its nodes bind: a copy's tree digest, or for a link the digest of its normalized control
+ * declarations, which includes the binding identity (DESIGN §4.16; no content digest pretends a linked directory is immutable).
+ */
+function pluginContentDigest(pkg: PluginPackage): string {
+  return pkg.materialization === "copy" ? pkg.treeDigest : "sha256:" + sha256Hex(canonicalPluginJson(pkg))
 }
 
 function renderText(text: Text): string {

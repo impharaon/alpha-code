@@ -1534,3 +1534,465 @@ plugin/core/ext/ui-mac 包内 bun typecheck 全部 exit 0（`/tmp/plugin-standar
 本轮 host checkpoint：`bun src/shared/host-extension-package-contract/generate-artifact.ts --check` **20 files / exit 0**（`/tmp/plugin-standard-r22-artifact.log`）；aggregate 保持 **9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7**，相对 71c38ad38b 的 artifact 成员变化 **0**。相对 1db6a3bbf5 的九成员仍为 CONTRACT.md、plugin-package.ts、plugin-hook-events.ts、plugin-conversion.mjs、plugin-conversion.d.mts、generate-artifact.ts、profiles/plugin-package.v1.schema.json、testvectors/plugin-package-description.v1.json、testvectors/decoder-corpus.v1.json；consumer pin/vendor 未改。
 
 R22 收口：`affected-tests --list` scope line 为 **all tests: scripts/gate-files.tsv changed (gate or declared global input)**，678 个 PR 文件，仅列举（`/tmp/plugin-standard-r22-affected{-scope,}.log`）。docs checker保持已接受基线 **71 errors / 250 warnings**（`r22-docs.json`），未修无关文档；旧三断言沿已接受处置。已核 Codex（GPT-6），本轮 **DONE：片 3–5 审查轮收口**；r20/r21 已接受 findings 继承，最后 B7 已红先行完成，§10 镜像与 alpha-web checkpoint 交编排器，无新增 BLOCKED/SEAM 或 OPTIONAL。05:34 开始，约 16 分钟；所有前台命令完成，git diff --check exit 0、hooksPath=.githooks。未运行 bin/check/gate run、全包/全层或未授权计时用例；未 push/PR/merge/rebase、启动应用/窗口或操作真实凭据/其他仓文件。最终实现、registry、ADR 与授权路径登记同一提交，工作树最终干净；未开始片 7。
+
+## 片 6 · #1776：原生文件按引用管理——同一处开关、原处编辑与重新加入（D6）
+
+- 依据：[SPEC-local-plugin-install v5 @ 7278c10](https://github.com/impharaon/alpha-work/blob/7278c10fa166c52cc0edba3ca14b1c8d9713a7e0/docs/specs/local-plugin-install/spec.md) BR-13，关联 AC-13（原生入口关闭/移除管理部分）、AC-15（原生项目入口的项目信任部分）；DESIGN-local-plugin-install v3.4（alpha-work origin/main `58772f7`）§4.6（D6 全表、绑定与移除、过滤边界、sync 合同）、P-10/P-14、§8 行 6、§9、§10 R-a…R-l；Issue impharaon/alpha-code#1776。基线 `418739e3eb`（片 3–5 分支头），worktree `feat/1776-slice6`。
+- 核对：IMPLEMENT 6a — 计划 1e47440e24 · orchestrator / Claude Opus 5.5 · 通过；AC 证明表与范围接受，Q1→A（design v3.5 §10 R-m，契约 C 同步 cb0f9b2d6e）、Q2→A（R-n）、Q3 与定制中心行归 6b（R-o，等 delivery-ux）。本轮只做 6a。
+
+### 当前代码核对（只读，`418739e3eb`）
+
+- 过滤边界：`packages/core/src/config.ts:330` 的 `gate.finish([...])` 收到本代全部 Entry（Document/Directory，`packages/schema/src/config.ts:124–138`）；目录内的 agent/command/skill 文件由各读取点之后各自扫描：`config/plugin/agent.ts:44–58`（经 `CodePuppyProjectGate.agent`）、`command.ts:31–61`（经 `CodePuppyProjectGate.markdown`，`loadDirectory:173` 对 undefined 跳过）、`skill.ts:116–148`（仅项目受限源经 `frontmatter`）；三点均已由 ADR-049 接管（`scripts/north-star-guard.sh` UPSTREAM_EXCLUDES）。
+- 继承技能：`.claude/.agents` 技能由 `config/plugin/compatibility.ts:41–60` 读取，**不在** UPSTREAM_EXCLUDES，也不经 gate；`skill-file.ts` 同样未接管。ext 已有 `skill.transform` 的 L0 `remove`（`ext/src/factory-deny.ts:53`、`context-injection.ts:791`），`Skill.Info.path` 可辨识文件（`schema/src/skill.ts:32`）。
+- 插件与 MCP：`config/plugin/source.ts:161–171` 先发现目录插件、再按 Entry 次序应用文档的 `plugins`（`-target` 即 remove）；`config/plugin/mcp.ts:42–49` 按文档次序整条覆盖同名 server，schema 用 `disabled`（`schema/src/mcp.ts:33/63`）。故在 finish 返回列表**末尾**追加一份本代文档，才同时压过全局与项目层的同名定义/再添加。
+- 时序：初次 `Config.load` 在 ext 的 Location setup 之前（`codepuppy-plugin-config-change.ts:15` 的 `ready` 门、design §6 S-04「首次初始化还没有 runner 时无插件贡献」）；ext 模块在 `sidecar.ts:208–214` 于 `startEngine` 前**异步**预载，`processState()`（`ext/src/plugin.ts:66–84`）在模块装载时建 hub bridge；gate 目前唯一宿主钩子是 contract C 的 `install({ trusted })`（`ui-mac/engine/engine-embed.ts:76–81`）。
+- 账本：`installs.json` 唯一物理写器 `ext-receipt-v2.ts:722 writeLedgerFile`，现有 `receipts/records/packageGraphs/claims` 四段，record 严格键集（`:105–126`），无原生来源段。main 的 sidecar 入站分派在 `hub-view.ts:540–570`。
+- 定制中心：今天没有任何原生（引擎自发现）条目行；`docs/design/current/customization-center/components.md` 与 11-15 帧（`#list #menu #manage #removed`）只覆盖已装包行，没有「来源」标签+开关的原生行，也没有移除后「重新加入」的行态。
+- `packages/core/test/codepuppy-project-gate-upgrade.test.ts` 钉「五个目录消费者 / 三个 Markdown 点」；增加读取点会使其按设计变红，须同提交更新。
+
+### 待裁决（PLAN-READY 返回的问题）
+
+**Q1 · 初代视图的状态来源（design §4.6 未定；影响 contract C）。** sync 应答是状态的唯一来源，但初次 Config.load 早于 ext 注册；若初代不过滤，已关闭的原生 JS 插件与 stdio MCP 会在启动时先执行一次，违反「关闭后入口停止」。选项：
+- A（推荐）：contract C 的 `install` 增可选 `native.sync(input) => Promise<NativeFileSyncReply>`，`startEngine` hooks 同名透传；sidecar 以「等 ext 预载完成→调用进程级 hub bridge 的 sync」实现，仍是 §4.6 的同一条 parentPort 消息与 id 空间。gate.finish await 一次 sync（文档级来源），应答返回该 Location 适用的全部绑定状态；读取点用它过滤并在完成后补 sync 本点发现的文件来源。代价：DESIGN-project-engine-config-takeover 的 contract C 多一个可选钩子；Config.load 等 main 应答（沿 bridge 既有 20s 超时，失败沿用上一代状态并记一行；无 parentPort 的 CLI/上游测试不作用）。
+- B：ext 在 `processState()` 装载时把 sync 注册到进程槽，gate 有槽才 await。无合同改动，但初代仍与异步预载竞态，不能保证已关闭项不先运行。
+- C：sidecar 同步读账本原生段（同 `engine-project-trust.ts` 读 consent 的先例），sync 只用于落账。时序最简单，但出现第二条状态读取路径，与 §4.6「main … 返回管理状态」不一致。
+
+**Q2 · 继承的 `.claude/.agents` 技能如何过滤（接缝）。** §4.6 行 1 纳管「已开启继承的 `.claude/.agents` 技能」，过滤边界写 gate.finish 视图；但该读取点 `compatibility.ts` 未接管且不经 gate。选项：A（推荐）ext 现有 `skill.transform` 按 `Skill.Info.path` 精确移除已关闭/removed 的继承技能（L0，factory-deny 先例），仅此一类偏离「gate 视图」字样；B 新 L3 接管 `compatibility.ts` 一处调用，须 ADR-029 登记后才能派。
+
+**Q3 · 定制中心原生行缺少已批视觉依据。** 需要：原生条目按 kind 页与作用域（全局/项目）出现的行、来源标签（文件路径形式）、复用 `MoreMenu` 的「开启」开关与「移除」、移除后的行态与「重新加入」动作及中英文案。现有帧/组件表没有这几态；按规则不在实施内画稿。请经 delivery-ux 给出帧或明确「复用已装包行＋菜单，移除态为同一行灰显＋『重新加入』按钮」的复用依据。Q3 只阻塞步骤 4，引擎/账本步骤不依赖它。
+
+**规模**：按下表实际触点（core gate＋三个已接管读取点、宿主钩子、ext bridge、消息合同、账本第五段及全部写路径透传、main 分派与 IPC/preload、hub 行与 i18n，及各层回归），预计 **8–11 小时**，约为派发 M（3–5 小时）的两倍；拆分建议：6a 引擎/账本/消息（Q1/Q2 裁决后即可做，闭合运行侧证明），6b 定制中心行（Q3 之后）。
+
+### 改动（按 Q1-A / Q2-A 写；裁决不同则在偏离记录改本表）
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/core/src/config/codepuppy-project-gate.ts` | 每 Location 一份原生状态视图（最近一次 sync 应答）。finish：从本代 Entry 收集文档级来源（全局/项目 `opencode.json(c)` 与 `.opencode`/`.codepuppy` 内的 MCP server、`plugins` target 与目录插件、内联 agent/command 条目），await sync；对关闭/removed 项在返回列表末尾追加一份文档（`plugins: ["-<target>"]`、按本代最后生效定义重设 `disabled: true` 的 MCP server），并从对应文档拿掉关闭的内联 agent/command 条目。主进程写的显式层、内联注入、托管/集成文档不作原生来源。新增 `nativeEntry(directory, kind, file, entry)` 供读取点过滤；`observe()` 完成时把该点发现的文件来源 sync 一次。路径保持发现时形式，不 realpath。未安装时全部不作用。`active` 取原生声明状态：项目信任暂缓不记为 false。 |
+| `packages/core/src/config/plugin/{agent,command,skill}.ts` | 在既有 ADR-049 调用点上只加一处过滤调用：agent 解码后按条目名、command 的 `markdown` 变换按文件、skill 每个文件（不只受限源）经 `nativeEntry`。不改发现模式、兄弟资料、链接或解析根。 |
+| `packages/ui-mac/engine/engine-embed.ts`、`src/main/env.d.ts`、`src/main/sidecar.ts` | contract C 透传可选 `nativeSources` 钩子；sidecar 等 ext 预载后调用进程级 bridge。 |
+| `packages/ext/src/hub-bridge.ts` | `syncNativeSources({ directory, sources })`：沿既有 `ask()`、id、超时与畸形应答处理；Q2-A 时 ext 的 `skill.transform` 按 path 移除继承技能。 |
+| `packages/ui-mac/src/main/codepuppy-sidecar-messages.ts` | §4.6 原样的 `NativeFileRef/State/Sync/SyncReply` 类型、build/parse（严格形状，畸形丢弃）。 |
+| `packages/ui-mac/src/main/ext-receipt-v2.ts` | 账本增 `nativeSources` 段（scope＋file＋kind＋entry＋target＋desiredState＋removed＋时间），严格解码、损坏保全并由 `writeLedgerFile` 全部写路径透传；`syncNativeSourcesV2`（首次出现取 active，已有项不改）与 `setNativeSourceStateV2`（开关、移除＝removed＋按关闭、重新加入＝清标记＋enabled）。 |
+| `packages/ui-mac/src/main/hub-view.ts` | 入站分派 `codepuppy.package.source` → 账本 → 应答该 Location 适用的全部状态；写失败 `write-failed`。主进程只落账，不读/不重新发现来源文件。 |
+| `packages/ui-mac/src/main/{ext-ipc,ext-write-channels}.ts`、`src/preload/{types,index}.ts`、`src/renderer/extensions/ext-ipc.ts` | 列出原生绑定（本进程最近 sync 见到的＋removed 项）与开关/移除/重新加入动作；动作后经现有 force 重载请求生效。 |
+| `src/renderer/extensions/extension-hub.tsx`、`ext-presentation.tsx`、`src/renderer/i18n/{zh,en}.ts` | 待 Q3。 |
+| `docs/architecture/codepuppy-authority-registry.json`、ADR-049 | 记录三个已接管读取点的原生过滤增量与 contract C 可选钩子；Q2-B 时另加接管登记。 |
+| `scripts/gate-files.tsv` | 实际用例数同步。 |
+
+### 顺序
+
+1. 红测提交（不夹生产）：gate 视图与 sync 各臂、账本绑定、消息合同、真引擎临时 HOME/项目的停止/编辑/重新加入/信任四例。
+2. 消息合同＋账本段＋main 分派＋bridge：跑 sidecar-messages、ext-receipt-v2、hub-view、hub-bridge 四文件。
+3. gate 视图＋三读取点＋宿主钩子（＋Q2 选定方案）：跑 core gate 两文件，真引擎文件经 `gate slot --`；更新 upgrade 清点的消费者计数（旧枚举随本变更替换）。
+4. 定制中心行（Q3 后）：hub DOM 用例。
+5. 收口：registry/ADR、类型检查、scoped lint、north-star、`affected-tests --list`、host artifact `--check`、文档检查。
+
+### 风险
+
+- 初代未过滤会让已关闭原生插件/MCP 先运行一次：Q1 的选择决定；红测含「重启后初代即关闭」臂。
+- Config.load 等待 main：只在已安装 gate 且有 parentPort 时 await，失败沿用上一代并记一行；不加用户等待或确认。
+- MCP/插件覆盖次序：追加文档必须在 finish 列表最末，并用本代最后生效定义重设，测试含项目层同名覆盖全局层的臂。
+- 主进程已管理的安装包 MCP 不被二次认领：显式层/内联注入文档不作原生来源，测试含同名包 MCP 臂。
+- 信任暂缓与用户关闭混淆：`active` 取声明状态；AC-15 臂验证允许项目后原生项照常加载、全局包仍可用。
+- 编辑重置状态：绑定以 file＋kind＋entry（＋target）为键，编辑不改键；改名/移动是新来源（按首次出现规则）。
+- 「移除」误删用户文件：任何路径都不写来源文件；测试断言原文件字节不变。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| BR-13 / AC-13 停止 | `codepuppy-project-gate.test.ts`：`native file view filters disabled entries and keeps siblings`（关闭 skill/agent/command 文件与内联条目被滤，兄弟文件、`../shared` 引用照常）；`project-config-view.engine.cases.ts`：`hub switch stops a native skill, command, agent, plugin and MCP in place`（临时 HOME/项目，真发现；关后 list/工具/插件钩子均无，原文件字节不变） | fast（core）/ integration（engine，affected PR + nightly，`gate slot --`） | 去掉过滤或末尾追加文档，对应条目仍在 list/执行 |
+| BR-13 / AC-13 移除与重新加入 | `ext-receipt-v2.test.ts`：`native binding remove suppresses and rejoin restores without touching files`；engine 例同文件：`removed native entry stays out after edit and rejoins in place` | fast / integration | 不持 removed 标记则编辑后复活；重新加入不清标记则仍缺 |
+| BR-13 原处编辑 | engine 例：`editing a native file keeps its binding and user-disabled state`；`ext-receipt-v2.test.ts`：`sync keeps existing desired state and binds new sources from native active` | integration / fast | sync 覆盖状态或 realpath 改键会让关闭项复活或出现重复绑定 |
+| AC-15 | engine 例：`untrusted project native plugin stays off while a global enabled package runs`（未允许项目的 `.opencode/plugin` 不运行，sync 记 active=true 不记关闭；允许后照常；全局已启用包可用） | integration | 把信任暂缓记成 disabled 则允许后仍关；gate 放行则项目插件执行 |
+| §4.6 sync 合同 | `codepuppy-sidecar-messages.test.ts`：`native source sync round-trips and drops malformed shapes`；`hub-bridge.test.ts`：`native source sync settles by id and reports unavailable without a port`；`hub-view.test.ts`：`native source sync writes the ledger and returns states; write failure answers write-failed` | fast | 形状漂移、无应答或写失败报成功均红 |
+| 定制中心 | 待 Q3：`hub-three-pages.cases.ts` 原生行开关/移除/重新加入 | integration | — |
+
+另：host 扩展包合同 artifact 不在本片触点内，收口以 `generate-artifact.ts --check` 的 aggregate 与成员对照记录。
+
+### 偏离记录
+
+2026-11-27 · 6a 实施（与本条同一提交）：
+
+- **契约 C 钩子确切签名（R-m 要求记在此处）**：`startEngine(options, hooks: { onDispatch?; projectTrust; nativeSources?: NativeSourceSync })`，`type NativeSourceSync = (input: { directory: string; sources: NativeFileSource[] }) => Promise<readonly NativeFileState[] | undefined>`；`NativeFileRef/NativeFileSource/NativeFileState` 与 §4.6 线上形状逐字，唯一声明在 `packages/schema/src/codepuppy-project-config.ts`（闸门、sidecar、ext bridge、main 共用）。闸门侧 `CodePuppyProjectGate.install({ trusted, nativeSources? })`；`Generation.finish(entries, owned?)` 的 `owned` 是 config.ts 交来的显式层与内联注入文档。sidecar 实现为 `extPreload.then(() => <ext 进程级 hub bridge>.syncNativeSources(input))`；答不出 ⇒ undefined。
+- **插件关闭机制偏离 §4.6 行 3 的「`-target`」**：引擎的移除指令按插件 **id** 匹配（`packages/core/src/plugin/supervisor.ts:26–39` 的 `matches(operation.target, plugin.id)`），且在模块装载之后才生效；原生插件 id 只在装载后才知道，`-<路径>` 匹配不到也挡不住模块顶层代码。改用同一闸门已有的 `plugin.use` deny（与未允许项目的闸门文档同一机制，`plugin/module.ts:51–53` 在装载前判定），文档插在托管策略之后。须编排器在 design §10 镜像。
+- **MCP 关闭的落点**：原生定义在原处读取，所以由闸门把关闭绑定所在文档里的同名 server 改成 `disabled: true`（引擎 schema 字段，`schema/src/mcp.ts:33/63`），而不是经 main 的 `ext-package-tx-builders.ts:392` 写配置；同名后来的原生定义按引擎原顺序照常覆盖。
+- **owned（非原生）来源**：显式层、内联注入、托管与集成文档不作原生来源；它们 `skills` 给出的根下的技能文件不过滤、不交 main（出厂 /init、/review 与已装包技能不会被二次认领，engine 例断言）。
+- **main 应答范围**：交回本次来源与全部关闭 / 已移除绑定（键是绝对路径＋kind＋entry＋target），闸门与 ext 的继承技能过滤都用这一份；sync 只增绑定、从不改已有状态或删除绑定。
+- **升级清点**：没有新增目录消费者或 Markdown 解码调用，`codepuppy-project-gate-upgrade.test.ts` 的计数不变（5 pass），因此计划里的同提交更新不需要。
+- **真引擎例的宿主**：沿 `project-config-view.engine.cases.ts`（scenario 层，nightly；表行 9→11），但另起一台带钩子与继承开关的引擎（闸门安装是进程级，前面用例的宿主不带钩子）；harness `codepuppyEngine` 加 `nativeSources?: boolean`，假 main 端口对 `codepuppy.package.source` 调生产 `syncNativeSourcesV2`。
+- **超出初始列表的文件**：`packages/ui-mac/src/main/env.d.ts`（虚拟模块的 startEngine 声明）、`test-component/codepuppy-engine.ts`（harness 钩子与假 main 作答）、`engine-cases.scenario.test.ts`（表行条数）、`.claude/rules/adrs/ADR-049-…`（同一接管的增量记录）。
+
+### 6a 收口证据（2026-11-27，Claude Opus 5.5）
+
+- 行为测试（实现提交 `06b968b2a6`）：core `test/codepuppy-project-gate.test.ts` **18 pass**（新增 3 例）；ui-mac `ext-receipt-v2.test.ts` **74 pass**（+3）、`codepuppy-sidecar-messages.test.ts` **16 pass**（+1）、`hub-view.test.ts` **26 pass**（+1）；ext `hub-bridge.test.ts` **15 pass**（+1）。真引擎 `gate slot -- bun test --max-concurrency 2 --timeout 120000 ./src/main/project-config-view.engine.cases.ts` **11 pass / 0 fail**（新增 2 例：原处开关/移除/编辑后仍关/重新加入，覆盖 skill、继承 `.claude` 技能、command、agent、plugin、MCP；未允许项目插件不运行而全局原生技能可用、允许后按原绑定加载）。
+- 移除臂（各自单独改一处生产代码、跑具名例、`git restore` 复原）：A 去掉 finish 的原生视图 → 3 例全红；B 去掉 command 读取点过滤 → 1 红；C sync 用 active 覆盖已有状态 → 1 红（disabled 被重置为 enabled）；D 未允许时把插件 active 记成信任值 → 1 红；F 应答失败时丢掉上一代状态 → 1 红；E 去掉 ext 继承技能的 remove → engine 例 1 红（`inherited` 仍在列表）。日志 `/tmp/s6-arm-{A,B,C,D,F,E}.log`。
+- 较宽相关集（一次）：core gate-upgrade/command-model-priority/project-watch 与 gate 文件合计 **46 pass**；ext network-egress/hub-tools/tool-policy-rpc/authority-registry/hub-bridge **91 pass**，`plugin-host.test.ts` **123 pass**；ui-mac sidecar-wiring/engine-server-options/sync-upstream-takeover-isolation **45 pass**。`ext/src/context-injection.test.ts` 10 例红为既有：栈在 `plugin-package-hooks.ts:733`（片 5 代码，假 context 的 `session.list` 无 cursor），早于本片改动的 skill tail，未修。
+- 类型与守卫：core（2,053 files / 0 errors）、ext、ui-mac 包内 `bun typecheck` exit 0；12 个生产文件 scoped oxlint 0/0；`bash scripts/north-star-guard.sh` exit 0；registry 判官 `authority-registry.test.ts` 5 pass、`sync-upstream-takeover-isolation.test.ts` 21 pass。
+- host artifact：`generate-artifact.ts --check` 20 files 通过，aggregate `9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7` 不变，成员变化 0（合同目录相对 `418739e3eb` 无 diff）。
+- `affected-tests --list` scope line：**all tests: scripts/gate-files.tsv changed (gate or declared global input)**（679 行，仅列举）。gate-files 只改三行条数：core gate 15→18、ext-receipt-v2 69→72（该行原登记 69、本地实跑基数 71，按 +3 同步，差值为既有）、hub-view 25→26；scenario 表行 9→11。
+- 文档：本节链接检查 exit 0，`git diff --check` exit 0；`/tmp` 里旧的 docs-contract 临时 profile 指向别的 worktree，本轮未据它报结果。
+
+## 片 6b · #1776：定制中心本机文件条目行（开关、移除、重新加入、管理页）
+
+- 依据：同片 6（spec v5 BR-13，关联 AC-13/15）；design v3.6 §4.6 与 §10 R-m…R-p；界面依据 owner 2026-11-27「按稿做（推荐）」（INT-extensions U-17）批准的活稿 `docs/design/current/customization-center/design.html#hub-native`（`#hub-native-skills` `-connectors` `-menu` `-removed` `-rejoin` `-manage`，提交 `f9e9eb1d18`；冻结增量稿 `2026-11-27-1776-native-entries/frame.html` @ `f57cc825e5` 的组件对照、放在哪一页与文案表）；`components.md` 行 `#hub-native`。
+- 核对：IMPLEMENT 6b — 编排器 Claude Opus 5.5 2026-11-27 派发（6a 与两处偏离已在 design v3.6 R-p 接受）；本节先单独提交。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/shared/native-source-view.ts`（新） | 本机文件条目的安全 DTO `NativeSourceRowV1`（身份 file/kind/entry/target、desiredState/removed、scope、目录小字、完整路径、描述、项目同意态、是否正在生效）与目录小字的纯函数（家目录写「~」，项目内写相对项目的目录，`.claude`/`.agents` 技能根写到 `skills`）。renderer/main 共用。 |
+| `packages/ui-mac/src/main/hub-view.ts` | sync 分派在落账后记下本进程见过的来源（directory → 绑定键）；不读来源文件。 |
+| `packages/ui-mac/src/main/ext-ipc.ts`、`ext-write-channels.ts` | 读通道 `nativeSources(directory)`：账本绑定 ∩ 本进程见过的（全局来源任一目录见过即可，项目来源须在该目录见过）＋全部已移除绑定；描述取引擎现有 skill/agent/command 列表（按路径/名称对上，本进程内记住最后一次见到的），读不到写类型名；项目来源的同意态沿 `projectMcpState` 的同一份 `#1709` 记录（`projectTrustIdentity` + `readProjectTrustEntry`）。写通道 `setNativeSourceState(ref, action)`：`setNativeSourceStateV2` 后发现有 force 重载请求并通知视图变化；renderer 不能给出路径以外的任何配置。 |
+| `src/preload/{types,index}.ts`、`src/renderer/extensions/ext-ipc.ts` | 串接上述两个动作，类型引用共享 DTO。 |
+| `src/renderer/extensions/extension-hub.tsx` | 技能页（skill、command）、助手页（agent）、连接器页（mcp、plugin）：全局来源进「已安装」、项目来源进「本项目 · 项目名」、已移除进收起的「已移除 N」组（排在本项目之后、目录类别之前，空组不出）。行用现有 `.codepuppy-ext-kit` 行、目录小字为无圆点 `RowStatus`＋`Tooltip` 完整路径、「已关闭」「等待项目同意」「项目同意已拒绝」「正在生效」沿现有状态小字；「…」菜单同包（开启开关 / 管理 / 移除），已移除行是 `.iact`「+」＋Tooltip「重新加入」；移除 / 重新加入成功走 `pushToast` success。 |
+| `src/renderer/extensions/extension-detail.tsx` | 本机条目管理页：同包管理页的返回、头部与「关于」（包含、来源＝本机文件＋完整路径、生效范围），连接器另带现有「权限」段；头部「…」同列表菜单。 |
+| `src/renderer/i18n/{zh,en}.ts` | 冻结文案表里的新文案（目录无说明时的类型名沿用 `typeLabel`）。 |
+| `test-component/hub-three-pages.cases.ts` | DOM 用例（生产 Solid 编译、真 `ExtensionHub`）。 |
+| `src/main/hub-view.test.ts`、`src/main/ext-write-channels.test.ts` | main 读写通道与「见过」集合的用例；写通道枚举同步。 |
+| `src/main/project-config-view.engine.cases.ts` | 真引擎：经 main 写通道（同一 IPC handler 函数）开关 / 移除 / 重新加入，由 sync 落账的绑定驱动。 |
+| `docs/design/current/customization-center/components.md` | `#hub-native` 行填「落地」「代码入口」。 |
+
+### 顺序
+
+1. 本节单独提交。
+2. 共享 DTO＋main 读写通道＋preload：跑 hub-view、ext-write-channels、相关 main 文件。
+3. renderer 行、组、菜单、Toast、管理页＋i18n：跑 hub DOM 宿主。
+4. 真引擎例改走 main 写通道（`gate slot --`），components.md 与 plan 证据，类型检查、scope line。
+
+### 风险
+
+- 「见过」集合只在本进程内：重启后首次加载前列表可能少于账本；sync 在每次加载都会补齐，不另存第二份状态。
+- 已删的文件在本进程内仍会显示到下次重启：不读文件判断存在，按 §4.6 main 不重新发现来源。
+- 关闭项的描述只在本进程见过它开着时才有；否则写类型名（不读文件正文）。
+- 项目同意读不到时按「等待项目同意」（与项目连接器行同一 fail-closed）。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| BR-13 / AC-13（界面） | `hub-three-pages.cases.ts`：`native file rows show directory, menu switch, removal group and rejoin`、`native project rows show consent words and manage page full path` | integration（affected PR + nightly） | 行不出现、目录/路径不对、菜单不调写通道、移除后不进「已移除」或「+」不重新加入均红 |
+| BR-13 main 通道 | `hub-view.test.ts`：`native rows join ledger, seen sources and project consent`；写通道枚举 | fast | 漏「见过」过滤、同意态来源错或写后不请求重载均红 |
+| AC-13 / AC-15（真引擎） | `project-config-view.engine.cases.ts` 两例改由 main 写通道驱动 | scenario（nightly），`gate slot --` | 通道不写账本或不重载，引擎列表不变 |
+
+### 偏离记录
+
+2026-11-27 · 6b 实施（与本条同一提交）：
+
+- main 的行与动作放进新模块 `packages/ui-mac/src/main/native-sources.ts`（`createNativeSources`：sync 落账并记「见过」、`rows`、`setState`），ext-ipc 与 hub-view 只接线；它的用例在同名 `native-sources.test.ts`（模块自己的测试文件），hub-view.test 只保留 sync 分派例（dep 签名改为 `(directory, sources)`）。
+- 账本加只读 `readNativeSourcesV2`（零写盘）；读通道失败只过稳定原因码 `unreadable`，路径只进 main 日志。
+- 没打开项目时说明按 Code Puppy 用户工作区 Location 读引擎列表（`defaultDirectory`）；路径比较用「最近存在的上级 realpath＋其余原样」，显示仍用发现时写法。来源目录取配置根（点目录或 `opencode`）之后第一个 skill(s)/agent(s)/command(s)/mode(s)/plugin(s) 段，`.claude`/`.agents` 写到 `skills`。
+- 「正在生效」= 动作改过的绑定且 coordinator 对该目录仍有在途重载；动作请求 global force 重载（`items: []`）。
+- DOM 宿主 `hub-three-pages.cases.ts` 加 `toolPolicy.inventory` 读不到的替身（本机连接器管理页带现有「权限」段）；`subprocess-cases.test.ts` 宿主条数 40→42。
+- 写通道表加 `ext-set-native-source-state`、读通道表加 `ext-native-sources`，`ext-write-channels.test.ts` 的逐名枚举与 13→14 通道用例同步。
+- 真引擎两例改由同一个 `createNativeSources` 的 `setState`/`rows` 驱动（harness 的假 main 端口对 sync 也调它）。
+
+### 6b 收口证据（2026-11-27，Claude Opus 5.5）
+
+- 实现提交 `d1ee295774`；本条与 native-sources 用例补强同一提交。
+- DOM（生产 Solid 编译、真 `ExtensionHub`）：`hub-three-pages.cases.ts` 新增 `native file rows show directory, menu switch, removal group and rejoin`、`native project rows show consent words and the manage page writes the full path`，两例绿；行为数据走 main 的真 `createNativeSources`＋临时账本。宿主 `bun test src/renderer/subprocess-cases.test.ts -t "定制中心三页结构"` 为 **41 pass / 1 fail**：红的是既有 `official credential dialogs reuse DSN and PAT help…`（`hub-three-pages.cases.ts:1081` 期望 SQLite 地址占位、实得「粘贴令牌」），在不含本片改动的工作树（`git stash` 探针）上同样红，未修。
+- main：`native-sources.test.ts` **3 pass**（见过过滤、上级目录项目条目不串项目、项目同意来源、移除后只回本项目、动作只写账本并请求重载、正在生效、目录小字与作用域）；`ext-write-channels.test.ts` 15 pass（通道表 14 条）；`hub-view.test.ts` 26 pass。
+- 真引擎：`gate slot -- bun test --max-concurrency 2 --timeout 120000 ./src/main/project-config-view.engine.cases.ts` **11 pass / 0 fail**，开关 / 移除 / 重新加入经 main 的 `setState`，列表经 `rows`（项目行 `.opencode`、继承技能 `.claude/skills`、移除后 removed）。
+- 移除臂（各改一处、跑具名例、`git restore`）：G 去掉「已移除」组 → 红；H 项目同意词换成「已关闭」→ 红；I 连接器页不渲染全局本机行 → 红；J 项目条目不要求本目录见过 → 红；K 动作不请求重载 → 红。日志 `/tmp/s6b-arm-*.log`。
+- 较宽相关集一次：ext-ipc-chokepoint、use-extensions-ipc、hub-copy、locale-regression、zh-punctuation、brand-residue-scan、old-name-scan、sidecar-wiring 与上述 main 文件合计 **108 pass / 0 fail**。
+- ui-mac `bun typecheck` exit 0；10 个生产文件 scoped oxlint 0/0；north-star exit 0；host artifact `--check` 20 files，合同目录相对 `418739e3eb` 无 diff（aggregate 仍 `9eaf5230…68b7`）。
+- `affected-tests --list` scope line：**all tests: scripts/gate-files.tsv changed (gate or declared global input)**（680 行，仅列举）。components.md `#hub-native` 行已填「落地」「代码入口」。
+
+### 片 6 审查 r1 Minor 修复（2026-11-27，Claude Opus 5.5）
+
+审查：另一位 Claude Opus 5.5 独立审计，APPROVE，无 Blocker/Major；三项 Minor 按派发逐项红先行。
+
+- **M1 上级目录 `opencode.json(c)`**：红 `6450755573`（`native-sources.test.ts` 的作用域例，上级 `opencode.json/.jsonc` 判成 global，1 fail）→ 修 `206bfdb51c`：`nativeSourceScope` 把上级目录（主目录本身除外）的 `opencode.json`/`opencode.jsonc` 也算项目条目；同文件 3 pass。
+- **M2 R-m 生产接线**：`58b9e4f8f6` 把 sidecar 钩子收成一个导出函数 `sidecarNativeSources(extLoaded)`（`src/main/sidecar-native-sources.ts`），`sidecar.ts` 与引擎测试宿主共用；`codepuppy-sidecar-wiring.test.ts` 新增 `native source sync crosses the production sidecar hook and main host into the ledger`：钩子 → ext 进程级 hub bridge → `registerExtIpcHandlers` 交回的生产 `codepuppySidecar` → `createNativeSources` → 账本，断言应答状态、账本内容与 bridge 缓存，ext 未装上时答 undefined。这是覆盖缺口而非行为缺陷，红由两个移除臂给出：钩子不调 bridge（L）、ext-ipc 不交 `nativeSources` 依赖（M），各 0 pass / 1 fail。该测试文件条数 4→5（gate-files 同步）；为在同进程装载 ext-ipc，只给文件内的 electron / logging 替身补了 `protocol` 与几个 logging 出口。
+- **M3 系统 / MDM 目录与 HTTP 技能索引**：红 `d98968c4f2`（`codepuppy-project-gate.test.ts` 两例：系统目录的插件 / 技能被交给 main 并可被关闭；HTTP 索引拉下的技能被原生绑定滤掉）→ 修：`config.ts` 的 `owned` 加 `managedSettings`（系统目录的 Directory 条目未包成 `ConfigManaged.Document`），闸门对 owned Directory 不发现插件、并把它的路径记为 owned 根；`skill.ts` 只对 `source.type === "directory"` 调 `nativeSkill`。gate 文件 18→20 pass。
+- **ARCH-NOTE**：`pluginTarget` / `pluginResource` 与上游 `config/plugin/source.ts` 的 parse/解析、`plugin/module.ts:51–53` 的去版本号目标串的逐条对应，已加进仓库既有的升级复核清单（ADR-049「上游变化需复核」表的 source.ts / module.ts 行）。
+- 未采纳（审计列为可选）：共享资源行提示、删文件后的已移除全局行。
+- 收口检查（M1–M3 合并后一次）：core `codepuppy-project-gate{,-upgrade}.test.ts` 25 pass；上游 `test/config/skill.test.ts`、接管的 `test/config/reload.test.ts` 与 `codepuppy-command-model-priority.test.ts` 47 pass；ui-mac `native-sources` / `codepuppy-sidecar-wiring` / `hub-view` / `ext-write-channels` 49 pass；真引擎 `gate slot -- … project-config-view.engine.cases.ts` 11 pass / 0 fail。core、ui-mac typecheck exit 0；6 个改动生产文件 oxlint 0/0；north-star exit 0。`affected-tests --list` scope line 不变：all tests: scripts/gate-files.tsv changed。
+
+## 片 7 · #1776：插件语言服务运行端与诊断
+
+- 依据：[Story #1776](https://github.com/impharaon/alpha-code/issues/1776) 当前正文；[local-plugin-install 规格 v5 @ 7278c10](https://github.com/impharaon/alpha-work/blob/7278c10/docs/specs/local-plugin-install/spec.md) BR-18、BR-11 与 **完整 AC-21**；[设计 v3.3 @ a5754df](https://github.com/impharaon/alpha-work/blob/a5754dfe975516d17ea57f98f165a4bc8fc361a3/docs/specs/local-plugin-install/design.md) §4.1 Entry `lsp`、§4.8 lspServers 合并、§4.10 值/DATA 绑定、§4.11（D12）、§5、§6 BR-18 行与 S-02、§8 片 7 行；§10 的 R-a…R-k 不涉及 LSP，沿用不重开。片 4 的配置/data/包生命周期与片 3 的文件工具身份已 accepted，作为输入消费。
+- 核对：IMPLEMENT — 2c0edd30c2 · orchestrator / Claude Opus 5.5 · 通过（每个 AC-21 分项有具名证明与移除臂、范围限于所列模块）。Q1 → 方案 A，记为 [设计 v3.4 §10 R-l @ 50573da](https://github.com/impharaon/alpha-work/blob/50573da/docs/specs/local-plugin-install/design.md)（§6 S-02 同步）；Q2 → 授权一次性在全新空临时目录用 npm 取公开包 `pyright`，按不可信输入处理，只运行其 pyright-langserver 取 AC-21 真实诊断与 pgrep 证据，用后删除。
+- 基线：`feat/1776-slice7` 叠在 `b3eff85a6beff67ce1132da4bd68b788a9ac46f8`（片 3–5 终点，另行发布，不改其提交、不 merge/rebase origin/alpha）。固定样本：`anthropics/claude-plugins-official@0fbfda5a91f4adc311daca25acc99132f40f0b6e/plugins/pyright-lsp/.claude-plugin/plugin.json`（兼容报告 D-lsp 行，`plugins.csv` 中该包现为 nothing-runnable）。
+- 规模与时间：计划起于 2026-11-27 09:22（UTC+08:00）。实施预计 5–8 小时，约 14–18 个手写生产/合同/文档文件、1,300–1,900 行手写改动（生成物、夹具另计）；每完成一步核对用时，达上界两倍即返回具体原因。
+
+### 当前代码核对（b3eff85a6b）
+
+| 位置 | 事实 |
+| --- | --- |
+| `packages/ui-mac/src/shared/host-extension-package-contract/plugin-package.ts:92–126`、`:350–427` | Entry 联合与 validator 没有 `lsp`；schema/decoder 语料同样缺。 |
+| `.../plugin-conversion.ts:224–243` | 只读 hooks/monitors；`.lsp.json` 与 manifest `lspServers` 被静默忽略（BR-11 不允许）。 |
+| `packages/ui-mac/src/shared/plugin-package-runtime.ts:4`、`main/install-from-source.ts:165–167`、`main/package-admission.ts:1039` | 运行可用 kind 表不含 `lsp`；LSP-only 包仍得 nothing-runnable / kind-not-supported-yet。 |
+| `packages/core/src/tool/plugin/write.ts:38`、`edit.ts:258` | 引擎明写 LSP runtime 不存在（design P-18），read/edit/write/patch 工具名为 `read`/`edit`/`write`/`patch`，patch 结果带 `applied[].target`。 |
+| `packages/util/src/process.ts:49` | AppProcess.Interface 含 ChildProcessSpawner 的 `spawn`（stdin sink / stdout stream / kill），可承载长期 stdio JSON-RPC，不另起 spawn 权威；`ext/src/plugin-package-process.ts:19` 已复用同一 runtime 与 `pluginProcessConfig`。 |
+| `packages/ui-mac/src/main/workspace-file-service.ts:128,263` | 预览打开成功后没有任何 sidecar 通知；main→ext 只有 `codepuppy-sidecar-messages.ts` 的既有私部消息与 `ext/src/hub-bridge.ts:111` 分发。 |
+| `main/ext-ipc.ts:291–334`、`shared/plugin-install.ts:6,34` | 已装包行只有安装时写入账本的静态 `notRunning`；ext→main 没有 LSP 运行状态通道（见待裁决 Q1）。 |
+
+### 改动
+
+路径省略 `packages/ui-mac/src/`，其他包写全。生成物随源同提交。
+
+| 文件 | 改什么 |
+| --- | --- |
+| `shared/host-extension-package-contract/plugin-package.ts`、`profiles/plugin-package.v1.schema.json`、`CONTRACT.md`、`testvectors/plugin-package-description.v1.json`、`testvectors/decoder-corpus.v1.json`、生成 `plugin-conversion.mjs/.d.mts`、artifact manifest | 按 §4.1/§4.11 落 `{ kind: "lsp"; server: LanguageServer }` 与 `JsonTemplate` 的类型、validator 与 schema；语料取真实 pyright-lsp 定义。改变已发布定义按仓库既有版本规则处理；host artifact aggregate 必变，交 alpha-web checkpoint。 |
+| `shared/host-extension-package-contract/plugin-conversion.ts` | 读根 `.lsp.json`，再按两份 manifest（§4.8 主 manifest 胜冲突键）的 inline/path/array 顺序合并，同名后者覆盖，保留各定义文件定位；command/args/env/workspaceFolder 为 Text，settings/initializationOptions 为 JsonTemplate（RFC 6901 指针绑定）；缺必填/坏形状只出该定义的 invalid-definition，其他 entry 照常。敏感 option 引用沿既有 documents 扫描进 SecretNeed。 |
+| `shared/plugin-package-runtime.ts` | `lsp` 进运行可用表，使 LSP-only 包作为整包安装（bundle 根，无组件行）。install-from-source/package-admission 不需另改分支（以 red 测验证）。 |
+| 新 `packages/ext/src/plugin-package-language.ts` | S-02 的 Location 级语言服务运行端：按 packageId/entryId/projectRoot 持子进程（AppProcess spawn，`pluginProcessConfig` 渲染 command/args/env 及 ROOT/DATA/OPTION，秘密只到进程边界并在日志脱敏）、Content-Length JSON-RPC、initialize/initialized/didChangeConfiguration、didOpen/didChange/didClose、publishDiagnostics 的 URI＋版本账本（迟到/无版本不覆盖较新明确版本）、server→client 的 workspace/configuration 等常见请求应答；匹配后缀才懒启动；restartOnCrash/maxRestarts 按源值；关包/更新/卸载/Location dispose 发 shutdown/exit，按源 shutdownTimeout 后终止残余进程并清除缓存诊断与排队回调。 |
+| `packages/ext/src/plugin.ts` | 注册运行端；在既有 `tool.hook("execute.after")` 链对 read/edit/write/patch 的实际文件 open/change 并等待此次诊断（上限为源 requestTimeout，缺省 60000，沿 §4.11），把真实行列（0→1 基）、severity、message、source/code 附到同一工具结果；`filesystem.changed` 对已打开文档发 didChange/didClose；预览触发且无任务时缓存，下一次该项目的 `session.hook("context")` 消费一次；cleanups 中 dispose。 |
+| `packages/ext/src/context-injection.ts` | 登记诊断外框（tool-output 与 system 各一，`renderWrapper`），不加正文截断以外的新限制。 |
+| `main/workspace-file-service.ts`、`main/hub-view.ts`（sidecar host）、`main/codepuppy-sidecar-messages.ts`、`main/index.ts` 接线；`packages/ext/src/hub-bridge.ts` | 预览 `openWorkspaceRead` 成功后只带 projectRoot/fileUri 经既有 sidecar post 发私部 `codepuppy.package.lsp.open`；ext 桥解析后交给同目录 Location 的运行端。main 不做 LSP。 |
+| 运行状态回报面（Q1 裁决后定） | 推荐方案 A 的落点：ext 运行端 → 既有 parentPort 私部状态消息 → main 最新状态表 → 已装包列表的安全字段 → 既有包行说明行文案；见 Q1。 |
+| `docs/architecture/codepuppy-authority-registry.json`、`docs/architecture/modules.md`、`scripts/gate-files.tsv` | 新增 `plugin-language-services` 的 L0 决定（runtime 归 ext，无 engine 接管），模块图补 ext 语言服务运行端一句；gate 文件条数随新增用例机械同步。 |
+| `test-fixtures/plugin-helper/standard/` 夹具与 provenance；下列模块的既有测试文件；新 `packages/ext/src/plugin-package-language.test.ts`、受控协议夹具 server | pyright-lsp 原 plugin.json 进 standard 归档并记 provenance；协议夹具按 LSP 标准 framing 应答并记录自身 pid，不冒充 pyright。 |
+
+### 顺序
+
+1. **红先行**：`plugin-conversion.test.ts` 加 pyright-lsp 转换例、`install-from-source.test.ts` 加 LSP-only 整包安装例，均在未实现上真实红（缺 entry / nothing-runnable）并单独提交。
+2. **合同与转换**：落类型/validator/schema/语料/converter 与生成物，跑上述两文件及 `package-envelope-v1.test.ts`、`host-extension-package-artifact.test.ts` 的改动项后各完整一次；两个 generator `--check`，记录新 aggregate 与成员。
+3. **ext 运行端**：新模块与其单测先红后绿（懒启动、版本账本、缺程序、停止/重启、Location dispose），再接 plugin.ts 的工具后置、filesystem.changed 与 context 消费；`plugin-host.test.ts` 加真宿主 integration 例（真实 edit 工具→附诊断；只改 .md 不启动；关包后 pid 不在）。
+4. **main 预览通知**：消息 builder/parser、sidecar host post、workspace-file-service 回调与 ext 桥分发，各在原测试文件加例。
+5. **运行状态回报（按 Q1）**，随后 registry/模块图/gate 条数同提交；一次较宽相关集、typecheck、scoped lint、`affected-tests --list`。
+6. **一次性真实证据（按 Q2）**：临时 HOME/项目内装入 pyright-lsp 夹具包，真实 pyright-langserver 对 `.py` 类型错误给出该行诊断；PATH 去掉该程序时状态写明 `pyright-langserver`；关包后 `pgrep -f pyright-langserver` 为空。记录命令与输出，不入测试集。
+
+### 风险
+
+- 诊断等待会延长匹配文件的工具调用：只在本包服务已在运行或可启动时等待，以源/协议 requestTimeout 为界；不匹配文件、服务缺失或启动失败不等待。真实 pyright 首次分析耗时只在一次性证据中观测，不加计时测试。
+- 进程泄漏：关闭路径以真实 pid 存活断言证明；Location dispose 与包撤销走同一 stop；AppProcess 作用域关闭兜底终止。
+- 版本竞态：迟到旧版本、无版本通知与较新明确版本的取舍在单测中逐一构造，不依赖时序猜测。
+- 秘密：LSP env/args 的敏感值只在 spawn 边界解引用，日志与附加到工具结果的文本经同一 `secretValues` 脱敏。
+- host artifact 变化需要 alpha-web checkpoint；本车道不改该仓。
+
+### 证明
+
+`U` = 从 `packages/ui-mac`、`E` = 从 `packages/ext` 执行 `bun test --max-concurrency 2 <file>`；迭代时附 `-t '<case>'`。
+
+| AC / 合同 | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-21 安装与注册；§4.11 定义 | `U src/shared/host-extension-package-contract/plugin-conversion.test.ts -t 'language servers keep their source protocol'`；`U src/main/install-from-source.test.ts -t 'language-server-only package installs'` | fast / integration：受影响 PR 与夜间 | 未读 lspServers 时无 entry；运行可用表缺 lsp 时安装得 nothing-runnable。 |
+| AC-21 编辑 `.py` 后同一任务拿到该行诊断 | `E src/plugin-package-language.test.ts -t 'diagnostics for the edited version'`；`E src/plugin-host.test.ts -t 'package language server diagnostics reach the edit result'`（真插件宿主、真实 edit 工具）；一次性真实 pyright（Q2） | integration；一次性命令记录 | 不在工具后置 open/change 或不等本版本诊断，结果里没有 1 基行号的诊断行；行号未转换则断言不符。 |
+| AC-21 只编辑 `.md` 不启动 | 同上两文件 `-t 'non-matching files do not start'`，以夹具 pid 记录文件不存在为判据 | integration | 去掉后缀过滤即产生 pid 记录。 |
+| AC-21 缺程序照常装好且状态写明 `pyright-langserver` | 安装例在 PATH 无该程序时仍 ok；运行端 `-t 'missing program names the command'`（不 spawn）；状态展示面的具名例按 Q1 落在对应原测试文件 | integration | 不检查程序时状态无名；spawn 失败吞掉时无状态。 |
+| AC-21 关闭本包后进程不在 | `E src/plugin-package-language.test.ts -t 'package off stops its server'` 与 host 例的 pid 存活断言；一次性 `pgrep` | integration；一次性 | 不撤运行项时 pid 仍存活。 |
+| §4.11 版本与预览 | 运行端 `-t 'late or unversioned diagnostics never replace a newer version'`；`U src/main/workspace-file-service.test.ts -t 'preview open notifies'`、`E src/hub-bridge.test.ts -t 'language open'`、host 例 `-t 'preview diagnostics reach the next project request'` | fast / integration | 去掉版本账本会被旧诊断覆盖；未发通知则下一请求无诊断。 |
+
+每个行为例有一个移除臂（child-only loader 撤去生产判据，不改磁盘源码）记录为一次性输出。较宽相关集按 `rg -l 'plugin-package-runtime|pluginEntryRuntimeAvailable|codepuppy-sidecar-messages|openWorkspaceRead|plugin-conversion'` 的导入/枚举消费者列出后各跑一次；不跑全包/全层、bin/check 或 gate run。
+
+### 待裁决（随 PLAN-READY 返回）
+
+**Q1 · LSP 运行状态的回报通道与展示面。** §4.11 要求「定义启用、依赖缺失/启动错误、protocol-error 与真正的诊断就绪分开报告」、§5 要求进入「该 entry 的真实状态」，AC-21 要求「状态写明缺少 pyright-langserver」；但 S-02 只冻结了 open/change/close/diagnostics 与 main→ext 文件打开，§6 写「main 只转真实文件打开动作」。lsp 是 bundle 所有的运行项，没有组件行或 hub 核验；已装包行只显示安装时写入账本的静态 notRunning（`ext-ipc.ts:323`），装好 pyright 后仍会显示缺失。ext→main 的状态消息与已装包 DTO 字段都是跨模块合同，不属本车道自选。
+
+- **A（推荐）**：ext 运行端是唯一状态 owner。包生效时只按 sidecar PATH 解析声明的 command 程序头（不启动），实际 spawn ENOENT/启动失败/协议错误/initialize 成功时更新；经既有 parentPort 发私部 `codepuppy.package.lsp.status {directory, packageId, entryId, state: ready｜dependency-missing｜start-failed｜protocol-error, detail}`（dependency-missing 的 detail 为 command 名，其余为脱敏原因）。main 按包/entry 保留最新值（同 `mcpDependencyErrors` 形制），在已装包列表增一个安全字段（如 `runtime: {kind:"lsp", sourceName, state, detail}[]`），renderer 复用既有包行说明行「名称 · 原因」与 hub-view-changed 刷新，只加 zh/en 原因文案。后果：一个私部消息、一个 DTO 字段与 3 条文案，无新界面布局；状态实时（装上程序后无需重装即恢复）。同一状态也附在匹配文件的工具结果中供助手使用。
+- **B**：main 在列表时自行按给 sidecar 的 PATH 解析 lsp 程序头，映射为 notRunning 的新原因。后果：无新消息，但 main 持有一条 LSP 程序判定（与 §6「main 只转文件打开」相左），启动失败/协议错误无法到界面，只入日志与工具结果。
+- **C**：只在工具结果与日志报告。后果：没有界面状态，AC-21「状态写明」若指包状态则不满足。
+
+推荐 A；未核前提：sidecar 的 PATH 与 spawn 解析使用同一进程环境；包行说明行复用是否满足 helper 规格体验约定，需编排器确认。
+
+**Q2 · 真实 pyright 的一次性证据来源。** 本机没有 `pyright-langserver`（`which` 无结果），本片不安装 pyright（§4.11）。自动测试用协议夹具；AC-21 的真实诊断需要一次性在临时前缀用 npm 取公开包 `pyright`（只在临时目录，不进仓库依赖），或由编排器在已装该程序的机器补跑。请确认是否授权本车道执行该一次性公开包下载。
+
+### 偏离记录
+
+计划阶段只写本节。实施阶段（2026-11-27 09:37–10:15 UTC+08:00）偏离与补记如下，均在本提交记录：
+
+- **R-l 的确切形状（裁决要求在此记录）**：ext→main 私部消息 `{ type: "codepuppy.package.lsp.status", packageId, entryId, sourceName, state, detail? }`，`state ∈ enabled｜dependency-missing｜start-error｜protocol-error｜diagnostics-ready`（唯一定义 `LANGUAGE_SERVER_STATES_V1`，`main/codepuppy-sidecar-messages.ts`）；dependency-missing 的 detail 是声明形式的 command（路径绑定保留 `${CLAUDE_PLUGIN_ROOT}` 占位，不出绝对路径），其他 detail 为截断、脱敏的短原因。main→ext 预览消息 `{ type: "codepuppy.package.lsp.open", projectRoot, fileUri }`（fileUri 必须是 file URL）。main 按 packageId＋entryId 只存最新值；已装包 DTO `InstalledPackageV1.languageServers?: { sourceName, state, detail? }[]`；包行只在 desiredState=enabled 时把它接在既有「名称 · 原因」说明行，三种失败状态沿用既有「未能启用」标记。工具结果附同一状态与诊断（外框 `package.language-result`），预览诊断由下一次该项目请求消费一次（外框 `package.language-context`），两条均在 context-injection 登记簿。
+- **计划点 1 已核**：程序检查与实际 spawn 使用同一合成环境（`process.env` 叠加本包 env；`extendEnv`）。具名例用钉住的 pyright 声明只把 env 的 PATH 改为空目录，状态即为 dependency-missing `pyright-langserver` 且不起进程；一次性证据中去掉 pyright 的 PATH 得到同一结果。
+- **shutdownTimeout 缺席**：发送 shutdown（以 requestTimeout 为界）与 exit 后立即关闭进程作用域，不另造等待值；因此只断言收到 shutdown，不要求 exit 被处理。
+- **新增文件（计划未逐一列名）**：`packages/ext/src/plugin-package-language.server.ts` 受控 stdio 协议夹具；`testvectors/plugin-package-lsp-description.v1.json` 由转换器产出、测试钉等，供解码语料。必要同链：`main/unattended-run.engine.cases.ts` 的 host deps 补 `languageStatus`；`package-envelope-v1.test.ts` 的语料枚举与条数、`subprocess-cases.test.ts` 的 hub-three-pages 条数、`gate-files.tsv` 条数为机械同步。
+- **本轮新增观察的纠正（r21 standing authorisation）**：`63b7d16829` 把 Location 关闭例从「进程不在」加严为同时观察到 shutdown；原断言在撤掉运行端 stop 后仍绿（AppProcess 作用域释放也会终止），纠正后该移除臂变红。
+
+实施证据（已核 Claude Opus 5.5）：
+
+- 红先行：`b92d7389df` 转换例在实现前 0 pass / 1 fail（无 lsp entry）；`9d44be3daf` 安装例在运行投影加 lsp 前 0 pass / 1 fail（kind-not-supported-yet）。实现后同名各 1 pass。
+- 完整文件（各一次）：ui-mac 合同三文件 160 pass；install-from-source、hub-view、workspace-file-service、sidecar-messages、package-presentation 五文件 118 pass；ext plugin-host（125）＋ plugin-package-language（5）＋ hub-bridge（15）145 pass；DOM 经 subprocess 表 hub-three-pages 41 例中新增例通过，唯一失败为既有 `official credential dialogs reuse DSN and PAT help…`（换回 b3eff85a6b 渲染文件仍红）。
+- 移除臂（逐个改生产代码跑具名例后 `git restore`）全红：转换器丢 lsp、后缀过滤、版本账本守卫、关包停止、程序检查、Location 关闭（两条停止路径同撤；单撤运行端 stop 在加严观察后亦红）、0→1 基换算、工具结果附加、预览 context 消费、预览打开通知、main 状态存储、桥分发、ext 状态上报、包行说明行。
+- 一次性真实 pyright（Q2 授权）：全新临时目录 `npm install --ignore-scripts pyright@1.1.409`，只运行其 `pyright-langserver`。真插件宿主真实 write 工具：`notes.md` 结果无语言块且无 pyright 进程；`typed.py` 同一工具结果为 `typed.py:2:14 error Type "Literal['not a number']" is not assignable to declared type "int" … [reportAssignmentType] (Pyright)`；运行中恰一个 `node …/pyright-langserver --stdio`，关包后进程列表为空；状态序列 enabled → diagnostics-ready。PATH 无 pyright 时状态 `dependency-missing: pyright-langserver`、不起进程。临时目录已按字面路径删除，未入库。
+- 较宽相关集（一次）：ext hub-tools/network-egress/policy 四文件/process-singleton/reload-wiring/authority-registry 9 文件 74 pass；ui-mac sidecar-wiring/unattended/reload-coordinator/sidecar-messages/package-admission 61 pass；DOM 安装卡表例 1 pass。engine：`gate slot --` 的 package-hub-lifecycle 首跑 10/1（机器上另有 gate pre-push 时 15s 等待例超时），隔离该例在 b3eff85a6b 与本片 main 模块下各 1 pass，整文件复跑 11/0；unattended-run 13/3，换回基线 cases 文件与基线 ext plugin.ts 后同样 3 例红，非本片引入。
+- ui-mac / ext 包内 `bun typecheck` exit 0；16 个改动生产文件 scoped oxlint 0 warning / 0 error；registry judge 5 pass；两个 generator `--check` 通过。
+- Host artifact：21 files，aggregate **489ce6c1e19f2e3a12a62009088825ebf286d66224f193198ce012d620a1ec0b**（基线 9eaf5230…68b7，20 files）；变化成员 CONTRACT.md、plugin-package.ts、plugin-conversion.mjs、plugin-conversion.d.mts、generate-artifact.ts、profiles/plugin-package.v1.schema.json、testvectors/decoder-corpus.v1.json，新增 testvectors/plugin-package-lsp-description.v1.json；需 alpha-web 另一次 checkpoint。consumer pin/vendor 未改。
+- `affected-tests --list` scope line：**all tests: scripts/gate-files.tsv changed (gate or declared global input)**，679 个 PR 测试文件，仅列举。
+
+### 审查 round 1/1 修正（独立 Claude Opus 5.5 审计，FIX-THEN-MERGE）
+
+红测 `f0e43babd1` 在 `63b7d16829` 上逐条按 finding 的原因红，修复在其后提交，红测断言未改（仅修复提交同步状态消息新增的 treeDigest 形状）。
+
+1. **别名项目根**：运行端入参改为 `projectRoot(): string | undefined`（plugin.ts 传 `projectRootFor(directory)?.directory`，与其他包消费者同一权威）；作用域按它匹配，cwd/rootUri/显示与相对路径解析用它，非项目回落 Location 目录；文件统一 realpath 成一个 URI。main 的预览消息按同一项目身份比对。证据：单测 `an aliased project root opens one document…`（红：两个 URI、显示 `../project-alias/typed.py`）、host `an aliased project Location runs its project-scoped language server`（红：无诊断块）。
+2. **main 状态只增长**：状态消息增 `treeDigest`（该状态计算时的已装树）；最新值表移入 sidecar host，`languageServers(packageId, treeDigest)` 只返回并保留与账本图 `pluginTree.treeDigest` 相同树的条目，更新/改名/卸载后旧树状态即被丢弃，ext 对新代按 reconcile 重报。偏离审计建议的「安装/更新/卸载时清空」：该做法与 ext 在提交后 100ms 内的重报竞态，可能把新状态清掉；按树摘要绑定无竞态。证据：hub-view `language server states follow the package's installed tree and drop with it`。
+3. **socket**：设计 §4.11 冻结「当前官方虽接受 socket 字段但仍经 stdio，Code Puppy 按此执行」，审计建议的「不启动并报 start-error」会撤掉该能力并与冻结设计相反，未采用，交编排器。只做保留能力的最小修正：从未完成 initialize 的 socket 声明，protocol-error 原因写明「declared transport socket runs over stdio」。证据：单测 `a socket declaration runs over stdio…`（正臂经 stdio 拿到诊断；红：原因不含 transport）。
+4. **重开文档版本**：每个运行中服务按 URI 维持单调版本，关闭不重置；迟到的关闭前版本不再结算重开后的等待。证据：单测 `a reopened document never takes a pre-close version's late diagnostics`（红：得到旧内容第 2 行）。
+5. **patch**：host `patch results get diagnostics for each applied file` 覆盖 `applied[].target` 分支（新增/更新的 .py 各得诊断，.md 无语言块），首跑即绿。
+6. **无 shutdownTimeout 不等待**：代码与偏离记录一致——仅当源给出 shutdownTimeout 时等待 shutdown 应答与退出（同一截止时刻），否则发送 shutdown/exit 后立即终止。证据：关包例改用不应答 shutdown 的夹具模式，pid 在 5s 内消失（红：等 requestTimeout）；Location 关闭例声明 shutdownTimeout 后观察到 shutdown 与 exit。
+
+修正后：ext 三文件 150 pass（plugin-host 127）、ui-mac 四文件 65 pass、`gate slot --` package-hub-lifecycle 11 pass；ext/ui-mac typecheck exit 0；6 个改动生产文件 oxlint 0/0；artifact `--check` 21 files，aggregate 仍为 489ce6c1…ec0b（本轮合同文件未变）。gate-files 条数 plugin-host 125→127、hub-view 26→27。
+
+## 片 8 · #1776：输出样式与插件默认主助手
+
+- 依据：[Story #1776](https://github.com/impharaon/alpha-code/issues/1776)；spec v5 @7278c10 的 AC-28（BR-24）、AC-29（BR-25）；[design v3.4 @50573da](https://github.com/impharaon/alpha-work/blob/50573da/docs/specs/local-plugin-install/design.md) §4.1（output-style / PluginDefaults 类型）、§4.14、§6 S-10/S-11、§8 片 8 行、§10 R-a…R-l 与 P-34。基线 418739e3eb（片 3–5 收口），分支 feat/1776-slice8。
+- 核对：PLAN 与 IMPLEMENT 同轮（派发 impl-1776-slice8）· 计划提交 79698c21ab · 本车道 Claude Opus 5.5 自查，未发现未决设计问题，编排器尚未核对；选择入口形状与默认编程指令的范围按「风险」前两条实施，交编排器复核。
+- 起于 2026-11-27 09:53（UTC+08:00），预计 4–6 小时；每个 AC 后核对用时，到 12 小时返回。片 6/7/9 不在本节，W 无必需改动；宿主 artifact aggregate 变化交编排器做 alpha-web checkpoint。
+
+### 当前代码与来源核对
+
+- host 库：`plugin-package.ts` 的 Entry 没有 output-style；`PluginPackage.defaults` 已有 `{agent?}` 槽，但 `plugin-conversion.ts:282` 恒写 `{}`；`shared/plugin-package-runtime.ts` 不列 output-style，安装会把样式记成 kind-not-supported-yet。
+- engine：`core/src/session/model-request.ts:105–129` 对无 `agent.system` 的 agent 调 `SessionSystemPrompt.make`；build、codepuppy-ask 与片 3 的包 agent（`agent.system=""`）都走这个 fallback。`core/src/plugin/optimize.ts` 按模型改写 `system[0]` 文本时 spread 原 part，S-10 的段标记随段保留。
+- ext 自有 coding 注入：`applyPromptTakeover` 只在无用户 prompt 时写 general/explore/docs，经 `applyAgents` 成为 `agent.system`；其 applied 名单与 cfg 中的最终字节就是 S-10 的记录来源。ext 的 context hook 次序为包 hooks/invocation → 请求组装（rebrand 等）→ MCP 别名。
+- 选择入口：现有斜杠命令入口（`command.transform` 注册；`POST /session/:id/command` → `session.command`，不开回合的插件命令回 `{}`）。会话自身的持久宿主注记是 `session.metadata`（`session.update`，子会话继承）。设置页没有样式入口，加设置控件等于新 UI，不采用。
+- 主助手：`Agent.select(undefined)` 取 `AgentEditor.default` 指向且非 subagent/hidden 的 agent；post 段的 `opencode.config.agent` 在 ext 之后写用户 `default_agent`；renderer 未选助手时不带 agent，engine-adapter `selectAgent` 的回退是 `agent.list()[0]`，即 engine 选定的默认助手。所以 S-11 在 main 侧的选择点不用改：会话显式助手经 switchAgent、用户设置 `default_agent` 经 post 段的 `editor.default`，都排在包默认之后生效。
+- 真实样本（只读公开数据，取到临时目录）：dominodatalab/domino-claude-plugin@7949e3ac470cf2f3b1c97a790c571032c844a5a3 的 `output-styles/domino-{learning,mlops}.md` 都写 `keep-coding-instructions: true`；SalesforceAIResearch/agentforce-adlc@09bf1539d41f9ff355ba3eb5d05d4a75813423bb 的 `settings.json` 为 `{"agent":"agents/adlc-orchestrator.md"}`，orchestrator 声明 `tools: Read, Grep, Glob, Bash, Task(adlc-author, adlc-engineer, adlc-qa)` 与三个同包 `skills`。两个样本都不含 inline shell 节点。
+
+### 改动
+
+| 文件（未注前缀时位于 packages/ui-mac） | 改什么 |
+| --- | --- |
+| `src/shared/host-extension-package-contract/plugin-package.ts`、`plugin-conversion.ts` | Entry 加 §4.1 冻结的 `output-style`，并加严格校验；`PluginDefaults` 改为具名类型。转换器读 `output-styles/*.md`，manifest 声明 `outputStyles` 时改读它（两份 manifest 取并集）：name 缺省取文件名，description 可选，`keep-coding-instructions` 只在显式 true 时保留。根 `settings.json` 的 `agent` 按 sourcePath 或源名归一为本包 agent 的 entry.id；目标缺失只诊断该字段，其他键记 `unsupported-setting`；不读 `.claude/settings.json`。 |
+| 同目录 `profiles/plugin-package.v1.schema.json`、`CONTRACT.md`，经两个 generator 产出的 `plugin-conversion.{mjs,d.mts}`、`host-extension-package-artifact.v1.json` 及 testvectors（如有变化） | 合同、ESM 与 artifact 同步生成，不手改生成物。 |
+| `src/shared/plugin-package-runtime.ts` | output-style 列为可运行 kind（同调用链必需，否则安装把样式记成没运行）。 |
+| `test-fixtures/plugin-helper/standard/{provenance.json,selection.tar.gz}` | 加两个固定样本子集：domino 的 manifest 和两个样式；adlc 的 manifest、`settings.json`、四个 agent 与三个 `SKILL.md`。逐文件记 mode/bytes/sha256。 |
+| `packages/core/src/session/model-request.ts` | S-10 唯一 engine 改动：fallback 段加 `metadata.codepuppyRole="default-coding"`，有 `agent.system` 的分支不动。 |
+| 新增 `packages/ext/src/plugin-package-styles.ts` | 负责样式的选择与应用。在现有命令入口注册一个 `output-style` 命令：参数为样式名或 default，只列本 Location 已启用包的样式；选择写本会话 metadata 的 packageKey+entryId。awaited context hook 只对主会话（无 parentID）应用：keep=true 把样式正文加到 system 末尾；keep=false 先去掉带 S-10 标记的段或与 ext 记录逐字相同的 agent 段，再把正文加到末尾。包关闭、移除或样式消失时，这次请求回到默认，并清掉会话里的引用。 |
+| `packages/ext/src/plugin.ts` | 记录 `applyPromptTakeover` 实际注入的 agent 与字节，交给样式模块；样式 hook 注册在请求组装之后，源正文逐字发出。 |
+| `packages/ext/src/plugin-package-invocation.ts` | S-11：已启用包的 `defaults.agent` 在 setup 的 agent transform 里调 `editor.default`（尾巴不调，用户 `default_agent` 照常胜出），多包按 ext-store 键序，后者胜；该 agent 投影为 `mode:"all"`。主会话以包 agent 为助手时，沿同一 `prepared`/`bind` 注入正文、preload 与调用期规则；子会话仍用原 task scope。 |
+| `packages/ext/src/context-injection.ts` 与 inventory snapshot | 登记 Code Puppy 为 `output-style` 命令写的描述模板。 |
+| `docs/architecture/codepuppy-authority-registry.json`、`scripts/north-star-guard.sh`、`.claude/rules/adrs/ADR-047-opencode2-engine-generation.md`、`docs/architecture/modules.md` | 登记 plugin-output-style（新 L3，只接管 model-request.ts 的 fallback 标记）和 plugin-default-settings（L0，无接管）；UPSTREAM_EXCLUDES 精确加该单文件；ADR-047 追加一段 S-10/S-11；模块图加新 ext 模块一行。 |
+| 测试：`src/shared/host-extension-package-contract/plugin-conversion.test.ts`、`packages/ext/src/plugin-host.test.ts`，`scripts/gate-files.tsv` 的精确条数 | 用例都加在原模块文件里，条数按机械同步改。 |
+
+### 顺序
+
+1. 本次 PLAN：只提交 plan.md。
+2. 转换合同先红后绿：两个样本固定进 standard fixture。converter 文件新增一个表驱动用例，覆盖两个样式、keep 显式 false、缺省、manifest 替代路径、坏 frontmatter、settings agent 归一、目标缺失、不支持键、不读 `.claude/settings.json`。红测单独提交。再补类型、校验、schema、CONTRACT、generator 与 runtime 列表，转换与 artifact 测试文件各完整跑一次。
+3. AC-28 先红后绿：host 文件里的 domino 旅程用例单独提交（红）。随后 S-10 标记、样式模块、plugin.ts 接线、context-injection 登记，以及 registry/north-star/ADR 一起提交（绿），跑 host 文件、registry judge 与 context-injection 文件。
+4. AC-29 先红后绿：adlc 旅程用例单独提交（红）；默认主助手与主会话正文接线、registry plugin-default-settings 同一提交（绿）。
+5. 收口：按 rg 找改动导出的 import/mock/枚举消费者，跑一次较宽相关集。另跑 ui-mac/ext/core 包内 typecheck、两个 generator `--check`、north-star、old-name-scan，用 `affected-tests --list` 取 scope line。每个移除臂各跑一次后用 `git restore` 复原。只 commit。
+
+### 风险
+
+- **选择入口的形状**：spec 只要求复用设置或命令入口。本节选一个 `output-style` 命令，参数为样式名或 default，与 Claude Code 的 `/output-style [style]` 一致；不新增设置控件。选择按会话存，因为 AC 说的是会话回到默认样式，跨会话记住不在本片。编排器若要别的形状，只改 `plugin-package-styles.ts` 的入口。
+- **哪些段算默认编程指令**：只替换 engine fallback（标记）与 ext 自己的 general/explore/docs 注入（agent 与整段逐字匹配）。main 注入的 codepuppy-readonly/automation prompt 是档位与治理文字，不替换；codepuppy-ask 本来走 fallback。用户覆盖的 system 不匹配，原样保留。
+- **rebrand 与 hook 次序**：样式 hook 排在请求组装之后，源正文不经品牌转写；fallback 标记靠 metadata，文本被 optimize/rebrand 改写也照样识别。
+- **默认主助手与用户设置**：`editor.default` 只在 setup transform 调，尾巴只做 mode/注册，用户 `default_agent` 仍胜出；用例有 config agent 插件一臂。档位强制的 codepuppy-ask/readonly 是用户明确的档位选择，包默认不覆盖它们。
+- **子会话继承 metadata**：样式只作用于无 parentID 的会话；包 agent 作为子会话执行时沿原 task scope，不重复注入。
+- **门的范围**：`scripts/gate-files.tsv` 属声明的全局输入，条数同步会使 PR 门走 all tests，与片 3–5 相同，返回时写明。host artifact aggregate 会变，返回时给出新 aggregate 与变化成员。
+
+### 证明
+
+U/E 分别在 packages/ui-mac、packages/ext 下执行 `bun test --max-concurrency 2 <file> -t '<name>'`。下表是待加证据，不是 PASS 收据。
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-28 声明与 keep 缺省 | U `plugin-conversion.test.ts`：`output styles and plugin settings normalize from their source declarations`（domino 原件、keep false/缺省、替代路径、坏定义） | integration（ui-mac 路径层）；受影响 PR＋nightly | 不读目录、名称/描述丢失、keep 缺省成 true，或 manifest 路径不替代默认目录，都会让 entry 表不符 |
+| AC-28 可选、生效、关闭 | E `plugin-host.test.ts`：`package output styles select through the command entry and leave with their package`。断言命令列出两名；选 Learning 后下一请求含正文与默认编程段；keep=false 副本的正文替换默认段；docs agent 的 ext 自有 prompt 逐字替换；用户自有 system 保留；关包后命令不列样式，同一会话回到默认，metadata 被清 | integration（真宿主、离线模型）；受影响 PR＋nightly | 撤 S-10 标记，keep=false 臂仍含默认段；撤应用 hook 或关闭检查，正文缺失或关包后仍在；按名字或正则删段，用户 system 臂变红 |
+| AC-29 归一 | U 同一 converter 用例：adlc 的 `settings.json` → `defaults.agent="agent:agents/adlc-orchestrator.md"`；目标缺失只诊断；`.claude/settings.json` 不读 | integration；受影响 PR＋nightly | 不读或误读设置时 defaults/diagnostics 不符 |
+| AC-29 新会话主助手、用户优先、关闭 | E `plugin-host.test.ts`：`a package default agent leads new sessions until the user chooses or the package closes`。新会话不带 agent 时选到 orchestrator，请求含其正文与 preload，工具表无 write；会话显式 build 时没有 orchestrator 正文；用户 `default_agent` 胜出；关包后新会话回到 build | integration；受影响 PR＋nightly | 撤 `editor.default` 或 mode all，默认臂选回 build；在尾巴设默认，用户设置臂变红；撤主会话正文注入，指令臂缺正文 |
+| 真实样本整包 | 一次性：临时目录对两个完整固定树跑 converter，记 entry/diagnostic 计数与命令输出 | one-time；记录于本节 | 证明完整原件可转，不进日常 suite |
+
+### 偏离记录
+
+2026-11-27 · AC-29 的用户设置臂：本宿主里 post-activation 尾巴在 ext 激活时就已放上，先于测试追加的 config agent 插件，和生产的次序（ext → post 段配置插件 → 尾巴）不同。所以 host 用例能证明用户 `default_agent` 胜过包默认，却证明不了 `editor.default` 没被挪进尾巴：把它挪进尾巴的移除臂一次实测仍绿。这一点靠代码结构与注释（`editor.default` 只在 setup transform 调用）守住，没有加计时轮询或第二条重用例。其余移除臂（撤 `editor.default`、撤 mode all、撤主会话正文）各一次 0 pass / 1 fail。用例给 config agent 插件单独提供临时 Global（与生产 Global 无关），属测试装配修正。
+
+2026-11-27 · S-10 engine 改动改为在原 `agent.system ? … : SessionSystemPrompt.make(…)` 表达式旁 spread 标记（602a1726f1），行为不变。改前的写法改动了该表达式，`codepuppy-prompts.test.ts` 的 #1241 drift 锁对它红了一次；现在的写法让上游 diff 更小。
+
+### 片 8 收口（2026-11-27 10:35，Claude Opus 5.5）
+
+- 提交：79698c21ab 计划；0e7f0cd983 → 940aa693d1 转换（先红 0/1，后绿）；4d4caf033c → 8c2e1490c7 AC-28（先红 0/1，后绿）；f9473cd1b0 → 874249d40a AC-29（先红 0/1，后绿）；602a1726f1 engine 写法修正。用时约 42 分钟，低于预计。
+- 一次性样本：在临时目录对两个完整固定树（domino 121 个文件、adlc 175 个文件）跑 converter。domino 有 2 个 output-style（都是 keep=true），adlc 的 `defaults.agent=agent:agents/adlc-orchestrator.md`，两者都没有诊断（`/tmp/slice8-full-samples.jsonl`）。
+- 移除臂（各一次，复原后逐字比对）：撤 S-10 标记、撤 ext 自有 prompt 逐字匹配、撤包启用检查、撤 `editor.default`、撤 mode all、撤主会话正文，各 0 pass / 1 fail。把默认挪进尾巴的那一臂在本宿主分辨不出，见上条偏离。
+- 相关集：ui-mac 的 converter/artifact/envelope 160 pass；install/admission/sources/child-kind/north-star-guard/sync-upstream-owned/old-name-scan 七个文件 186 pass。ext host 整文件 125 pass；package-process、setup-order、reload-wiring、process-singleton、register、codepuppy-prompts、两个 upstream-probes、ask-deadline、engine-transforms 共 69 pass；registry judge 5 pass。core 的 model-request/compaction/provider 八个文件 96 pass。context-injection 有 35 pass / 10 fail：10 条失败在本片改动之前就有（`plugin-package-hooks.ts:733` 读 recording context 的 `page.cursor`），改动前后的失败清单逐条相同（`/tmp/slice8-ci-{base,mine}.txt`），快照已重生。
+- ui-mac/ext/core 包内 typecheck 都 exit 0；8 个改动生产文件 scoped oxlint 0/0；north-star exit 0；两个 generator `--check` 通过。`affected-tests --list` 的 scope line：**all tests: scripts/gate-files.tsv changed (gate or declared global input)**（列出 678 个文件）。
+- 宿主 artifact：aggregate 从 9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7 变为 **9401e0274a858b49253b95ad7f36d3ef467d59b6115b474b01b9954f299e69ba**。变化成员 5 个：CONTRACT.md、plugin-package.ts、plugin-conversion.mjs、plugin-conversion.d.mts、profiles/plugin-package.v1.schema.json。因此 `codepuppy-contracts-consumer/src/extension-package-artifact.test.ts` 的 vendored 副本一致性用例 6 pass / 1 fail，需要 alpha-web checkpoint 重钉（跨仓，本车道没改 vendor）。
+
+### 片 8 审查 r1 修正（2026-11-27，Claude Opus 5.5）
+
+审查结论 FIX-THEN-MERGE（另一 Claude Opus 5.5 审计），三项均接受，每项先红再修：
+
+- **#1 Major，运行中的会话被包默认接管**：先在 host 文件加运行中会话一臂，0/1 红（5af33b50f4）。修正：ext 的 prompt hook 在会话第一条消息时，把当时的默认助手记进会话 metadata（`SESSION_DEFAULT_AGENT_KEY`，定义在 `shared/permission-tier.ts`）；没选过助手的会话同时 switchAgent。engine-adapter 的 `selectAgent` 保留原来的提前返回，不带 agent 时回到钉住的助手；钉住的助手已不存在时才退回 `agent.list()[0]`（109d289085）。偏离：审查要求把钉住放在 adapter 首轮。先按此实施了（622520bf0d），但这样每个新会话首轮都要经 adapter 调 agent.list/PATCH，录制的假上游夹具不提供这两个接口，5 个 adapter 用例变红；而且不经 adapter 的会话仍每次请求重选默认。因此钉住移到 engine 侧，adapter 只负责回到钉住的助手。返回钉住的助手不限于两个档位 agent，手选助手（如 plan）也回去，以保持既有「计划 → 默认」的真引擎用例。adapter 的 fast 用例按新分工改写，撤掉「回到钉住」时 0/1；真引擎 default-agent 五例经 gate slot 跑一次。
+- **#2 Minor，关包再开会复活旧选择**：先红 0/1（c0dbed4206）。修正：样式模块监视包启用集文件（与 invocation 撤销用同一文件、同一节奏），包关闭或移除时立即清掉所有会话里对它的选择（4a9862246a）。偏离：没有记录 pluginRoot。包更新会换 generation，但设计 §5 要求更新时保留用户设置，记 pluginRoot 会在更新时误清选择；启用集里也没有可比对的启用代号。限制：用 100 ms 轮询，若关闭和重开发生在同一个轮询间隔内，仍可能看不到关闭。
+- **#3 Minor，按名删与逐字匹配分不清**：在样式旅程里加两臂。一是用 engine config agent 插件改写 docs prompt，keep=false 时用户的 prompt 仍在；二是替换臂里 `# Your Model` 身份段与 instructions 部分（`core/environment` 来源）仍在。项目 AGENTS.md 中途写入时本宿主经异步 watcher 才读入，所以用 instructions 部分本身作证据，没有加计时等待。三个移除臂各 0/1：按 agent 名删、清空所有 system 段、不监视启用集。
+- 收口：host 整文件 125 pass；adapter 中驱动 selectAgent 的六个文件 103 pass；ext 注册顺序等六个文件 38 pass；registry judge 5 pass；context-injection 失败清单与基线逐条相同；ext/ui-mac typecheck、scoped oxlint、north-star、old-name-scan 均通过。宿主 artifact 本轮无变化，aggregate 仍为 9401e0274a858b49253b95ad7f36d3ef467d59b6115b474b01b9954f299e69ba。`affected-tests --list` 的 scope line 仍为 all tests: scripts/gate-files.tsv changed。
+
+## 片 9 · #1776：官方 xcode 命令来源与 link 安装
+
+- 依据：[Story #1776](https://github.com/impharaon/alpha-code/issues/1776) 当前正文；[local-plugin-install 规格 v5 @ 7278c10](https://github.com/impharaon/alpha-work/blob/7278c10/docs/specs/local-plugin-install/spec.md) 的 BR-27 / AC-31（连带 BR-01/02/10）；设计 v3.5（alpha-work `origin/main` @ 58772f7）§4.1 的 Capture/LinkedNode/PluginPackage 联合、§4.16 全文与末尾「未核实」、§5「link 与外部副作用」、§8 第 9 行、§10 R-a…R-o；helper 设计 v9 冻结的 `InstallOutcomeV1`。片 2 整树物化与片 4 脱敏/身份/data 按其收据消费，不重述决定。
+- 核对：计划提交 `e6cb8667ce` · 派发 Phase 行为「PLAN, then IMPLEMENT in the same round」，计划未揭示待定设计问题，按派发同轮进入实施；编排器对计划的单独核对未发生，由本轮返回一并核对。
+- 基线：worktree `/Users/pharaon/app/wt/alpha-code-feat-1776-slice9`，分支 `feat/1776-slice9` 叠在 `418739e3eb`（片 3–5 头）；host artifact aggregate `9eaf52305a…68b7`。计划起于 2026-11-27 10:10（UTC+08:00）。预计 M–L：约 20–26 个手写生产/合同文件、900–1,400 行，生成物与真实夹具另计；4–6 小时，达到上界两倍即返回。
+- 本机事实：只有 Command Line Tools（`xcode-select -p` = `/Library/Developer/CommandLineTools`），`/usr/bin/sandbox-exec -p … /bin/sh -c 'xcrun agent plugin path --plugin-format claude'` 实测 exit 72，stderr `xcrun: error: unable to find utility "agent", not a developer tool or in PATH`。真实 Xcode 的成功臂（实际目录布局、组件、运行）在本机不可得，列为 Acceptance 项交编排器在装有 Xcode 的 Mac 上实测，不以夹具冒充。
+
+### 改动
+
+路径省略 `packages/ui-mac/src/`。
+
+| 文件 | 改什么 |
+| --- | --- |
+| `shared/host-extension-package-contract/plugin-package.ts` | `MarketplaceEntry.source` 加 command 分支；加 `LinkedNode`；`Capture`、`PluginPackage` 按 §4.1 改为 `materialization` 联合（copy 现有字段，link 只带 `bindingId/topLevel`）；`validPluginPackage` 分别校验两臂，link 的 entry 源路径须落在声明的顶层节点内。 |
+| 同目录 `plugin-conversion.ts` 及生成的 `.mjs/.d.mts` | `readMarketplace` 解析 command（command 非空，timeout 取源显式正整数否则 60，mode 缺省 copy，未知 mode 为 unsupported）。`convertPluginTree` 的 link 臂只用 topLevel、按标准入口与清单声明路径调用 `readDirectory`/`readFile` 读控制定义，其余规则与 copy 共用同一段解释代码；声明文件按 `missing-entry` 结果补读到不动点。 |
+| 同目录 `decoder.ts`、`profiles/plugin-package.v1.schema.json`、`testvectors/*`、`CONTRACT.md`、`host-extension-package-artifact.v1.json` | 公开 `plugin-package@1` 只接受 `materialization:"copy"`（W 只发布本机重新捕获的 copy）；真实语料补该判别字段，生成物与 aggregate 同步。 |
+| 新 `main/plugin-command-source.ts` | 单一职责：取源阶段的 locator。`/usr/bin/sandbox-exec -p <profile> /bin/sh -c <command>`，cwd=HOME，env 从空对象只放 PATH/HOME/LANG/TMPDIR 与 `sidecarEgressProxyEnv` 的同一代理路由；超时杀进程组；按官方协议判定 stdout，失败给带脱敏命令、退出码/实际 stderr 的具名来源错误；成功后按 mode 产出 copy（同 `captureFolder` 走法）或 link Capture（realpath＋顶层名/目标生成 bindingId，`readDirectory` 不跟随链接）。 |
+| `main/process-fence-profile.ts`、`process-fence-plan.ts`、`server.ts` | 导出 locator profile 渲染：`(allow default)`＋N1/N4＋同一 `renderConfigFence`/`renderCredentialFence`；计划结果带出已解析的 configFence 规则，server 规划后交给 locator；C1 为 `mainCredentialStores` 加 `userEnvFile` 经 `planCredentialStores`。围栏或代理未就绪即报来源错误，不退回无围栏执行。 |
+| `main/plugin-sources.ts` | 搜索与 folder/Git 市场都列出 command 条目；仅在该候选取源时运行一次（同一 capture 供转换、比对、安装），搜索期的同名比对不对 command 候选取源；官方市场走现有归档复核条目与 commit；失败 detail 保留具名来源错误。 |
+| `main/plugin-package-install.ts`、`install-from-source.ts`、`shared/installed-plugin-package.ts` | link 包在 generation 的 `tree/` 建受管视图：顶层逐项链接原目录；有 D5 替代字节的文件只在其祖先建最小覆盖目录，兄弟继续链接；元数据记录视图节点与 `CommandSourceBinding`。link 的内容身份用 bindingId、子节点/envelope 摘要用规范化控制声明摘要，版本取 bindingId；graph 写 `pluginLink`。 |
+| `main/ext-package-ledger-v3.ts` 与读取 `graph.pluginTree` 的 main 消费方（`plugin-package-config.ts`、`package-mcp-activation.ts`、`codepuppy-config-injection.ts`、`ext-config.ts`、`ext-receipt-v2.ts`、`ext-package-uninstall.ts`、`ext-ipc.ts`、`package-admission.ts`、`ext-install-planner.ts`） | 账本接受与 `pluginTree` 互斥的 `pluginLink:{bindingId,storeKey}`，纳入 installedGraphDigest；整包判定/取 storeKey 的读点同时认两者（机械同步）。 |
+| `main/ext-health-probe-router.ts` | bundle generation 的探针对 link 按元数据视图节点校验，不跟随链接、不读外部内容。 |
+| `renderer/extensions/plugin-source-results.tsx`（及同一错误行的 `hub-install-card.tsx` 如需） | 复用候选行既有错误段：`source-unreachable` 时在本地化句后显示 main 给的 detail（命令与实际错误）。不新增页面、确认或步骤。 |
+| `test-fixtures/plugin-helper/` 新 `command/`（真实 0fbfda5a 归档子集与 provenance）、`source-fetch.ts`；上述模块既有测试；新 `main/plugin-command-source.test.ts` | 见证明表。 |
+
+不改：alpha-web（无 xcode 目录条目或 pin）、片 6/7/8 文件、ext 运行端（`pluginRoot` 仍为 generation 的 `tree/`，经链接原处运行）。
+
+### 顺序
+
+1. **合同与转换**：plugin-package/conversion/decoder/schema/vectors＋生成物；`plugin-conversion.test.ts`、`package-envelope-v1.test.ts`、`host-extension-package-artifact.test.ts` 的改动例，再各完整跑一次；两个 generator `--check`。
+2. **locator 与围栏**：新模块、profile 渲染、计划/server 接线；`plugin-command-source.test.ts`（协议各失败臂、围栏与最小环境、link 身份）；`process-fence-profile.test.ts`、`process-fence-plan.test.ts` 相关例。
+3. **取源入口**：plugin-sources 的 command 候选、一次运行、搜索比对不取源、失败 detail；`plugin-sources.test.ts`。
+4. **link 安装与账本**：受管视图、覆盖、元数据、pluginLink、探针、读点同步；`install-from-source.test.ts`、`ext-package-ledger-v3.test.ts`、`ext-package-ledger-uninstall.test.ts`。
+5. **界面错误行**：`test-component/plugin-source-results.cases.ts`。
+6. **收尾**：较宽相关集一次（rg 找 mock/枚举 `pluginTree`、`Capture`、`readMarketplace`、`validPluginPackage` 的测试）、`bun typecheck`（ui-mac、ext）、scoped oxlint、generator `--check`、旧名扫描、`git diff --check`、`affected-tests --list`；记录 aggregate 与成员变化。
+
+### 风险
+
+- link 视图把外部目录链接进 ext-store：卸载、GC、探针、事务校验若跟随链接会删改 Xcode 目录。以实际卸载后外部树逐文件不变为证据，校验只 lstat/readlink。
+- 敏感配置不能先以链接暴露再覆盖：视图在 staging 中一次物化，覆盖文件随同一事务提交；测试从安装视图读回替代字节且原文件未改。
+- `materialization` 判别字段改变公开 profile 与 aggregate：alpha-web 需单独 checkpoint；当前 W 无 plugin-package 产出（`git grep payload.plugin-package.v1 origin/main` 仅命中合同副本），不影响已发布内容。
+- 片 7/8 并行扩展转换器的新控制文件（`.lsp.json`、输出样式等）：link 发现表集中在转换器一处，集成时须把新入口加入该表，否则 link 包读不到；写入偏离/交接。
+- 真实 xcrun 测试依赖机器：测试先直接观察同一命令的实际结果，失败时断言具名错误含该命令与实际 stderr，成功时断言安装成功，两臂都不伪造。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-31 · 读市场条目 | `plugin-conversion.test.ts`「marketplace command sources keep command, timeout and mode」：真实 0fbfda5a 清单的 xcode 条目（mode link、timeout 缺省 60）及受控 timeout/mode 变体 | integration（文件 glob）：受影响 PR＋夜间 | 无 command 分支时条目为 unsupported，候选不出现 |
+| AC-31 · 运行一次、link 按 BR-01/02 装好 | `install-from-source.test.ts`「command marketplace source installs the printed plugin in place」：真实 plugin-dev（0fbfda5a）复制到临时目录，市场清单为真实条目只把 command 换成打印该目录并记一次计数；经 prepareCapture→转换→安装：计数=1；graph 为 `pluginLink`；视图顶层为指向原目录的链接，技能注册路径 realpath 落在原目录，改原目录普通文件后经视图读到新内容；卸载后原目录不变 | integration | 复制实现时 realpath 不在原目录、改原文件读不到；重复取源计数>1；卸载跟随链接会删原文件 |
+| AC-31 · link 身份与控制声明摘要 | `plugin-command-source.test.ts`「link identity follows the printed path and top-level entries」：同目录改普通文件 bindingId 不变、增删顶层或换真实路径即变；`install-from-source.test.ts` 同例内改 SKILL.md 后再选一次：bindingId 不变而 envelope 摘要变化并走 update | integration | 用内容哈希作身份时改普通文件即变；只看 bindingId 时声明改动不更新 |
+| AC-31 · 脱敏覆盖 | 同上安装例的受控变体：打印目录含真实 github `.mcp.json` 副本，Authorization 换成无效 canary；视图中该文件为覆盖字节、兄弟仍为链接、原文件未改、canary 不在视图/CAS/元数据 | integration | 直接链接会暴露 canary；整目录覆盖会使兄弟不再原处 |
+| AC-31 · 协议与围栏 | `plugin-command-source.test.ts` 表格：多行、相对路径、非目录、非零退出（带 stderr）、超时分别为具名错误；围栏例：命令读 C1 存放点文件被拒、写 CF 位置被拒、env 只含允许键，同一命令不经围栏的对照臂能读到 | integration | 猜首行/接受相对路径会通过；去掉 sandbox-exec 时 C1 读取成功、继承的秘密 env 出现 |
+| AC-31 · 失败臂（真实 xcrun）与同市场其他条目 | `plugin-sources.test.ts` / `install-from-source.test.ts`「real xcode command failure names the command and its error」：真实 0fbfda5a 清单与归档子集经搜索入口；直接观察同一命令后，失败则 outcome 为 `source-unreachable` 且 detail 含 `xcrun agent plugin path --plugin-format claude`、实际退出码与 stderr，同市场 project-artifact 照常安装；本机该命令成功时改断言安装成功 | integration | 吞掉错误或泛化文案时 detail 不含命令/stderr；一个条目失败若影响市场，其他条目安装失败 |
+| AC-31 · 搜索不提前运行 | `plugin-sources.test.ts`「search comparison never runs a command source」：同名高优先候选触发比对，计数=0 | integration | 比对路径取源即运行命令 |
+| AC-31 · 界面写明错误 | `test-component/plugin-source-results.cases.ts`：source-unreachable 带 detail 时候选行显示该命令与错误 | integration（DOM case） | 只显示本地化通用句时找不到命令文本 |
+| AC-31 · 公开发布只收 copy | `package-envelope-v1.test.ts`：link 描述的 plugin-package 载荷被拒 | integration | 放宽 validator 后 link 进入公开载荷 |
+| AC-31 · 真实 Xcode 成功臂 | Acceptance：在装有支持 `xcrun agent` 的 Xcode 的 Mac 上经定制中心选 xcode，记录实际打印目录、组件、安装结果与一次运行 | one-time（编排器安排） | 本机无 Xcode，不能以夹具代替 |
+
+### 偏离记录
+
+- 2026-11-27 · 夹具：改用仓内已固定的官方市场夹具（`test-fixtures/plugin-helper/provenance.json`，claude-plugins-official@b5b01ac4，含归档与 317 条清单）。其中 xcode 条目与 AC-31 钉住的 0fbfda5a 条目逐字段相等（一次性核对：两份 `marketplace.json` 的 xcode 对象 `==` 为 True），因此不新增 `command/` 归档；成功臂用同仓 0fbfda5a 的 plugin-dev 真实树（standard 夹具）作打印目录，只把 xcode 条目的 command 换成打印该目录的受控变体。失败臂与「同市场其他条目」走搜索入口与该夹具归档（frontend-design）。
+- 2026-11-27 · 落点：`captureLinkedDirectory` 是取源壳，放在 `main/plugin-sources.ts`（与 `captureFolder` 同处），其身份测试在 `plugin-sources.test.ts`；locator 经 `createPluginSources` 的 `locateCommand` 注入（`ext-ipc.ts` 传 `locateCommandSource`）。原因：ext 的类型检查经 `hub-bridge.ts` 的 type import 到达 `plugin-sources.ts`，直接 import locator 会把 `codepuppy-artifact-download.ts` 的 ReadableStream 类型带进 ext 而报错。
+- 2026-11-27 · 文件表外的必要同调用链：`main/created-plugin.ts`（Capture 判别字段）、`test-fixtures/plugin-helper/fixture.ts`（同上）、`renderer/extensions/ext-package-presentation.ts`（失败 detail 的唯一取法）、`renderer/codepuppy-ui/session-timeline/cards/hub-install-card.tsx` 与 `test-component/hub-install-card.cases.ts`（聊天卡与候选行同一错误）、`renderer/subprocess-cases.test.ts`（两个 cases 文件的 pass 计数机械同步 10→11、14→15）。旧断言随替代行为更新：`plugin-conversion.test.ts` 的 xcode 由 unsupported 改为 command，`plugin-sources.test.ts` 的「command 不铸候选」改为「是候选且搜索比对不运行」。
+- 2026-11-27 · 界面：`source-unreachable` 在本地化句后显示 main 的 detail（所有该码失败一律显示，不按文本判别）；其他失败码不变。
+- 2026-11-27 · 未实施并交回：设计 §4.16「来源内容更新时，原 watcher 对变化的声明重新规范化与重绑定代」——仓内没有已装 bundle 来源的 watcher（`grep -rln 'fs.watch\|watch(' ui-mac/src/main ext/src` 只命中 engine-explicit-config / ext plugin 的无关监听）。AC-31 不要求；普通文件已原处生效，控制声明更新沿「再次选中＝新一次取源＝update」（证明表安装例已覆盖 binding 不变、摘要更新）。
+
+### 实施收据（2026-11-27，Claude Opus 5.5）
+
+- 提交：计划 `e6cb8667ce`；实现 `b6a805a2a2`；合同说明 `048e705af8`；copy 模式补例 `49cba22dc2`。用时约 50 分钟（10:10–10:58 UTC+08:00），未超出预估。
+- 本片改动文件（ui-mac）：`bun test --max-concurrency 2` 跑 `plugin-sources`、`install-from-source`、`plugin-command-source`、`ext-package-ledger-v3`、`ext-package-ledger-uninstall`、`plugin-conversion`、`package-envelope-v1`、`host-extension-package-artifact`、`process-fence-profile`、`process-fence-plan` 十个文件，397 pass / 0 fail；补 copy 例后 `install-from-source.test.ts` 54 pass。DOM：`subprocess-cases.test.ts -t 'A4 production install card|BC1 production source results'` 2 pass。订正（审查 r1 Minor 3）：当时只有聊天卡用例落地（15 例）；候选行用例的编辑因所在命令被钩子拦下而未执行，`plugin-source-results.cases.ts` 仍为 10 例，原「11 例」说法不实，r1 补上。
+- 移除臂（临时改动后用备份恢复，均已复原）：link 发现读全部文件或漏读 skills → 转换例 0 pass / 1 fail；locator 去掉 `sandbox-exec` → 围栏例失败；去掉搜索比对跳过 → 搜索例失败（出现 codeload 取源）；去掉 capture/转换缓存 → 安装例计数变为 2；command 走 copy → 安装例 `pluginLink` 缺失。
+- 较宽相关集一次：ui-mac 十五文件 531 pass / 1 fail，唯一失败 `server.test.ts:1021`（警告行含本 worktree 未构建的 `packages/ext/dist/server.js` 路径中的 `.`；`ls` 证实该文件不存在），与本片无关；ext 六文件 216 pass / 1 fail，唯一失败 `plugin-host.test.ts` ralph-loop Stop 例，具名原因为本 shell 继承的 `CLAUDE_CODE_SESSION_ID`，`env -u CLAUDE_CODE_SESSION_ID` 重跑该例 1 pass（与 r22 收据同一做法）。
+- 其他检查：ui-mac 与 ext `bun typecheck` 均 0 error；改动 TS scoped oxlint 0 warnings / 0 errors；两个 generator `--check` 通过；旧名扫描 10 pass；`scripts/north-star-guard.sh` exit 0；本文件链接检查与 `git diff --check` 通过。
+- 宿主 artifact：aggregate `9eaf52305a…68b7` → `2619bda909cf830c9f5063d15f95fd4a2d4896fdecf46761eb6b8864baef2c88`；变化成员为 `CONTRACT.md`、`decoder.ts`、`plugin-package.ts`、`plugin-conversion.mjs`、`plugin-conversion.d.mts`、`profiles/plugin-package.v1.schema.json`、`testvectors/decoder-corpus.v1.json`、`testvectors/plugin-package-description.v1.json`。`codepuppy-contracts-consumer` 的 `extension-package-artifact.test.ts`「vendored host contract copy is byte-identical」因此变红（6 pass / 1 fail），需 alpha-web 消费新 artifact 后本仓重钉 producer。
+- `affected-tests --list`：`all tests: scripts/gate-files.tsv changed (gate or declared global input)`，679 个文件；该全局输入来自叠在下面的片 3–5 提交，不是本片改动。
+- 真实 xcrun（本机仅 Command Line Tools）：经搜索入口选中固定 xcode 条目，返回 `source-unreachable`，detail 为 `Command "xcrun agent plugin path --plugin-format claude" exited with 72: xcrun: error: unable to find utility "agent", not a developer tool or in PATH`；同市场 frontend-design 照常安装。装有 Xcode 的成功臂仍为 Acceptance 项。
+
+### 审查 r1 修正（2026-11-27，独立 Claude Opus 5.5 审计：FIX-THEN-MERGE，编排器接受六项）
+
+- 红先行：`ac6496a298` 只加测试，未修代码时 6 例失败（链接到 C1 的 `SKILL.md` 内容进入转换；链接到别处的顶层 `skills/` 未被跟随、0 技能；原目录移走后探针仍 healthy；30 天超时立即触发；`source-unreachable` 的通用 detail 被拼到候选行与聊天卡）。`2b1f8ecd7a` 只修正 hub-view 用例的夹具 generation 名（须为 `gen-NNNNNN-<8 hex>`），断言未改，修正后在未修代码上仍红（detail 为 `bundle plugin-xcode: no verification…`）。修复提交不改这些红测。
+- Major 1：新 `main/plugin-command-fence.ts` 持本次运行的 locator 围栏（profile、代理端口、C1 规则），locator 与 main 的读取共用。`locatedFiles()` 复用 `credentialReferenceGuard`（真实路径＋上级节点按 device/inode 判 C1，按判定的真实文件 O_NOFOLLOW 打开并复核身份）；命中即按缺失处理（转换器的 missing-entry 路径）。link 捕获的 `readFile`/`readDirectory` 与 copy 捕获的逐文件读取都经它；打印目录本身落在 C1 内时 locator 报具名错误。转换器的 `walk` 现在也跟随顶层为链接的 `skills/`、`commands/`、`agents/`，解析结果由同一守卫把关。
+- Major 2：跨仓依赖。设计 §8 第 9 行写「W 无必需改动」，但公开 `plugin-package@1` 现要求 `materialization:"copy"`，`readMarketplace` 的 command 分支也在宿主 artifact 内，因此 alpha-web 必须重新 vendor 本仓 artifact，本仓再重钉 producer；在此之前 `codepuppy-contracts-consumer/src/extension-package-artifact.test.ts`「vendored host contract copy is byte-identical」为红。编排器在片 6–9 集成时安排该 checkpoint。
+- Minor 3：补 `plugin-source-results.cases.ts` 的「失败的市场来源命令显示命令与实际错误」用例，计数改为 12（含 Minor 5 的通用失败用例）。
+- Minor 4：`plugin-package-config.ts` 的 `missingLinkedPluginSource`/`linkedPluginSourceGap` 找出第一个目标已不存在的受管链接；bundle 探针返回 `Linked plugin source is missing: <目标>`，定制中心包行在既有 `stateReason`（`not-loaded`）里给出同一句。账本、记录与数据不动，来源恢复后探针恢复 healthy。不新增步骤或提示。
+- Minor 5：`shared/plugin-install.ts` 的 `sourceCommandFailure`/`isSourceCommandFailure` 是命令失败 detail 的唯一写法；候选行与聊天卡只在该写法时显示 detail，其他 `source-unreachable` 仅显示本地化句。
+- Small 6：超时按 setTimeout 上限 2^31−1 ms 截取（声明值照旧显示）；`server.test.ts` 新增断言：locator 使用本次 ProcessFencePlan 的 configFence（去掉该传递时用例失败）。
+- 验证：改动文件 `plugin-sources`、`plugin-command-source`、`install-from-source`、`hub-view`、`plugin-conversion`、`host-extension-package-artifact`、`ext-package-presentation`、`process-fence-profile`、`process-fence-plan` 共 262 pass；DOM 两 cases 文件经 `subprocess-cases.test.ts` 2 pass（12/16 例）；`server.test.ts` 52 pass / 1 fail（同前，ext dist 未构建的既有环境原因）；较宽集 ui-mac 五文件 92 pass、ext `hub-bridge`/`hub-tools` 37 pass；两包 typecheck 0 error，改动文件 oxlint 0/0，两 generator `--check` 通过。宿主 aggregate 再变为 `9c02be752c14f1bc562e23e36995086ba3c264a19ef72325d9d20515a2bc30af`（本轮只 `plugin-conversion.mjs` 与清单变化；相对 `9eaf…` 的成员集合同上）。

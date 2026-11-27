@@ -1,3 +1,5 @@
+import { buildWriteScopeRequest, parseWriteScopeReply } from "./codepuppy-sidecar-messages"
+import { buildPackageManagerControlRequest, parsePackageManagerControlReply } from "./codepuppy-sidecar-messages"
 // REQ-234 `#1529`(基线 §2.5 / §2.3 / §2.2;不变量 I4、I6、I9 的 main 半边)。
 //
 // 夹具:真盘账本(upsertRecordV2)+ 引擎在 HTTP 层的替身(只替换 fetch,SDK 客户端与 tool-policy 客户端都是生产的)。
@@ -613,6 +615,31 @@ test("A3 main accepts before a slow install finishes and owns the submitted/comm
   await Bun.sleep(0)
   expect(requests.get("request_a3")).toMatchObject({ stage: "committed", packageId: "claude:playwright", outcome: { ok: true } })
   expect(changes).toHaveLength(2)
+})
+
+
+test("external write scope dispatch reads main's projection without any install or registration", async () => {
+  const w = world("write-scope")
+  const queries: unknown[] = [], posted: unknown[] = []
+  const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: createHubRequestStages({ log: () => {} }), searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => { throw Error("query must not install") }, reloads: w.coordinator, log: () => {} })
+  const request = buildWriteScopeRequest(1, { access: "write", targets: [{ absolute: "/outside/a", directory: "/outside" }] })
+  expect(host.receive(request, (message) => void posted.push(message), async (input) => { queries.push(input); return { revision: 4, targets: input.targets.map((target) => ({ absolute: target.absolute, outcome: "needs-approval" })) } })).toBe(true)
+  await Promise.resolve()
+  expect(queries).toHaveLength(1)
+  expect(parseWriteScopeReply(posted[0])?.result).toEqual({ revision: 4, targets: [{ absolute: "/outside/a", outcome: "needs-approval" }] })
+})
+
+test("package-manager control dispatch uses only the handler of the sending generation", async () => {
+  const w = world("prepared-shell")
+  const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: createHubRequestStages({ log: () => {} }), searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => { throw Error("must not install") }, reloads: w.coordinator, log: () => {} })
+  const seen: unknown[] = [], replies: unknown[] = []
+  const request = buildPackageManagerControlRequest(8, { op: "bind", executionID: "execution", pid: 42 })
+  host.receive(request, (reply) => replies.push(reply), async () => { throw Error("must not query scope") }, async (control) => { seen.push(control); return { ok: true } })
+  await Promise.resolve()
+  expect(seen).toEqual([request.request])
+  expect(parsePackageManagerControlReply(replies[0])?.result).toEqual({ ok: true })
+  host.receive({ ...request, request: { ...request.request, argv: [] } }, (reply) => replies.push(reply), async () => { throw Error("must not query scope") }, async (control) => { seen.push(control); return { ok: true } })
+  expect(seen).toHaveLength(1)
 })
 
 test("video requests use the existing host channel with a correlated durable receipt",async()=>{

@@ -61,7 +61,7 @@ beforeAll(async () => {
       filewatcher: false,
       platform: process.platform,
     }),
-    { projectTrust: engineProjectTrust },
+    { packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   client = engineClient({ url: engine.url, username: "opencode", password: PASSWORD })

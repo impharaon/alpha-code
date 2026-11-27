@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { Tool } from "../../../schema/src/tool"
-import { attachWriteDenied } from "./display"
+import { ToolFailure } from "../../../ai/src/schema/errors"
+import { attachNetFailure, attachTerminal, attachUnattendedDenial, attachWriteDenied } from "./display"
 import { CONTEXT_INJECTIONS, WRITE_REFUSED_NOTE } from "../context-injection"
 
 // The real plugin Error constructor; error shape/cause chain matches the real-engine fixture
@@ -49,4 +50,32 @@ test("shell refusal has no known write target: append a neutral stop instruction
 })
 test("an unopened-project snippet with no attach point is absent from the injection registry", () => {
   expect(CONTEXT_INJECTIONS.some((entry) => entry.id === "sandbox.write-denied")).toBe(false)
+})
+
+test("error metadata updates retain the incoming engine constructor and cause", () => {
+  // ToolFailure is the engine's actual subclass, not the plugin SDK constructor.
+  for (const kind of ["terminal", "write", "network", "unattended"] as const) {
+    const cause = kind === "network" ? Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" }) : eperm()
+    const original = new ToolFailure({ message: "tool failed", error: cause, metadata: { prior: true } })
+    const event = { ...errorEvent("write", { url: "https://example.test" }, cause), error: original }
+    if (kind === "terminal") attachTerminal(event, {
+      identity: { source: "builtin", origin: "", name: "write" },
+      technicalId: "write",
+      authority: { kind: "not-asserted" },
+    })
+    if (kind === "write") attachWriteDenied(event, "/project")
+    if (kind === "network") attachNetFailure(event, {}, "")
+    if (kind === "unattended") attachUnattendedDenial(event, {
+      version: 1,
+      reason: "readonly",
+      tool: "write",
+      message: "这个任务是只读档,不能使用「write」。",
+    })
+    expect(event.error).not.toBe(original)
+    expect(event.error).toBeInstanceOf(ToolFailure)
+    expect(event.error.constructor).toBe(original.constructor)
+    expect(event.error.error).toBe(cause)
+    expect(event.error.metadata?.prior).toBe(true)
+    expect(event.error.message).toStartWith(original.message)
+  }
 })

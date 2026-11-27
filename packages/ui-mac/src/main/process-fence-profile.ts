@@ -9,7 +9,7 @@
 // 两者差两条,其中 zsh 存历史走 `.zsh_history.new` 再改名 —— 照 §7.6 原文立闸,用户每开一次终端
 // 看一条 `failed to write history file`。逐行消融结论(§8.2 表):W2/W3/W4/W5/W6/W15 去掉引擎/注入/
 // 终端直接死,W7 去掉 **静默**(provider 装不上而 health 仍 200),W8 去掉每开终端一条报错;
-// W11–W14 / W17–W18 本轮**未证伪 ≠ 可删**,删减各自要实测(基线 I1)。本文件不做那个判定。W16(`~/.opencode`)已删:计划目录移到引擎数据目录,
+// W11–W14 的删减各自要实测(基线 I1)。#1759 将缓存迁到 W3 下的 package-managers,撤 W7/W17/W18。W16(`~/.opencode`)已删:计划目录移到引擎数据目录,
 // 围栏里再没有写者要它,它整个是受保护配置位置 CF-9(DESIGN-engine-config-fence D13)。
 //
 // ── 与 REQ-138 那层的关系:替换,不叠加 ─────────────────────────────────────────────
@@ -39,7 +39,7 @@
 // 只用来决定**不**签发,判据偏向判「覆盖」)。
 
 import { statSync } from "node:fs"
-import { dirname, isAbsolute, join, resolve } from "node:path"
+import { dirname, isAbsolute, join, posix, resolve, win32 } from "node:path"
 import { SETTINGS_STORE, UPDATER_STORE } from "./store-keys"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
@@ -56,18 +56,17 @@ export const WORKSPACE_WRITE_EXTENSION_CLASS = "app.codepuppy.workspace-write"
  */
 export const WRITABLE_ROOT_IDS = {
   W1: "工作区(启动时并集,每个工作区一条 subpath)",
-  W3: "<userDataPath>(opencode/locks/**、engine-scratch-cwd、uv-cache …;其中的受保护配置位置由 profile 末尾的拒写块拿回)",
+  W3: "<userDataPath>(opencode/locks/**、engine-scratch-cwd、package-managers …;其中的受保护配置位置由 profile 末尾的拒写块拿回)",
   W4: "<XDG_DATA_HOME>/opencode:上游引擎 log / *.db / -wal / -shm / repos / plan(其中的工具策略目录由 profile 末尾的拒写块拿回,CF-11)",
   W5: "<XDG_CACHE_HOME>/opencode:bin / models.json / packages",
-  W7: "<HOME>/.npm:@npmcli/arborist 的 cacache,不随 XDG",
   W8: "<HOME>/.zsh_history*(regex):登录 shell 存历史含 .zsh_history.new(§8.5 坑一)",
   W11: "/private/tmp",
   W12: "/private/var/folders($TMPDIR)",
   W13: "/dev/null /dev/stdout /dev/stderr",
   W14: "/dev/tty ^/dev/fd/",
   W15: "/dev/ptmx ^/dev/ttys:PTY 靠它(§6.4)",
-  W17: "<HOME>/Library/Caches/bun(dev-only)",
-  W18: "<HOME>/.cache/bun(dev-only)",
+  W21: "R1/R3/R7 绑定的固定全局安装与用户配置位置",
+  W20: "R1/R7 绑定的包管理器缓存;Cargo 原生 Home 的精确缓存/锁/数据库",
   X1: "用户本次应用运行亲手打开的项目(主进程绑定当前引擎签发的私有类扩展)",
 } as const
 export type WritableRootId = keyof typeof WRITABLE_ROOT_IDS
@@ -157,8 +156,11 @@ export function configFenceLocations(input: {
 }
 
 export type ProcessFenceProfileInput = {
+  homebrewFence: readonly Exclude<ConfigFenceRule, { kind: "dat-files" }>[]
+  userWritableLocations?: readonly ProcessFenceWriteRule[]
   /** W1:启动时并集,顺序即优先级(裁剪从尾部丢)。 */
   workspaces: readonly string[]
+  packageManagerCaches?: readonly ProcessFenceWriteRule[]
   /** 当前环境根:W2 删掉之后不再渲染进放行块,它作为 CF-1 的一条由计划器放进 configFence(冻结设计「既有字段不变」)。 */
   codepuppyGlobalRoot: string
   userDataPath: string
@@ -207,6 +209,132 @@ function regexLiteral(p: string): string {
   return p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
+export type PackageManager = "bun" | "pnpm" | "yarn" | "npm" | "pip" | "uv" | "go" | "cargo"
+export const PACKAGE_MANAGERS_DIRNAME = "package-managers"
+export type PackageManagerPlatform = "darwin" | "linux" | "win32"
+export type PackageManagerLocationInput = {
+  platform: PackageManagerPlatform
+  home: string
+  userDataPath: string
+  configHome: string
+  appData: string
+  localAppData: string
+  goInstallBin: string | null
+  xdgCacheHome: string | null
+  bunInstall: string | null
+}
+export type PackageManagerLocations = {
+  env: Readonly<Record<string, string>>
+  /** `onlyIfExisting`: a version manager's own location; binding (creating) it when absent would change where that tool installs itself. */
+  writable: readonly { manager: PackageManager; rule: ProcessFenceWriteRule; purpose: "cache" | "global-install"; onlyIfExisting?: true }[]
+}
+
+/** Candidate locations only: the main planner binds their identities before any rule is applied. */
+export function resolvePackageManagerLocations(input: PackageManagerLocationInput): PackageManagerLocations {
+  const path = packageManagerPath(input)
+  const cache = path.join(input.userDataPath, PACKAGE_MANAGERS_DIRNAME)
+  const bun = input.bunInstall ?? path.join(input.xdgCacheHome ?? input.home, ".bun")
+  const pnpm = input.platform === "win32" ? path.join(input.localAppData, "pnpm") : input.platform === "darwin" ? path.join(input.home, "Library", "pnpm") : path.join(input.home, ".local", "share", "pnpm")
+  const env = {
+    ...(input.bunInstall === null ? { BUN_INSTALL: bun } : {}),
+    BUN_INSTALL_CACHE_DIR: path.join(cache, "bun", "install-cache"),
+    BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(cache, "bun", "transpiler-cache"),
+    ...Object.fromEntries(["store", "cache", "state"].flatMap((name) => ["pnpm", "npm"].map((prefix) => [`${prefix}_config_${name}_dir`, path.join(cache, "pnpm", name)]))),
+    PNPM_HOME: pnpm,
+    YARN_CACHE_FOLDER: path.join(cache, "yarn", "cache"),
+    YARN_GLOBAL_FOLDER: path.join(cache, "yarn", "berry"),
+    npm_config_cache: path.join(cache, "npm", "cache"),
+    PIP_CACHE_DIR: path.join(cache, "pip", "cache"),
+    UV_CACHE_DIR: path.join(cache, "uv", "cache"),
+    UV_PYTHON_INSTALL_DIR: path.join(cache, "uv", "python"),
+    ...(input.goInstallBin === null ? {} : { GOPATH: path.join(cache, "go", "gopath"), GOBIN: input.goInstallBin }),
+    GOMODCACHE: path.join(cache, "go", "mod"),
+    GOCACHE: path.join(cache, "go", "build"),
+    CARGO_INSTALL_ROOT: path.join(input.home, ".cargo"),
+  }
+  const writable: PackageManagerLocations["writable"][number][] = []
+  const add = (manager: PackageManager, purpose: "cache" | "global-install", kind: ProcessFenceWriteRule["kind"], ...values: string[]) => {
+    values.forEach((value) => writable.push({ manager, purpose, rule: { kind, value } }))
+  }
+  const addVersionManager = (manager: PackageManager, kind: ProcessFenceWriteRule["kind"], ...values: string[]) => {
+    values.forEach((value) => writable.push({ manager, purpose: "global-install", rule: { kind, value }, onlyIfExisting: true }))
+  }
+  add("bun", "cache", "subpath", env.BUN_INSTALL_CACHE_DIR, env.BUN_RUNTIME_TRANSPILER_CACHE_PATH)
+  add("pnpm", "cache", "subpath", ...["store", "cache", "state"].map((name) => path.join(cache, "pnpm", name)))
+  add("yarn", "cache", "subpath", env.YARN_CACHE_FOLDER, env.YARN_GLOBAL_FOLDER)
+  add("npm", "cache", "subpath", env.npm_config_cache)
+  add("pip", "cache", "subpath", env.PIP_CACHE_DIR)
+  add("uv", "cache", "subpath", env.UV_CACHE_DIR, env.UV_PYTHON_INSTALL_DIR)
+  add("go", "cache", "subpath", path.join(cache, "go", "gopath"), env.GOMODCACHE, env.GOCACHE)
+  add("cargo", "cache", "subpath", ...["registry", "git"].map((name) => path.join(input.home, ".cargo", name)))
+  add("cargo", "cache", "literal", ...[".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-journal"].map((name) => path.join(input.home, ".cargo", name)))
+  add("bun", "global-install", "subpath", path.join(bun, "install", "global"), path.join(bun, "bin"))
+  add("pnpm", "global-install", "subpath", ...["global", "bin", ".tools"].map((name) => path.join(pnpm, name)))
+  // pnpm creates executable shims directly in PNPM_HOME; its recursive store is not an install root.
+  add("pnpm", "global-install", "regex", `^${regexLiteral(pnpm)}${input.platform === "win32" ? "\\\\[^\\\\]+" : "/[^/]+"}$`)
+  add("go", "global-install", "subpath", path.join(input.home, "go", "bin"))
+  add("cargo", "global-install", "subpath", path.join(input.home, ".cargo", "bin"))
+  add("cargo", "global-install", "literal", ...[".crates.toml", ".crates2.json"].map((name) => path.join(input.home, ".cargo", name)))
+  if (input.platform === "win32") {
+    add("npm", "global-install", "subpath", path.join(input.appData, "npm"))
+    add("yarn", "global-install", "subpath", path.join(input.localAppData, "Yarn", "config", "global"), path.join(input.localAppData, "Yarn", "bin"))
+    add("pip", "global-install", "regex", `^${regexLiteral(path.join(input.appData, "Python"))}\\\\Python[^\\\\]+\\\\(site-packages|Scripts)(\\\\.*)?$`)
+    add("uv", "global-install", "subpath", path.join(input.appData, "uv", "tools"), path.join(input.home, ".local", "bin"))
+    return { env, writable }
+  }
+  add("yarn", "global-install", "subpath", path.join(input.home, ".config", "yarn", "global"), path.join(input.home, ".yarn", "bin"))
+  for (const prefix of ["/opt/homebrew", "/usr/local", path.join(input.home, ".npm-global"), path.join(input.home, ".local")]) {
+    add("npm", "global-install", "subpath", path.join(prefix, "lib", "node_modules"), path.join(prefix, "bin"))
+    add("yarn", "global-install", "subpath", path.join(prefix, "bin"))
+  }
+  for (const manager of ["npm", "yarn"] as const) {
+    for (const [root, suffix] of [
+      [path.join(input.home, ".nvm"), "/versions/node/[^/]+"],
+      [path.join(input.configHome, "nvm"), "/versions/node/[^/]+"],
+      ...(input.platform === "darwin" ? [[path.join(input.home, "Library", "Application Support", "fnm"), "/node-versions/[^/]+/installation"]] : []),
+      [path.join(input.home, ".local", "share", "fnm"), "/node-versions/[^/]+/installation"],
+      [path.join(input.home, ".fnm"), "/node-versions/[^/]+/installation"],
+      [path.join(input.home, ".volta"), "/tools/image/node/[^/]+"],
+      [path.join(input.home, ".asdf"), "/installs/nodejs/[^/]+"],
+      [path.join(input.home, ".local", "share", "mise"), "/installs/node/[^/]+"],
+    ]) addVersionManager(manager, "regex", `^${regexLiteral(root!)}${suffix}/(lib/node_modules|bin)(/.*)?$`)
+    addVersionManager(manager, "subpath", ...["tools/image/packages", "tools/user/packages", "tools/user/bins", "tools/shared", "bin", "tmp", "log"].map((suffix) => path.join(input.home, ".volta", suffix)), path.join(input.home, ".asdf", "shims"), path.join(input.home, ".local", "share", "mise", "shims"))
+  }
+  if (input.platform === "darwin") add("pip", "global-install", "subpath", path.join(input.home, "Library", "Python"))
+  add("pip", "global-install", "regex", `^${regexLiteral(path.join(input.home, ".local", "lib"))}/python[^/]+(/.*)?$`)
+  add("pip", "global-install", "subpath", path.join(input.home, ".local", "bin"))
+  add("uv", "global-install", "subpath", path.join(input.home, ".local", "share", "uv", "tools"), path.join(input.home, ".local", "bin"))
+  return { env, writable }
+}
+
+export function userConfigurationLocations(input: PackageManagerLocationInput): readonly ConfigFenceRule[] {
+  const path = packageManagerPath(input)
+  const files = [
+    ...[".gitconfig", ".gitconfig.lock", ".zshenv", ".zprofile", ".zshrc", ".zlogin", ".zlogout", ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".profile", ".npmrc", ".yarnrc", ".yarnrc.yml", ".bunfig.toml", ".cargo/config", ".cargo/config.toml"].map((name) => path.join(input.home, name)),
+    path.join(input.configHome, "git", "config"), path.join(input.configHome, "git", "config.lock"),
+  ]
+  if (input.platform === "win32") {
+    files.push(path.join(input.appData, "pip", "pip.ini"), path.join(input.appData, "uv", "uv.toml"), path.join(input.appData, "go", "env"))
+    // Windows shell profiles require the OS-resolved Documents location; Windows is outside this increment.
+    return files.map((file) => ({ kind: "literal", path: file }))
+  }
+  files.push(path.join(input.configHome, "fish", "config.fish"), path.join(input.configHome, "pip", "pip.conf"), path.join(input.home, ".pip", "pip.conf"), path.join(input.configHome, "uv", "uv.toml"))
+  files.push(input.platform === "darwin" ? path.join(input.home, "Library", "Application Support", "go", "env") : path.join(input.configHome, "go", "env"))
+  if (input.platform === "darwin") files.push(path.join(input.home, "Library", "Application Support", "pip", "pip.conf"))
+  return [...files.map((file): ConfigFenceRule => ({ kind: "literal", path: file })), { kind: "subpath", path: path.join(input.configHome, "fish", "conf.d") }]
+}
+
+function packageManagerPath(input: PackageManagerLocationInput) {
+  if (!["darwin", "linux", "win32"].includes(input.platform)) throw new Error("package manager locations: unsupported platform")
+  const path = input.platform === "win32" ? win32 : posix
+  for (const key of ["home", "userDataPath", "configHome", "appData", "localAppData"] as const)
+    if (typeof input[key] !== "string" || !path.isAbsolute(input[key])) throw new Error(`package manager locations: ${key} must be an absolute path`)
+  for (const key of ["xdgCacheHome", "bunInstall"] as const)
+    if (input[key] !== null && (typeof input[key] !== "string" || !path.isAbsolute(input[key]))) throw new Error(`package manager locations: ${key} must be an absolute path or null`)
+  if (input.goInstallBin !== null && (typeof input.goInstallBin !== "string" || !path.isAbsolute(input.goInstallBin))) throw new Error("package manager locations: goInstallBin must be an absolute path or null")
+  return path
+}
+
 /**
  * 渲染 profile —— 勘破 §8.2 的行(去掉 W10 / W19,见 WRITABLE_ROOT_IDS),参数已代入(不用 `(param …)`:sidecar 里 `sandbox_init` 不带
  * 参数表,而且把根写死进文本才能让「试编译的」与「apply 的」是同一串字节)。
@@ -235,19 +363,23 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     "(deny file-write*)",
     "(allow file-write*",
     ...ws.map((w) => `  (subpath "${w}")                                  ; W1`),
+    ...(input.packageManagerCaches ?? []).map((rule) => `  (${rule.kind} ${rule.kind === "regex" ? "#" : ""}"${assertSeatbeltSafePath(rule.value, "package manager cache")}") ; W20`),
+    ...(input.userWritableLocations ?? []).map((rule) => {
+      if (rule.kind !== "regex") return `  (${rule.kind} "${assertSeatbeltSafePath(rule.value, "user writable location")}") ; W21`
+      new RegExp(rule.value)
+      if (/["\u0000-\u001f\u007f]/.test(rule.value)) throw new Error("process fence: invalid user writable pattern")
+      return `  (regex #"${rule.value}") ; W21`
+    }),
     `  (subpath "${userDataPath}")                             ; W3`,
     ...(stateHome === userDataPath ? [] : [`  (subpath "${join(stateHome, "opencode")}")               ; W3 (XDG_STATE_HOME)`]),
     `  (subpath "${join(dataHome, "opencode")}")               ; W4`,
     `  (subpath "${join(cacheHome, "opencode")}")               ; W5`,
-    `  (subpath "${join(home, ".npm")}")                                ; W7`,
     `  (regex #"^${homeRe}/\\.zsh_history")                       ; W8`,
     `  (subpath "/private/tmp")                               ; W11`,
     `  (subpath "/private/var/folders")                       ; W12`,
     `  (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")   ; W13`,
     `  (literal "/dev/tty") (regex #"^/dev/fd/")              ; W14`,
     `  (literal "/dev/ptmx") (regex #"^/dev/ttys")            ; W15`,
-    `  (subpath "${join(home, "Library", "Caches", "bun")}")                  ; W17`,
-    `  (subpath "${join(home, ".cache", "bun")}")                       ; W18`,
     ")",
     `(allow file-write* (extension "${WORKSPACE_WRITE_EXTENSION_CLASS}"))                       ; X1 用户本次运行亲手打开的项目`,
     `(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "${WORKSPACE_WRITE_EXTENSION_CLASS}")) ; X2 围栏内五种方式都签不出本类`,
@@ -256,6 +388,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     '(allow network-bind (local ip "localhost:*"))             ; N2 sidecar 自己的 HTTP 服务器要 bind',
     '(allow network-inbound (local ip "localhost:*"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)',
     `(allow network-outbound (remote ip "localhost:${egressProxyPort}"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)`,
+    ...renderConfigFence(input.homebrewFence),
     ...renderConfigFence(configFence),
     ...renderCredentialFence(credentialStores),
   ]
@@ -399,12 +532,17 @@ export function processFenceWriteRules(profile: string): ProcessFenceWriteRules 
 /**
  * 已覆盖 = 某条 allow 盖住 directory 或其祖先(subpath / literal 等于、regex 命中;一个祖先上的 literal 让那个祖先可写,所以其下全算),
  * 且没有 deny 盖住它(subpath / regex 盖住 directory 或其祖先、literal 只在等于 directory 时算)。大小写折叠。
+ * file 判具体写目标：只有 subpath 沿祖先匹配，literal/regex 都匹配目标本身。
  */
-export function processFenceRulesCover(rules: ProcessFenceWriteRules, directory: string): boolean {
+export function processFenceRulesCover(rules: ProcessFenceWriteRules, directory: string, kind: "directory" | "file" = "directory"): boolean {
   const chain = [resolve(directory)]
   while (chain.at(-1) !== dirname(chain.at(-1)!)) chain.push(dirname(chain.at(-1)!))
   const hits = (rule: ProcessFenceWriteRule, path: string) =>
     rule.kind === "regex" ? new RegExp(rule.value, "i").test(path) : resolve(rule.value).toLowerCase() === path.toLowerCase()
+  if (kind === "file") {
+    const matches = (rule: ProcessFenceWriteRule) => rule.kind === "subpath" ? chain.some((path) => hits(rule, path)) : hits(rule, chain[0]!)
+    return rules.allow.some(matches) && !rules.deny.some(matches)
+  }
   if (!chain.some((path) => rules.allow.some((rule) => hits(rule, path)))) return false
   return !rules.deny.some((rule) => (rule.kind === "literal" ? hits(rule, chain[0]!) : chain.some((path) => hits(rule, path))))
 }

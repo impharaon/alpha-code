@@ -5,13 +5,14 @@ export type { Context, Metadata, Namespace, Options, Result } from "@opencode/sc
 import { ToolDefinition, type ToolCall } from "@opencode/ai/effect"
 import type { CodeMode } from "@opencode/codemode"
 import { Tool } from "@opencode/schema/tool"
-import { Context, Effect, Layer, Ref, Result, Schema, SchemaIssue, Types } from "effect"
+import { Context, Effect, Exit, Layer, Ref, Result, Schema, SchemaIssue, Types } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import type { Agent } from "./agent.js"
 import { CodeModeCatalog } from "./codemode/catalog.js"
 import { CodeModeTool } from "./codemode/tool.js"
 import { Image } from "./image.js"
 import { Permission } from "./permission.js"
+import { ProtectedFiles } from "@opencode/schema/codepuppy-protected-files"
 import { PluginHooks } from "./plugin/hooks.js"
 import { SessionMessage } from "./session/message.js"
 import { SessionSchema } from "./session/schema.js"
@@ -310,10 +311,36 @@ const layer = Layer.effect(
               if (!requested && input.definitions && (direct.has(event.tool) || codeModeTool?.name === event.tool))
                 return yield* new Tool.Error({ message: `Tool is not available for this request: ${event.tool}` })
               const name = requested?.name ?? event.tool
-              if (name === "execute" && codeModeTool)
-                return yield* executeTool(codeModeTool, name, event.input, context)
-              const tool = direct.get(name)
-              if (tool) return yield* executeTool(tool, name, event.input, context)
+              const tool = name === "execute" && codeModeTool ? codeModeTool : direct.get(name)
+              if (tool) {
+                // codepuppy(ADR-050 SC-02): shared root boundary, including synthetic Code Mode.
+                let required = yield* hooks.has("tool", "execute.progress")
+                let withheld = false
+                const hidden = (): Tool.Metadata => ({
+                  output: ProtectedFiles.MASKING_FAILED_TEXT,
+                  ...(name === "execute" ? { toolCalls: [] } : {}),
+                })
+                const progress = Effect.fnUntraced(function* (metadata: Tool.Metadata) {
+                  const present = yield* hooks.has("tool", "execute.progress")
+                  required ||= present
+                  const update = { sessionID: context.sessionID, agent: context.agent, messageID: context.messageID, id: context.id, tool: name, metadata }
+                  if (required && !present) withheld = true
+                  if (!withheld && present) {
+                    const exit = yield* hooks.trigger("tool", "execute.progress", update).pipe(Effect.exit)
+                    if (Exit.isFailure(exit)) withheld = true
+                  }
+                  const safe = withheld ? hidden() : update.metadata
+                  yield* context.progress(safe)
+                })
+                return yield* executeTool(tool, name, event.input, { ...context, progress }).pipe(
+                  Effect.map((result) => withheld
+                    ? { content: [{ type: "text" as const, text: ProtectedFiles.MASKING_FAILED_TEXT }], metadata: hidden() }
+                    : result),
+                  Effect.mapError((error) => withheld
+                    ? new Tool.Error({ message: ProtectedFiles.MASKING_FAILED_TEXT, metadata: hidden() })
+                    : error),
+                )
+              }
               return yield* new Tool.Error({
                 message: `No tool named "${name}" is currently available. Please use a tool from the available tool list.`,
               })

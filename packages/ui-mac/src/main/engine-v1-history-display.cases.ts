@@ -47,7 +47,7 @@ async function startOn(slot: ReturnType<typeof engineSlot>) {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-v1-display")), projectTrust: engineProjectTrust },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-v1-display")), packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   const get = async (route: string) => {
     const response = await fetch!(new Request(`http://codepuppy-sidecar.invalid${route}`, { headers: { "x-opencode-directory": encodeURIComponent(slot.projectDirectory) } }))

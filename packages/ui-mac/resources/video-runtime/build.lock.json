@@ -105,6 +105,34 @@
       "bytes": 328064,
       "sha256": "cd05c9589b9f86ecf044c10a2269822bc9eb001eced2582cfffd658b0a50c243",
       "root": "pkgconf-2.5.1"
+    },
+    "dav1d": {
+      "filename": "dav1d-1.5.3.tar.xz",
+      "url": "https://downloads.videolan.org/pub/videolan/dav1d/1.5.3/dav1d-1.5.3.tar.xz",
+      "bytes": 1022836,
+      "sha256": "732010aa5ef461fa93355ed2c6c5fedb48ddc4b74e697eaabe8907eaeb943011",
+      "root": "dav1d-1.5.3"
+    },
+    "ninja": {
+      "filename": "ninja-1.13.1.tar.gz",
+      "url": "https://github.com/ninja-build/ninja/archive/refs/tags/v1.13.1.tar.gz",
+      "bytes": 292098,
+      "sha256": "f0055ad0369bf2e372955ba55128d000cfcc21777057806015b45e4accbebf23",
+      "root": "ninja-1.13.1"
+    },
+    "nasm": {
+      "filename": "nasm-3.01.tar.xz",
+      "url": "https://www.nasm.us/pub/nasm/releasebuilds/3.01/nasm-3.01.tar.xz",
+      "bytes": 1499136,
+      "sha256": "b7324cbe86e767b65f26f467ed8b12ad80e124e3ccb89076855c98e43a9eddd4",
+      "root": "nasm-3.01"
+    },
+    "meson": {
+      "filename": "meson-1.10.1.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/1b/d3/8c43e758cf456273c32652bb8b7a4ec2d74327d8849856b0b714ad671da7/meson-1.10.1.tar.gz",
+      "bytes": 2413969,
+      "sha256": "c42296f12db316a4515b9375a5df330f2e751ccdd4f608430d41d7d6210e4317",
+      "root": "meson-1.10.1"
     }
   },
   "whisperVersion": "1.1.3",

@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test"
 import pins from "../../resources/pinned-files.json"
+import lock from "../../resources/video-runtime/build.lock.json"
+import licences from "../../resources/video-runtime/licenses.json"
 import { defaultOcrPins, firstVideoPins, videoRecipes } from "../../resources/video-mcp/asset-recipes"
 
 // Fast PR layer: selected files and download arithmetic, no downloads/builds.
@@ -30,4 +32,16 @@ test("each video recipe references a unique pinned delivery and requires its act
     expect(recipe.required).toContain(recipe.entry)
   }
   expect(pins.files.filter((file) => file.family === "ocr-model")).toHaveLength(41)
+})
+
+
+test("codec recipes require the licensed software AV1 decoder on each target", () => {
+  const licence = licences.licences.find((entry) => entry.file === "dav1d.txt")
+  expect(licence?.name).toContain("libdav1d")
+  expect(licence?.provenanceUrl).toBe(lock.sources.dav1d.url)
+  for (const target of ["darwin-arm64", "win32-x64"] as const) {
+    const pin = firstVideoPins(target).find((entry) => entry.family === "ffmpeg")!
+    expect(pin.version).toContain(lock.sources.dav1d.root)
+    expect(videoRecipes.find((recipe) => recipe.id === pin.id)?.required).toContain("ffmpeg/licenses/dav1d.txt")
+  }
 })

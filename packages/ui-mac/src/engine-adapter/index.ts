@@ -47,7 +47,7 @@ export function createEngineFetch(options: {
   const ledgerFor = (origin: string) => {
     const existing = ledgers.get(origin)
     if (existing) return existing
-    const created = createReceiptLedger()
+    const created = createReceiptLedger(origin)
     ledgers.set(origin, created)
     return created
   }

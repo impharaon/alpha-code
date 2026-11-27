@@ -133,6 +133,7 @@ export const { ConfigCommandPlugin } = await load("src/config/plugin/command.ts"
 export const { Command } = await load("src/command.ts")
 export const { Config } = await load("src/config.ts")
 export const { ShellSelect } = await load("src/shell/select.ts")
+const { Shell } = await import("../../../core/src/shell")
 export const ConfigSchema = await resolve("@opencode/schema/config")
 export const { SessionPrompt } = await load("src/session/prompt.ts")
 export const { fromPromise } = await resolve("@opencode/plugin/promise/adapter")
@@ -194,6 +195,10 @@ const generateLayer = Layer.succeed(
   nodes.Generate.Service.of({ text: () => Effect.succeed(""), image: () => Effect.die("unused"), decisions: () => Effect.die("unused") }),
 )
 const configLayer = nodes.Config.testLayer()
+// Only this module's integration fixture gains writer services; literal imports keep PR selection traceable.
+const { FileMutation } = await import("../../../core/src/file-mutation")
+const { FileWrite } = await import("../../../core/src/file-write")
+const { Formatter } = await import("../../../core/src/formatter")
 
 /**
  * The tools the MCP runtime reports as listed by its servers (`Mcp.tools()`); empty unless a test fills it. The real
@@ -236,6 +241,9 @@ export const HostLayer = AppNodeBuilder.build(
     nodes.Database.node,
     nodes.Environment.node,
     nodes.FileAccess.node,
+    FileMutation.node,
+    FileWrite.node,
+    Formatter.node,
     Global.node,
     nodes.Bus.node,
     nodes.Form.node,
@@ -251,6 +259,8 @@ export const HostLayer = AppNodeBuilder.build(
     nodes.InstructionDiscovery.node,
     nodes.Integration.node,
     nodes.Job.node,
+    Shell.node,
+    ShellSelect.node,
     nodes.KV.node,
     Mcp.node,
     Session.node,

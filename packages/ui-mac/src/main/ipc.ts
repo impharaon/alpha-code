@@ -1,5 +1,7 @@
 import { connectorLaunchApi } from "./connector-launch-state"
 import { isLaunchIdentity } from "../../../util/src/codepuppy-connector-launch"
+import { parseDirectoryAccessDescriptionInput, parseDirectoryWriteApproval } from "../shared/directory-write-approval"
+import type { createDirectoryWriteApproval } from "./directory-write-approval"
 import { execFile } from "node:child_process"
 import { stat } from "node:fs/promises"
 import { basename } from "node:path"
@@ -47,6 +49,8 @@ const pickerFilters = (ext?: string[]) => {
 export const pickedFiles = createPickedFileAuthorizations() // REQ-033:agent 导入 preview 复用同一授权注册表(codex H1)
 
 type Deps = {
+  directoryWrites: ReturnType<typeof createDirectoryWriteApproval>
+  isAppRenderer(id: number): boolean
   killSidecar: () => Promise<void> | void
   sidecarGenerationState: () => SidecarGenerationState
   /** REQ-159 `#1322`:转给当前 sidecar 的写探针;没有活着的 sidecar 时答 unknown。 */
@@ -109,6 +113,18 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("workspace-write-probe", (_event: IpcMainInvokeEvent, value: unknown) => {
     const target = parseWorkspaceTarget(value)
     return target ? deps.probeWorkspaceWrite(target) : ({ outcome: "unknown", grant: "ineligible", detail: "invalid workspace target" } satisfies WorkspaceWriteProbeResult)
+  })
+  const appRenderer = (event: IpcMainInvokeEvent) => deps.isAppRenderer(event.sender.id) && (event.senderFrame === event.sender.mainFrame)
+  ipcMain.handle("directory-access-describe", (event: IpcMainInvokeEvent, value: unknown) => {
+    const input = parseDirectoryAccessDescriptionInput(value)
+    if (!input || !appRenderer(event)) throw new Error("invalid directory approval source")
+    event.sender.once("destroyed", () => deps.directoryWrites.forgetRenderer(event.sender.id))
+    return deps.directoryWrites.describeDirectoryAccess(input, event.sender.id)
+  })
+  ipcMain.handle("directory-write-approve", (event: IpcMainInvokeEvent, value: unknown) => {
+    const input = parseDirectoryWriteApproval(value)
+    if (!input || !appRenderer(event)) return { outcome: "conflict" }
+    return deps.directoryWrites.approveDirectoryWrite(input, event.sender.id)
   })
   ipcMain.handle("workspace-open-record", (_event: IpcMainInvokeEvent, value: unknown) => {
     const target = parseWorkspaceTarget(value)

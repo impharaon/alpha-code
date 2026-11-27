@@ -1,3 +1,4 @@
+import { directoryAccessMetadata } from "../../../ui-mac/src/shared/directory-write-approval"
 import { documentPythonEnvironmentFor } from "../../../util/src/codepuppy-document"
 // Code Puppy tool policy inside the extension (lane seams I3): everything L4 hangs on the OpenCode 2 plugin Context
 // goes through `registerPolicy`. The extension's `setup` awaits it first and awaits `seal()` last (L3 owns the call
@@ -20,7 +21,7 @@ import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
 import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, attachWriteDenied, displaySnapshot, wrapForDisplay } from "./display"
-import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
+import { confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, deepFreeze, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
 import {
   codeModeFacts,
   CODE_MODE_TOOL,
@@ -38,8 +39,12 @@ import type { ToolDisplaySnapshotV1 } from "../../../schema/src/tool-identity"
 import { isCodePuppyPolicyRequest } from "../../../schema/src/codepuppy-tool-policy"
 import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
+import { createExternalDirectoryRead } from "../external-directory-rule"
+import { createSecretMask } from "../secret-mask"
+import type { ProtectedFiles } from "../../../schema/src/codepuppy-protected-files"
 
 export interface PolicyRegistration {
+  readonly dispose: () => void
   readonly videoToolFacts: () => Promise<(tool: RegisteredTool) => ToolFacts>
   readonly factsFor: (name: string) => Promise<ToolFacts | undefined>
   /** Last statement of the extension's `setup`: registers the parts that must see every earlier registration. */
@@ -75,8 +80,20 @@ export function policyWorkspace(location: Plugin.Context["location"]): string {
  * `toolPolicy`: who writes the tool policy document (SPEC-engine-config-fence BR-03, DESIGN §4.5). The extension passes the hub bridge's
  * writer — main, over the parent port — whenever the process has one; absent (CLI, test hosts) the store writes directly.
  */
-export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"], toolPolicy?: ToolPolicyWriter, network?: HubBridge["network"]): Promise<PolicyRegistration> {
+export async function registerPolicy(context: Plugin.Context, unattended: UnattendedState, installSubject: HubBridge["installSubject"], toolPolicy?: ToolPolicyWriter, network?: HubBridge["network"], readWriteScope?: HubBridge["readWriteScope"]): Promise<PolicyRegistration> {
   const env = process.env
+  const externalRead = createExternalDirectoryRead()
+  const home = os.homedir()
+  const secrets = createSecretMask({
+    platform: process.platform === "win32" ? "win32" : "darwin",
+    project: String(context.location.project.id) === "global" ? context.location.directory : context.location.project.directory,
+    directory: context.location.directory,
+    home,
+    appData: process.platform === "win32" ? env.APPDATA ?? path.join(home, "AppData", "Roaming") : path.join(home, "Library", "Application Support"),
+    localAppData: process.platform === "win32" ? env.LOCALAPPDATA ?? path.join(home, "AppData", "Local") : path.join(home, "Library"),
+    // Node supplies strings; Schema reads only its published path-variable keys.
+    pathVariables: env as ProtectedFiles.ProtectedRoots["pathVariables"],
+  })
   // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
   const bootstrap = codepuppyBootstrap()
   const store = createToolPolicyStore({
@@ -144,6 +161,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }
 
   const deps: GateDeps = {
+    protectedRoots: secrets.roots,
     profile,
     denied,
     store,
@@ -202,6 +220,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       }
       return holdUnattendedDeny(event, selected, event.action, (denial) => denied(event.source?.type === "tool" ? event.source.id : undefined, denial))
     }
+    externalRead.evaluate(event)
+    await evaluateDirectoryWrite(event, readWriteScope)
     if (isCodePuppyPolicyRequest(event.metadata)) {
       // BR-10: an assistant-initiated install asks in every tier — no allow rule, saved approval or tier skips it.
       if (isInstallAsk(event.metadata) && event.effect !== "deny") event.effect = "ask"
@@ -215,6 +235,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     }
     if (event.effect !== "ask" || !event.metadata) return
     ;(event.metadata as Record<string, unknown>)[RISK_METADATA_KEY] = classifyPermissionRequest({
+      protectedRoots: secrets.roots,
       permission: event.action,
       patterns: [...event.resources],
       always: [],
@@ -232,7 +253,18 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     },
   }) as never)
 
+  const terminalEvents = new AbortController()
+  void (async () => {
+    for await (const event of context.event.subscribe({ types: ["session.tool.success", "session.tool.failed"], signal: terminalEvents.signal }))
+      {
+        const call = { sessionID: event.data.sessionID, messageID: event.data.assistantMessageID, id: event.data.id }
+        secrets.release(call)
+        externalRead.end(call)
+      }
+  })().catch(() => { /* Location disposal aborts the cleanup subscription. */ })
+
   return {
+    dispose: () => { terminalEvents.abort(); externalRead.dispose(); secrets.dispose() },
     videoToolFacts: async () => {
       // Transform callbacks are synchronous: capture the existing plugin-order fact before registering one.
       const ambiguous = await earlyAmbiguous()
@@ -257,6 +289,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       if (prepared !== "asked") await confirm(deps, prepared.decision, prepared.call, prepared.install)
     },
     seal: async () => {
+      await context.shell.hook("capture", (event) => secrets.capture(event))
       // Configured MCP servers as OpenCode will run them, after every earlier transform (the extension's cloud entry).
       await context.mcp.transform((editor) => {
         mcp.clear()
@@ -279,6 +312,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           displays.set(event.id, displaySnapshot(decision.facts))
           pin(event)
           if (event.tool === CODE_MODE_TOOL && await profile(event.sessionID, event.agent) !== undefined) codeModeDenials.set(event.id, undefined)
+          await secrets.begin({ call: event, kind: event.tool === CODE_MODE_TOOL ? "execute" : "tool" })
+          if (secrets.isRoot(event, event.tool)) externalRead.begin(event, decision.facts)
         } catch (error) {
           displays.delete(event.id)
           installAsks.delete(installCallKey(event))
@@ -286,21 +321,38 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
         }
       })
 
-      await context.tool.transform((editor) =>
-        wrapForDisplay(editor as never, (callID) => displays.get(callID), network ? (tool, call, execute) => network.run(context.location.directory, tool, call, execute) : undefined),
-      )
-      await context.tool.hook("execute.after", (event) => {
-        const networkNotice = network?.attachResult(event as never)
-        if (event.tool === CODE_MODE_TOOL) {
-          attachUnattendedDenial(event as never, codeModeDenials.get(event.id))
-          codeModeDenials.delete(event.id)
-        }
-        if (!networkNotice) attachNetFailure(event as never)
-        attachWriteDenied(event as never, context.location.directory)
-        attachDirectoryDisplay(event as never)
-        attachTerminal(event as never, displays.get(event.id))
-        displays.delete(event.id)
-        installAsks.delete(installCallKey(event))
+      await context.tool.transform((editor) => {
+        wrapForDisplay(editor as never, (callID) => displays.get(callID), network ? (tool, call, execute) => network.run(context.location.directory, tool, call, execute) : undefined)
+        secrets.wrap(editor, { facts: factsFor, profile, protect: externalRead.protect })
+      })
+      await context.tool.hook("execute.progress", async (event) => {
+        const safe = deepFreeze(await secrets.progress({ call: event, facts: await factsFor(event.tool), update: event.metadata }))
+        Object.defineProperty(event, "metadata", { value: safe, enumerable: true, configurable: false, writable: false })
+      })
+      await context.tool.hook("execute.after", async (event) => {
+        try {
+          const networkNotice = network?.attachResult(event as never)
+          if (event.tool === CODE_MODE_TOOL) {
+            attachUnattendedDenial(event as never, codeModeDenials.get(event.id))
+            codeModeDenials.delete(event.id)
+          }
+          if (!networkNotice) attachNetFailure(event as never)
+          attachWriteDenied(event as never, context.location.directory)
+          attachDirectoryDisplay(event as never)
+          attachTerminal(event as never, displays.get(event.id))
+          if (event.status === "completed" && event.tool === "read" && externalRead.file(event)) event.result = await secrets.read({ call: event, file: externalRead.file(event)!, result: event.result })
+          if (event.status === "completed") event.result = await secrets.result({ call: event, tool: event.tool, facts: await factsFor(event.tool), result: event.result })
+          else event.error = await secrets.error({ call: event, tool: event.tool, error: event.error })
+          displays.delete(event.id)
+          installAsks.delete(installCallKey(event))
+        } finally { externalRead.end(event) }
+      })
+
+      await context.permission.hook("evaluate", async (event) => {
+        if (!event.metadata) return
+        const safe = await secrets.preview(event.metadata, event.source?.type === "tool" ? { sessionID: event.sessionID, messageID: event.source.messageID, id: event.source.id } : undefined)
+        for (const key of Object.keys(event.metadata)) delete event.metadata[key]
+        Object.assign(event.metadata, safe)
       })
 
       await catalog.refresh()
@@ -308,3 +360,19 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }
 }
 
+
+
+export async function evaluateDirectoryWrite(event: { action: string; effect: "allow" | "ask" | "deny"; metadata?: unknown }, readWriteScope?: HubBridge["readWriteScope"]) {
+  if (event.action !== "external_directory" || event.effect === "deny") return
+  const request = directoryAccessMetadata(event.metadata)
+  if (!request || request.access !== "write") return
+  const result = await readWriteScope?.(request).catch(() => ({ error: "unavailable" as const }))
+  if (!result || "error" in result) { event.effect = "ask"; return }
+  if (result.targets.length !== request.targets.length || result.targets.some((target, index) => target.absolute !== request.targets[index]!.absolute)) { event.effect = "ask"; return }
+  if (result.targets.every((target) => target.outcome === "no-fence")) return
+  if (result.targets.some((target) => target.outcome === "protected")) { event.effect = "deny"; return }
+  if (result.targets.some((target) => target.outcome === "needs-approval")) { event.effect = "ask"; return }
+  // R6: only fixed global-install/user-config targets skip external_directory; for /tmp, caches and run-approved
+  // folders the engine's own decision stands (BR-08).
+  if (result.targets.every((target) => target.outcome === "fixed")) event.effect = "allow"
+}

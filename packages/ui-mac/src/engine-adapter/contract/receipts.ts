@@ -88,7 +88,21 @@ function sameDecision(receipt: V1.PermissionV2DecisionReceipt, input: DecisionIn
 }
 
 /** 一个引擎源一本(管道持有):交出过的请求快照、已出的收据。 */
-export function createReceiptLedger(): ReceiptLedger {
+const directoryApprovals = new Map<string, { decision: V1.PermissionV2Decision; approve: () => Promise<void> }>()
+
+/** Only the concrete card click installs this action; ordinary permission replies have no grant action. */
+export function prepareDirectoryWriteApproval(origin: string, requestID: string, decision: V1.PermissionV2Decision, approve: () => Promise<void>) {
+  const key = JSON.stringify([new URL(origin).origin, requestID])
+  const entry = { decision, approve }
+  directoryApprovals.set(key, entry)
+  return () => { if (directoryApprovals.get(key) === entry) directoryApprovals.delete(key) }
+}
+export async function approveDirectoryBeforeReply(origin: string, input: Pick<DecisionInput, "requestID" | "decision">) {
+  const entry = directoryApprovals.get(JSON.stringify([new URL(origin).origin, input.requestID]))
+  if (input.decision !== "reject" && entry?.decision === input.decision) await entry.approve()
+}
+
+export function createReceiptLedger(origin?: string): ReceiptLedger {
   const shown = new Map<string, { sessionID: string; fingerprint: Promise<string> }>()
   const receipts = new Map<string, V1.PermissionV2DecisionReceipt>()
   const decisionIDs = new Map<string, string>()
@@ -115,6 +129,7 @@ export function createReceiptLedger(): ReceiptLedger {
     if ((await requestFingerprint(current)) !== expected) return { type: "conflict" }
     if (input.decision === "always" && !current.always.length) return { type: "conflict" }
 
+    if (origin) await approveDirectoryBeforeReply(origin, input)
     const resolvedRequestIDs = await engine.decide({
       sessionID,
       requestID,

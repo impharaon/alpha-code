@@ -37,7 +37,7 @@ import {
   UNVERIFIED_MCP_OWNERSHIP,
   type McpOwnership,
 } from "./cloud-websearch-kill"
-import { createHubBridge, processParentPort, type HubBridge } from "./hub-bridge"
+import { createHubBridge, delegatePackageManagerShell, processParentPort, type HubBridge } from "./hub-bridge"
 import { createHubTools, HUB_READ_ACTIONS } from "./hub-tools"
 import { TOOL_POLICY_DEFAULT } from "./policy/catalog"
 import { createReloadScheduler, type ReloadScheduler } from "./reload-scheduler"
@@ -121,12 +121,12 @@ export const CodePuppyExt: Plugin.Plugin = {
     // 版本或形状不符 ⇒ 抛 ⇒ 本插件 failed ⇒ sidecar 拒报 ready。只读一份冻结的文档,不挂任何钩子,不改 I3 的挂钩次序。
     const bootstrap = codepuppyBootstrap()
     // SPEC-engine-config-fence BR-03:工具策略文档由 main 写 —— 有 parentPort 时桥给出 main 的写者(DESIGN-engine-config-fence §4.5)
-    const policy = await registerPolicy(context, processState().hubBridge.unattended, processState().hubBridge.installSubject, processState().hubBridge.toolPolicy, processState().hubBridge.network)
+    const policy = await registerPolicy(context, processState().hubBridge.unattended, processState().hubBridge.installSubject, processState().hubBridge.toolPolicy, processState().hubBridge.network, processState().hubBridge.readWriteScope)
     const directory = context.location.directory
     const { hubBridge, reloads } = processState()
     const registration = {}
     reloads.register(directory, registration)
-    const cleanups: Array<() => Promise<void> | void> = [() => reloads.unregister(directory, registration), ...(bootstrap.network.egressProxy ? [hubBridge.network.watch(context)] : [])]
+    const cleanups: Array<() => Promise<void> | void> = [policy.dispose, () => reloads.unregister(directory, registration), ...(bootstrap.network.egressProxy ? [hubBridge.network.watch(context)] : [])]
     const cleanup = async () => {
       for (const run of cleanups.splice(0).reverse()) {
         try {
@@ -148,6 +148,10 @@ export const CodePuppyExt: Plugin.Plugin = {
         else delete event.env[DOCUMENT_PYTHON_HOST]
         event.env.CODEPUPPY_GLOBAL_DIR = codepuppyBootstrap().paths.globalRoot
       })
+      // The prepared-Shell seam exists only in the engine build (scripts/build-engine.ts, drift fails that build);
+      // an engine loaded from source keeps its original Shell spawn.
+      const shell = context.shell as typeof context.shell & Partial<Parameters<typeof delegatePackageManagerShell>[0]>
+      if (process.platform === "darwin" && processParentPort() && typeof shell.delegatePreparedShell === "function") await delegatePackageManagerShell(shell as Parameters<typeof delegatePackageManagerShell>[0], hubBridge)
       const projectRootFor = (target: string): ProjectRoot | null => {
         const identity = projectDirectoryIdentity(target)
         return identity.status === "project" ? identity : null

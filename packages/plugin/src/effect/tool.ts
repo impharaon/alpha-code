@@ -26,6 +26,11 @@ export interface ToolHooks {
     readonly id: Tool.CallID
     input: unknown
   }
+  // codepuppy(ADR-050 SC-02): root progress before publisher caching.
+  readonly "execute.progress": Pick<Tool.Context, "sessionID" | "agent" | "messageID" | "id"> & {
+    readonly tool: string
+    metadata: Tool.Metadata
+  }
   readonly "execute.after": {
     readonly tool: string
     readonly sessionID: Session.ID
@@ -48,6 +53,7 @@ export interface ToolHooks {
 // Only execute.before may fail: a Tool.Error rejects the call before the tool runs.
 export interface ToolFailures extends Record<keyof ToolHooks, unknown> {
   readonly "execute.before": Tool.Error
+  readonly "execute.progress": never
   readonly "execute.after": never
 }
 

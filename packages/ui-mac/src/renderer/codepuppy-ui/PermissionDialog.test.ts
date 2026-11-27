@@ -26,6 +26,7 @@ type TestRuntime = {
   render: typeof render
   createPermissionDecisionCommand: typeof createPermissionDecisionCommand
   expiryLabel: typeof expiryLabel
+  approveDirectoryBeforeReply: typeof import("../../engine-adapter/contract/receipts").approveDirectoryBeforeReply
   PermissionDialog: typeof PermissionDialog
   PermissionWatcher: typeof PermissionWatcher
   resetAuthRecoveryForTests: () => void
@@ -125,7 +126,7 @@ function mount(
   onSubmit: (command: PermissionV2DecisionCommand) => Promise<PermissionV2DecisionReceipt>,
   projectID: string | null = "prj_alpha",
   permissionRequest = request,
-  options: { composer?: boolean; saveToolPolicy?: SaveToolPolicy; signedIn?: boolean } = {},
+  options: { composer?: boolean; saveToolPolicy?: SaveToolPolicy; signedIn?: boolean; directoryContext?: { server: string; origin: string } } = {},
 ) {
   const textarea = document.createElement("textarea")
   if (options.composer !== false) {
@@ -141,6 +142,7 @@ function mount(
     () =>
       runtime.createComponent(runtime.PermissionDialog, {
         request: permissionRequest,
+        directoryContext: options.directoryContext,
         projectID: projectID ?? undefined,
         onSubmit,
         saveToolPolicy: options.saveToolPolicy ?? (async () => ({ ok: true as const })),
@@ -1183,7 +1185,11 @@ describe("REQ-236 #1617 确认卡只写人话", () => {
 // 分类结论取**真分类器**的输出,经生产适配器 `adaptPermissionV1Request` 投影(`v1()`),与生产里审批卡看到的形状一致。
 describe("#1314 批准面板的风险标签", () => {
   const classify = (permission: string, patterns: string[], metadata: Record<string, unknown> = {}) =>
-    classifyPermissionRequest({ permission, patterns, always: [], metadata })
+    // #1758 AC-06 / design §4.1: trusted Location roots are required; keep every card/ARIA assertion below.
+    classifyPermissionRequest({
+      protectedRoots: { platform: "darwin", project: "/project", directory: "/project", home: "/Users/me", appData: "/Users/me/Library/Application Support", localAppData: "/Users/me/Library", pathVariables: {} },
+      permission, patterns, always: [], metadata,
+    })
   const asked = (id: string, permission: string, patterns: string[], codepuppyRisk?: unknown) =>
     v1({
       id,
@@ -1297,4 +1303,56 @@ describe("批准卡期限写成人话(AC-07)", () => {
     for (const value of [at(2026, 11, 18, 18, 30), at(2026, 12, 1, 8, 0), at(2028, 2, 29, 23, 59)])
       expect(runtime.expiryLabel(value, now)).not.toMatch(/UTC|\d{4}-\d{2}-\d{2}|T\d\d:/)
   })
+})
+
+
+test("external directory card shows the real target and waits for the human grant before allow", async () => {
+  const origin = "http://127.0.0.1:47003"
+  const external = { ...request, action: "external_directory", metadata: { directoryAccess: { access: "write", targets: [{ absolute: "/alias/a.txt", directory: "/alias" }] } } }
+  const grant = Promise.withResolvers<{ outcome: "granted" }>()
+  let approvals = 0, replies = 0
+  Object.assign(window.api, {
+    describeDirectoryAccess: async () => ({ snapshotID: "shown", targets: [{ absolute: "/alias/a.txt", directory: "/alias", realTarget: "/actual/a.txt", realDirectory: "/actual", dev: "1", ino: "2" }] }),
+    approveDirectoryWrite: async () => { approvals++; return grant.promise },
+  })
+  mount(async (command) => {
+    await runtime.approveDirectoryBeforeReply(origin, { requestID: external.id, decision: command.decision })
+    replies++
+    return receipt(command, external)
+  }, "project", external, { directoryContext: { server: "sidecar", origin } })
+  await flush()
+  expect(document.querySelector("[data-permission-real-directory]")?.textContent).toBe("/actual")
+  expect(approvals).toBe(0)
+  const button = document.querySelector<HTMLButtonElement>('[data-permission-decision="once"]')!
+  button.click();await flush()
+  expect(approvals).toBe(1);expect(replies).toBe(0)
+  grant.resolve({ outcome: "granted" });await flush()
+  expect(replies).toBe(1)
+})
+
+test("external directory rejection never calls the main grant", async () => {
+  const origin = "http://127.0.0.1:47003"
+  const external = { ...request, action: "external_directory", metadata: { directoryAccess: { access: "write", targets: [{ absolute: "/outside/a", directory: "/outside" }] } } }
+  let approvals = 0
+  Object.assign(window.api, {
+    describeDirectoryAccess: async () => ({ snapshotID: "shown", targets: [] }),
+    approveDirectoryWrite: async () => { approvals++; return { outcome: "granted" } },
+  })
+  mount(async (command) => { await runtime.approveDirectoryBeforeReply(origin, { requestID: external.id, decision: command.decision }); return receipt(command, external) }, "project", external, { directoryContext: { server: "sidecar", origin } })
+  await flush()
+  document.querySelector<HTMLButtonElement>('[data-permission-decision="reject"]')!.click();await flush()
+  expect(approvals).toBe(0)
+})
+
+
+test("external directory grant failure keeps the original request unanswered", async () => {
+  const origin = "http://127.0.0.1:47003"
+  const external = { ...request, action: "external_directory", metadata: { directoryAccess: { access: "write", targets: [{ absolute: "/outside/a", directory: "/outside" }] } } }
+  let replies = 0
+  Object.assign(window.api, { describeDirectoryAccess: async () => ({ snapshotID: "shown", targets: [] }), approveDirectoryWrite: async () => ({ outcome: "failed", reason: "grant-failed" }) })
+  mount(async (command) => { await runtime.approveDirectoryBeforeReply(origin, { requestID: external.id, decision: command.decision }); replies++;return receipt(command, external) }, "project", external, { directoryContext: { server: "sidecar", origin } })
+  await flush()
+  document.querySelector<HTMLButtonElement>('[data-permission-decision="once"]')!.click();await flush()
+  expect(replies).toBe(0)
+  expect(document.querySelector('[role="alert"]')).not.toBeNull()
 })

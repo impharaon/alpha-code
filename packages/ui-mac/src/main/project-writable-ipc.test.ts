@@ -12,7 +12,7 @@ test("main project-write eligibility, IPC and live listener wiring", async () =>
     const output = `${stdout}${stderr}`
     writeFileSync(join(base, "results", `${basename(run)}.log`), output.slice(-32768))
     expect(code, output).toBe(0)
-    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("17")
+    expect(output.match(/(\d+) pass\b/)?.[1], output).toBe("18")
     expect(output.match(/(\d+) fail\b/)?.[1], output).toBe("0")
   } finally {
     for (const file of ["proof.json", "events.json", "result.json"]) if (existsSync(join(run, file))) copyFileSync(join(run, file), join(base, "results", `${basename(run)}-${file}`))

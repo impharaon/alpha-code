@@ -1029,7 +1029,6 @@ itWithPermission.live("权威 · 项目 agent 的权限(0.1.26 同意后生效):
     const { exit, text, rules } = yield* readerEdits(true)
     expect(rules).toEqual(expect.arrayContaining([{ action: "edit", resource: "*", effect: "deny" }, { action: "shell", resource: "*", effect: "deny" }]))
     expect(Exit.isFailure(exit)).toBe(true)
-    // 拒它的是项目 agent 的 `edit: deny`(真权限服务的 BlockedError,断言的动作是 edit、资源是 a.txt)
     expect(JSON.stringify(exit)).toContain('"_tag":"Permission.BlockedError"')
     expect(JSON.stringify(exit)).toContain('{"action":"edit","resource":"*","effect":"deny"}')
     expect(text).toBe("hello\n")

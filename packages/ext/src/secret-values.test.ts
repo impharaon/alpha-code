@@ -1,0 +1,134 @@
+import { expect, test } from "bun:test"
+import { parseEnv } from "node:util"
+import { credentialValues, documentValues, envAssignments } from "./secret-values"
+import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
+
+// Fixture source/version/hash: fixtures/secret-files/provenance.json. All CLI writers used isolated paths.
+const fixture = (name: string) => Bun.file(new URL(`./fixtures/secret-files/${name}`, import.meta.url))
+const file = (
+  profile: ProtectedFiles.CredentialProfile,
+  format: ProtectedFiles.ProtectedFormat,
+): ProtectedFiles.ProtectedFile => ({ rule: "fixture", path: "/fixture/sample", profile, format, view: "notice" })
+const strings = (values: readonly Uint8Array[]) => values.map((value) => Buffer.from(value).toString())
+
+test("published profiles collect credential values", async () => {
+  const samples = [
+    ["aws-credentials.ini", "aws", "ini", "fixture-secret-key"],
+    ["npm.ini", "npm", "assignments", "fixture-npm-token"],
+    ["kube.yaml", "kube", "assignments", "fixture-kube-token"],
+    ["git-credentials.txt", "git-credentials", "credential-url", "fixture-git-password"],
+  ] as const
+  for (const [name, profile, format, expected] of samples) {
+    const values = strings(credentialValues(file(profile, format), await fixture(name).bytes()))
+    expect(values.includes(expected), name).toBe(true)
+    expect(values).not.toContain("json")
+    expect(values).not.toContain("us-east-1")
+  }
+  expect(credentialValues(file("aws", "ini"), await fixture("aws-config.ini").bytes())).toEqual([])
+  for (const [name, profile, key] of [
+    ["gcp.json", "gcp-adc", "refresh_token"],
+    ["azure-entry.json", "azure", "secret"],
+  ] as const) {
+    const document = await fixture(name).json()
+    expect(
+      strings(credentialValues(file(profile, "json"), await fixture(name).bytes())).includes(document[key]),
+      name,
+    ).toBe(true)
+    expect(strings(documentValues(profile, document))).not.toContain(document.client_id)
+  }
+  const docker = await fixture("docker.json").json()
+  const auth = Object.values(docker.auths)[0] as { auth: string }
+  expect(
+    strings(credentialValues(file("docker", "json"), await fixture("docker.json").bytes())).includes(auth.auth),
+  ).toBe(true)
+  const key = await fixture("private-key.txt").bytes()
+  expect(credentialValues(file("private-key", "opaque"), key).some((value) => Buffer.from(value).equals(key))).toBe(
+    true,
+  )
+  expect(credentialValues(file("encrypted-store", "opaque"), key).length).toBe(1)
+  expect(credentialValues(file("netrc", "netrc"), await fixture("netrc.txt").bytes()).length).toBeGreaterThan(0)
+  expect(credentialValues(file("pypi", "ini"), await fixture("pypi.ini").bytes()).length).toBeGreaterThan(0)
+  expect(
+    credentialValues(file("credential-document", "assignments"), await fixture("credentials.toml").bytes()).length,
+  ).toBeGreaterThan(0)
+  const gcp = await fixture("gcp.json").json()
+  expect(strings(documentValues("credential-document", gcp)).includes(gcp.client_secret)).toBe(true)
+})
+
+test("env records preserve every assignment occurrence", async () => {
+  const text = await fixture("node-env.txt").text()
+  const records = envAssignments(text)
+  expect(Object.fromEntries(records.map((row) => [row.name, row.value]))).toEqual(parseEnv(text))
+  const original = records[0]
+  const first = text.slice(original.start, original.end)
+  const second = first.slice(0, original.valueStart - original.start) + '"another-fixture-value"'
+  const repeated = envAssignments(`${first}\n${second}\n`)
+  expect(repeated.map((row) => row.occurrence)).toEqual([1, 2])
+  expect(repeated[0].value === repeated[1].value).toBe(false)
+  expect(repeated.map((row) => `${first}\n${second}\n`.slice(row.valueStart, row.valueEnd))).toEqual([
+    text.slice(original.valueStart, original.valueEnd),
+    '"another-fixture-value"',
+  ])
+})
+
+test("env files collect only credential-named values", () => {
+  // Node dotenv assignment grammar (node-env.txt); fixture values only.
+  const env: ProtectedFiles.ProtectedFile = { rule: "env", path: "/fixture/.env", profile: "env", format: "env", view: "variables" }
+  const source = "DB_HOST=db\nAPI_KEY=fixture-api-key\nPORT=3000\nPASSWORD=1234\nexport authToken='fixture-auth'\nREGION=us-east-1\n"
+  expect(strings(credentialValues(env, Buffer.from(source)))).toEqual(["fixture-api-key", "1234", "fixture-auth"])
+})
+
+test("embedded URL passwords are credential fields in every format", () => {
+  // Node dotenv assignment grammar and static YAML mapping syntax; fixture values only.
+  const env: ProtectedFiles.ProtectedFile = { rule: "env", path: "/fixture/.env", profile: "env", format: "env", view: "variables" }
+  const rows = [
+    ["DATABASE_URL=postgres://app:fixture-db-pass@db:5432/x", ["fixture-db-pass"]],
+    ["REDIS_URL='redis://:fixture-redis-pass@cache:6379/0'", ["fixture-redis-pass"]],
+    // Multi-host URLs (MongoDB replica set, libpq) and several URLs in one value.
+    ["MONGO_URL=mongodb://app:fixture-mongo-pass@h1:27017,h2:27017/db?replicaSet=rs0", ["fixture-mongo-pass"]],
+    ["PG_HOSTS=postgresql://app:fixture-pq-pass@h1:5432,h2:5432/db", ["fixture-pq-pass"]],
+    ["BOTH=postgres://a:fixture-p1@h1/x,postgres://b:fixture-p2@h2/y", ["fixture-p1", "fixture-p2"]],
+    ["AT_SIGN=postgres://app:fixture-p@ss@db/x", ["fixture-p@ss"]],
+    // The URL shape without an extractable password hides the whole value.
+    ["EMPTY_URL=postgres://app:@db/x", ["postgres://app:@db/x"]],
+    // Invalid UTF-8 percent escapes keep the written form instead of failing every refresh.
+    ["ENCODED=postgres://app:fixture%9Apass@db/x", ["fixture%9Apass"]],
+    // Credential-keyed segments inside a value: ADO/ODBC strings and query parameters.
+    ["CONN=Server=db;Database=app;User Id=svc;Password=fixture-ado-pass;", ["fixture-ado-pass"]],
+    ["ODBC=Driver={SQL};Pwd={fixture-odbc;pass};", ["fixture-odbc;pass"]],
+    ["API=https://api.example.com/v1?user=svc&password=fixture-query-pass&pwd=fixture-pwd#top", ["fixture-query-pass", "fixture-pwd"]],
+    ["SITE_URL=https://example.com/path?page=2", []],
+    ["DB_HOST=db", []],
+  ] as const
+  for (const [line, expected] of rows) expect(strings(credentialValues(env, Buffer.from(`${line}\n`))), line).toEqual([...expected])
+  const document = "database:\n  url: postgres://svc:fixture-yaml-pass@db/app\n  host: db\n"
+  expect(strings(credentialValues(file("credential-document", "assignments"), Buffer.from(document)))).toEqual(["fixture-yaml-pass"])
+})
+
+test("structured parse failures never become opaque values", async () => {
+  const text = await fixture("gcp.json").text()
+  expect(() => credentialValues(file("gcp-adc", "json"), Buffer.from(text.slice(0, -3)))).toThrow()
+})
+
+test("AWS EKS exec args and YAML aliases retain credential classification", async () => {
+  // Official aws eks update-kubeconfig golden output; provenance.json pins its original bytes.
+  expect(credentialValues(file("kube", "assignments"), await fixture("kube-eks.yaml").bytes())).toEqual([])
+  // YAML 1.2 anchors/aliases/flow sequence and YAML merge-key examples, with fixture-only values.
+  const document = `defaults: &default
+  token: fixture-aliased-token
+ordinary: &region us-east-1
+users:
+- name: fixture
+  user:
+    <<: *default
+    exec:
+      args: [--region, *region, eks]
+    extras:
+    - --region
+    - *region
+`
+  const values = strings(credentialValues(file("kube", "assignments"), Buffer.from(document)))
+  expect(values).toContain("fixture-aliased-token")
+  expect(values).not.toContain("us-east-1")
+  expect(values).not.toContain("--region")
+})

@@ -1,4 +1,5 @@
 import type { ConnectorLaunchApi } from "../../../util/src/codepuppy-connector-launch"
+import type { DirectoryAccessDescriptionInput, DirectoryAccessDescription, DirectoryWriteApproval, DirectoryWriteApprovalResult } from "../shared/directory-write-approval"
 import type { NetworkEgressApi } from "../shared/network-egress-wire"
 import type { SourceSearchResultV1, PreparePluginSourceInputV1, PreparePluginSourceResultV1 } from "../main/plugin-sources"
 import type { InstallRequestV1, InstallOutcomeV1 } from "../shared/plugin-install"
@@ -759,6 +760,8 @@ export type ElectronAPI = {
    * REQ-159 `#1322`:「这个目录现在写得进去吗」—— 由**被围栏的引擎进程**在该目录真写一次再删。
    * writable / denied(围栏 EPERM)/ unknown(引擎不在 / 超时 / 别的失败)。呈现层只在 denied 时标记。
    */
+  describeDirectoryAccess(input: DirectoryAccessDescriptionInput): Promise<DirectoryAccessDescription>
+  approveDirectoryWrite(input: DirectoryWriteApproval): Promise<DirectoryWriteApprovalResult>
   workspaceWriteProbe: (input: WorkspaceWriteProbeRequest) => Promise<WorkspaceWriteProbeResult>
   recordWorkspaceOpen: (input: WorkspaceOpenRecordRequest) => Promise<WorkspaceOpenRecordResult>
   onWorkspaceWritableChanged: (cb: (change: WorkspaceWritableChanged) => void) => () => void

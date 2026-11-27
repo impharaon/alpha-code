@@ -804,3 +804,78 @@ A5 原私有整轨入口在不跑真实模型/容量的约束内没有先行 2 G
 `affected-tests --list` exit 2：本基线仍缺 `.gate-tests`，**无 scope line**；保持 gate 冻结，交 gate owner。#1760 真身份/准备/ready path 与 A8 异步 duration → 原依赖集成；Windows 实机、长视频/真实模型评分与收费结算场景 → orchestrator 的既有验收；本轮不套用本机小样本结果。A4 增加本地 AV1 decoder → 原 designer/编排器，按 r9 明确排除；未增加产品限制。无新增其它 ARCH/OPTIONAL 工作。
 
 本次 canonical docs-contract 核对仍为既有 **69 errors / 253 warnings**，本 plan **0 finding**；未顺修文档基线。`affected-tests --list` 的原输出为 `affected-tests: [Errno 2] No such file or directory: <worktree>/.gate-tests`，未运行 gate。所有前台命令已结束；提交仅在分配的分支，未推送。
+
+## D6 AV1 本机解码
+
+- 依据：规格 v1 AC-06/12/16/17/18；`impharaon/alpha-work:docs/specs/video-understanding/design.md` §4.2、§6、§10 V-d @ `e1a5106f6802600cf802f09fda7181f2a86c8081`（alpha-work#254）；alpha-code#1775 r13。沿既有 source/info/frames/clip 路径消费新组件。
+- 核对：计划提交 `c293e80bcb`；r13 的 Phase: PLAN then IMPLEMENT 同轮授权，无额外设计选择。未有独立计划审查收据，不代写通过记录。
+
+### 改动
+
+| 文件（相对本仓） | 改什么 |
+| --- | --- |
+| `packages/ui-mac/resources/video-runtime/build.lock.json` | 固定 dav1d 1.5.3 源归档的来源、长度、SHA256；固定其必需的 Meson/Ninja/NASM 构建工具源输入。不修改应用依赖或模型版本 |
+| `packages/ui-mac/scripts/build-video-components.ts` | 用既有源码验证器/工具链构建两平台静态 dav1d 并链接 FFmpeg；源代码资产、SOURCE.json、BUILD.sh 带对应源与可重放命令；输出版本独立的两平台 codec/source 归档及 pin，不上传 |
+| `packages/ui-mac/resources/pinned-files.json`、`resources/video-mcp/asset-recipes.ts` | 用实物输出更新两个 ffmpeg pin；配方消费 pin 身份并要求 dav1d 许可，保持原 pinned-file/launcher 准备接缝 |
+| `packages/ui-mac/resources/video-runtime/licenses/dav1d.txt`（新）、`licenses.json`、`resources/NOTICE.txt` | 从固定源归档留存 BSD-2-Clause 全文和署名，更新应用 AC-18 清单及组件内许可 |
+| `packages/ui-mac/resources/office-mcp/tools.json`、既有 `scripts/gen-office-mcp-tools.ts` / `build-video-mcp.ts` 输出链 | 用原生成器同步配方、源码和随包材料摘要，不手改生成摘要；不为 codec 变化重建其它模型引擎 |
+| `packages/ui-mac/src/main/video-assets.fast.test.ts`、`video-assets.test.ts`、`video-runtime-artifacts.test.ts`、`office-mcp-tools-snapshot.test.ts` | 在既有用例中更新/补充两目标 pin、许可与配方要求；保持原 downloader、取消和 manifest 校验。只运行直接相关文件 |
+| `scripts/old-name-exceptions.tsv`、`scripts/gate-files.tsv`（仅实测需要时） | 同步新的正式资产 URL/源 URL 及既有用例精确计数，使用既有扫描器/登记生成脚本，不放宽规则 |
+
+### 顺序
+
+1. 仅提交本节计划。到固定公开源下载 dav1d 与构建工具到临时目录，核对 release 的 SHA256（有发布校验值则逐字比对）并读取原许可。
+2. 扩展既有组件构建，固定工具输入；Meson 只生成静态库，不生成测试/播放器；Darwin 使用现有最低目标，Windows 使用原 llvm-mingw 工具链及 NASM。两平台每次最多两个编译 worker。更新许可，并在原 fast 用例验证许可/配方闭包；先迭代具名用例。
+3. 在临时目录分别生成 darwin-arm64、win32-x64 codec 与对应源材料。以实际 archive 的 bytes/SHA256 更新 pin；同步 source asset 名与 SOURCE.json/BUILD.sh。不发布或联系 relay。
+4. 用可用编码器将本仓已有真实视频转换为小 AV1 MP4；记录原样本来源/哈希、编码器/参数、产物 SHA256。经新 Mac 组件跑 mediaInfo、时间点帧、scene 帧及 clip（输出可解码、时长），记录 `-decoders` 的 libdav1d。用不含 libdav1d 的原 pinned FFmpeg 作移除对照，沿原工具错误出口确认 `format_unsupported`。Windows 交叉产物检查 PE、链接依赖和许可证；无 Windows 执行环境时明确实机未测。
+5. 用原生成器同步 video bundle 与 Office/video 声明。端到端小样本及 native 构建是一次性证据（命令/输出/资产），不塞进 PR 测试。相关文件完整跑一次，再跑一次被导出/枚举变化直接影响的集合、ui-mac `bun typecheck`、`affected-tests --list`；仅复核改动相关的登记行。更新本节实物结果和发布清单后提交。
+
+### 风险
+
+- 本机缺 Meson/Ninja/NASM：工具源码同样经构建锁校验并只展开在临时构建根，不依赖机器上的未锁版本，不增加产品安装步骤。
+- Windows 构建成功不能证明 Windows 系统播放成功；分别报告交叉产物检查和实际执行证据，不能以 Mac 结果代替 AC-17 的 Windows 验收。
+- codec 更换使 frames/media 缓存按既有 pin 身份失效；不改变 transcript 的 speech 身份轴，不迁移旧缓存。
+- 资产首次构建估计 30–60 分钟（不含共享 gate 队列）；两平台归档、源材料及许可需要编排器发布后原 pinned-file 准备链才能下载。AC-15 的 400 MB 算术按实物复核。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-06/12/16 | 真实 AV1 小样本经新组件的 info、时间点帧、scene、clip；无 dav1d 原组件的移除对照；`-decoders` 输出 | 一次性，构建后本机命令/输出，不新增真实构建的常驻 PR 用例 | 移除软件解码器时解码返回 ENOSYS/不支持格式，帧/clip 无法产生有效输出 |
+| AC-15/17 | `video-assets.fast.test.ts` 两平台 pin 唯一、必需文件及完整首用下载量；交叉产物 PE/依赖检查 | fast：受影响 PR/夜间；实际构建/架构检查一次性，Windows 系统播放待实机 | 错目标/漏许可/超过已批准下载量直接失败；Mach-O 不能冒充 PE |
+| AC-18 | `video-runtime-artifacts.test.ts` 全许可目录摘要核验；dav1d 许可目录/编译配置/源码资产实际检查；NOTICE/清单检查 | integration：受影响 PR/夜间；产物检查一次性 | 删除许可或许可不完整时 inventory 失败；固定源的全文与署名缺失可从资产检查指出 |
+| AC-01/14 的既有准备链不退化 | `video-assets.test.ts`、`office-mcp-tools-snapshot.test.ts` | integration：受影响 PR/夜间，静态导入和字面路径可被 selector 跟踪 | 新 pin/配方漏同步时声明或实际准备 ids 不一致；不新增启动下载或云识图路径 |
+
+### 偏离记录
+
+r13 执行：新 worktree 无随包 native/runtime 目录，原声明生成器需要真实 runtime 材料；复用既有固定源缓存调用原 Mac runtime producer，纳入完整 dav1d 许可并核验实际 native 闭包，不改 ASR 源码、版本或编译选项。生成声明因此也同步真实 runtime/build-lock/licences 和该 producer 的 native 摘要。两平台 codec/source 资产仍单独生产，不下载模型。
+
+同链必要修正：Windows 的既有 SOURCE.json 中 OpenH264 PREFIX 字段原来固定为 Mac codec-prefix，实际 Windows 构建和 BUILD.sh 使用 codec-win-prefix；本片发布的新源材料改为消费同一个 prefixName，确保元数据与真实命令相同。无冻结决定变化。最终实物摘要、证明和发布清单在本节续记；发布由编排器执行。
+
+
+### D6 实物与验证（r13）
+
+- 源输入：dav1d 1.5.3，`1022836 B`，SHA256 `732010aa5ef461fa93355ed2c6c5fedb48ddc4b74e697eaabe8907eaeb943011`，与 release 的 `.sha256` 逐字核对一致。必需的 Meson 1.10.1 / Ninja 1.13.1 / NASM 3.01 源输入同归 `resources/video-runtime/build.lock.json`，不进入应用 package 依赖。
+- BSD-2-Clause 原文从 dav1d 源归档 COPYING 提取，署名 VideoLAN and dav1d authors，`1317 B`、SHA256 `dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5`；本仓/两平台 codec 目录的三份文本逐字相等。Mac 原 runtime producer 的完整许可及 native inventory 检查通过。
+- 构建命令（工作目录 `packages/ui-mac`）：`gate slot -- bun scripts/build-video-components.ts <darwin-arm64|win32-x64> /tmp/video-av1-1775 /tmp/video-av1-1775/release`。实际均 exit 0；各 source archive 中原始输入的 SHA256 与锁一致，`bash -n BUILD.sh` 通过。SOURCE 与实际 configure 都保留 disable-gpl / disable-nonfree / disable-autodetect 并启用 libdav1d。最终 Mac minos=12.0、仅系统依赖；Windows 两程序均 PE32+ x86-64，`llvm-readobj --coff-imports` 只有系统 DLL。未在 Windows 上执行，不记作 Windows 实机解码/播放验收。
+- 一次性真实样本在 `/tmp/video-av1-1775/proof/`：本机既有 libaom-av1 编码器把 red/blue/white 三个 lavfi color 输入编码为 3 秒、96×64、5 fps 的真实 AV1 MP4（不含外部视频内容）；1307 B，SHA256 `ca4bf541cc2341b5b1fd372fec5ad589352a6715c51850f31022944888e52fd8`。`provenance.json` 留有完整命令、编码器版本及二进制 SHA256；编码器不进入产品。
+- 实物命令：在 `packages/ui-mac` 执行 `gate slot -- bun /tmp/video-av1-1775/proof/proof.ts "$PWD" /tmp/video-av1-1775`；调用原 source/mediaInfo/framesOf/clipMedia 和真实 Vision helper。info 得 av1/3000 ms；请求 1500 ms 得实际 PTS 1400 ms 的蓝色 JPEG（RGB 0,0,254）；scene 返回 0/1000/2000 ms；500..2500 ms 剪辑得到可解码 H.264、1800 ms，误差 200 ms 在 AC-12 的一秒容差内。临时脚本最初误加 100 ms 容差，实际输出否定该前提后按原 AC 修正，未改仓库测试阈值或产品代码。`results.json` 与所有输出保留；最终重新封装后程序 SHA256 与证明时逐字相等，无须重跑同一媒体测量。
+- 移除对照：原 darwin-arm64 codec 归档 SHA256 `fa3bb967e71c7bb934924822799d2f633197e6b972430961cbbf8a651bdaf98f` 与原 pin 的长度/摘要核对后解包。三个解码动作（定点帧、scene、clip）均返回 `format_unsupported`，且有原动作建议；新组件的 `-decoders` 出现 libdav1d，原组件没有。此为旧真实组件对照，不是假造 native/header 格式。
+- fast 新用例 `codec recipes require the licensed software AV1 decoder on each target` 在旧 pin 版本上先得到 0 PASS/1 FAIL，再随实际新 pin 变绿。首次相关六文件（assets fast/assets/runtime artifacts/Office snapshot/frames/export）20 PASS；最后两轮 pin/声明重生成后相关与枚举集合（assets fast/assets/runtime artifacts/Office snapshot/old-name/gate-file-registry）49 PASS。两次集合共八个不同文件，55 个不同用例，重叠不相加。无全套/层/计时测试。
+- `CODEPUPPY_TEST_FILES=/tmp/video-av1-1775/selected.txt gate slot -- bash scripts/assert-gate-files.sh --from-reports /tmp/video-av1-1775/final-reports` exit 0，3 个相关登记文件条数精确一致，331 个范围外不判；登记条数没有变化，不改 gate-files.tsv。
+- `bun typecheck`（ui-mac）最终 exit 0；`affected-tests --list` exit 0，scope 原文：`affected tests: 120 of 727 test files`。新 case 仍是原 fast 文件；输入通过直接 JSON import、现有 runtime fixture 的字面目录和既有消费者被 selector 跟踪，不加 global/setup/层声明。docs links 检查一份 Markdown、0 相对链接；额外 docs-contract 仍报既有 56 errors / 251 warnings（如 docs/README.md 索引），本 plan 0 finding，不扩展到文档治理。
+
+### D6 发布交接
+
+以下四个实物在 `/tmp/video-av1-1775/release/`，尚未上传；`publication.json` 在其上级目录记录相同测量值。由编排器发布到已有正式 release `v0.2.8`。组件两 pin 的 origin/provenance URL 已消费以下新版本名，不覆盖旧发布文件。
+
+| 文件名 | bytes | SHA256 |
+| --- | ---: | --- |
+| `video-ffmpeg-9.1-openh264-2.7.0-dav1d-1.5.3-darwin-arm64-source.tar.gz` | 78104141 | `4f832aeafa49a656739c54777214e5cef14b782d858e9dcbb80543945bc758a8` |
+| `video-ffmpeg-9.1-openh264-2.7.0-dav1d-1.5.3-darwin-arm64.tar.gz` | 22089752 | `f3b4b956ccd84f0415f1e1cece5b18cc336e95fa345507f92b14fa345bdf4288` |
+| `video-ffmpeg-9.1-openh264-2.7.0-dav1d-1.5.3-win32-x64-source.tar.gz` | 78104578 | `9444dac91fb74c0f8c72ac2bd71b0bac9ec3c08e9d84e589a5f17b399630b461` |
+| `video-ffmpeg-9.1-openh264-2.7.0-dav1d-1.5.3-win32-x64.tar.gz` | 23953704 | `d22e8b186b10814b43a637095e0f3643057dc709fe58ce23759604f7742f2cae` |
+
+国内 relay pinned list 由编排器增加/发布 `ffmpeg/darwin-arm64/9.1-openh264-2.7.0-dav1d-1.5.3`、`ffmpeg/win32-x64/9.1-openh264-2.7.0-dav1d-1.5.3` 两个运行期 ID，origin/bytes/SHA256 以本仓 pinned-files.json 为准；对应源归档按 provenanceUrl 同时可取。原其它模型、OCR、语言与 Python 条目没有变化。
+
+首用全部固定文件量（既有 firstVideoPins）：darwin-arm64 **348493556 B**，win32-x64 **369869121 B**，仍小于 400000000 B。未发布资产、未部署 relay、未发收费调用、未启动窗口。Windows 实机解码与系统播放器播放仍交原发布验收，不以交叉编译代替。

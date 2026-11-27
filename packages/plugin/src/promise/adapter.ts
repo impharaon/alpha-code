@@ -688,6 +688,7 @@ const toolHook: {
 } = {
   "execute.before": (run) => Effect.tryPromise({ try: run, catch: toolError }),
   "execute.after": (run) => Effect.promise(run),
+  "execute.progress": (run) => Effect.promise(run), // codepuppy(ADR-050 SC-02)
 }
 
 const executePromiseTool = (tool: Info, input: any, context: Tool.Context) =>

@@ -73,14 +73,22 @@ test("H3 environment carries only exported variables and the leaf's own prefix a
   // physical PWD, so the planner gets the real path of the same directory.
   const physical = realpathSync(root)
   mkdirSync(join(physical, "p"), { recursive: true })
-  const plannedAt = (command: string, shell: string) => ({ ...snapshot, ...Object.fromEntries(planner.planPackageManagerExecution({ manager: "homebrew", command, shell, cwd: physical, env: snapshot })[0].assignments.map((entry) => [entry.name, entry.value])) }) as Record<string, string>
+  // As main spawns brew: the snapshot minus the planned `unset` names, then the planned assignments.
+  const plannedAt = (command: string, shell: string, start: Record<string, string>) => {
+    const node = planner.planPackageManagerExecution({ manager: "homebrew", command, shell, cwd: physical, env: start })[0]
+    const env: Record<string, string> = { ...start }
+    for (const name of node.unset) delete env[name]
+    return { ...env, ...Object.fromEntries(node.assignments.map((entry) => [entry.name, entry.value])) } as Record<string, string>
+  }
   const sources = ["X=1; brew --prefix", "export X=1; brew --prefix", "X=1 brew --prefix", "X=1; export X; brew --prefix", "export X; X=1; brew --prefix", "set -a; X=1; brew --prefix", "set -a; set +a; X=1; brew --prefix", "PATH=/bin:/usr/bin; brew --prefix", "VALUE=changed; brew --prefix",
-    "brew --prefix", "cd p && brew --prefix", "pushd p >/dev/null && brew --prefix", "cd p && cd - >/dev/null && brew --prefix", "export X=1; unset X; brew --prefix"]
-  for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) for (const source of sources) {
-    const real = spawnSync(shell, ["-c", source.replace("brew --prefix", "/usr/bin/env")], { cwd: physical, env: snapshot, encoding: "utf8" })
+    "brew --prefix", "cd p && brew --prefix", "pushd p >/dev/null && brew --prefix", "cd p && cd - >/dev/null && brew --prefix", "export X=1; unset X; brew --prefix",
+    "unset VALUE; brew --prefix", "unset VALUE; VALUE=again; brew --prefix", "unset VALUE; export VALUE=again; brew --prefix", "VALUE=x brew --prefix; unset VALUE"]
+  // A snapshot with an inherited OLDPWD/PWD: bash and sh drop OLDPWD at startup, every shell replaces PWD.
+  for (const start of [snapshot, { ...snapshot, OLDPWD: "/inherited/old", PWD: "/inherited/pwd" }]) for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) for (const source of sources) {
+    const real = spawnSync(shell, ["-c", source.replace("brew --prefix", "/usr/bin/env")], { cwd: physical, env: start, encoding: "utf8" })
     expect(real.status).toBe(0)
     const actual = Object.fromEntries(real.stdout.trim().split("\n").map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]))
-    const expected = plannedAt(source, shell)
+    const expected = plannedAt(source, shell, start)
     for (const name of ["X", "PATH", "VALUE", "PWD", "OLDPWD"]) expect(`${shell} ${source} ${name}=${expected[name]}`).toBe(`${shell} ${source} ${name}=${actual[name]}`)
   }
 })

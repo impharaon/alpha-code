@@ -20,7 +20,7 @@ import assert from "node:assert/strict"
 import http from "node:http"
 import {once} from "node:events"
 import {spawn} from "node:child_process"
-import {mkdirSync,writeFileSync,readFileSync,existsSync,chmodSync,unlinkSync} from "node:fs"
+import {mkdirSync,writeFileSync,readFileSync,existsSync,chmodSync,unlinkSync,symlinkSync,realpathSync} from "node:fs"
 import {join} from "node:path"
 const prefix=join(root,"homebrew"),cwd=join(root,"project"),report=join(root,"spawns.jsonl"),pids=join(root,"pids")
 mkdirSync(join(prefix,"bin"),{recursive:true});mkdirSync(join(prefix,"Library/Homebrew"),{recursive:true});mkdirSync(cwd)
@@ -76,6 +76,16 @@ await generation.control({op:"bind",executionID:execLease.executionID,pid:execRo
 execRoot.stdio[3].end(Buffer.from(execLease.shellPrivateInput.data));execRoot.stdin.end("go\n")
 const execResult=await execDone;assert.equal(execResult.exit,17,execResult.stderr);assert.equal(execResult.stdout,"exec-ready");assert.equal(execResult.stderr,"stderr")
 await generation.control({op:"finish",executionID:execLease.executionID});rows.push("root-exec")
+// C-2: planned unset names leave brew's real environment; PWD is the physical start directory, as the shell sets it.
+const link=join(root,"project-link");symlinkSync(cwd,link)
+const unsetLease=(await generation.control({op:"authorize",input:{shellID:"shell",sessionID:"session",messageID:"message",callID:"call",command:"unset HTTP_PROXY; brew stream",cwd:link,shell:"/bin/bash"}})).lease
+const unsetRoot=spawn("/bin/bash",["-c",unsetLease.executionSource],{cwd:link,env:{HOME:root,PATH:join(prefix,"bin")+":/usr/bin:/bin",HTTP_PROXY:"http://user.example:1234"},stdio:["pipe","pipe","pipe","pipe"]})
+const unsetDone=collect(unsetRoot)
+await generation.control({op:"bind",executionID:unsetLease.executionID,pid:unsetRoot.pid})
+unsetRoot.stdio[3].end(Buffer.from(unsetLease.shellPrivateInput.data));unsetRoot.stdin.end()
+const unsetResult=await unsetDone;assert.equal(unsetResult.exit,17,unsetResult.stderr)
+assert.deepEqual({proxy:spawns().at(-1).proxy,cwd:spawns().at(-1).cwd},{proxy:"",cwd:realpathSync(cwd)})
+await generation.control({op:"finish",executionID:unsetLease.executionID});rows.push("unset-physical")
 for(const kind of ["early","late"]){
  mode=kind;const l=await authorize(kind==="early"?"brew stream":"brew wait"),before=spawns().length
  const c=spawn("/bin/bash",["-c",l.executionSource],{cwd,env:{HOME:root,PATH:join(prefix,"bin")+":/usr/bin:/bin"},stdio:["pipe","pipe","pipe","pipe"]});const done=collect(c);await generation.control({op:"bind",executionID:l.executionID,pid:c.pid});c.stdio[3].end(Buffer.from(l.shellPrivateInput.data));c.stdin.end();const result=await done
@@ -100,7 +110,7 @@ front.closeAllConnections();actual.closeAllConnections();front.close();actual.cl
     const result = spawnSync("node", [build.outputs[0].path], { encoding: "utf8", timeout: 30000 })
     expect(result.status, result.stderr + result.stdout).toBe(0)
     const evidence = JSON.parse(result.stdout.trim())
-    expect(evidence.rows).toEqual(["proof-format/wrong/pending/real/once/finish", "root-exec", "early-invalid", "late-invalid", "normal-app-exit-group"])
-    expect(evidence.spawns).toBe(4)
+    expect(evidence.rows).toEqual(["proof-format/wrong/pending/real/once/finish", "root-exec", "unset-physical", "early-invalid", "late-invalid", "normal-app-exit-group"])
+    expect(evidence.spawns).toBe(5)
   } finally { rmSync(scratch, { recursive: true, force: true }) }
 }, 40000)

@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID, createHash, timingSafeEqual } from "node:crypto"
 import { spawn, type ChildProcess } from "node:child_process"
+import { realpathSync } from "node:fs"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { planPackageManagerExecution, packageManagerExecutionSource, type PackageManagerCommand } from "../../engine/package-manager-plan"
 import type { PackageManagerExecutionLease, PreparedShellExecution } from "@opencode/plugin/codepuppy-package-manager"
@@ -73,7 +74,8 @@ export function openPackageManagerGeneration(input: {
 function authorizePackageManagerExecution(input: PreparedShellExecution, generation: Generation): PackageManagerExecutionLease {
   const executionID = randomUUID()
   const env = Object.freeze({ ...generation.env })
-  const nodes = planPackageManagerExecution({ manager: "homebrew", ...input, env }).filter((plan) => resolveHomebrewExecutable({ ...plan, env: nodeEnvironment(generation.env, plan), installations: generation.installations }))
+  // The shell starts with its physical working directory as PWD (design §10 C-2).
+  const nodes = planPackageManagerExecution({ manager: "homebrew", ...input, cwd: physicalDirectory(input.cwd), env }).filter((plan) => resolveHomebrewExecutable({ ...plan, env: nodeEnvironment(generation.env, plan), installations: generation.installations }))
   if (nodes.length && generation.service === undefined) generation.service = generation.native.startPackageManagerService(generation.serviceName, generation.helper, (claim, peer, reply) => {
     claimPackageManagerNode(claim, peer, generation).then(reply, () => reply({ kind: "error", error: "unauthorized" }))
   })
@@ -108,9 +110,15 @@ async function claimPackageManagerNode(claim: PackageManagerNodeClaim, peer: Nat
 }
 
 function nodeEnvironment(base: Readonly<Record<string, string>>, plan: PackageManagerCommand) {
-  const env = { ...base, ...Object.fromEntries(plan.assignments.map((assignment) => [assignment.name, assignment.value])) }
+  // As the shell would hand it over: unset names leave the snapshot, then the planned values apply.
+  const inherited: Record<string, string> = { ...base }
+  for (const name of plan.unset) delete inherited[name]
+  const env = { ...inherited, ...Object.fromEntries(plan.assignments.map((assignment) => [assignment.name, assignment.value])) }
   for (const key of Object.keys(env)) if (["BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "PS4"].includes(key) || key.startsWith("BASH_FUNC_") || key.startsWith("CODEPUPPY_PACKAGE_MANAGER_")) delete env[key]
   return env
+}
+function physicalDirectory(cwd: string) {
+  try { return realpathSync.native(cwd) } catch { return cwd } // A missing directory fails in the shell itself.
 }
 function digest(value: string) { return createHash("sha256").update(value).digest("hex") }
 function terminal(node: Node) { node.state = "terminal"; node.proof?.fill(0); node.proof = undefined }

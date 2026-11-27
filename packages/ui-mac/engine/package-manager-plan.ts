@@ -7,11 +7,13 @@ export type PackageManagerAssignment = { name: string; value: string; origin: "p
 export type PackageManagerCommand = {
   nodeID: string; start: number; end: number; program: string; argv: readonly string[]; cwd: string
   assignments: readonly PackageManagerAssignment[]
+  /** Names main deletes from the snapshot before applying `assignments` (design §10 C-2): `unset NAME` and names the shell drops at startup. */
+  unset: readonly string[]
   leafStart: number; leafEnd: number; redirects: readonly { start: number; end: number }[]
   prefix: string; exec: boolean; wrapper: string
 }
 // `env` holds shell values for expansion; only exported names (or all, under allexport) reach brew's environment.
-type State = { cwd: string | null; env: Readonly<Record<string, string | null>>; assignments: readonly PackageManagerAssignment[]; exported: ReadonlySet<string>; allexport: boolean }
+type State = { cwd: string | null; env: Readonly<Record<string, string | null>>; assignments: readonly PackageManagerAssignment[]; exported: ReadonlySet<string>; allexport: boolean; unset: ReadonlySet<string> }
 type Outcome = { success?: State; failure?: State }
 type Leaf = Exclude<PackageManagerSyntax, { kind: "separator" }>
 
@@ -94,7 +96,7 @@ export function planPackageManagerExecution(input: {
       const next = leaf.words.slice(index + 1).reduce((current, raw) => {
         const name = /^[A-Za-z_][A-Za-z0-9_]*$/.exec(raw.raw)?.[0]
         if (!name) return current
-        return { ...current, env: { ...current.env, [name]: "" }, exported: without(current.exported, name), assignments: current.assignments.filter((entry) => entry.name !== name) }
+        return { ...current, env: { ...current.env, [name]: "" }, exported: without(current.exported, name), assignments: current.assignments.filter((entry) => entry.name !== name), unset: new Set([...current.unset, name]) }
       }, state)
       return invert({ success: next }, leaf.negated)
     }
@@ -134,7 +136,7 @@ export function planPackageManagerExecution(input: {
       const last = Math.max(...leaf.words.map((raw) => raw.end), ...leaf.redirects.map((redir) => redir.end))
       plans.push({
         nodeID: `node-${leaf.words[index].start}`, start: leaf.words[index].start, end: leaf.words[index].end,
-        program, argv: args, cwd: node.cwd, assignments: [...node.assignments, ...envAssignments],
+        program, argv: args, cwd: node.cwd, assignments: [...node.assignments, ...envAssignments], unset: [...node.unset],
         leafStart: first, leafEnd: last, redirects: leaf.redirects,
         prefix: [...prefixes.map((raw) => raw.raw), ...leaf.words.slice(leaf.builtin + 1, index).map((raw) => raw.raw)].join(" "),
         exec: leaf.words.slice(leaf.command, leaf.builtin).some((raw) => raw.value === "exec"),
@@ -168,11 +170,12 @@ export function planPackageManagerExecution(input: {
     }
     return result
   }
-  const initial: State = { cwd: input.cwd, env: input.env, assignments: [], exported: new Set(Object.keys(input.env)), allexport: false }
-  // Every shell exports PWD as its directory at start; zsh also sets OLDPWD to it, bash and sh drop an inherited one.
+  const initial: State = { cwd: input.cwd, env: input.env, assignments: [], exported: new Set(Object.keys(input.env)), allexport: false, unset: new Set() }
+  // Every shell exports PWD as its directory at start (input.cwd is the physical one); zsh also sets OLDPWD to it,
+  // bash and sh drop an inherited one.
   const started = exported(initial, { name: "PWD", value: input.cwd, origin: "export", start: 0, end: 0 })
   sequence(facts, dialect === "zsh" ? exported(started, { name: "OLDPWD", value: input.cwd, origin: "export", start: 0, end: 0 })
-    : { ...started, env: { ...started.env, OLDPWD: "" }, exported: without(started.exported, "OLDPWD") })
+    : { ...started, env: { ...started.env, OLDPWD: "" }, exported: without(started.exported, "OLDPWD"), unset: new Set([...started.unset, "OLDPWD"]) })
   return plans
 }
 
@@ -205,6 +208,8 @@ function join(a?: State, b?: State): State | undefined {
     assignments: a.assignments.filter((entry) => b.assignments.some((other) => JSON.stringify(entry) === JSON.stringify(other))),
     exported: new Set([...a.exported].filter((name) => b.exported.has(name))),
     allexport: a.allexport && b.allexport,
+    // A name unset on either path does not reach brew with an inherited value.
+    unset: new Set([...a.unset, ...b.unset]),
   }
 }
 function invert(outcome: Outcome, negated: boolean): Outcome { return negated ? { success: outcome.failure, failure: outcome.success } : outcome }

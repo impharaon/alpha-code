@@ -91,6 +91,8 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots, credentia
     if (!cause || typeof cause !== "object" || seen.has(cause)) return undefined
     seen.add(cause)
     const source = cause as { _tag?: string; error?: unknown; message?: string; reason?: string; feedback?: string; rules?: unknown; permission?: string; resources?: unknown }
+    // A plain decline carries no fields; kept as raised, the engine recognises it and ends the step (PermissionDomain.assert).
+    if (source._tag === "Permission.DeclinedError") return cause
     if (source._tag !== "Permission.BlockedError" && source._tag !== "Permission.CorrectedError")
       return permissionCause(source.error, mode, seen)
     const fields = mode === "hide"

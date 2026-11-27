@@ -104,6 +104,8 @@ interface Setup {
    * effects get the host's services the way packages/core/src/plugin/internal.ts provides them.
    */
   readonly internal?: readonly { readonly id: string; readonly effect: (ctx: any) => any }[]
+  /** Main's R6 write-scope projection as the hub bridge delivers it (SPEC child-process-write-fence v7). */
+  readonly readWriteScope?: import("../hub-bridge").HubBridge["readWriteScope"]
 }
 
 const counts = { write: 0, probe: 0, paid: 0, free: 0 }
@@ -152,7 +154,7 @@ const setup = (options: Setup = {}) =>
         revision: `internal-${Math.random().toString(36).slice(2)}`,
       })),
       promisePlugin("codepuppy-ext", async (ctx: any) => {
-        const policy = options.policy === false ? undefined : await registerPolicy(ctx, options.unattended ?? createUnattendedState())
+        const policy = options.policy === false ? undefined : await registerPolicy(ctx, options.unattended ?? createUnattendedState(), undefined as never, undefined, undefined, options.readWriteScope)
         registration = policy
         await ctx.tool.transform((editor: any) => editor.add(tool(ALIAS_PROBE, "probe")))
         await options.inside?.(ctx)
@@ -2360,3 +2362,206 @@ for (const action of [ID_BUILTIN_WRITE, ALIAS_WRITE]) {
     expect(counts.write).toBe(1)
   }))
 }
+
+// SPEC child-process-write-fence v7 BR-11 / AC-13 (design v6 §4.3–§4.4, §4.3.1): a write refused mid-command whose error
+// names the full path brings up BR-08's folder card after the command. Real plugin host, real ShellTool and permission
+// engine; main's R6 projection is a stand-in that resolves directories as given. The command prints the exact error line
+// `touch` prints under the fence (design §2 AB-P02); the real fence is the ui-mac scenario's job.
+describe("v7 BR-11: after-the-fact approval of a write refused mid-command", () => {
+  const { WRITE_APPROVED_RETRY_NOTE, WRITE_REFUSED_NOTE } = require("../context-injection") as typeof import("../context-injection")
+  const refusedIn = (folder: string) => ({ command: `echo "touch: ${folder}/b.txt: Operation not permitted" >&2; exit 1` })
+  const fakeWriteScope = (outcomes: Record<string, "ineligible" | "protected" | "unavailable"> = {}) => {
+    const granted = new Set<string>()
+    const queries: { targets: readonly { absolute: string; directory: string }[] }[] = []
+    const scope = async (request: { access: "read" | "write"; targets: readonly { absolute: string; directory: string }[] }) => {
+      queries.push(request)
+      if (request.targets.some((target) => outcomes[target.directory] === "unavailable")) return { error: "unavailable" as const }
+      return { revision: 1, targets: request.targets.map((target) => ({ absolute: target.absolute, realDirectory: target.directory, outcome: granted.has(target.directory) ? "writable" as const : (outcomes[target.directory] as "ineligible" | "protected" | undefined) ?? "needs-approval" as const })) }
+    }
+    return { scope, granted, queries }
+  }
+  const shellCall = (sessionID: string, input: Record<string, unknown>, id: string, agent = "build", messageID = "msg_1") =>
+    Effect.gen(function* () {
+      const snapshot = yield* (yield* Tool.Service).snapshot([ALLOW_ALL])
+      return yield* snapshot.execute({ sessionID, agent, messageID, call: { type: "tool-call", id, name: "shell", input } } as never).pipe(Effect.exit)
+    })
+  const texts = (exit: any): string[] => Exit.isSuccess(exit) ? ((exit.value as { content?: { text?: string }[] }).content ?? []).map((part) => part.text ?? "") : []
+  const requests = (sessionID?: string) => Effect.gen(function* () {
+    const list = (yield* (yield* Permission.Service).list()) as { id: string; sessionID: string; action: string; resources: string[]; save?: string[]; metadata?: Record<string, unknown>; source?: { messageID: string; id: string } }[]
+    return list.filter((request) => sessionID === undefined || request.sessionID === sessionID)
+  })
+  const until = (condition: () => boolean) => Effect.gen(function* () {
+    for (let i = 0; i < 200 && !condition(); i++) yield* Effect.sleep("10 millis")
+  })
+  const newSession = Effect.gen(function* () {
+    const location = yield* Location.Service
+    return yield* (yield* Session.Service).create({ location: { directory: location.directory }, agent: "build" } as never)
+  })
+
+  it.live("the folder the error names gets BR-08's card; approval answers with the retry instruction, not the stop one", () => Effect.gen(function* () {
+    const r6 = fakeWriteScope()
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope })
+    const fiber = yield* Effect.forkChild(shellCall(session.id, refusedIn("/outside-a"), "call_a"))
+    const [request] = yield* pending
+    expect(request).toMatchObject({ sessionID: session.id, action: "external_directory", resources: ["/outside-a/*"], save: ["/outside-a/*"], source: { type: "tool", messageID: "msg_1", id: "call_a" } })
+    expect(request!.metadata?.directoryAccess).toEqual({ access: "write", targets: [{ absolute: "/outside-a/b.txt", directory: "/outside-a" }] })
+    r6.granted.add("/outside-a")
+    yield* (yield* Permission.Service).reply({ requestID: request!.id, reply: "once" })
+    const exit = yield* E.Fiber.join(fiber)
+    expect(texts(exit).at(-1)).toBe(WRITE_APPROVED_RETRY_NOTE)
+    expect(texts(exit)).not.toContain(WRITE_REFUSED_NOTE)
+    expect(texts(exit).join("\n")).toContain("touch: /outside-a/b.txt: Operation not permitted")
+  }))
+
+  it.live("calls refused in one folder share one card; a plain rejection ends every one of them with the same error", () => Effect.gen(function* () {
+    const r6 = fakeWriteScope()
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope })
+    const first = yield* Effect.forkChild(shellCall(session.id, refusedIn("/outside-m"), "call_m1"))
+    yield* pending
+    const second = yield* Effect.forkChild(shellCall(session.id, refusedIn("/outside-m"), "call_m2"))
+    // first's classification and the card's evaluation, then second's classification: second has joined the card.
+    yield* until(() => r6.queries.length >= 3)
+    yield* Effect.sleep("50 millis")
+    const cards = yield* requests(session.id)
+    expect(cards).toHaveLength(1)
+    yield* (yield* Permission.Service).reply({ requestID: cards[0]!.id, reply: "reject" })
+    const [a, b] = [yield* E.Fiber.join(first), yield* E.Fiber.join(second)]
+    expect(Exit.isFailure(a) && Exit.isFailure(b)).toBe(true)
+    // The engine's own decline, kept as raised through the tool's error masking: the session runner ends the step on it.
+    const declined = (exit: any) => (failure(exit) as { error?: unknown })?.error
+    expect(declined(a)).toBeInstanceOf(Permission.DeclinedError)
+    expect(declined(b)).toBe(declined(a))
+    expect(texts(b)).toEqual([])
+  }))
+
+  it.live("approving a shared card gives every waiting call the retry instruction", () => Effect.gen(function* () {
+    const r6 = fakeWriteScope()
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope })
+    const first = yield* Effect.forkChild(shellCall(session.id, refusedIn("/outside-n"), "call_n1"))
+    yield* pending
+    const second = yield* Effect.forkChild(shellCall(session.id, refusedIn("/outside-n"), "call_n2"))
+    yield* until(() => r6.queries.length >= 3)
+    yield* Effect.sleep("50 millis")
+    const cards = yield* requests(session.id)
+    expect(cards).toHaveLength(1)
+    r6.granted.add("/outside-n")
+    yield* (yield* Permission.Service).reply({ requestID: cards[0]!.id, reply: "once" })
+    for (const fiber of [first, second]) expect(texts(yield* E.Fiber.join(fiber)).at(-1)).toBe(WRITE_APPROVED_RETRY_NOTE)
+  }))
+
+  it.live("an approval is recorded per session, message and call: the same call id in another session keeps its stop instruction", () => Effect.gen(function* () {
+    const r6 = fakeWriteScope({ "/outside-home-like": "ineligible" })
+    const held = Promise.withResolvers<void>()
+    let holdSession = ""
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope, after: promisePlugin("hold-after-approval", async (ctx) => {
+      // Outside the extension's wrapper: the first call's approval is recorded, its execute.after has not run yet.
+      await ctx.tool.transform((editor: any) => editor.update("shell", (draft: any) => {
+        const inner = draft.execute
+        draft.execute = async (input: unknown, context: { sessionID: string }) => {
+          const result = await inner(input, context)
+          if (context.sessionID === holdSession) await held.promise
+          return result
+        }
+      }))
+    }) })
+    holdSession = session.id
+    const other = yield* newSession
+    const first = yield* Effect.forkChild(shellCall(session.id, refusedIn("/outside-k"), "call_same"))
+    const [card] = yield* pending
+    r6.granted.add("/outside-k")
+    yield* (yield* Permission.Service).reply({ requestID: card!.id, reply: "once" })
+    yield* until(() => r6.queries.length >= 3)
+    yield* Effect.sleep("50 millis")
+    const second = yield* shellCall(other.id, refusedIn("/outside-home-like"), "call_same")
+    expect(texts(second).at(-1)).toBe(WRITE_REFUSED_NOTE)
+    expect(texts(second)).not.toContain(WRITE_APPROVED_RETRY_NOTE)
+    held.resolve()
+    expect(texts(yield* E.Fiber.join(first)).at(-1)).toBe(WRITE_APPROVED_RETRY_NOTE)
+  }))
+
+  it.live("a stopped call withdraws its card; the next refusal in that folder asks anew; another session's request stays", () => Effect.gen(function* () {
+    const r6 = fakeWriteScope()
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope })
+    const other = yield* newSession
+    const unrelated = yield* Effect.forkChild(shellCall(other.id, refusedIn("/outside-other"), "call_other"))
+    yield* until(() => r6.queries.length >= 2)
+    const stopped = yield* Effect.forkChild(shellCall(session.id, refusedIn("/outside-c"), "call_c1"))
+    yield* until(() => r6.queries.length >= 4)
+    yield* Effect.sleep("50 millis")
+    expect((yield* requests(session.id)).map((request) => request.source?.id)).toEqual(["call_c1"])
+    yield* E.Fiber.interrupt(stopped)
+    for (let i = 0; i < 100; i++) { if ((yield* requests(session.id)).length === 0) break; yield* Effect.sleep("10 millis") }
+    expect(yield* requests(session.id)).toEqual([])
+    expect((yield* requests(other.id)).map((request) => request.source?.id)).toEqual(["call_other"])
+    const next = yield* Effect.forkChild(shellCall(session.id, refusedIn("/outside-c"), "call_c2"))
+    for (let i = 0; i < 100; i++) { if ((yield* requests(session.id)).length > 0) break; yield* Effect.sleep("10 millis") }
+    const [renewed] = yield* requests(session.id)
+    expect(renewed?.source?.id).toBe("call_c2")
+    yield* (yield* Permission.Service).reply({ requestID: renewed!.id, reply: "reject" })
+    expect(Exit.isFailure(yield* E.Fiber.join(next))).toBe(true)
+    const [left] = yield* requests(other.id)
+    yield* (yield* Permission.Service).reply({ requestID: left!.id, reply: "reject" })
+    expect(Exit.isFailure(yield* E.Fiber.join(unrelated))).toBe(true)
+  }))
+
+  it.live("no card where none can help: R6 unavailable, ineligible, protected, a relative path, an unattended session", () => Effect.gen(function* () {
+    const r6 = fakeWriteScope({ "/outside-u": "unavailable", "/outside-i": "ineligible", "/outside-p": "protected" })
+    const unattended = createUnattendedState()
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope, unattended })
+    const inputs = [refusedIn("/outside-u"), refusedIn("/outside-i"), refusedIn("/outside-p"), { command: `echo "touch: outside-r/b.txt: Operation not permitted" >&2; exit 1` }]
+    for (const [index, input] of inputs.entries()) {
+      const exit = yield* shellCall(session.id, input, `call_none_${index}`).pipe(Effect.timeout("10 seconds"))
+      expect({ index, last: texts(exit).at(-1) }).toEqual({ index, last: WRITE_REFUSED_NOTE })
+    }
+    const automated = yield* newSession
+    unattended.install(buildUnattendedLive({ seq: 1, nonce: "fixture", sessions: [{ sessionID: automated.id, promptID: "msg_automation", agent: "build" }] }))
+    const before = r6.queries.length
+    const exit = yield* shellCall(automated.id, refusedIn("/outside-w"), "call_unattended", "build", "msg_automation").pipe(Effect.timeout("10 seconds"))
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(texts(exit)).not.toContain(WRITE_APPROVED_RETRY_NOTE)
+    expect(r6.queries.length).toBe(before)
+    expect(yield* requests()).toEqual([])
+  }))
+
+  // The background command keeps running here (its completion would start a real model turn in this host); its result
+  // text is the engine's own notification format with the error line, as the engine's synthetic message carries it.
+  it.live("a background command asks when its result reaches the model; the note stays on that result in later requests", () => Effect.gen(function* () {
+    const { ShellResult } = yield* Effect.promise(() => import("../../../core/src/shell/result"))
+    const { Message } = yield* Effect.promise(() => import("../../../ai/src/schema/messages"))
+    const r6 = fakeWriteScope()
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope })
+    const hooks = yield* PluginHooks.Service
+    const request = (shellID: string, folder: string) => ({ sessionID: session.id, agent: "build", model: { providerID: "test", id: "test" }, system: [], options: {}, tools: {},
+      messages: [Message.make({ role: "user", content: ShellResult.notification({ shellID, command: "refused", state: "completed", text: `touch: ${folder}/b.txt: Operation not permitted\n\nExited with code 1` }).text })] })
+    const shellIDOf = (exit: any) => (exit.value as { metadata?: { shellID?: string; status?: string } }).metadata
+    const lastText = (event: any) => (event.messages[0].content as { text: string }[]).at(-1)!.text
+    for (const [folder, reply, note] of [["/outside-bg-yes", "once", WRITE_APPROVED_RETRY_NOTE], ["/outside-bg-no", "reject", WRITE_REFUSED_NOTE]] as const) {
+      const exit = yield* shellCall(session.id, { command: "sleep 60", background: true }, `call_${folder.slice(1)}`)
+      const metadata = shellIDOf(exit)
+      expect(metadata?.status).toBe("running")
+      expect(yield* requests(session.id)).toEqual([])
+      const hook = yield* Effect.forkChild(hooks.trigger("session", "context", request(metadata!.shellID!, folder) as never))
+      const [card] = yield* pending
+      expect(card).toMatchObject({ action: "external_directory", resources: [`${folder}/*`], source: { id: `call_${folder.slice(1)}` } })
+      if (reply === "once") r6.granted.add(folder)
+      yield* (yield* Permission.Service).reply({ requestID: card!.id, reply })
+      const event = yield* E.Fiber.join(hook)
+      expect(lastText(event)).toBe(note)
+      // Later requests carry the same note on the same result, without another card.
+      const again = yield* hooks.trigger("session", "context", request(metadata!.shellID!, folder) as never)
+      expect(lastText(again)).toBe(note)
+      expect(yield* requests(session.id)).toEqual([])
+    }
+    // A request that stops waiting leaves the card with its command; the decision lands in the next request.
+    const exit = yield* shellCall(session.id, { command: "sleep 60", background: true }, "call_bg_stop")
+    const shellID = shellIDOf(exit)!.shellID!
+    const abandoned = yield* Effect.forkChild(hooks.trigger("session", "context", request(shellID, "/outside-bg-stop") as never))
+    const [card] = yield* pending
+    yield* E.Fiber.interrupt(abandoned)
+    expect((yield* requests(session.id)).map((item) => item.id)).toEqual([card!.id])
+    r6.granted.add("/outside-bg-stop")
+    yield* (yield* Permission.Service).reply({ requestID: card!.id, reply: "once" })
+    const later = yield* hooks.trigger("session", "context", request(shellID, "/outside-bg-stop") as never)
+    expect(lastText(later)).toBe(WRITE_APPROVED_RETRY_NOTE)
+  }))
+})

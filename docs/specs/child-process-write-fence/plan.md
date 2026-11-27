@@ -876,4 +876,6 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 ### 偏离记录
 
-暂无。
+- 2026-11-27 · 步骤 4 多改一个同调用链文件 `packages/ext/src/secret-mask.ts`：execute.after 的错误遮盖 `permissionCause` 只保留 `Permission.BlockedError` / `CorrectedError` 作原因，普通拒绝 `Permission.DeclinedError` 被丢成 `error: undefined`，于是 promise 工具里原样抛出的拒绝到了会话运行器已认不出，模型拿到一条空的失败结果继续往下走（design §4.3 第 4 步「按结束本步恢复」列为未实跑，实测在此被否定）。DeclinedError 没有字段，原样保留即可，不涉遮盖内容。红：`register-policy.test.ts` 共享拒绝例在改前 `failure(exit).error` 为 `undefined`（两条调用都只剩空 message 的 Tool.Error）；改后两条调用的原因是同一个 `Permission.DeclinedError` 实例。同一修正也让既有安装工具（BR-10，`askInstall`）的普通拒绝按其文档结束本步；该端到端行为此前无用例。
+- 2026-11-27 · 步骤 4 证据：`bun test src/policy/register-policy.test.ts` **122 pass**（原 115 + 7）；只去掉撤回（`leave` 不调 `withdrawRefusedWriteCard`）⇒ 取消例 **1 fail**（停止后请求仍待决）；只去掉 context 钩子里的 AB5 调用 ⇒ 后台例 **1 fail**；旧码上 AB3 六例红、「不出卡」例为守卫（旧码本就不出卡）。`secret-mask.test.ts`、`hub-tools.test.ts`、`display.test.ts` **53 pass**，ext `bun typecheck` exit 0。后台例的命令保持运行（`sleep 60`）：它在本宿主里完成会由 `notifyWhenDone` 触发一次真实模型回合并外呼；结果正文用 core 的 `ShellResult.notification` 造，真实完成路径归场景层。
+

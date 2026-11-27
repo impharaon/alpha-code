@@ -5,9 +5,9 @@ import { Environment } from "../environment/index.js"
 import { ConnectorRequirement } from "./codepuppy-connector-key.js"
 import { connectorContentRuntime, connectorSourceProgram } from "./codepuppy-connector-content.js"
 
+// V24-R1: dependency install scripts run as with official npx, inside the write fence and egress approval.
 export const connectorNpmDefaults = {
   "prefer-offline": "true",
-  "ignore-scripts": "true",
   "update-notifier": "false",
 } as const
 
@@ -163,7 +163,8 @@ const { createRequire } = require('node:module')
   }
   if (input.operation.kind === 'normalize') {
     fs.mkdirSync(input.content.temporary, { recursive: true, mode: 0o700 })
-    const content = vm.runInThisContext('(' + input.contentProgram + ')')({ ...input.content, packageOptions: { ...options, ignoreScripts: input.defaults['ignore-scripts'] === 'true' } })
+    // Content identity packs a local source without its pack lifecycle scripts; V24-R1 is about the install.
+    const content = vm.runInThisContext('(' + input.contentProgram + ')')({ ...input.content, packageOptions: { ...options, ignoreScripts: true } })
     const semver = npmRequire('semver')
     const requirements = []
     const installSpecs = []

@@ -928,6 +928,8 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 
 2026-11-27 · npm 只收它定义的绑定键（`7f4a8b7870`）：实测 pnpm 10.32.1 只认 `npm_config_{store,cache,state}_dir`，`pnpm_config_*` 三项均为 `undefined`（`pnpm config get` 与 `pnpm store path` 两种读法），所以 #1759 R1 的环境表不能按名字拆开——拆掉会让 pnpm 的 store 回到 `~/Library/pnpm/store`。修在启动器 npm 程序的安装分派处：它本来就负责把绑定环境重新落到 npm 进程上，现在只删除绑定里以 `npm_config_` 开头、而 npm 自身 definitions 不认识的键，再交给 npm CLI；用户自己设的 npm 变量不动，pnpm 仍拿到这三项。红例在旧实现上得到三行 `Unknown env config "store-dir"/"cache-dir"/"state-dir"`；一次性用真随包 npm 11.20.0 与不可达 registry 核对：直接运行的对照臂 stderr 前三行就是这三条警告，经启动器安装时详情以 `npm error code ECONNREFUSED` 开头。剩余：会话里的 shell 与 pnpm 共用同一份环境，用户或助手在终端里直接运行 npm 仍会看到这三行（#1759 的既有行为，不在本调用链）→ 观察项交 #1759 拥有者。
 
+2026-11-27 · V24-R1 install 脚本（本轮提交）：`connectorNpmDefaults` 去掉 `ignore-scripts`，准备安装的 argv 与 npm-exec 运行器环境都不再强制它，用户自己的 npm 配置（含 ignore-scripts）按官方 npx 一样保留。本地源的内容身份与归档（content 程序里 `libnpmpack`/`npm-packlist` 的 `ignoreScripts`）仍固定为 true：那是计算准备 key 时打包本地源，不是安装；若跟着放开，算 key 本身就会运行 prepack/prepare 脚本。这一处显式保留，原先它只是读同一个默认值。
+
 2026-11-27 · R8 显式 cwd（`55e4fe0163`）：新模块 `connector-workspace-binding.ts`。声明里明确配置了 cwd（不含 `{workspace}`）时，main 用既有写端（`persistMcpWithPolicy` → `persistMcp`，同一策略入口与停用投影）只把 cwd 换成所选文件夹，其余命令/环境/业务字段原样保留，再经 ext-ipc 已有的重载协调器请求一次 global 重载，由重载重读定义并重启连接器；`{workspace}` 或没有 cwd 的声明照旧在所选 Location 重新连接；写失败回 `unavailable` 并带原因，取消仍回 cancelled。来源：目录与包派生（`deriveMcpConfig`）从不产出 cwd，显式 cwd 只出现在用户自建的全局定义里，所以只接这一个写端；项目 `codepuppy.jsonc` 里手写的 cwd 没有既有的改写端（项目侧只有事务化安装与 `removeProjectMcpConfigInLock`），这种定义仍走「所选 Location 重连」，cwd 不变 → 观察项，不在本票另造项目写端。
 
 ### r10 独立部分实施收据（#1759 合入前）
@@ -1009,5 +1011,13 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 | AC-10 正式包 | macOS 候选包 | 编排器 | 五个连过一次后断网重启应用，10 s 内全部连上；对照臂用启动器默认设置时 Node 类连不上或超时 |
 
 遗留去向：①②各自返回设计（上文）；shell 中直接运行 npm 的三行警告 → #1759 拥有者观察项；项目 `codepuppy.jsonc` 手写 cwd 无改写端 → 观察项；探针里两条连接器并行 `mcp.add` 时第一条出现一次 `connected → disabled → 重新准备 → connected`（推断为探针并行的第二次 `mcp.add` 触发了配置重载，未单独验证；最终两条都按各自结果收敛）→ 丢弃。OPTIONAL：无。
+
+### r13 编排器裁定 V24-R1..R4 的落实
+
+依据：DESIGN v2.4 §10 V24-R1..R4（`af26ac4c97`，编排器裁定）；已核：Claude Opus 5.5。上节的两处返回设计已由 V24-R1（AC-04 取 A）与 V24-R2（AC-02 取 A）关闭。
+
+| 裁定 | 落实与证据 | 红例 |
+| --- | --- | --- |
+| V24-R1 AC-04 install 脚本 | 代码见偏离记录同日条。常驻命名例 core `codepuppy-connector-launch.test.ts` 「npm product installer runs dependency install scripts like official npx」：以真实准备 argv 与 npm-exec 运行器环境进入 CLI 分派，装载真 `@npmcli/config`，断言 argv 无 `--ignore-scripts`、生效配置 `ignore-scripts=false`、`prefer-offline=true`。本机模块本身用一次性真入口证明，不做常驻：常驻用例需要联网取 prebuild 或本机编译工具链。`PROBE_PHASE=native`（同 r11 探针、真围栏、`gate slot --` exit 0）：`better-sqlite3@12.11.1` 那条 → `connected`（49.9 s，暖 Python），install 脚本经 prebuild-install 把 `better_sqlite3.node` 下到 `userData/package-managers/npm/cache/_prebuilds`，再落进 `userData/connector-runtime/prepared/<key>/node_modules/better-sqlite3/build/Release/`；`@parcel/watcher` 那条同样 `connected`（42.4 s）；HOME 只多出引擎数据根下的 `shell/<id>`；旧工具未执行 | 改动前：常驻例 FAIL（argv 含 `--ignore-scripts=true`）；一次性探针同一入口 `better-sqlite3` → `failed`，stderr `Could not locate the bindings file`（上节 r12 ②） |
 
 遗留去向：①#1759 R1 env 里 pnpm 的 `npm_config_store_dir/cache_dir/state_dir` 让 npm 11 每次打印「Unknown env config」三行，并出现在下载失败的详情开头 → #1759 拥有者（或呈现层只取末行）；②网络中断时一次下载失败约需 338 s 才定论（npm 自身重试 × 准备事务一次恢复）→ 意图项（是否在 BR-06/07 下接受）；③AC-02 中引擎首次起子进程时在 HOME 的引擎数据根建空目录 `opencode/shell/<hash>` → 验收方判定是否计入；④开发树未做启动器预构建时不写描述（打包产物必有）→ 无需处理，已记偏离。OPTIONAL：无。

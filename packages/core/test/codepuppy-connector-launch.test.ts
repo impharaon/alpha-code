@@ -636,8 +636,8 @@ for (const runner of ["uv-tool", "npm-exec"] as const)
     for (const key of ["PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"]) expect(env).not.toHaveProperty(key)
     if (runner === "uv-tool") expect(env).toMatchObject({ UV_TOOL_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/tools"), UV_TOOL_BIN_DIR: path.join(input.launchers.runtimeRoot, "prepared", input.key, "uv/bin") })
     if (runner === "npm-exec") {
-      expect(env).toMatchObject({ npm_config_prefer_offline: "true", npm_config_ignore_scripts: "true", npm_config_update_notifier: "false" })
-      expect(env).not.toHaveProperty("NPM_CONFIG_IGNORE_SCRIPTS")
+      // V24-R1: no forced ignore-scripts; the user's own npm configuration is kept as official npx keeps it.
+      expect(env).toMatchObject({ npm_config_prefer_offline: "true", npm_config_update_notifier: "false", npm_config_ignore_scripts: "false", NPM_CONFIG_IGNORE_SCRIPTS: "false" })
       expect(env).not.toHaveProperty("UV_TOOL_DIR")
     }
     expect(input).toEqual(before)
@@ -1624,7 +1624,7 @@ test("npm product installer forwards resolved configuration and owned prefix wit
   const trace = JSON.parse(result.stdout)
   expect(trace.arguments.slice(0, 1)).toEqual(["install"])
   expect(trace.arguments).toContain("--registry=https://registry.invalid/")
-  expect(trace.arguments).toContain("--ignore-scripts=true")
+  expect(trace.arguments).toContain("--prefer-offline=true")
   expect(trace.arguments).toContain(input.prefix)
   expect(trace.arguments).not.toContain("--cache=" + path.join(input.root, "unbound-cache"))
   expect(trace.arguments.join(" ")).not.toContain("must-not-run")
@@ -1655,6 +1655,28 @@ test("npm product installer gives npm only the bound configuration npm defines",
   const trace = JSON.parse(result.stdout)
   expect(trace.warnings.filter((line: string) => line.includes("Unknown env config"))).toEqual([])
   expect(trace.cache).toBe(cache)
+})
+
+// Integration layer: V24-R1. The CLI dispatch loads the real npm Config from the actual
+// preparation argv and runner environment; dependency install scripts run as with official npx.
+test("npm product installer runs dependency install scripts like official npx", async () => {
+  const input = npmSourceFixture()
+  const npm = path.dirname(path.dirname(input.launchers.npmCli))
+  writeFileSync(path.join(npm, "lib/cli.js"), [
+    "module.exports = async process => {",
+    "  const Config = require('@npmcli/config')",
+    "  const { definitions, shorthands, flatten, nerfDarts } = require('@npmcli/config/lib/definitions')",
+    "  const config = new Config({ definitions, shorthands, flatten, nerfDarts, npmPath: require('node:path').dirname(__dirname), argv: process.argv })",
+    "  await config.load()",
+    "  process.stdout.write(JSON.stringify({ arguments: process.argv.slice(2), ignoreScripts: config.get('ignore-scripts'), preferOffline: config.get('prefer-offline') }))",
+    "}",
+  ].join("\n"))
+  const environment = connectorRunnerEnvironment({ runner: "npm-exec", launchers: input.launchers, key: input.key, inherited: input.environment, declared: {}, packageBins: [] })
+  const result = await Effect.runPromise(Effect.scoped(installNpmConnector({ ...input, cwd: input.root, syntax: "npx", arguments: ["--package=better-sqlite3@12.11.1", "--call", "must-not-run"], key: input.key, installSpecs: ["better-sqlite3@12.11.1"], environment })).pipe(Effect.provide(hostEnvironmentLayer)))
+  expect(result.exitCode).toBe(0)
+  const trace = JSON.parse(result.stdout)
+  expect(trace.arguments.filter((argument: string) => argument.startsWith("--ignore-scripts"))).toEqual([])
+  expect(trace).toMatchObject({ ignoreScripts: false, preferOffline: true })
 })
 
 // Module layer: actual uv0.13.10 Debug sample, including nested map keys and Rust escapes.

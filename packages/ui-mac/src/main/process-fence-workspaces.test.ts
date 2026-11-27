@@ -9,6 +9,9 @@ import { join, relative, resolve } from "node:path"
 import {
   bootFenceWorkspaceTruth,
   fenceWorkspaceTruthPath,
+  writableLocationTruthPath,
+  readWritableLocationTruth,
+  writeWritableLocationTruth,
   readWorkspaceTruth,
   readWorkspaceTruthOrThrow,
   workspacesFromRendererTabs,
@@ -17,6 +20,7 @@ import {
 import { environmentMutableRoot } from "./codepuppy-environment"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
 import { createDeepLinkQueue } from "./deep-link-queue"
+import { relativeImportClosure } from "./process-fence-write-sites"
 
 const STATE_ROOT = "/Users/alpha/Library/Application Support/codepuppy-state"
 const eligibilityFixture = {
@@ -34,6 +38,62 @@ function withTemp<T>(run: (dir: string) => T): T {
 }
 
 const draft = (id: string, directory: string, server = "sidecar") => ({ type: "draft", draftID: id, server, directory })
+
+describe("writable location truth", () => {
+  test("independent schema round-trips atomically beside workspace truth", () => {
+    withTemp((dir) => {
+      const file = writableLocationTruthPath(dir, "dev")
+      expect(file).toBe(join(dir, "fence-workspaces", "dev-write-locations.json"))
+      const entries = [{ sourcePath: "/home/puppy/.bun/bin", targetPath: "/tools/bun/bin", kind: "directory" as const }]
+      expect(readWritableLocationTruth(file, fs)).toMatchObject({ ok: false, absent: true })
+      writeWritableLocationTruth(file, { v: 1, entries }, fs)
+      expect(readWritableLocationTruth(file, fs)).toEqual({ ok: true, entries })
+      expect(readFileSync(file, "utf8")).toBe('{"v":1,"entries":[{"sourcePath":"/home/puppy/.bun/bin","targetPath":"/tools/bun/bin","kind":"directory"}]}\n')
+      expect(readdirSync(join(dir, "fence-workspaces"))).toEqual(["dev-write-locations.json"])
+      writeWorkspaceTruth(fenceWorkspaceTruthPath(dir, "dev"), ["/project"], fs)
+      expect(readWorkspaceTruth(fenceWorkspaceTruthPath(dir, "dev"), fs)).toEqual({ ok: true, workspaces: ["/project"] })
+      expect(readWritableLocationTruth(file, fs)).toEqual({ ok: true, entries })
+    })
+  })
+
+  test("bad records and unreadable truth fail without being treated as a first binding", () => {
+    withTemp((dir) => {
+      const file = join(dir, "truth.json")
+      const entry = { sourcePath: "/source", targetPath: "/target", kind: "file" }
+      for (const value of [
+        "not json", "[]", '{"v":2,"entries":[]}', '{"v":1,"entries":{}}',
+        JSON.stringify({ v: 1, entries: [{ ...entry, sourcePath: "relative" }] }),
+        JSON.stringify({ v: 1, entries: [{ ...entry, targetPath: "relative" }] }),
+        JSON.stringify({ v: 1, entries: [{ ...entry, kind: "subpath" }] }),
+        JSON.stringify({ v: 1, entries: [entry, entry] }),
+      ]) {
+        writeFileSync(file, value)
+        expect(readWritableLocationTruth(file, fs), value).toMatchObject({ ok: false, absent: false })
+        expect(readFileSync(file, "utf8")).toBe(value)
+      }
+      expect(readWritableLocationTruth(dir, fs)).toMatchObject({ ok: false, absent: false })
+    })
+  })
+
+  test("write and rename failures preserve the committed truth and remove temporary files", () => {
+    withTemp((dir) => {
+      const file = join(dir, "truth.json")
+      writeWritableLocationTruth(file, { v: 1, entries: [] }, fs)
+      const before = readFileSync(file, "utf8")
+      for (const api of ["writeFileSync", "renameSync"] as const) {
+        expect(() => writeWritableLocationTruth(file, { v: 1, entries: [{ sourcePath: "/a", targetPath: "/b", kind: "file" }] }, { ...fs, [api]: () => { throw new Error("EROFS") } })).toThrow("EROFS")
+        expect(readFileSync(file, "utf8")).toBe(before)
+        expect(readdirSync(dir)).toEqual(["truth.json"])
+      }
+    })
+  })
+
+  test("the identity writer and planner stay outside the sidecar import closure", () => {
+    const closure = relativeImportClosure(join(import.meta.dir, "sidecar.ts"))
+    expect(closure).not.toContain(join(import.meta.dir, "process-fence-workspaces.ts"))
+    expect(closure).not.toContain(join(import.meta.dir, "process-fence-plan.ts"))
+  })
+})
 
 describe("真源文件:位置、严格读、原子写", () => {
   test("路径 = <casBaseRoot>/fence-workspaces/<env>.json,与三个 env 根、cas/ 同级 —— 不在 W2(env/<env>)之下", () => {

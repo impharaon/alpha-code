@@ -76,7 +76,7 @@ async function startOn(slot: ReturnType<typeof engineSlot>) {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-naming")), projectTrust: engineProjectTrust },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-naming")), packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   const get = async (route: string) => {

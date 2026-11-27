@@ -55,7 +55,7 @@ async function engineWithPlugins(name: string, plugins: string[]) {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   return { fetch: fetch!, directory: slot.projectDirectory }

@@ -1,12 +1,97 @@
-import { spawnSync } from "node:child_process"
+import { execFile, spawnSync } from "node:child_process"
+import { accessSync, constants, statSync } from "node:fs"
 import { userInfo } from "node:os"
-import { basename } from "node:path"
+import { basename, delimiter, isAbsolute, join } from "node:path"
+import type { EngineRoots } from "./process-fence-profile"
+
+export type ShellProbeFenceContext = {
+  profile: string
+  env: Readonly<Record<string, string>>
+  roots: EngineRoots & { stateHome: string; engineConfigDirectory: string }
+  /** Root keys whose `env` value is an app default, not a user export: the probe child gets them, main's own environment never does. */
+  defaults?: readonly string[]
+}
+
+const ROOT_KEYS = ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG", "OPENCODE_DB"] as const
+
+/** Every probe/cache merge restores this same trusted snapshot, including absent optional roots. */
+export function applyTrustedShellEnvironment(target: NodeJS.ProcessEnv, source: Record<string, string>, context: ShellProbeFenceContext) {
+  Object.assign(target, source)
+  for (const key of ROOT_KEYS) {
+    const value = context.env[key]
+    // An app default written here would look user-exported after a relaunch.
+    if (value === undefined || context.defaults?.includes(key)) delete target[key]
+    else target[key] = value
+  }
+}
 
 const TIMEOUT = 5_000
 
 type Probe = { type: "Loaded"; value: Record<string, string> } | { type: "Timeout" } | { type: "Unavailable" }
 type ShellEnvLogger = {
   log: (message: string) => void
+}
+
+export type GoInstallTarget = { directory: string; configured: boolean }
+
+// Any PATH lookup happens inside the fence, so a program planted in a fence-writable directory runs fenced.
+function fencedArgs(context: ShellProbeFenceContext, command: string, args: readonly string[]) {
+  return ["-p", context.profile, "/bin/sh", "-c", 'exec "$0" "$@"', command, ...args]
+}
+
+/** First executable regular file named `name` on an absolute PATH entry. Nothing is executed. */
+export function commandOnPath(name: string, path: string | undefined): string | undefined {
+  for (const entry of (path ?? "").split(delimiter)) {
+    if (!isAbsolute(entry)) continue
+    const candidate = join(entry, name)
+    try {
+      accessSync(candidate, constants.X_OK)
+      if (statSync(candidate).isFile()) return candidate
+    } catch { /* not on this entry */ }
+  }
+}
+
+let generationFence: ShellProbeFenceContext | undefined
+/** The latest planned generation's profile and command environment; main's own helper commands run under it. */
+export function useGenerationFence(context: ShellProbeFenceContext) {
+  generationFence = context
+}
+/** Tests only: other test files in the same process may already have planned a generation. */
+export function __resetGenerationFenceForTests() {
+  generationFence = undefined
+}
+
+/**
+ * A main-side helper command (tool version, git diff). On darwin it runs only under the generation fence; before any
+ * plan there is no fence to run under, so it is refused (undefined). Other platforms have no fence and run it as is.
+ */
+export function underGenerationFence(command: string, args: readonly string[]): { file: string; args: string[]; env?: Record<string, string> } | undefined {
+  if (process.platform !== "darwin") return { file: command, args: [...args] }
+  if (!generationFence) return undefined
+  return { file: "/usr/bin/sandbox-exec", args: fencedArgs(generationFence, command, args), env: { ...generationFence.env } }
+}
+
+/** Native configuration resolution, inside the same tested fence and original command environment. */
+export async function queryGoInstallTarget(context: ShellProbeFenceContext, cwd: string, log: (reason: string) => void, signal?: AbortSignal): Promise<GoInstallTarget | null> {
+  // Without go on the command PATH there is nothing to ask; the caller keeps its current projection.
+  if (!commandOnPath("go", context.env.PATH)) return null
+  const query = (args: string[]) => new Promise<string>((resolve, reject) => {
+    execFile("/usr/bin/sandbox-exec", fencedArgs(context, "go", args), {
+      cwd, env: { ...context.env, GOTOOLCHAIN: "local", GOTELEMETRY: "off" }, timeout: TIMEOUT, signal, windowsHide: true,
+    }, (error, output) => error ? reject(error) : resolve(output))
+  })
+  try {
+    const native: unknown = JSON.parse(await query(["env", "-json", "GOPATH"]))
+    const changed: unknown = JSON.parse(await query(["env", "-changed", "-json", "GOBIN"]))
+    if (!native || typeof native !== "object" || !("GOPATH" in native) || typeof native.GOPATH !== "string" || !changed || typeof changed !== "object" || Array.isArray(changed)) throw new Error("invalid result")
+    const configured = "GOBIN" in changed
+    const directory = configured ? changed.GOBIN : join(native.GOPATH.split(delimiter)[0] || "", "bin")
+    if (typeof directory !== "string" || !isAbsolute(directory) || (!configured && !isAbsolute(native.GOPATH.split(delimiter)[0] || ""))) throw new Error("invalid directory")
+    return { directory, configured }
+  } catch {
+    log("Go install directory query unavailable")
+    return null
+  }
 }
 
 export function resolveUserShell(envShell: string | undefined, loginShell: string | null | undefined) {
@@ -48,12 +133,14 @@ export function minimalProbeEnv(source: Record<string, string | undefined>): Rec
   return env
 }
 
-function probe(shell: string, mode: "-il" | "-l"): Probe {
-  const out = spawnSync(shell, [mode, "-c", "env -0"], {
+function probe(shell: string, mode: "-il" | "-l", context: ShellProbeFenceContext): Probe {
+  const fenced = process.platform === "darwin"
+  const out = spawnSync(fenced ? "/usr/bin/sandbox-exec" : shell, fenced ? ["-p", context.profile, shell, mode, "-c", "env -0"] : [mode, "-c", "env -0"], {
     stdio: ["ignore", "pipe", "ignore"],
     timeout: TIMEOUT,
     windowsHide: true,
-    env: minimalProbeEnv(process.env),
+    env: context.env,
+    cwd: context.roots.home,
   })
 
   const err = out.error as NodeJS.ErrnoException | undefined
@@ -83,13 +170,13 @@ export function isNushell(shell: string) {
   return name === "nu" || name === "nu.exe" || raw.endsWith("\\nu.exe")
 }
 
-export function loadShellEnv(shell: string, logger: ShellEnvLogger) {
+export function loadShellEnv(shell: string, logger: ShellEnvLogger, context: ShellProbeFenceContext) {
   if (isNushell(shell)) {
     logger.log(`[server] Skipping shell env probe for nushell: ${shell}`)
     return null
   }
 
-  const interactive = probe(shell, "-il")
+  const interactive = probe(shell, "-il", context)
   if (interactive.type === "Loaded") {
     logger.log(`[server] Loaded shell environment with -il (${Object.keys(interactive.value).length} vars)`)
     return interactive.value
@@ -99,7 +186,7 @@ export function loadShellEnv(shell: string, logger: ShellEnvLogger) {
     return null
   }
 
-  const login = probe(shell, "-l")
+  const login = probe(shell, "-l", context)
   if (login.type === "Loaded") {
     logger.log(`[server] Loaded shell environment with -l (${Object.keys(login.value).length} vars)`)
     return login.value

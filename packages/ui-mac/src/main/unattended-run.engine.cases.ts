@@ -37,7 +37,8 @@ mock.module("./logging", () => ({
   write: () => {},
   rotateServerLogs: () => {},
 }))
-mock.module("./codepuppy-user-workspace", () => ({ saveVisibleOutputs: () => {} }))
+const userWorkspace = { ...await import("./codepuppy-user-workspace") }
+mock.module("./codepuppy-user-workspace", () => ({ ...userWorkspace, saveVisibleOutputs: () => {} }))
 
 const { createCodePuppySidecarHost, createHubRequestStages } = await import("./hub-view")
 const { createReloadCoordinator } = await import("./reload-coordinator")

@@ -51,6 +51,15 @@ export function fenceWorkspaceTruthPath(casBaseRoot: string, environment: AppEnv
   return resolve(casBaseRoot, FENCE_WORKSPACES_DIRNAME, `${environment}.json`)
 }
 
+export type WritableLocationTruth = {
+  v: 1
+  entries: readonly { sourcePath: string; targetPath: string; kind: "directory" | "file" }[]
+}
+
+export function writableLocationTruthPath(casBaseRoot: string, environment: AppEnvironment): string {
+  return resolve(casBaseRoot, FENCE_WORKSPACES_DIRNAME, `${environment}-write-locations.json`)
+}
+
 export type WorkspaceTruthReadFs = { readFileSync: (path: string, encoding: "utf8") => string }
 export type WorkspaceTruthWriteFs = {
   mkdirSync: (path: string, options: { recursive: true }) => unknown
@@ -60,6 +69,7 @@ export type WorkspaceTruthWriteFs = {
 }
 
 export type WorkspaceTruthRead = { ok: true; workspaces: string[] } | { ok: false; absent: boolean; reason: string }
+export type WritableLocationTruthRead = { ok: true; entries: WritableLocationTruth["entries"] } | { ok: false; absent: boolean; reason: string }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v)
@@ -107,14 +117,50 @@ export function readWorkspaceTruthOrThrow(path: string, fs: WorkspaceTruthReadFs
   return read.workspaces
 }
 
+export function readWritableLocationTruth(path: string, fs: WorkspaceTruthReadFs): WritableLocationTruthRead {
+  let text: string
+  try {
+    text = fs.readFileSync(path, "utf8")
+  } catch (error) {
+    return { ok: false, absent: errorCode(error) === "ENOENT", reason: `${path}: ${errorMessage(error)}` }
+  }
+  const invalid = (reason: string): WritableLocationTruthRead => ({ ok: false, absent: false, reason: `${path}: ${reason}` })
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return invalid("not JSON")
+  }
+  if (!isRecord(parsed) || parsed.v !== 1 || !Array.isArray(parsed.entries)) return invalid("expected v:1 and entries array")
+  const entries: WritableLocationTruth["entries"][number][] = []
+  const keys = new Set<string>()
+  for (const [index, entry] of parsed.entries.entries()) {
+    if (!isRecord(entry) || typeof entry.sourcePath !== "string" || !isAbsolute(entry.sourcePath) || typeof entry.targetPath !== "string" || !isAbsolute(entry.targetPath) || (entry.kind !== "directory" && entry.kind !== "file"))
+      return invalid(`entries[${index}] must contain absolute sourcePath/targetPath and directory/file kind`)
+    const key = JSON.stringify([entry.sourcePath, entry.kind])
+    if (keys.has(key)) return invalid(`entries[${index}] duplicates sourcePath and kind`)
+    keys.add(key)
+    entries.push({ sourcePath: entry.sourcePath, targetPath: entry.targetPath, kind: entry.kind })
+  }
+  return { ok: true, entries }
+}
+
 let tmpSeq = 0
 
 /** 原子写:临时文件 + rename;父目录不在就建(`fence-workspaces/` 本身不在 codepuppy-environment 的拓扑预检里)。 */
 export function writeWorkspaceTruth(path: string, workspaces: readonly string[], fs: WorkspaceTruthWriteFs): void {
+  writeTruth(path, { v: FENCE_WORKSPACE_TRUTH_VERSION, workspaces: [...workspaces] }, fs)
+}
+
+export function writeWritableLocationTruth(path: string, truth: WritableLocationTruth, fs: WorkspaceTruthWriteFs): void {
+  writeTruth(path, truth, fs)
+}
+
+function writeTruth(path: string, value: unknown, fs: WorkspaceTruthWriteFs): void {
   fs.mkdirSync(dirname(path), { recursive: true })
   const tmp = `${path}.${process.pid}.${++tmpSeq}.tmp`
   try {
-    fs.writeFileSync(tmp, JSON.stringify({ v: FENCE_WORKSPACE_TRUTH_VERSION, workspaces: [...workspaces] }) + "\n")
+    fs.writeFileSync(tmp, JSON.stringify(value) + "\n")
     fs.renameSync(tmp, path)
   } catch (error) {
     try {

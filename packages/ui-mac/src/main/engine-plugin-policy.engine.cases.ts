@@ -127,7 +127,7 @@ async function engineWith(name: string, config: CodePuppyConfigInjectionResult["
   const engine = await startEngine(buildEngineServerOptions({
     hostname: "127.0.0.1", port: 0, password: PASSWORD, engineVersion: "test", databasePath: slot.databasePath,
     configDirectory: global, config, models: { ...(modelsFile ? { file: modelsFile } : {}), fetch: false }, filewatcher: false, platform: process.platform,
-  }), { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust })
+  }), { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), packageManagerEnvironment: {}, projectTrust: engineProjectTrust })
   engines.push(engine)
   const request = (directory: string, method: string, route: string, body?: unknown) => fetch!(new Request(`http://codepuppy-sidecar.invalid${route}`, {
     method, headers: { "x-opencode-directory": encodeURIComponent(directory), "content-type": "application/json" },

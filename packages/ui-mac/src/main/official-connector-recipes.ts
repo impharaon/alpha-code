@@ -11,6 +11,7 @@ import { keychainBackend } from "./codepuppy-keychain-backend"
 export const DBHUB_READONLY_TOML =
   '[[sources]]\nid = "default"\ndsn = "${DSN}"\n\n[[tools]]\nname = "execute_sql"\nsource = "default"\nreadonly = true\n'
 import type { OfficialConnectorName } from "./official-connector-names"
+import { commandOnPath, underGenerationFence } from "./shell-env"
 export { OFFICIAL_CONNECTOR_NAMES, isOfficialConnector, type OfficialConnectorName } from "./official-connector-names"
 export const officialConnectorFailure = () =>
   new Error("official-connector-needs-reentry: secure storage or runtime prerequisite unavailable")
@@ -65,18 +66,12 @@ export function officialRuntimeParent(root: string) {
 }
 
 export function officialNodeCommand() {
-  const node = spawnSync("which", ["node"], {
-    encoding: "utf8",
-    timeout: 5000,
-    env: { PATH: process.env.PATH },
-  }).stdout?.trim()
-  const npx = spawnSync("which", ["npx"], {
-    encoding: "utf8",
-    timeout: 5000,
-    env: { PATH: process.env.PATH },
-  }).stdout?.trim()
-  if (!node || !npx || !isAbsolute(node) || !isAbsolute(npx)) throw officialConnectorFailure()
-  const tested = spawnSync(node, ["--version"], { encoding: "utf8", timeout: 5000, env: { PATH: process.env.PATH } })
+  // PATH directories can be fence-writable: look them up without running anything, and run the version check fenced.
+  const node = commandOnPath("node", process.env.PATH)
+  const npx = commandOnPath("npx", process.env.PATH)
+  const check = node ? underGenerationFence(node, ["--version"]) : undefined
+  if (!node || !npx || !check) throw officialConnectorFailure()
+  const tested = spawnSync(check.file, check.args, { encoding: "utf8", timeout: 5000, env: check.env ?? { PATH: process.env.PATH } })
   const version = /^v(\d+)\.(\d+)\.(\d+)\s*$/.exec(tested.stdout ?? "")
   if (
     tested.status !== 0 ||

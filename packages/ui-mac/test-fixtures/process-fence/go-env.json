@@ -1,0 +1,19 @@
+{
+  "source": "Official Go 1.27.4 darwin-arm64; go env -json GOPATH and go env -changed -json GOBIN, GOENV=off; GOPATH=/native/first:/native/second; GOBIN empty/configured. Archive source and digest in scenario record.json.",
+  "samples": [
+    {
+      "native": {
+        "GOPATH": "/native/first:/native/second"
+      },
+      "changed": {}
+    },
+    {
+      "native": {
+        "GOPATH": "/native/first:/native/second"
+      },
+      "changed": {
+        "GOBIN": "/native/configured/bin"
+      }
+    }
+  ]
+}

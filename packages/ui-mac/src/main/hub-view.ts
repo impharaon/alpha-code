@@ -1,3 +1,4 @@
+import { buildPackageManagerControlReply, buildWriteScopeReply, type PackageManagerControlHandler, type WriteScopeRequest, type WriteScopeReply } from "./codepuppy-sidecar-messages"
 import type { VideoBridgeRequest, VideoBridgeReply } from "../shared/video-understanding"
 import { networkEgressActivity, type NetworkInspection } from "./network-egress-activity"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
@@ -495,7 +496,7 @@ export function createHubRequestStages(deps: { log: (line: string) => void; onCh
 // 回复发不出去(sidecar 已退出)⇒ 记一行,不抛:ext 侧的请求簿记会按超时 / 子进程退出答「无法判断」。
 
 export type CodePuppySidecarHost = {
-  receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void): boolean
+  receive(message: unknown, post: (message: CodePuppySidecarOutbound) => void, readWriteScope: (request: Pick<WriteScopeRequest, "access" | "targets">) => Promise<WriteScopeReply["result"]>, packageManager: PackageManagerControlHandler): boolean
   /** sidecar ready:返回该次连接的断开函数(只断开自己那一次,晚到的旧 exit 不会断开新连接)。 */
   attach(post: (message: CodePuppySidecarOutbound) => void, generation?: number, inspect?: NetworkInspection): (reason: string) => void
 }
@@ -521,12 +522,20 @@ export function createCodePuppySidecarHost(deps: {
     }
   }
   return {
-    receive(message, post) {
+    receive(message, post, readWriteScope, packageManager) {
       if (networkEgressActivity.receive(message, post)) return true
       if (!isCodePuppySidecarMessage(message)) return false
       const inbound = parseCodePuppySidecarInbound(message)
       if (!inbound) {
         deps.log(`alpha sidecar: dropped malformed or unknown message type=${String((message as { type: unknown }).type).slice(0, 80)}`)
+        return true
+      }
+      if (inbound.type === "codepuppy.package-manager.request") {
+        packageManager(inbound.request).then((result) => reply(post, buildPackageManagerControlReply(inbound.id, result)), () => reply(post, buildPackageManagerControlReply(inbound.id, { ok: false, error: "unavailable" })))
+        return true
+      }
+      if (inbound.type === "codepuppy.write-scope.request") {
+        readWriteScope(inbound).then((result) => reply(post, buildWriteScopeReply(inbound.id, result)), () => reply(post, buildWriteScopeReply(inbound.id, { error: "unavailable" })))
         return true
       }
       if(inbound.type === "codepuppy.video.understand") {

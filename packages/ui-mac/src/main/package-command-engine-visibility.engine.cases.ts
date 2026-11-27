@@ -59,7 +59,7 @@ test(`#840 engine read on OpenCode 2: the package command is ${EXPECT}`, async (
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), projectTrust: engineProjectTrust },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, PASSWORD)), packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   const send = async (method: string, route: string, body?: unknown) => {
     const response = await fetch!(

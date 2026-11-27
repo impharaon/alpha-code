@@ -15,6 +15,7 @@ import { finalizeArtifactWithQuota, registerDownloadedArtifact, registeredArtifa
 import { validateArtifactDescriptor } from "../shared/cloud-artifact-descriptor"
 import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent, type OpenDialogOptions } from "electron"
 import { execFile } from "node:child_process"
+import { underGenerationFence } from "./shell-env"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { dispatchCloudJob, dispatchExplicitCloudUpload, getCloudJobStatus, cancelCloudJob, listCloudArtifacts, downloadCloudArtifactTo, getCloudAccountStatus } from "./codepuppy-cloud-jobs"
@@ -44,9 +45,12 @@ import { resolveEndpoints } from "./codepuppy-endpoints"
 // 工作树有变更 → `git diff HEAD`(含 staged);干净 → 回退最近一次 commit 的 diff(e2e 常在干净树上跑)。
 // 只读操作(git diff 无副作用);超 8MB 直接砍 buffer 报错 —— 上限最终由 dispatch 的 256KiB 信封帽把关。
 function gitDiff(directory: string): Promise<{ ok: true; diff: string; source: "worktree" | "last-commit" } | { ok: false; reason: string }> {
+  // git and the repository's own hooks/config (e.g. core.fsmonitor) run under the generation fence, not as main.
   const run = (args: string[]) =>
     new Promise<{ ok: boolean; out: string }>((resolve) => {
-      execFile("git", args, { cwd: directory, maxBuffer: 8 * 1024 * 1024 }, (err, stdout) =>
+      const command = underGenerationFence("git", args)
+      if (!command) return resolve({ ok: false, out: "" })
+      execFile(command.file, command.args, { cwd: directory, maxBuffer: 8 * 1024 * 1024, ...(command.env ? { env: command.env } : {}) }, (err, stdout) =>
         resolve({ ok: !err, out: stdout ?? "" }),
       )
     })

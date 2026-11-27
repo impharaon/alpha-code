@@ -1,9 +1,22 @@
+import { parseDirectoryAccessTargets, type DirectoryAccessTarget } from "../shared/directory-write-approval"
 import { parseVideoBridgeRequest, type VideoBridgeRequest, type VideoBridgeReply } from "../shared/video-understanding"
 import type { NetworkOutbound } from "../shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
 import type { ToolPolicyPartition, ToolPolicyRecord } from "../../../schema/src/codepuppy-tool-policy"
+import type { PackageManagerExecutionLease, PreparedShellExecution } from "@opencode/plugin/codepuppy-package-manager"
+
+export const PACKAGE_MANAGER_CANCEL_REASONS = ["cancelled", "timeout", "engine-disconnected", "app-quitting"] as const
+export type PackageManagerCancelReason = typeof PACKAGE_MANAGER_CANCEL_REASONS[number]
+export type PackageManagerControl =
+  | { op: "authorize"; input: PreparedShellExecution }
+  | { op: "bind"; executionID: string; pid: number }
+  | { op: "finish"; executionID: string }
+  | { op: "cancel"; executionID: string; reason: PackageManagerCancelReason }
+export type PackageManagerControlRequest = { type: "codepuppy.package-manager.request"; id: number; request: PackageManagerControl }
+export type PackageManagerControlReply = { type: "codepuppy.package-manager.reply"; id: number; result: { ok: true; lease?: PackageManagerExecutionLease } | { ok: false; error: "unavailable" } }
+export type PackageManagerControlHandler = (request: PackageManagerControl) => Promise<PackageManagerControlReply["result"]>
 import { documentRecord, isDocumentRuntimeState, isDocumentRuntimeVerifyRef, isDocumentRuntimeVerifyTask, isDocumentRuntimeVerifyReceipt, type DocumentRuntimeState, type DocumentRuntimeVerifyRef, type DocumentRuntimeVerifyTask, type DocumentRuntimeVerifyReceipt } from "../../../util/src/codepuppy-document"
 
 export type DocumentRuntimeMessage =
@@ -164,6 +177,8 @@ export type PackageAuthorizationQuery = { type: "codepuppy.package.authorization
 export type PackageAuthorizationReply = { type: "codepuppy.package.authorization.reply"; id: number; result: PackageAuthorizationResultV1 }
 
 export type CodePuppySidecarInbound =
+  | PackageManagerControlRequest
+  | WriteScopeRequest
   | VideoBridgeRequest
   | HubViewRequestMessage
   | PackageAuthorizationQuery
@@ -173,6 +188,8 @@ export type CodePuppySidecarInbound =
   | SourcesSearchRequest
   | HubInstallRequest
 export type CodePuppySidecarOutbound =
+  | PackageManagerControlReply
+  | WriteScopeReply
   | VideoBridgeReply
   | NetworkOutbound
   | ReloadRequestMessage
@@ -224,6 +241,8 @@ export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarIn
   const video=parseVideoBridgeRequest(value)
   if(video)return video
   if (!isRecord(value)) return
+  if (value.type === "codepuppy.package-manager.request") return parsePackageManagerControlRequest(value)
+  if (value.type === "codepuppy.write-scope.request") return parseWriteScopeRequest(value)
   if (value.type === "codepuppy.package.authorization.request")
     return isId(value.id) && isText(value.packageId) && Object.keys(value).every(key => ["type", "id", "packageId"].includes(key))
       ? buildPackageAuthorizationQuery(value.id, value.packageId) : undefined
@@ -749,4 +768,70 @@ export function parseToolPolicyWriteReply(value: unknown): ToolPolicyWriteReply 
   if (value.ok !== true || Object.keys(value).some((key) => !["type", "id", "ok", "backup"].includes(key))) return
   if (value.backup !== undefined && !isText(value.backup)) return
   return buildToolPolicyWriteReply(value.id, { ok: true, ...(typeof value.backup === "string" ? { backup: value.backup } : {}) })
+}
+
+
+export type WriteScopeRequest = { type: "codepuppy.write-scope.request"; id: number; access: "read" | "write"; targets: readonly DirectoryAccessTarget[] }
+/** `fixed`: writable because the target matched the R7-verified R3 fixed global-install/user-config table; `writable`: any other source (/tmp, caches, run-approved folders). */
+export type WriteScopeReply = { type: "codepuppy.write-scope.reply"; id: number; result: { revision: number; targets: readonly { absolute: string; outcome: "fixed" | "writable" | "needs-approval" | "protected" | "no-fence" }[] } | { error: "unavailable" } }
+
+export function parseWriteScopeRequest(value: unknown): WriteScopeRequest | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 4 || value.type !== "codepuppy.write-scope.request" || !isId(value.id) || (value.access !== "read" && value.access !== "write")) return
+  const targets = parseDirectoryAccessTargets(value.targets)
+  return targets ? { type: value.type, id: value.id, access: value.access, targets } : undefined
+}
+export function buildWriteScopeRequest(id: number, input: Pick<WriteScopeRequest, "access" | "targets">): WriteScopeRequest {
+  const request = parseWriteScopeRequest({ type: "codepuppy.write-scope.request", id, ...input })
+  if (!request) throw new Error("invalid write scope query")
+  return request
+}
+export function parseWriteScopeReply(value: unknown): WriteScopeReply | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 3 || value.type !== "codepuppy.write-scope.reply" || !isId(value.id) || !isRecord(value.result)) return
+  const result = value.result
+  if (Object.keys(result).length === 1 && result.error === "unavailable") return { type: value.type, id: value.id, result: { error: "unavailable" } }
+  if (Object.keys(result).length !== 2 || !isId(result.revision) || !Array.isArray(result.targets)) return
+  const targets = result.targets
+  if (!targets.every((target) => isRecord(target) && Object.keys(target).length === 2 && parseDirectoryAccessTargets([{ absolute: target.absolute, directory: target.absolute }]) && ["fixed", "writable", "needs-approval", "protected", "no-fence"].includes(target.outcome as string))) return
+  return { type: value.type, id: value.id, result: { revision: result.revision, targets } }
+}
+export function buildWriteScopeReply(id: number, result: WriteScopeReply["result"]): WriteScopeReply {
+  const reply = parseWriteScopeReply({ type: "codepuppy.write-scope.reply", id, result })
+  if (!reply) throw new Error("invalid write scope result")
+  return reply
+}
+
+export function buildPackageManagerControlRequest(id: number, request: PackageManagerControl): PackageManagerControlRequest {
+  return { type: "codepuppy.package-manager.request", id, request }
+}
+export function buildPackageManagerControlReply(id: number, result: PackageManagerControlReply["result"]): PackageManagerControlReply {
+  return { type: "codepuppy.package-manager.reply", id, result }
+}
+export function parsePackageManagerControlRequest(value: unknown): PackageManagerControlRequest | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.package-manager.request" || !isId(value.id) || !closedKeys(value, ["type", "id", "request"]) || !isRecord(value.request)) return
+  const request = value.request
+  if (request.op === "authorize") {
+    const input = request.input
+    const keys = ["shellID", "sessionID", "messageID", "callID", "command", "cwd", "shell"] as const
+    if (!closedKeys(request, ["op", "input"]) || !isRecord(input) || !closedKeys(input, keys) || !keys.every((key) => typeof input[key] === "string") || !keys.filter((key) => key !== "command").every((key) => isText(input[key]))) return
+    return buildPackageManagerControlRequest(value.id, { op: "authorize", input: input as PreparedShellExecution })
+  }
+  if (!isText(request.executionID)) return
+  if (request.op === "bind" && closedKeys(request, ["op", "executionID", "pid"]) && Number.isSafeInteger(request.pid) && typeof request.pid === "number" && request.pid > 0) return buildPackageManagerControlRequest(value.id, { op: "bind", executionID: request.executionID, pid: request.pid })
+  if (request.op === "finish" && closedKeys(request, ["op", "executionID"])) return buildPackageManagerControlRequest(value.id, { op: "finish", executionID: request.executionID })
+  if (request.op === "cancel" && closedKeys(request, ["op", "executionID", "reason"]) && PACKAGE_MANAGER_CANCEL_REASONS.some((reason) => reason === request.reason)) return buildPackageManagerControlRequest(value.id, { op: "cancel", executionID: request.executionID, reason: request.reason as PackageManagerCancelReason })
+}
+export function parsePackageManagerControlReply(value: unknown): PackageManagerControlReply | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.package-manager.reply" || !isId(value.id) || !closedKeys(value, ["type", "id", "result"]) || !isRecord(value.result)) return
+  const result = value.result
+  if (result.ok === false && result.error === "unavailable" && closedKeys(result, ["ok", "error"])) return buildPackageManagerControlReply(value.id, { ok: false, error: "unavailable" })
+  if (result.ok !== true || !closedKeys(result, result.lease === undefined ? ["ok"] : ["ok", "lease"])) return
+  if (result.lease === undefined) return buildPackageManagerControlReply(value.id, { ok: true })
+  const lease = result.lease
+  if (!isRecord(lease) || !closedKeys(lease, ["executionID", "nodes", "helperService", "executionSource", "shellPrivateInput"]) || !isText(lease.executionID) || typeof lease.executionSource !== "string" || typeof lease.helperService !== "string" || !Array.isArray(lease.nodes) || !lease.nodes.every((node) => isRecord(node) && closedKeys(node, ["nodeID"]) && isText(node.nodeID))) return
+  const input = lease.shellPrivateInput
+  if (!isRecord(input) || !closedKeys(input, ["fd", "data"]) || typeof input.fd !== "number" || !Number.isSafeInteger(input.fd) || input.fd < 3 || input.fd > 9 || !(input.data instanceof Uint8Array)) return
+  return buildPackageManagerControlReply(value.id, { ok: true, lease: lease as PackageManagerExecutionLease })
+}
+function closedKeys(value: Record<string, unknown>, keys: readonly string[]) {
+  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
 }

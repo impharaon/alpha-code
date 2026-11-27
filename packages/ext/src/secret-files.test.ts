@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
@@ -242,6 +242,9 @@ console.log(JSON.stringify({first:first>0,later,edited:files.values().some(v=>Bu
 
 // Design §10 SPEC5-04: a link whose literal target (readlink, hop by hop) leaves every source is never walked, resolved or
 // read — e.g. a workspace link into the app's own fenced credential stores; links that stay inside a source still alias.
+// Files registered later (a command or the read tool named them) keep the same boundary; real files outside still register.
+// A link a command names (spec v6 BR-05) registers the list file it literally points to; its walk reads no hop outside the
+// sources unless that hop is a list file, so a link into a store costs nothing, and an unreadable listed target one readlink.
 test("links whose literal target leaves every source are not followed, also through several hops", async () => {
   const { root, roots } = await setup()
   const outside = path.join(root, "outside")
@@ -255,20 +258,40 @@ test("links whose literal target leaves every source are not followed, also thro
   await writeFile(path.join(roots.project, "data", "env.txt"), "API_KEY=fixture-chain-token\n")
   await symlink(path.join(roots.project, "data", "env.txt"), path.join(roots.project, "hop-c"))
   await symlink(path.join(roots.project, "hop-c"), path.join(roots.project, ".env.chain"))
-  const followed = [path.join(roots.project, "link-store"), path.join(roots.project, "hop-a"), path.join(roots.project, "hop-b")]
+  await writeFile(path.join(outside, "linked.env"), "API_KEY=fixture-linked-token\n")
+  await symlink(path.join(outside, "linked.env"), path.join(roots.project, ".env.link"))
+  await mkdir(path.join(root, "other"))
+  await writeFile(path.join(root, "other", ".env"), "API_KEY=fixture-registered-token\n")
+  const registered = [path.join(roots.project, ".env.link"), path.join(root, "other", ".env")]
+  await mkdir(path.join(root, "linked-project"))
+  await writeFile(path.join(root, "linked-project", ".env"), "API_KEY=fixture-link-target-token\n")
+  await symlink(path.join(root, "linked-project", ".env"), path.join(roots.project, "link-other-env"))
+  const locked = path.join(outside, "locked")
+  await mkdir(locked)
+  await writeFile(path.join(locked, ".env"), "API_KEY=fixture-locked-token\n")
+  await symlink(path.join(locked, ".env"), path.join(roots.project, "link-locked-env"))
+  await chmod(locked, 0)
+  const named = ["link-store", "link-locked-env", "link-other-env"].map((name) => path.join(roots.project, name))
+  const followed = [path.join(roots.project, "link-store"), path.join(roots.project, "hop-a"), path.join(roots.project, "hop-b"), registered[0]]
   await writeFile(path.join(root, "audit.mjs"), `
 import fs from 'node:fs/promises';export const touched=[];
 const followed=${JSON.stringify(followed)},outside=${JSON.stringify(outside + path.sep)};
 const audit=(name,run)=>async (...args)=>{const file=String(args[0]);if(followed.includes(file)||file.startsWith(outside))touched.push(name+' '+file);return run(...args)};
-export const stat=audit('stat',fs.stat),realpath=audit('realpath',fs.realpath),readFile=audit('readFile',fs.readFile),readdir=fs.readdir,readlink=fs.readlink;
+export const stat=audit('stat',fs.stat),realpath=audit('realpath',fs.realpath),readFile=audit('readFile',fs.readFile),readdir=fs.readdir;
+export const readlink=async (...args)=>{const file=String(args[0]);if(file.startsWith(outside))touched.push('readlink '+file);return fs.readlink(...args)};
 `)
-  expect(await nodeCollector(root, roots, `
+  const result = await nodeCollector(root, roots, `
 import {registerHooks} from 'node:module';
 registerHooks({resolve(name,context,next){return next(name==='node:fs/promises'&&context.parentURL?.endsWith('/collector.mjs')?new URL('./audit.mjs',import.meta.url).href:name,context)}});
-const {createSecretFiles}=await import('./collector.mjs');const audit=await import('./audit.mjs');
-const files=createSecretFiles(JSON.parse(process.argv[2]));await files.refresh();await files.refresh();
-console.log(JSON.stringify({touched:audit.touched,chain:files.values().some(v=>Buffer.from(v).toString()==='fixture-chain-token')}));files.dispose();
-`)).toEqual({ touched: [], chain: true })
+const {createSecretFiles,resolveProtectedFile}=await import('./collector.mjs');const audit=await import('./audit.mjs');
+const roots=JSON.parse(process.argv[2]),files=createSecretFiles(roots);await files.refresh();
+for(const file of ${JSON.stringify(registered)})files.track(await resolveProtectedFile(file,roots));
+for(const file of ${JSON.stringify(named)})await files.trackLink(file);
+await files.refresh();await files.refresh();
+const has=(token)=>files.values().some(v=>Buffer.from(v).toString()===token);
+console.log(JSON.stringify({touched:audit.touched,chain:has('fixture-chain-token'),linked:has('fixture-linked-token'),registered:has('fixture-registered-token'),linkTarget:has('fixture-link-target-token'),locked:has('fixture-locked-token')}));files.dispose();
+`).finally(() => chmod(locked, 0o700))
+  expect(result).toEqual({ touched: [`readlink ${path.join(locked, ".env")}`], chain: true, linked: false, registered: true, linkTarget: true, locked: false })
 })
 
 // Design §10 SPEC5-04 with the fence's own credential stores (credentialStores(), the list C1 is planned from): HOME is a
@@ -291,13 +314,18 @@ test("links into the app's credential stores under HOME are never followed", asy
 import fs from 'node:fs/promises';export const touched=[];
 const followed=${JSON.stringify(followed)},store=${JSON.stringify(userData + path.sep)};
 const audit=(name,run)=>async (...args)=>{const file=String(args[0]);if(followed.includes(file)||file.startsWith(store))touched.push(name+' '+file);return run(...args)};
-export const stat=audit('stat',fs.stat),realpath=audit('realpath',fs.realpath),readFile=audit('readFile',fs.readFile),readdir=audit('readdir',fs.readdir),readlink=fs.readlink;
+export const stat=audit('stat',fs.stat),realpath=audit('realpath',fs.realpath),readFile=audit('readFile',fs.readFile),readdir=audit('readdir',fs.readdir);
+// Reading a workspace link itself is the literal walk; reading anything inside the store is a touch.
+export const readlink=async (...args)=>{const file=String(args[0]);if(file.startsWith(store))touched.push('readlink '+file);return fs.readlink(...args)};
 `)
   expect(await nodeCollector(root, roots, `
 import {registerHooks} from 'node:module';
 registerHooks({resolve(name,context,next){return next(name==='node:fs/promises'&&context.parentURL?.endsWith('/collector.mjs')?new URL('./audit.mjs',import.meta.url).href:name,context)}});
 const {createSecretFiles}=await import('./collector.mjs');const audit=await import('./audit.mjs');
-const files=createSecretFiles(JSON.parse(process.argv[2]),${JSON.stringify(stores)});await files.refresh();await files.refresh();
+const files=createSecretFiles(JSON.parse(process.argv[2]),${JSON.stringify(stores)});
+// I-54: a shell command naming the workspace links registers what they literally point to (SecretMask.command -> trackLink).
+for(const link of ${JSON.stringify(followed)})await files.trackLink(link);
+await files.refresh();await files.refresh();
 console.log(JSON.stringify({touched:audit.touched}));files.dispose();
 `)).toEqual({ touched: [] })
 })

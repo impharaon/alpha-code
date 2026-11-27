@@ -1898,6 +1898,50 @@ describe("safe file tools", () => {
     expect(JSON.stringify(read)).toContain("PORT=3000")
   }))
 
+  // Spec v6 BR-05: another project's protected file that a command names literally (relative to the command's working
+  // directory) is registered before the command's output is released, so a first contact by command is masked from its
+  // first live chunk, never read by the read tool. The path is the word the shell reads: escapes undone, quoted pieces joined;
+  // a project link named in the command registers the list file its literal target is.
+  for (const form of ["path relative to the project", "working directory under ~", "escaped path", "quoted directory joined to the file name", "project link to the file"] as const) it.live(`outside project protected files a command names are masked from its first output (${form})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const name = `other project-${randomUUID()}`
+    // The link's target lies outside every collection source (the home directory is one), where the project scan never follows.
+    const other = form === "project link to the file" ? path.join(os.tmpdir(), name) : path.join(os.homedir(), "work", name)
+    const directory = path.relative(location.directory, other)
+    fs.mkdirSync(other, { recursive: true })
+    const value = randomUUID()
+    fs.writeFileSync(path.join(other, ".env"), `TOKEN=${value}\nPORT=3000\n`)
+    const link = path.join(location.directory, `link-to-other-env-${randomUUID()}`)
+    if (form === "project link to the file") fs.symlinkSync(path.join(other, ".env"), link)
+    const live: string[] = []
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, rules: [ALLOW_ALL, { action: "external_directory", resource: "*", effect: "allow" }], after: promisePlugin("observe-live-capture", async (ctx) => {
+      await ctx.shell.hook("capture", async (event) => {
+        if (event.phase === "chunk") live.push(await fs.promises.readFile(event.file, "utf8"))
+      })
+    }) })
+    // This host points the engine's home (OPENCODE_TEST_HOME) away from os.homedir(), which the policy's roots use; in
+    // production the engine's `~` is os.homedir() too, so the engine resolves this workdir there for the call.
+    const engineHome = process.env.OPENCODE_TEST_HOME
+    if (form === "working directory under ~") process.env.OPENCODE_TEST_HOME = os.homedir()
+    const input = {
+      "path relative to the project": { command: `cat ${JSON.stringify(path.join(directory, ".env"))}` },
+      "working directory under ~": { command: "cat .env", workdir: `~/work/${name}` },
+      "escaped path": { command: `cat ${directory.replaceAll(" ", "\\ ")}/\\.env` },
+      "quoted directory joined to the file name": { command: `cat "${directory}"/.env` },
+      "project link to the file": { command: `cat ./${path.basename(link)}` },
+    }[form]
+    const shell = yield* callRaw(session.id, "shell", input).pipe(Effect.ensuring(Effect.sync(() => { process.env.OPENCODE_TEST_HOME = engineHome })))
+    fs.rmSync(other, { recursive: true, force: true })
+    fs.rmSync(link, { force: true })
+    if (Exit.isFailure(shell)) throw new Error(String(failure(shell)?.message ?? Cause.pretty(shell.cause)))
+    expect(live.length).toBeGreaterThan(0)
+    expect(live.some((text) => text.includes(value))).toBe(false)
+    expect(live.join("\n")).toContain("PORT=3000")
+    expect(JSON.stringify(shell).includes(value)).toBe(false)
+    expect(JSON.stringify(shell)).toContain("TOKEN=[REDACTED]")
+    expect(JSON.stringify(shell)).toContain("PORT=3000")
+  }))
+
   it.live("env files mask only credential-named values", () => Effect.gen(function* () {
     const location = yield* Location.Service
     const value = randomUUID()

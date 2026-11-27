@@ -918,6 +918,23 @@ AC-01..03 的测量 runner 不在本轮落代码：它要驱动已组合好的�
 | AC-09、10、13、14 | 干净机器无安装生成、国内下载与断点续传、香港入口不可用改原始来源、断网再做；下载卡住时三格式先交付再补查；出网记录；安装包许可证清单 | #1760 合入、LO 发行资产与国内固定文件入口上线、可签名的安装包 |
 | AC-15 | Windows 包上做 AC-01、02、03、08、09 | Windows 安装包与 Windows 执行机 |
 
+### AC-08 实测（2026-11-27，darwin-arm64 dev 构建）
+
+前提：本机没有微软雅黑、SimSun、SimHei（只有系统 Songti.ttc）；LibreOffice 为 pilot 目录中的 26.8.3.1 展开副本（版本与设计 §4.3 的 pin 相同，未经固定文件入口下载）。资产由 `gate slot -- bun ./scripts/build-document-assets.ts` 构建（593 个已核文件、4 字体、3 模板）。
+
+命令：`cd packages/ui-mac && gate slot -- bun ./scripts/document-font-acceptance.ts <pilot>/E-libreoffice/app/LibreOffice.app/Contents/MacOS/soffice <输出目录>`，exit 0。输出与页图在 `~/.cache/alpha-orch/2026-11-27/impl-1761-s8/ac08-committed/`，产品臂 PDF sha256 前缀 `00d76390a6f43bf8`。
+
+| 臂 | 页数 | 每段的中文字体 | 结果 |
+| --- | --- | --- | --- |
+| 对照（只列系统字体目录，无随包字体、无替代表） | 1 | 三段都是 ArialUnicodeMS + HiraMaruPro-W4 两种逐字混用 | 不通过（同段两种字体；字形无法核对） |
+| 产品（`prepareDocumentFonts` 生成的私有配置） | 1 | 宋体段 NotoSerifSC-Regular；黑体段、微软雅黑段 NotoSansSC-Regular | 通过：每段一种字体，全部字符在所用随包字体的 cmap 里 |
+
+检查本身能失败的证据：上面的对照臂（真实混用）；另把检查用的资产清单里 `NotoSansSC-Regular.ttf` 换成只有西文的 Arial.ttf，对同一产品臂 PDF 复核，黑体段与微软雅黑段报出全部中文字符缺字形，exit 1。页图人工核看：产品臂宋体段为衬线、另两段为无衬线，无方块；对照臂三段同一圆体外观，标点来自另一字体。
+
+第一次运行暴露检查脚本两处缺陷，均在提交前修正：对照臂的回退字形是分开绘制的，按文本顺序取不到原句，改为按基线分行、行内按 x 排序；ReportLab 的 cmap 以码位为键，改用 `ord(char)`。
+
+AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口下载的 LO、以及 Windows（AC-15）仍 pending。
+
 ### 偏离记录
 
-暂无。
+2026-11-27 · 计划外两处：没有为脚本新增套件测试（它需要真实 LibreOffice，按 test-layers 记为一次性证据）；`scripts/` 不在 ui-mac 的 tsconfig 里，新驱动另用临时配置单独做了类型检查（tsgo exit 0）。

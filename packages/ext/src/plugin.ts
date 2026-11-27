@@ -1,4 +1,3 @@
-import type { LauncherEnvironment } from "../../util/src/codepuppy-connector-launch"
 import { DOCUMENT_PYTHON_HOST, documentHost, documentPythonEnvironmentFor } from "../../util/src/codepuppy-document"
 import { declaredFirstPartyTools } from "../../core/src/mcp/codepuppy-first-party-mcp"
 import { checkCodePuppyOfficeMcpSafety } from "../../ui-mac/src/shared/office-advisories"
@@ -423,7 +422,7 @@ export const CodePuppyExt: Plugin.Plugin = {
           for (const [name, config] of editor.list()) {
             if (config.type !== "local" || config.disabled === true || !bootstrap.paths.officeMcpManifest) continue
             const previous = config.environment?.[DOCUMENT_PYTHON_HOST] ? documentPythonEnvironmentFor(context.location) : undefined
-            if (!declaredFirstPartyTools(name, config, bootstrap.paths.officeMcpManifest, readFileSync, previous, Reflect.get(bootstrap, "launchers") as LauncherEnvironment | undefined)) continue
+            if (!declaredFirstPartyTools(name, config, bootstrap.paths.officeMcpManifest, readFileSync, previous, bootstrap.launchers)) continue
             const resources = dirname(dirname(bootstrap.paths.officeMcpManifest))
             if (!checkCodePuppyOfficeMcpSafety(name, config as unknown as Record<string, unknown>, context.location.directory, resources, previous).ok) continue
             try {

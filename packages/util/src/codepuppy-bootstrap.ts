@@ -10,6 +10,7 @@
 import path from "node:path"
 import { readFileSync } from "node:fs"
 import type { PinnedFiles } from "./codepuppy-pinned-files.js"
+import type { LauncherEnvironment } from "./codepuppy-connector-launch.js"
 
 export const CODEPUPPY_BOOTSTRAP_VERSION = 1
 
@@ -88,6 +89,8 @@ export type CodePuppyBootstrap = {
   sidecarGeneration?: number
   /** #1761 §4.8 的文档资源投影:main 从随包资源与已校验固定文件清单解析;缺席 = 本构建没有可用的文档资源 */
   documents?: DocumentBootstrap
+  /** #1760 §4.3 的本代启动器描述(main 唯一构建);缺席 = 不是桌面宿主,两类运行器不接管 */
+  launchers?: LauncherEnvironment
 }
 
 export type DocumentBootstrap = {
@@ -186,7 +189,7 @@ const slot = globalThis as unknown as Record<symbol, unknown>
 export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   const root = record(value, "")
   if (root.v !== CODEPUPPY_BOOTSTRAP_VERSION) throw new CodePuppyBootstrapError("version", "v")
-  only(root, ["v", "paths", "registryChannel", "engine", "platform", "cloudMcp", "webSearch", "skills", "policy", "permission", "network", "switches", "sidecarGeneration", "documents"], "")
+  only(root, ["v", "paths", "registryChannel", "engine", "platform", "cloudMcp", "webSearch", "skills", "policy", "permission", "network", "switches", "sidecarGeneration", "documents", "launchers"], "")
   const paths = record(root.paths, "paths")
   only(paths, ["userData", "globalRoot", "userConfig", "initialDirectory", "database", "engineConfigDirectory", "extPlugin", "extBundledManifest", "officeMcpManifest"], "paths")
   const extPlugin = optional(paths, "extPlugin", "paths", absolute)
@@ -222,6 +225,7 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   only(switches, SWITCHES, "switches")
   const sidecarGeneration = optional(root, "sidecarGeneration", "", nonNegativeSafeInteger)
   const documents = optional(root, "documents", "", documentsOf)
+  const launchers = optional(root, "launchers", "", launchersOf)
   return deepFreeze({
     v: CODEPUPPY_BOOTSTRAP_VERSION,
     paths: {
@@ -253,6 +257,7 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
     switches: Object.fromEntries(SWITCHES.map((name) => [name, bool(switches[name], `switches.${name}`)])) as CodePuppyBootstrap["switches"],
     ...(sidecarGeneration === undefined ? {} : { sidecarGeneration }),
     ...(documents === undefined ? {} : { documents }),
+    ...(launchers === undefined ? {} : { launchers }),
   })
 }
 
@@ -374,6 +379,29 @@ function documentsOf(value: unknown, at: string): DocumentBootstrap {
   return {
     ...(Object.fromEntries(DOCUMENT_PATHS.map((key) => [key, absolute(documents[key], join(at, key))])) as Omit<DocumentBootstrap, "libreoffice">),
     libreoffice,
+  }
+}
+
+const LAUNCHER_PATHS = ["uv", "uvx", "node", "npmCli", "npxCli", "runtimeRoot"] as const
+
+function launchersOf(value: unknown, at: string): LauncherEnvironment {
+  const launchers = record(value, at)
+  only(launchers, ["platform", "pinSet", ...LAUNCHER_PATHS, "pythonFileId", "packageManagerEnv", "environment", "firstPartyCacheRoots"], at)
+  const platform = matching(/^(?:darwin-arm64|win32-x64)$/)(launchers.platform, join(at, "platform")) as LauncherEnvironment["platform"]
+  const table = (key: string, check: (field: unknown, at: string) => string, name = (_: string) => true) => {
+    const entries = Object.entries(record(launchers[key], join(at, key)))
+    for (const [field] of entries) if (!name(field)) throw new CodePuppyBootstrapError("invalid", join(at, `${key}.${field}`))
+    return Object.fromEntries(entries.map(([field, item]) => [field, check(item, join(at, `${key}.${field}`))]))
+  }
+  return {
+    platform,
+    pinSet: matching(/^[0-9a-f]{64}$/)(launchers.pinSet, join(at, "pinSet")),
+    ...(Object.fromEntries(LAUNCHER_PATHS.map((key) => [key, absolute(launchers[key], join(at, key))])) as Pick<LauncherEnvironment, (typeof LAUNCHER_PATHS)[number]>),
+    pythonFileId: matching(new RegExp(`^python/${platform}/[^/]+$`))(launchers.pythonFileId, join(at, "pythonFileId")) as LauncherEnvironment["pythonFileId"],
+    // #1759 R1 locations are absolute paths; launcher defaults are plain values; cache roots are keyed by one protected entry ID.
+    packageManagerEnv: table("packageManagerEnv", absolute),
+    environment: table("environment", text),
+    firstPartyCacheRoots: table("firstPartyCacheRoots", absolute, (field) => field !== "" && field !== "." && field !== ".." && !/[\\/\x00-\x1f:]/.test(field)),
   }
 }
 

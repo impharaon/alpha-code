@@ -292,3 +292,21 @@ test("the sidecar generation and the document projection parse strictly and stay
   expect(failure({ ...valid(), documents: { ...documents, libreoffice: [{ ...pin, id: "libreoffice/win32-x64/26.8.3" }] } }).path).toBe("documents.libreoffice.0.id")
   expect(failure({ ...valid(), documents: { ...documents, libreoffice: [{ ...pin, sha256: "A".repeat(64) }] } }).path).toBe("documents.libreoffice.0.sha256")
 })
+
+// Fast layer: the launcher descriptor is main's one build; every bundle reads it through this strict parser (design §4.3, v2.2 §4.1).
+test("the launcher descriptor parses strictly: two platforms, an absolute entry per launcher, the same-platform Python pin and single-segment cache keys", () => {
+  const launchers = { platform: "darwin-arm64", pinSet: "f".repeat(64), uv: "/app/l/uv/uv", uvx: "/app/l/uv/uvx", node: "/app/l/node/bin/node", npmCli: "/app/l/npm-cli.js", npxCli: "/app/l/npx-cli.js", runtimeRoot: "/u/data/connector-runtime", pythonFileId: "python/darwin-arm64/3.12.16-20261124", packageManagerEnv: { UV_PYTHON_INSTALL_DIR: "/u/data/package-managers/uv/python" }, environment: { UV_PYTHON: "3.12.16" }, firstPartyCacheRoots: { video: "/u/data/connector-runtime/first-party-cache/video" } }
+  expect(parseCodePuppyBootstrap({ ...valid(), launchers }).launchers).toEqual(launchers as never)
+  expect(parseCodePuppyBootstrap(valid()).launchers).toBeUndefined()
+  for (const [change, path] of [
+    [{ platform: "darwin-x64" }, "launchers.platform"],
+    [{ pinSet: "F".repeat(64) }, "launchers.pinSet"],
+    [{ node: "node" }, "launchers.node"],
+    [{ pythonFileId: "python/win32-x64/3.12.16-20261124" }, "launchers.pythonFileId"],
+    [{ packageManagerEnv: { UV_CACHE_DIR: "relative/cache" } }, "launchers.packageManagerEnv.UV_CACHE_DIR"],
+    [{ environment: { UV_PYTHON: 3 } }, "launchers.environment.UV_PYTHON"],
+    [{ firstPartyCacheRoots: { "../video": "/u/x" } }, "launchers.firstPartyCacheRoots.../video"],
+    [{ extra: "/x" }, "launchers.extra"],
+  ] as const)
+    expect(failure({ ...valid(), launchers: { ...launchers, ...change } }).path).toBe(path)
+})

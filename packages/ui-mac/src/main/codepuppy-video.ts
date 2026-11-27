@@ -1,11 +1,10 @@
 import path from "node:path"
 import { expandFirstPartyCommand } from "@opencode/core/mcp/codepuppy-first-party-mcp"
-import type { LauncherEnvironment } from "@opencode/util/codepuppy-connector-launch"
 import type { CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { VIDEO_DECLARATION_ID, VIDEO_SERVICE_COMMAND } from "../shared/video-service"
 
 export function codepuppyVideoDefinition(bootstrap: CodePuppyBootstrap) {
-  const launchers = Reflect.get(bootstrap, "launchers") as LauncherEnvironment | undefined
+  const launchers = bootstrap.launchers
   if (!launchers) return undefined
   return videoServerDefinition((template) =>
     expandFirstPartyCommand(template, path.dirname(path.dirname(bootstrap.paths.officeMcpManifest)), launchers, VIDEO_DECLARATION_ID),

@@ -49,7 +49,7 @@ test("capture reprojects the terminal file with newly discovered values", async 
   await mask.capture(event("chunk", `first=${first}\nnew=${second}\nPORT=3000\n`))
   expect(live.join("").includes(first)).toBe(false)
   expect(live.join("").includes(second)).toBe(true) // Approved print-before-write live window.
-  await writeFile(path.join(roots.project, ".env"), `NEW=${second}\nPORT=3000\n`)
+  await writeFile(path.join(roots.project, ".env"), `NEW_TOKEN=${second}\nPORT=3000\n`)
   const end = event("end")
   await mask.capture(end)
   expect(end.disposition).toBe("replace")

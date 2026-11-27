@@ -30,6 +30,25 @@ test("safe read consumes the original page and preserves line slots", async () =
   expect(text).toContain(ProtectedFiles.PROTECTED_FILE_TEXT)
 })
 
+test("env read view keeps ordinary values visible", async () => {
+  const source = "DB_HOST=db\nAPI_KEY=fixture-api-key\nREGION=us-east-1\n"
+  const result = project(source, await read(source))
+  expect(result.output).toMatchObject({ content: "DB_HOST=db\nAPI_KEY=[REDACTED]\nREGION=us-east-1\n" })
+  expect(JSON.stringify(result.content)).toContain("1: DB_HOST=db")
+})
+
+test("env read view masks only embedded URL passwords", async () => {
+  const source = "DATABASE_URL=postgres://app:fixture-db-pass@db:5432/x\nDB_HOST=db\n"
+  expect(project(source, await read(source)).output).toMatchObject({ content: "DATABASE_URL=postgres://app:[REDACTED]@db:5432/x\nDB_HOST=db\n" })
+  const forms = "MONGO_URL=mongodb://app:fixture-mongo-pass@h1:27017,h2:27017/db?replicaSet=rs0\nBOTH=postgres://a:fixture-p1@h1/x,postgres://b:fixture-p2@h2/y\nCONN='Server=db;User Id=svc;Password=fixture-ado-pass;'\nAPI=https://api.example.com/v1?user=svc&password=fixture-query-pass\n"
+  expect(project(forms, await read(forms)).output).toMatchObject({ content: "MONGO_URL=mongodb://app:[REDACTED]@h1:27017,h2:27017/db?replicaSet=rs0\nBOTH=postgres://a:[REDACTED]@h1/x,postgres://b:[REDACTED]@h2/y\nCONN='Server=db;User Id=svc;Password=[REDACTED];'\nAPI=https://api.example.com/v1?user=svc&password=[REDACTED]\n" })
+  // A line truncated inside the password shows none of it.
+  const long = `DATABASE_URL=postgres://app:${"p".repeat(4000)}@db/x\n`
+  const truncated = project(long, await read(long))
+  expect(JSON.stringify(truncated).includes("p".repeat(8))).toBe(false)
+  expect(JSON.stringify(truncated.content)).toContain("1: DATABASE_URL=postgres://app:[REDACTED]")
+})
+
 test("long-line secret prefixes and raw file references are removed", async () => {
   const source = `TOKEN=${"s".repeat(4000)}\nPORT=3000\n`
   const result = project(source, await read(source))

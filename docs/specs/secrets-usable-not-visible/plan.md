@@ -7,7 +7,7 @@ status: active
 spec: SPEC-secrets-usable-not-visible
 design: DESIGN-secrets-usable-not-visible
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # PLAN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 实施计划
@@ -811,3 +811,87 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 本轮共 **178 个不同用例 PASS**。`bun typecheck` 从 ext、ui-mac、schema 各自目录执行，均 exit 0（schema 145 files）；没有额外整层或整套测试。`affected-tests --list` exit 0：**`affected tests: 162 of 746 test files`**，只列范围。相对 origin/alpha 的 `git diff --check` exit 0，本计划文档合同检查通过。
 
 证据统一前缀 `/tmp/secrets-r15-`：install、inventory、write-ledger、build、sample、old-name、fixture-identity、fixture-consumers、ext-typecheck、ui-typecheck、schema-typecheck、affected.log；消费者原 JUnit 为 `fixture-consumers.xml`；`name-counts.json`、`name-deltas.json`、`count-intersection.json`、`receipt.json` 记录实测事实。无未解冲突、生产行为变更或新设计决定；没有修改 known-fails、门槛、.gate-tests，无 push/PR/merge PR。偏离仅为题述授权的合并、采样与失效登记同步；遗留去向 none；无新增 ARCH/OPTIONAL。
+
+## ⑥ 规格 v5：项目外读到的名单文件、env 只遮凭据字段
+
+- 依据：[规格 v5](spec.md) @ `5d56d0cae1`：BR-05、BR-06 的 v5 句与 AC-11、AC-12（来源：协调仓安全意图 U-43，owner 2026-11-27「intent 全部按照你的建议。」对 I-50、I-51 的批准）；[冻结设计](design.md) v3.3 §4.1、§4.3、§4.4、§4.5 的入口与契约不改签名；#1758。代码基线 `88c88edcee`（origin/alpha，含已合入的 `6a55937acd`）。继承 ①..⑤ 与 r9..r15 收据，不重审已定范围。
+- 核对：2026-11-27 编排器（Claude Opus 5.5）核对：规格 v5 与本节通过（没有新增用户限制；全部批准档读项目外 `.env` 不再出卡、项目外 `.pem` 只给说明，均属 U-43「同一规则」）；另要求一项修正：值里内嵌的连接地址密码属凭据字段，见下文「⑥ 核对修正」。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/schema/src/codepuppy-protected-files.ts` | `match` 在既有定位规则之后，对项目外路径再用同一份项目规则判定（项目文件名规则；项目固定位置加 `**/` 前缀；同一示例排除与依赖树剪枝；以该路径的文件系统根为根），规则 ID 不变。`sources` 不含这一范围，即不扫描；`probe` 经 `match` 同时认它。`CredentialFields.env` 由 `assignments: "all"` 改为与 credential-document 相同的 `names: "credential"`。 |
+| `packages/schema/src/codepuppy-protected-files.test.ts` | 新增项目外判定表例（darwin/win32、示例与依赖排除、私钥与 rails 位置、sources 不选、probe 命中）；`published sources and probes share exclusions` 中编码旧行为的 `/fixture/project-copy/.env` 样本移入新表例；凭据字段表例的 env 断言改为 names。 |
+| `packages/ext/src/secret-files.ts`、`secret-files.test.ts` | `createSecretFiles` 增加 `track(file)`：读文件工具读过的名单文件此后每次 refresh 与来源一起 stat/采集，沿用同一版本缓存与缺失/不可读重试，不对其目录 readdir；dispose 清空。测试在现实 HOME 中加另一项目的 `.env`：未读前不采集且无关 stat/readdir 为 0；track 后采集到，其目录仍无 readdir。 |
+| `packages/ext/src/secret-values.ts`、`secret-values.test.ts` | 新增 `envSecret(record)`（`isCredentialName` 且非公开值，即 `CredentialFields.env` 的 names 选择）；env 采集只收凭据名变量的值。表例：`DB_HOST=db`、`PORT`、`API_KEY`、`PASSWORD=1234`。 |
+| `packages/ext/src/secret-read.ts`、`secret-read.test.ts` | `projectEnvRows` 用 `envSecret` 决定原样或遮盖（read 视图与 diff 投影共用）；表例 `DB_HOST=db` 原样、`API_KEY` 遮盖。 |
+| `packages/ext/src/secret-mask.ts`、`secret-mask.test.ts` | `read` 先 `track` 本次名单文件；错误中恢复 env 片段的判定改用 `envSecret`。测试里以非凭据名充当秘密的旧样本（`NEW=`）改为凭据名。 |
+| `packages/ext/src/policy/register-policy.test.ts` | 两条接线例：全部批准档读隔离 HOME 下另一项目的 `.env` 零询问、得安全视图，之后文件改写为新值，真 shell `cat` 与批准预览都遮盖；项目 `.env` 的 `DB_HOST=db` 与 `API_KEY` 经 read 与 shell 输出（含 `mongodb`）只遮后者。 |
+| `packages/ext/src/policy/risk.test.ts` | `protected path risk consumes the location roots` 中「项目外 `.env` 不标凭据路径」的旧断言改为标注，另以项目外普通文件保留未标注对照；条数不变。 |
+| `packages/ui-mac/src/main/composer-tier-matrix.engine.cases.ts`、`composer-tier-matrix.engine.scenario.test.ts`、`docs/architecture/codepuppy-authority-registry.json` | 场景层新增 AC-11、AC-12 两行真引擎；`protected files read` 行里以非凭据名充当秘密的长值/多行样本改为凭据名（该行原意是这两类秘密跨页不漏）；宿主标题与条数 48→50，登记册两处同名证明机械同步。 |
+| `scripts/gate-files.tsv` | register-policy 精确条数 97→99。 |
+| 本 `plan.md` | 本节、核对与收据。 |
+
+`secret-mutations.ts`、`secret-diff.ts` 不改：写回经 `resolveProtectedFile`，随 `match` 覆盖项目外 env；diff 经 `projectEnvRows`。
+
+### 顺序
+
+1. **I-50 红例提交**：Schema 表例、secret-files 现实 HOME 例、register-policy 项目外读例，在未修改的实现上各自 FAIL，记录输出。
+2. **I-50 修复提交**：Schema `match`、`track`、SecretMask.read 调用；同提交改编码旧行为的两处断言（Schema 排除表、risk 表）。结束时完整跑 Schema 测试文件、secret-files、secret-mask、register-policy、risk 各一次。
+3. **I-51 红例提交**：secret-values、secret-read、register-policy 的短值例，在未修改的实现上 FAIL。
+4. **I-51 修复提交**：`CredentialFields.env`、`envSecret` 及三处消费；同提交改编码「env 每个值都是秘密」的旧样本（secret-files 的 env helper、secret-mask 的 `NEW=`、Schema 凭据字段的 env 断言）。结束时完整跑 secret-values/read/diff/mutations/mask/files 与 register-policy。
+5. **场景提交**：两行真引擎、旧样本改名、计数与登记同步；经 `gate slot --` 只跑 `protected files` 各行一次；authority-registry 原文件一次。
+6. 返回前一次扩大相关集：按 grep 找 ProtectedFiles、classifyPermissionRequest、secret-values/secret-mask 的消费者与枚举者（ui-mac PermissionDialog、permission-risk，ext plugin-host 等）各跑一次；各包 `bun typecheck`、改动 TS 的 oxlint、`affected-tests --list`。移除臂（Schema 项目外判定、`track`、`envSecret` 三处）在工作树临时改写、跑对应具名例、`git restore` 恢复。
+
+### 风险
+
+- 项目外判定经 `match` 进入所有消费者：风险标注、结果里的 `file:` 引用、写回恢复，以及来源扫描在家目录等已有来源里遇到的同名文件。这是「同一规则」的应有结果；Schema 表例钉住 `sources` 不含该范围，现实 HOME 例钉住不发生全盘扫描。项目规则里的 `*.pem` 等也随之适用于项目外（例如读系统证书目录下的 `.pem` 只得到说明），与项目内一致，在返回中列出。
+- 档位：项目外 env 仍走原读工具的目录询问/拒绝（BR-05 v5 原文）；项目外的非 env 名单文件与家目录同类文件一样前置说明。不改权限规则。
+- I-51 使 `.env` 里名字不像凭据的变量的值可见，包括连接地址里嵌的密码（如 `DATABASE_URL`）。按 U-43 实施，不另加 URL 解析；作为意图回流项返回。
+- 场景行依赖嵌入式真引擎，较重，只在第 5 步经 slot 跑一次。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-11 | Schema `outside project files follow the published project rules`；secret-files `outside protected files are tracked without scanning a realistic home`；register-policy `outside project protected reads keep later outputs masked`；场景 `protected files outside project read shell and card` | fast；integration（受影响 PR 与夜间）；scenario（夜间，本次经 slot 一次） | 去掉项目外判定：read 返回原值，shell 与预览出现值；去掉 `track`：读后改写的新值在 shell 中出现；改成扫描实现：现实 HOME 的无关调用不为 0 |
+| AC-12 | secret-values `env files collect only credential-named values`；secret-read `env read view keeps ordinary values visible`；register-policy `env files mask only credential-named values`；场景 `protected files ordinary env values stay visible` | fast 性质的模块例与 integration；scenario（夜间，本次经 slot 一次） | 恢复「每个值都是秘密」：`db` 进入采集集合，read 视图与 shell 输出里的 `db`、`mongodb` 中的 db 变成遮盖符 |
+
+### 偏离记录
+
+2026-11-27 · 冻结设计 v3.3 有三处正文与规格 v5 不一致，需要设计方出 v3.4 增量（入口签名不变）：§4.1「match、sources、probe 消费相同范围」——v5 起 `match`/`probe` 另含项目外按项目规则的判定，`sources` 不含；§4.1 env 行与「env 保留每个值默认是秘密」「env 的其它非空值仍默认是秘密」——v5 起 env 只取凭据名字段；§4.3「按名单 profile 读取项目/主目录」——另含读文件工具读过的项目外名单文件。本节按规格 v5 实施，未改设计文档。
+
+2026-11-27 · 追加必要范围：Schema 改动使 17 份 engine-adapter 夹具的引擎身份失效（fixture-identity 4 pass / 1 fail），按 r12 先例用原采样器重采（`73fad5bf77`）；`events.json` 记录本工作树的 CLI 路径，`scripts/old-name-exceptions.tsv` 里旧工作树的失效键换为当前实测键（21 行、user-content 不变）。其余文件与顺序同本节。
+
+### ⑥ 实施收据
+
+- 已核：Claude Opus 5.5 作者自查；开始 2026-11-27 09:28 CST，检查完成约 09:58 CST。提交：规格 `5d56d0cae1`、计划 `c13977efab`；I-50 红 `5b8927b790` → 修 `1ef55f26f9`；I-51 红 `def84a4b33` → 修 `165c027d24`；场景与计数 `e1c8e7e046`；夹具重采 `73fad5bf77`。红例提交后未改其断言。
+- 红例（未修改实现）：Schema `outside project files follow the published project rules` 0/1（`/fixture/other/.env` 未命中）；secret-files `outside protected files are tracked without scanning a realistic home` 0/1；register-policy `outside project protected reads keep later outputs masked` 0/1（读结果含原值）；secret-values `env files collect only credential-named values` 0/1（多出 db、us-east-1）；secret-read `env read view keeps ordinary values visible` 0/1；register-policy `env files mask only credential-named values` 0/1。secret-read 红例在提交前修正了自身预期（小文件页是带结尾换行的 file 输出），提交后未再改。日志 `/tmp/secrets-i50-*-red.log`、`/tmp/secrets-i51-*-red.log`。
+- 步骤结束完整文件：Schema `bun test src/codepuppy-protected-files.test.ts` 8 pass；ext `bun test --max-concurrency 2` 逐文件：secret-files 10、secret-mask 11、risk 23、register-policy 99、secret-values 5、secret-read 4、secret-diff 2、secret-mutations 9，均 exit 0。临时还原两处旧样本（`BASIC_TOKEN`→`BASIC`、`NEW_TOKEN`→`NEW`）后 secret-files 3 FAIL、secret-mask 1 FAIL，确认它们编码的是被替换的行为。
+- 场景（ui-mac，`gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/composer-tier-matrix.engine.cases.ts -t 'protected files (read (build|ask|readonly)|outside project read shell and card|ordinary env values stay visible)'`）：5 pass / 45 filtered / 0 fail（注册共 50）。同时回退两条规则后只跑两条新行：0 pass / 2 fail（AC-11 行在读取处出现一张 read 询问；AC-12 行 `DB_HOST=db` 不在）。日志 `/tmp/secrets-v5-scenario{,-removal}.log`。
+- 移除臂（工作树临时改写、跑具名例、`git restore`，生产文件与 HEAD 一致）：Schema 去掉项目外判定 → Schema、secret-files、register-policy 外读例、risk 例各 0/1；SecretMask.read 去掉 `track` → register-policy 外读例 0/1（读后改写的新值在 shell 输出出现，断言行 1820）；采集器忽略已 track 文件 → secret-files 例与 register-policy 外读例各 0/1；env 采集恢复旧判定 → secret-values 例、register-policy env 例各 0/1；read 视图恢复旧判定 → secret-read 例、register-policy env 例各 0/1。日志 `/tmp/secrets-v5-arm-*.log`。
+- 一次扩大相关集：ext authority-registry 5、plugin-host 56；ui-mac gate-file-registry 25；经 slot 的 fixture-identity + old-name-scan 15，14 个直接夹具消费者与 PermissionDialog、permission-risk、RiskTag 共 260。均 exit 0。Core 只引用未改的 `MASKING_FAILED_TEXT`，不在相关集。
+- 静态：schema `bun typecheck` 145 files 无错；ext `bun typecheck` exit 0；ui-mac `bun typecheck` exit 0；14 个改动 TS 的 oxlint 0 warnings / 0 errors；ext `bun run build` exit 0；`git diff --check` 通过；`core.hooksPath` 仍为 `.githooks`，未安装依赖。
+- `affected-tests --list` exit 0：`affected tests: 138 of 746 test files`；含本节改动的 ext 六个测试文件、fixture-identity、old-name-scan、permission-risk。Schema 的 `packages/schema/src/codepuppy-protected-files.test.ts` 不在任何 `.gate-tests` runner 根下（schema 根为 `packages/schema/test/codepuppy-*.test.ts`），PR 门与夜间都不跑它；本节行为另由 ext 的受选用例覆盖。
+- 观察：生产「全部批准」档在 v5 前读项目外 `.env` 并非不问——引擎底座 `read *.env` ask 会出一张卡，批准后原值交给模型；`credentials.json`、`*.pem`、`.envrc` 等不带 `.env` 后缀的名单文件则不问且原样。v5 后两者都不问、返回安全视图（AC-11「读取没有批准卡片」）。
+
+### ⑥ 核对修正：值里内嵌的密码
+
+- 依据：编排器对 I-51 的核对修正（「只遮凭据类字段」中，值里内嵌的密码也是凭据字段）；规格 v5 BR-06 补句与 AC-12 扩写（同一版本，批准不变；v5 批准行的遗留只保留 BR-05 的「读前打印」边界）。设计文档、Schema 的 `.gate-tests` 根与文档检查器引用按编排器指示不在本轮处理。
+- 改动：`secret-values.ts` 新增 `urlPasswords`（`scheme://用户:密码@主机` 形状的值取出密码的书写形与解码形）与 `envView`（凭据名整值遮；否则只遮内嵌密码；源文里找不到该密码原文时整值遮），env、结构化文档每个叶子、assignments 每一行都经同一 `embedded` 采集密码，不论变量/字段名。`secret-read.ts` 的 `projectEnvRows` 按 `envView` 只把密码段换成遮盖符，截断在密码中间时不露出密码前缀。追加必要范围：`secret-mutations.ts`——视图里出现 `postgres://app:[REDACTED]@…` 后，write/edit/patch 写回时把「其余部分与当前值一致」的这一值恢复为当前 RHS，模板按同一视图匹配；否则会把占位符写进密码。register-policy 精确条数 99→100；场景 AC-12 行加 `DATABASE_URL`。
+- 红例 `cf39dc46d1`（当前实现上全部失败，密码原样到达）：secret-values `embedded URL passwords are credential fields in every format` 0/1；secret-read `env read view masks only embedded URL passwords` 0/1；secret-mutations `embedded URL password view restores through write/edit/patch` 0/3；register-policy `env URL values mask only the embedded password` 0/1。
+- 绿：ext 逐文件 secret-values 6、secret-read 5、secret-diff 2、secret-mutations 12、secret-mask 11、secret-files 10、register-policy 100；Schema 8；ui-mac gate-file-registry 25；场景 `gate slot -- … -t 'protected files ordinary env values stay visible'` 1 pass / 49 filtered。均 exit 0。
+- 移除臂（临时改写后 `git restore` 回到已暂存的修正）：`urlPasswords` 恒为空 → 上述四个文件的具名例各红（1+1+3+1 FAIL）；写回不认内嵌占位符 → secret-mutations 三条全红。第一次还原时修正尚未暂存，`git restore` 连带撤回了 `secret-values.ts` 的修正；已按原文重做、暂存后重跑全部改动文件，结果同上，之后的臂都还原到暂存版本。
+- 静态：schema、ext、ui-mac `bun typecheck` 均 exit 0；8 个改动 TS 的 oxlint 0 warnings / 0 errors。
+
+### ⑥ 审查 R1 修正（FIX-THEN-MERGE）
+
+- 依据：独立审查 R1（Claude Opus 5.5）7 项，编排器全部接受；规格 v5 BR-06 补「值里以 `Password=`、`?password=` 这类键写出的密码同样只遮这一段」，其余不变。设计同步另由编排器派单。
+- 红例 `099c3ec893`（当前实现上全红）：Schema `public values preserve credential names` 加 PGPASSWORD/APIKEY/SECRETKEY/ACCESSTOKEN/oauth/Pwd（第 3 项）；secret-values 同名例改为表例，逐行在旧实现上取得：多主机 []、`BOTH` 只得 p1、空密码形状 []、`%9A` 抛 URIError、ADO/ODBC/查询参数 []（第 1、5、6 项）；secret-read 多主机、两地址、`Password=` 段、`?password=`（第 1、6 项）；secret-mutations 写回循环加改主机 write/edit/patch（第 2 项）与 `longer embedded views keep later occurrence positions` edit/patch（第 4 项）。旧实现逐行输出 `/tmp/secrets-r1-rows-before.log`。
+- 修 `fc825e9e6d`：逐处提取 `scheme://用户:密码@`（授权段止于 `/ ? #` 或空白，用户信息到最后一个 `@`），形状匹配而无密码时整值遮；凭据名键的 key=value 段只遮其值；解码失败保留书写形；名字片段以凭据词结尾即算凭据名，词表加 `PWD`（审查所列 `Pwd` 需要）；写回按位置换回每个遮盖符；`position()` 按实际替换长度计偏移。夹具重采 `c41cc44272`（Schema 改动使引擎身份失效，CLI 路径 21 行不变）。
+- 第 7 项（核实，非缺陷）：`packages/ext` 下临时用例经真实 Code Mode 执行 `tools.read(<另一项目 .env>)`，输出 `{"readInDirect":true,"readInCodeMode":false,"success":true,"containsValue":false,"containsPort":false,"excerpt":"caught: Error: Unknown tool 'read'."}`（`/tmp/secrets-r1-codemode-probe.log`）。内置 read、grep、glob 均 `codemode: false`（`packages/core/src/tool/plugin/read.ts:47` 等），子调用读不到文件；临时用例已删，不入测试集。
+- 绿：Schema 8；ext secret-values 6、secret-read 5、secret-mutations 17、secret-diff 2、secret-mask 11、secret-files 10、risk 23、register-policy 100；经 slot 的 fixture-identity、old-name-scan、14 个夹具消费者与 PermissionDialog、permission-risk、RiskTag 共 275。均 exit 0。
+- 移除臂（临时改写，`git restore` 回到已暂存的修正）：只取第一个地址 → secret-values `BOTH` 行、secret-read 各红；整段 `URL.parse` 门 → `MONGO_URL` 行、secret-read 各红（首次按逗号截断的臂不忠实、未变红，已改为整段解析后重做）；不加保护的解码 → URIError 红；跳过键值段 → `CONN` 行、secret-read 各红；精确词匹配 → Schema `PGPASSWORD` 红；仅相等时还原 → 改主机三例红；旧偏移公式 → 长视图两例红。日志 `/tmp/secrets-r1-arm-*.log`。
+- 静态：schema、ext、ui-mac `bun typecheck` 均 exit 0；7 个改动 TS 的 oxlint 0 warnings / 0 errors。
+- 偏离：Schema 词表加 `PWD`、名字片段以凭据词结尾即算——均为审查裁定所需，冻结设计 §4.1 的词表正文随设计同步更新。

@@ -21,6 +21,8 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { Effect } from "effect"
 import { PluginHooks } from "../../core/src/plugin/hooks.ts"
+import { Location } from "../../core/src/location.ts"
+import { Session as Sessions } from "../../core/src/session.ts"
 import { Tool } from "../../core/src/tool.ts"
 import { Message } from "../../ai/src/schema/messages.ts"
 import * as Media from "../../ai/src/media.ts"
@@ -800,7 +802,9 @@ describe("③i session.prompt 咽喉:用户消息上 alpha 一个字不加", () 
     Effect.gen(function* () {
       yield* activate(CodePuppyExt)
       const hooks = yield* PluginHooks.Service
-      const input = () => ({ sessionID: "ses_prompt_throat", messageID: "msg_prompt_throat", prompt: { text: "帮我看一下 a.txt" }, delivery: "queue" })
+      // core 只对已存在的会话触发 prompt 钩子(session/prompt.ts 的 prepare 拿的是 Session.Info),这里用本 Location 里的真会话。
+      const session = yield* (yield* Sessions.Service).create({ location: { directory: (yield* Location.Service).directory }, title: "prompt throat" })
+      const input = () => ({ sessionID: session.id, messageID: "msg_prompt_throat", prompt: { text: "帮我看一下 a.txt" }, delivery: "queue" })
       const leaves = (event: unknown) => stringLeaves(event).map((leaf) => `${leaf.pointer}=${leaf.value}`)
       const added = (event: unknown) => leaves(event).filter((leaf) => !leaves(input()).includes(leaf))
       const info = spyOn(console, "info").mockImplementation(() => {})

@@ -148,7 +148,10 @@ export const CodePuppyExt: Plugin.Plugin = {
         else delete event.env[DOCUMENT_PYTHON_HOST]
         event.env.CODEPUPPY_GLOBAL_DIR = codepuppyBootstrap().paths.globalRoot
       })
-      if (process.platform === "darwin" && processParentPort()) await delegatePackageManagerShell(context.shell as typeof context.shell & Parameters<typeof delegatePackageManagerShell>[0], hubBridge)
+      // The prepared-Shell seam exists only in the engine build (scripts/build-engine.ts, drift fails that build);
+      // an engine loaded from source keeps its original Shell spawn.
+      const shell = context.shell as typeof context.shell & Partial<Parameters<typeof delegatePackageManagerShell>[0]>
+      if (process.platform === "darwin" && processParentPort() && typeof shell.delegatePreparedShell === "function") await delegatePackageManagerShell(shell as Parameters<typeof delegatePackageManagerShell>[0], hubBridge)
       const projectRootFor = (target: string): ProjectRoot | null => {
         const identity = projectDirectoryIdentity(target)
         return identity.status === "project" ? identity : null

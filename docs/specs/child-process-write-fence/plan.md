@@ -803,3 +803,8 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - R2 Minor 1｜`join` 对 `unset` 取交集：只在两条路径都 unset 的名字才算确定，与 assignments 的合流一致（design :786）。红（`ba7b01bc08` 的真实 shell 预言）：`[ -n "" ] && unset VALUE; brew --prefix` 现有代码让 brew 失去 `VALUE`（真实为 `hello world`）；改后该行与真实 shell 一致，剩余红为 Minor 2 的引号操作数行。
 - R2 Minor 2｜`unset` 的操作数按普通 shell 词解析（`word(raw.raw, state)`），`--` 结束选项，`-f`（函数）不改环境，其它选项或无法确定的操作数使本命令其余部分不规划（cwd 置未知，design :786）；删去 C-2 之后已失真的注释，改写为"main 在 spawn 前从快照删除"。红（`ba7b01bc08`）：Minor 1 修后 `unset "VALUE"; brew --prefix` 现有代码 brew 仍得 `hello world`（真实为缺席）。修后 `engine/package-manager-plan.test.ts` **8 pass / 1049 expect**（含 `unset 'VALUE'`、`unset -- VALUE` 与 `unset $NOT_IN_SNAPSHOT` → 不规划）。撤除臂：无法确定的操作数改为跳过，显式断言 **1 fail**；恢复后一致。消费方执行测试 **1 pass**，ui-mac `bun typecheck` exit 0。
 - R2 可选项｜ext 的 `delegatePackageManagerShell` 在授权失败退回原 spawn 时记一行（每进程一次，`console.error`，即 hub-bridge 缺省 logger），便于诊断落回围栏内执行；行为不变。ext `hub-bridge.test.ts` + `identity.test.ts` **38 pass**（失败授权例打出该行一次），ext `bun typecheck` exit 0。
+
+### 合并 origin/alpha（b8255b4695，`e6d4fa93b8`）后的门修正（2026-11-27）
+
+- 基线对照：五个失败原因的符号（`delegatePackageManagerShell`、`installPackageManagerEnvironment`、`build-package-manager-helper`、`packageManagerScannerPlugin`、`codepuppy.package-manager.request`）在 `b8255b4695` 上 `git grep` 均无命中（exit 1），全部由本分支引入。
+- ① ext（类 a）：切片五起 ext 在 darwin 且有 parentPort 时无条件调用 `shell.delegatePreparedShell`，而该接缝只存在于引擎构建（`scripts/build-engine.ts` 的 H2 改写，锚点漂移即构建失败）；从源码装载 Core 的宿主（ext 自己的 plugin-host 用例等）因此装载失败。改为宿主提供该函数时才委派，否则保持原 Shell spawn。`bun test --max-concurrency 2 --timeout 90000 src/plugin-host.test.ts` 由 **50 pass / 6 fail**（I-13、I-10×3、A3、D3/I-10）变为 **56 pass**；ext `bun typecheck` exit 0。

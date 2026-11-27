@@ -23,8 +23,10 @@
 import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs"
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
+import type { DirectoryAccessTarget, WriteApprovalKind } from "../shared/directory-write-approval"
 import {
   assertSeatbeltSafePath,
+  canonicalWorkspacePath,
   configFenceLocations,
   checkWorkspaceDirectory,
   PACKAGE_MANAGERS_DIRNAME,
@@ -233,6 +235,39 @@ export function checkWritableTarget(input: WorkspaceDirectoryInput, planned: { t
     stat: (path) => planned.missing.has(resolve(path)) ? { dev: "planned", ino: resolve(path) } : stat(path),
     isDirectory: (path) => path === planned.target || input.isDirectory(path),
   }, planned.target)
+}
+
+export type { WriteApprovalKind }
+export type WriteApprovalScope =
+  | { eligible: true; kind: "directory"; root: string; planned: { target: string; missing: Set<string> } }
+  | { eligible: true; kind: "new-path"; root: string }
+  | { eligible: false; reason: "home-or-app-state" | "protected-config" | "not-a-directory"; directory: string }
+
+/**
+ * What approving a write to `target` makes writable — the one judgement R6, R4, the tracker and the planner share (K2).
+ * A new path: the request's folder is HOME itself, the object's parent is HOME (device + inode), and nothing is there now
+ * (`stored`: or it is still itself, created after the approval — a link or a re-point is not). Anything else is the folder
+ * rule; a new-path request that no longer qualifies ends at HOME's refusal, never at P approved as a folder.
+ * Synchronous and read-only; an unresolved symlink throws (plannedWritableTarget).
+ */
+export function planWriteApproval(input: WorkspaceDirectoryInput, target: DirectoryAccessTarget, mode: "open" | "stored" = "open"): WriteApprovalScope {
+  const object = plannedWritableTarget(target.absolute, input.realpath)
+  const folder = plannedWritableTarget(target.directory, input.realpath)
+  const stat = input.stat ?? ((path: string) => statSync(path, { bigint: true }))
+  const same = (a: string, b: string) => {
+    try {
+      const [left, right] = [stat(a), stat(b)]
+      return `${left.dev}:${left.ino}` === `${right.dev}:${right.ino}`
+    } catch {
+      return false
+    }
+  }
+  const parent = dirname(object.target)
+  const absent = object.missing.has(object.target) || (mode === "stored" && object.missing.size === 0 && canonicalWorkspacePath(input, target.absolute) === resolve(target.absolute))
+  if (absent && same(parent, input.homeDir) && same(folder.target, parent) && checkWritableTarget(input, object).eligible)
+    return { eligible: true, kind: "new-path", root: join(canonicalWorkspacePath(input, parent), basename(object.target)) }
+  const check = checkWritableTarget(input, folder)
+  return check.eligible ? { eligible: true, kind: "directory", root: check.directory, planned: folder } : { eligible: false, reason: check.reason, directory: folder.target }
 }
 
 export type ProcessFencePlan = {

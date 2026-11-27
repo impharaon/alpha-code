@@ -22,7 +22,7 @@ async function fixture(root: string) {
   const granted = new Set<string>()
   let calls = 0, fail = false
   let scope: "protected" | "needs-approval" = "needs-approval"
-  const sidecar: SidecarListener = { fenced: true, generationWrites: (path) => granted.has(path), grantWrite: async (path) => { calls++; if (fail) return { outcome: "failed", detail: "consume failed" }; granted.add(path); return { outcome: "granted" } }, probeWrite: async () => ({ outcome: "unknown" }), projectConfigView: async () => undefined, permissionRequest: async () => undefined, readWriteScope: async (input) => ({ revision: 1, targets: input.targets.map((target) => ({ absolute: target.absolute, outcome: scope, realDirectory: target.directory })) }), stop: async () => {}, kill: () => {} }
+  const sidecar: SidecarListener = { fenced: true, generationWrites: (path) => granted.has(path), grantWrite: async (path) => { calls++; if (fail) return { outcome: "failed", detail: "consume failed" }; granted.add(path); return { outcome: "granted" } }, probeWrite: async () => ({ outcome: "unknown" }), projectConfigView: async () => undefined, permissionRequest: async () => undefined, readWriteScope: async (input) => ({ revision: 1, targets: input.targets.map((target) => ({ absolute: target.absolute, outcome: scope, realDirectory: target.directory, kind: "directory" as const })) }), stop: async () => {}, kill: () => {} }
   let generation: SidecarListener | null = sidecar
   // Real engine sample, projected by production translator. Only this feature's own action/targets are substituted.
   let request: ReturnType<typeof toV1PermissionRequest> | undefined

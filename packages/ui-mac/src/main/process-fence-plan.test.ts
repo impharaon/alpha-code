@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { planConfigFence, planPackageManagerCaches, planUserWritableLocations, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
+import { planConfigFence, planPackageManagerCaches, planUserWritableLocations, planProcessFence, planWritableLocations, planWriteApproval, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
 import { writableLocationTruthPath } from "./process-fence-workspaces"
 import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
 import { renderProcessFenceProfile, processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
@@ -185,6 +185,65 @@ describe("planWritableLocations", () => {
       expect(existsSync(sourcePath)).toBe(false)
       expect(() => planWritableLocations({ ...input, truthPath: disk.state })).toThrow("writable location truth")
       expect(existsSync(sourcePath)).toBe(false)
+    })
+  })
+})
+
+// SPEC child-process-write-fence v8 BR-08 (design v7 NP1, §6 evidence 4, 12, 15a/b): on the real file system, what approving a
+// write target makes writable. Only `{ P, HOME }` with nothing at P is a new path; `{ P, P }` stays the folder rule (R1-F1).
+describe("planWriteApproval", () => {
+  test("a path directly in HOME that does not exist yet is approved as itself; everything else keeps the folder rule", () => {
+    withLocationDisk((disk) => {
+      const { home, state } = disk
+      mkdirSync(join(home, "existing-dir")); mkdirSync(join(home, "sub")); writeFileSync(join(home, "existing.txt"), "keep")
+      const at = (absolute: string, directory = absolute.slice(0, absolute.lastIndexOf("/"))) => planWriteApproval(disk.eligibility, { absolute, directory })
+      const shape = (scope: ReturnType<typeof at>) => scope.eligible ? { kind: scope.kind, root: scope.root } : { reason: scope.reason, directory: scope.directory }
+      expect([
+        join(home, "newfolder"), join(home, "note.txt"), join(home, "existing.txt"), join(home, "existing-dir"),
+        join(home, "newfolder", "x"), join(home, "sub", "new"), join(home, "a", "b"), join(state, "new"), join(disk.protected, "new"),
+      ].map((absolute) => shape(at(absolute)))).toEqual([
+        { kind: "new-path", root: join(home, "newfolder") },
+        { kind: "new-path", root: join(home, "note.txt") },
+        // Already in HOME (BR-08 v8 "已经存在的不算"): HOME's refusal, not the entry.
+        { reason: "home-or-app-state", directory: home },
+        { reason: "home-or-app-state", directory: home },
+        { kind: "directory", root: join(home, "newfolder") },
+        { kind: "directory", root: join(home, "sub") },
+        { kind: "directory", root: join(home, "a") },
+        { reason: "home-or-app-state", directory: state },
+        { reason: "protected-config", directory: disk.protected },
+      ])
+      // `{ P, P }` is the engine's shape for a folder itself (a command's working directory): never a new path.
+      expect(shape(at(join(home, "newfolder"), join(home, "newfolder")))).toEqual({ kind: "directory", root: join(home, "newfolder") })
+      // 15a: a case or Unicode variant of an existing entry is that entry (APFS lookup), so it is not new.
+      writeFileSync(join(home, "café.txt"), "keep")
+      for (const variant of ["EXISTING.txt", "café.txt"])
+        if (existsSync(join(home, variant))) expect(shape(at(join(home, variant)))).toEqual({ reason: "home-or-app-state", directory: home })
+      // 15b: HOME spelled with another case, or through the Data volume, is HOME by identity; the root uses its canonical spelling.
+      for (const spelled of [join(home, "..", "HOME"), `/System/Volumes/Data${home}`])
+        if (existsSync(spelled)) expect(shape(at(join(spelled, "spelled.txt"), spelled))).toEqual({ kind: "new-path", root: join(home, "spelled.txt") })
+      expect(existsSync(join(home, "newfolder")) || existsSync(join(home, "note.txt"))).toBe(false)
+    })
+  })
+
+  test("stored: a granted new path stays itself after it is created; a link or another entry under that name does not", () => {
+    withLocationDisk((disk) => {
+      const { home, root } = disk
+      const stored = (name: string) => {
+        const scope = planWriteApproval(disk.eligibility, { absolute: join(home, name), directory: home }, "stored")
+        return scope.eligible ? { kind: scope.kind, root: scope.root } : { reason: scope.reason }
+      }
+      mkdirSync(join(home, "made-dir")); writeFileSync(join(home, "made.txt"), "x")
+      mkdirSync(join(root, "outside")); symlinkSync(join(root, "outside"), join(home, "linked")); symlinkSync(join(home, "made-dir"), join(home, "linked-in-home"))
+      expect(["missing", "made-dir", "made.txt", "linked", "linked-in-home"].map(stored)).toEqual([
+        { kind: "new-path", root: join(home, "missing") },
+        { kind: "new-path", root: join(home, "made-dir") },
+        { kind: "new-path", root: join(home, "made.txt") },
+        { reason: "home-or-app-state" },
+        { reason: "home-or-app-state" },
+      ])
+      // Open (now): something already there is never a new path.
+      expect(planWriteApproval(disk.eligibility, { absolute: join(home, "made.txt"), directory: home })).toMatchObject({ eligible: false, reason: "home-or-app-state" })
     })
   })
 })

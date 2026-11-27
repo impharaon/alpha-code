@@ -734,6 +734,20 @@ export type WorkspaceDirectoryCheck =
 /** APFS Data volume. Electron Node's realpath(3) keeps this spelling for firmlinked paths (`/Users/...`). */
 const DATA_VOLUME = "/System/Volumes/Data"
 
+/** The identity spelling below: the `realpath` result, the Data-volume spelling collapsed only onto the same device + inode. */
+export function canonicalWorkspacePath(input: Pick<WorkspaceDirectoryInput, "realpath" | "stat">, path: string): string {
+  const stat = input.stat ?? ((p: string) => statSync(p, { bigint: true }))
+  const directory = resolve(input.realpath(path))
+  if (directory !== DATA_VOLUME && !directory.startsWith(`${DATA_VOLUME}/`)) return directory
+  const plain = directory.slice(DATA_VOLUME.length) || "/"
+  try {
+    const [real, other] = [stat(directory), stat(plain)]
+    return `${real.dev}:${real.ino}` === `${other.dev}:${other.ino}` ? plain : directory
+  } catch {
+    return directory // The other spelling does not exist: nothing to collapse.
+  }
+}
+
 /**
  * The one identity / validity rule (INT-safety R7/R8) behind explicit-open registration, W1 selection,
  * start-time seeding, quarantine and the runtime grant.
@@ -763,12 +777,7 @@ export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: str
       return false // The other spelling does not exist: nothing to collapse or to add.
     }
   }
-  const canonical = (path: string) => {
-    const directory = resolve(input.realpath(path))
-    if (directory !== DATA_VOLUME && !directory.startsWith(`${DATA_VOLUME}/`)) return directory
-    const plain = directory.slice(DATA_VOLUME.length) || "/"
-    return sameObject(directory, plain) ? plain : directory
-  }
+  const canonical = (path: string) => canonicalWorkspacePath({ realpath: input.realpath, stat }, path)
   const chain = (path: string) => {
     const out = [path]
     while (out.at(-1) !== dirname(out.at(-1)!)) out.push(dirname(out.at(-1)!))

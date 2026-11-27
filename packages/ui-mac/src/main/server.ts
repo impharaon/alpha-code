@@ -67,7 +67,7 @@ import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
 // sidecar 在 import 引擎之前 apply。计划做不出来 = 拒绝 fork(fail-closed,原因可读),不静默无围栏。
-import { checkWritableTarget, planCredentialStores, plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
+import { planCredentialStores, plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, planWriteApproval, type ProcessFencePlan, type WriteApprovalKind } from "./process-fence-plan"
 import { configureCommandSourceFence } from "./plugin-command-source"
 import { trialCompileProfile } from "./process-fence-compile"
 import type { ProcessFenceStartInput } from "./process-fence-apply"
@@ -975,15 +975,18 @@ export async function spawnLocalServer(
     return { revision: writeScopeRevision, targets: request.targets.map((target): Extract<WriteScopeReply["result"], { targets: unknown }>["targets"][number] => {
       // Filesystem semantics, never lexical: `P/link/../b` is written in the link target's parent (design v6 §4.2, R1-F1).
       const directory = plannedWritableTarget(target.directory, realpathSync.native)
-      const answer = (outcome: WriteScopeOutcome) => ({ absolute: target.absolute, outcome, realDirectory: directory.target })
+      const answer = (outcome: WriteScopeOutcome, realDirectory = directory.target, kind: WriteApprovalKind = "directory") => ({ absolute: target.absolute, outcome, realDirectory, kind })
       if (!fence) return answer("no-fence")
       const actual = plannedWritableTarget(target.absolute, realpathSync.native).target
       if (processFenceRulesCover({ allow: writeRules!.deny, deny: [] }, actual, "file")) return answer("protected")
       if (processFenceRulesCover({ allow: [...(fence.fixedWritable ?? [])], deny: writeRules!.deny }, actual, "file")) return answer("fixed")
       if (processFenceRulesCover({ allow: [...writeRules!.allow, ...[...grantedDirectories].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules!.deny }, actual, "file")) return answer("writable")
-      // R4's own eligibility rule: a folder it would refuse to grant is never offered after the fact (BR-11).
-      if (fence.eligibility && !checkWritableTarget(fence.eligibility, directory).eligible) return answer("ineligible")
-      return answer("needs-approval")
+      if (!fence.eligibility) return answer("needs-approval")
+      // R4's own judgement (NP1): a target it would refuse is never offered (BR-11); a new path directly in HOME is offered as
+      // that path itself (BR-08 v8).
+      const scope = planWriteApproval(fence.eligibility, target)
+      if (!scope.eligible) return answer("ineligible", scope.directory)
+      return scope.kind === "new-path" ? answer("needs-approval", scope.root, "new-path") : answer("needs-approval")
     }) }
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。

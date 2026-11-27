@@ -890,7 +890,7 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 ## 交付切片七｜直接在主目录下新建的那一个路径可批准（I-56）
 
 - 依据：#1759；spec v8 BR-08 的 v8 句、BR-11 的 v8 修订、AC-08 第一种情形、AC-13 的 v8 修订、AC-14；design v7 增量 §2 NP-P01–NP-P09、§4.1–§4.8（NP1–NP7）、§5、§6（实施证据 1–16）、§10 送审前裁决 1–11 与「R1 审查及处置」R1-F1、R1-F2 @ `4e5f004f4a`（#1832）。切片六的 AB1/AB4/AB5、R5 与卡片其余部分原样复用。INT-safety I-56（owner U-46）。
-- 核对：待填（首个实施提交按编排者 brief 的 `Phase:` 行填写）。
+- 核对：`d32b5eed51` · 编排者 brief（`Phase: PLAN, then IMPLEMENT in the same round`）授权同轮计划并直接实施；Claude Opus 5.5 实施自核，未另收到编排者计划审查回执，不宣称独立审查通过。
 
 ### 改动
 
@@ -949,4 +949,4 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 
 ### 偏离记录
 
-暂无。
+- 2026-11-27 · 步骤 2：`WriteApprovalKind` 放在 `packages/ui-mac/src/shared/directory-write-approval.ts`（与 `DirectoryAccessTarget` 同处），`process-fence-plan.ts` 原样再导出。原因：R6 线上类型在 `codepuppy-sidecar-messages.ts`，ext 经它做类型检查；从 `process-fence-plan.ts` 取类型会把 main 世界的模块拉进 ext 的类型检查。类型只有一份，含义不变。

@@ -15,12 +15,15 @@ export function connectorLocalLaunch(input: {
   directory: string
   bootstrap: CodePuppyBootstrap | undefined
   declared: DeclaredFirstParty | undefined
-  host: () => ConnectorLaunchHost
+  /** undefined when the engine was started without the sidecar's host: no trusted context, the entry keeps its own launch. */
+  host: () => ConnectorLaunchHost | undefined
 }): McpConnection.Input["localLaunch"] {
   const config = input.config
   const launchers = input.bootstrap?.launchers
   const generation = input.bootstrap?.sidecarGeneration
   if (config.type !== "local" || !launchers || generation === undefined) return undefined
+  const host = input.host()
+  if (!host) return undefined
   const command = config.command
   const runner = connectorPackageRunner(command, launchers.platform === "win32-x64" ? "win32" : "darwin")
   const environment = config.environment ?? {}
@@ -29,7 +32,7 @@ export function connectorLocalLaunch(input: {
     runtimeRoot: launchers.runtimeRoot,
     // Every value configured for this server is a known secret fact here (a {file:} key arrives already substituted).
     secrets: Object.values(environment).filter((value) => value !== ""),
-    host: input.host(),
+    host,
     ...(input.declared ? { firstParty: { launchers, declaration: input.declared } } : {}),
     ...(runner && command[0] !== undefined
       ? {

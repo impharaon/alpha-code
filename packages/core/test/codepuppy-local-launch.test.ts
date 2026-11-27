@@ -30,6 +30,12 @@ describe("connectorLocalLaunch", () => {
     expect(connectorLocalLaunch({ config: { type: "remote", url: "https://mcp.example/" } as never, directory: "/w", bootstrap: desktop, declared: undefined, host: () => { throw Error("no host for remote") } })).toBeUndefined()
   })
 
+  // An engine started without the sidecar's host (a harness, a partial start) must not lose every connector's startup.
+  test("launchers without a published host leave every entry on its own launch path", () => {
+    expect(connectorLocalLaunch({ config: local(["uvx", "pkg"]), directory: "/w", bootstrap: desktop, declared: undefined, host: () => undefined })).toBeUndefined()
+    expect(connectorLocalLaunch({ config: local(["python3", "server.py"]), directory: "/w", bootstrap: desktop, declared: undefined, host: () => undefined })).toBeUndefined()
+  })
+
   test("a native command keeps its own environment: diagnostics and the dependency gate only, never package preparation", () => {
     // A short key is still a key: every configured value is masked, never filtered by length.
     const value = connectorLocalLaunch({ config: local(["python3", "server.py"], { API_TOKEN: "sk-owned-secret-value", API_KEY: "abc123", EMPTY: "" }), directory: "/w", bootstrap: desktop, declared: undefined, host: () => host })

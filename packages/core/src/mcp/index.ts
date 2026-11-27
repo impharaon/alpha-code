@@ -45,7 +45,7 @@ import { withFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { declaredFirstPartyTools, listedFirstPartyTools, listsDeclaration, sameTool, type DeclaredTool } from "./codepuppy-first-party-mcp.js"
 import { connectorLocalLaunch } from "./codepuppy-local-launch.js" // codepuppy(#1760)
-import { connectorLaunchHost } from "@opencode/util/codepuppy-connector-launch"
+import { publishedConnectorLaunchHost } from "@opencode/util/codepuppy-connector-launch"
 import type { PinnedFilesCallPreparation } from "@opencode/util/codepuppy-connector-launch"
 import { reconnectDelay, type StartFailure } from "./codepuppy-startup.js"
 import { effectiveName, normalizedName } from "../tool/runtime.js"
@@ -478,7 +478,7 @@ export const layer = (options?: Options) =>
             lock: locks.withLock(name),
             callbacks,
             fork,
-            localLaunch: connectorLocalLaunch({ config, directory: location.directory, bootstrap, declared: firstParty, host: connectorLaunchHost }), // codepuppy(#1760)
+            localLaunch: connectorLocalLaunch({ config, directory: location.directory, bootstrap, declared: firstParty, host: publishedConnectorLaunchHost }), // codepuppy(#1760)
             events: {
               connecting: Effect.gen(function* () {
                 // A server still pending from creation keeps the window that started with its entry.

@@ -98,6 +98,11 @@ export function publishConnectorLaunchHost(host: ConnectorLaunchHost) {
   if (target[hostKey]) throw new Error("connector launch host already published for this process")
   target[hostKey] = host
 }
+/** The published host, or undefined when this engine was started without the sidecar's host. */
+export function publishedConnectorLaunchHost(): ConnectorLaunchHost | undefined {
+  return (globalThis as { [hostKey]?: ConnectorLaunchHost })[hostKey]
+}
+
 export function connectorLaunchHost(): ConnectorLaunchHost {
   const host = (globalThis as { [hostKey]?: ConnectorLaunchHost })[hostKey]
   if (!host) throw new Error("connector launch host was not published before engine startup")

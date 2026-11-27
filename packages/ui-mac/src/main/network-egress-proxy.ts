@@ -136,6 +136,11 @@ export type EgressProxyDeps = {
   dialTimeoutMs?: number
   /** `#1572` 静默兜底期限(默认 15 s):TLS 隧道上游零字节多久就关。0 = 不设期限。 */
   tlsSilentMs?: number
+  /**
+   * #1760 R5:每个已判定的 CONNECT 交出它的 Proxy-Authorization 原值与结果,只用于把结果归到在途的连接器 attempt。
+   * 不参与放行判定,头不转发、不进日志。
+   */
+  attribute?: (authorization: string | string[] | undefined, fact: { host: string; port: number; outcome: "refused" | "granted" | "not-asked" }) => void
 }
 
 export type EgressProxyHandle = {
@@ -287,7 +292,11 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
 
     const parsed = parseConnectAuthority(authority)
     if (!parsed) return deny(400, "bad-authority")
-    if (!authorize(parsed.host, parsed.port) && !admitUserEgressGrant(parsed.host, parsed.port)) return deny(403, "unregistered", parsed)
+    const attribute = (outcome: "refused" | "granted" | "not-asked") => deps.attribute?.(req.headers["proxy-authorization"], { host: parsed.host, port: parsed.port, outcome })
+    if (!authorize(parsed.host, parsed.port) && !admitUserEgressGrant(parsed.host, parsed.port)) {
+      attribute("refused")
+      return deny(403, "unregistered", parsed)
+    }
     void openTunnel(parsed)
     return
 
@@ -313,9 +322,11 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
             pause()
             let outcome: EgressGrantOutcome
             try { outcome = await requestGrant(parsed.host, parsed.port, controller.signal) }
-            catch { if (!stopped()) deny(403, "unregistered", parsed, "approval-unavailable"); return }
+            catch { if (!stopped()) { attribute("refused"); deny(403, "unregistered", parsed, "approval-unavailable") } return }
             if (stopped()) return
             if (outcome !== "granted") {
+              // Any decision the protection made (denied, timed out, nobody to ask) is "refused"; only an absent channel is not-asked.
+              attribute(outcome === "not-asked" ? "not-asked" : "refused")
               if (outcome !== "not-asked") log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: "refused" })
               deny(403, "unregistered", parsed, outcome === "not-asked" ? undefined : outcome)
               return
@@ -323,7 +334,7 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
             resume()
             basis = authorize(parsed.host, parsed.port) ? undefined : await currentEgressPass(controller.signal)
             if (stopped()) return
-            if (authorize(parsed.host, parsed.port)) log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: "granted" })
+            if (authorize(parsed.host, parsed.port)) { attribute("granted"); log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: "granted" }) }
             else if (!basis) { deny(403, "unregistered", parsed, "approval-unavailable"); return }
           }
           const routes = await resolveRoutes(parsed, controller.signal)

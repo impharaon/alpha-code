@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs"
-import type { ConnectorLaunchMainMessage } from "../../../util/src/codepuppy-connector-launch"
+import { isLaunchSnapshot, type ConnectorLaunchMainMessage, type LaunchIdentity } from "../../../util/src/codepuppy-connector-launch"
+import { connectorSecretNeed } from "./connector-secret-needs"
+import { beginConnectorEgressAttempt, endConnectorEgressAttempt } from "./connector-egress-attribution"
 import type { PinnedFiles } from "../../../util/src/codepuppy-pinned-files"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { codepuppyGlobalRoot } from "./codepuppy-installs"
@@ -42,12 +44,18 @@ export function openConnectorLaunchMain(input: {
   authority: NonNullable<ReturnType<typeof forkLauncherAuthority>>
   launches: Pick<ReturnType<typeof createConnectorLaunchState>, "changed">
   catalog: () => Promise<{ entries: readonly CatalogEntry[]; version: string }>
+  /** The policy proxy port of this generation; undefined where no proxy runs (no attribution, the inherited environment). */
+  proxyPort: number | undefined
+  /** Main's package/secret facts for a server (connectorSecretNeed); they refine only an unclassified failure. */
+  secretNeed?: (server: string) => { fields: string[]; packageId?: string } | undefined
   post: (message: ConnectorLaunchMainMessage) => void
 }) {
-  return createConnectorLaunchMainBridge({
+  const attributed = new Map<string, LaunchIdentity>()
+  const key = (identity: LaunchIdentity) => JSON.stringify([identity.directory, identity.server, identity.attempt])
+  const bridge: ReturnType<typeof createConnectorLaunchMainBridge> = createConnectorLaunchMainBridge({
     sidecarGeneration: input.sidecarGeneration,
     runtimeRoot: input.authority.environment.runtimeRoot,
-    changed: input.launches.changed,
+    changed: (value) => input.launches.changed(withSecretNeed(value, input.secretNeed ?? connectorSecretNeed)),
     resolveAssets: () => input.authority.resolveAssets(),
     runtimeDependencies: connectorRuntimeDependencyReader({
       installed: (identity) =>
@@ -58,11 +66,33 @@ export function openConnectorLaunchMain(input: {
         }),
       environment: hostProgramEnvironment,
     }),
-    // Attribution marks land with R5's proxy evidence; until then the attempt keeps the inherited proxy and has no evidence.
-    beginEgress: async () => ({ proxyEnvironment: {} }),
-    endEgress: () => {},
+    beginEgress: async (identity) => {
+      if (input.proxyPort === undefined) return { proxyEnvironment: {} }
+      attributed.set(key(identity), identity)
+      return beginConnectorEgressAttempt({ identity, proxyPort: input.proxyPort, report: (evidence) => bridge.evidence(evidence) })
+    },
+    endEgress: (identity) => {
+      attributed.delete(key(identity))
+      endConnectorEgressAttempt(identity)
+    },
     post: input.post,
   })
+  return {
+    ...bridge,
+    // A stopped generation's marks stop attributing at once; a late CONNECT from its processes is no one's evidence.
+    dispose() {
+      for (const identity of attributed.values()) endConnectorEgressAttempt(identity)
+      attributed.clear()
+      bridge.dispose()
+    },
+  }
+}
+
+/** §4.5: main's authorization facts may name a missing key, but never overwrite a concrete download/egress/dependency fact. */
+function withSecretNeed(value: unknown, need: (server: string) => { fields: string[]; packageId?: string } | undefined) {
+  if (!isLaunchSnapshot(value) || value.state.phase !== "failed" || value.state.failure.kind !== "unknown") return value
+  const secret = need(value.identity.server)
+  return secret ? { ...value, state: { ...value.state, failure: { kind: "secret" as const, ...secret } } } : value
 }
 
 function readBundle(directory: string, platform: NonNullable<ReturnType<typeof hostLauncherPlatform>>, packaged: boolean) {

@@ -68,7 +68,7 @@ test.skipIf(!platform)("main answers the sidecar host with this authority's asse
   expect(addReceipt(process.env.CODEPUPPY_GLOBAL_DIR!, { id: "mcp:git", name: "git", type: "mcp", scope: "global", version: "1.0.0", installedAt: "2026-11-27T00:00:00.000Z", origin: "catalog" }).ok).toBe(true)
   const launches = createConnectorLaunchState("2", { retry: async () => ({ ok: true }), diagnostic: async () => ({ ok: false, error: "unavailable" }), openNetworkApproval: async () => ({ ok: false, error: "unavailable" }), chooseWorkspace: async () => ({ ok: false, error: "unavailable" }) })
   let toSidecar: (message: unknown) => void = () => {}
-  const main = openConnectorLaunchMain({ sidecarGeneration: "2", authority, launches, catalog: async () => ({ entries: [card], version: "catalog-1" }), post: (message) => queueMicrotask(() => toSidecar(structuredClone(message))) })
+  const main = openConnectorLaunchMain({ sidecarGeneration: "2", authority, launches, catalog: async () => ({ entries: [card], version: "catalog-1" }), proxyPort: 4433, post: (message) => queueMicrotask(() => toSidecar(structuredClone(message))) })
   const sidecar = createConnectorLaunchSidecarHost({ sidecarGeneration: "2", launchers: structuredClone(authority.environment), post: (message) => queueMicrotask(() => main.receive(structuredClone(message))) })
   toSidecar = (message) => void sidecar.receive(message)
   try {
@@ -78,10 +78,47 @@ test.skipIf(!platform)("main answers the sidecar host with this authority's asse
     expect(facts.missing).toContain("docker-for-this-test")
     expect(facts.missing).not.toContain("uv")
     expect(await sidecar.host.runtimeDependencies({ directory: f.root, server: "user-added", attempt: "a2" })).toEqual({ runtimeDep: [], executables: {}, missing: [] })
-    expect(await sidecar.host.beginEgress({ directory: f.root, server: "git", attempt: "a1" })).toEqual({ proxyEnvironment: {} })
+    // R5: the attempt's own marked proxy URL, then evidence from the real registry reaches this attempt only until it ends.
+    const identity = { directory: f.root, server: "git", attempt: "a1" }
+    const { proxyEnvironment } = await sidecar.host.beginEgress(identity)
+    const url = new URL(proxyEnvironment.HTTPS_PROXY!)
+    expect([url.hostname, url.port, proxyEnvironment.https_proxy === proxyEnvironment.HTTPS_PROXY]).toEqual(["127.0.0.1", "4433", true])
+    const { attributeConnectorEgress } = await import("./connector-egress-attribution")
+    attributeConnectorEgress(`Basic ${Buffer.from(`${url.username}:attempt`).toString("base64")}`, { host: "pypi.org", port: 443, outcome: "refused" })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(await sidecar.host.egressEvidence(identity)).toEqual([{ identity, host: "pypi.org", port: 443, outcome: "refused" }])
+    main.dispose()
+    attributeConnectorEgress(`Basic ${Buffer.from(`${url.username}:attempt`).toString("base64")}`, { host: "pypi.org", port: 443, outcome: "refused" })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(await sidecar.host.egressEvidence(identity)).toHaveLength(1)
   } finally {
     sidecar.close()
     main.dispose()
     launches.dispose()
   }
+})
+
+// Integration layer (real config file): a definition whose secret reference is unsaved turns an unclassified failure into
+// 「需要填写密钥」; a concrete download failure stays what it was; saving the file clears the need.
+test("main's secret facts refine only an unclassified failure", async () => {
+  const { connectorSecretNeed } = await import("./connector-secret-needs")
+  const { mcpPluginTargetPath } = await import("./ext-config")
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "launch-generation-secret-"))); roots.push(root)
+  const secret = join(root, "GITHUB_PERSONAL_ACCESS_TOKEN")
+  mkdirSync(join(mcpPluginTargetPath(), ".."), { recursive: true })
+  writeFileSync(mcpPluginTargetPath(), JSON.stringify({ mcp: { github: { type: "local", command: ["npx", "-y", "@modelcontextprotocol/server-github"], environment: { GITHUB_PERSONAL_ACCESS_TOKEN: `{file:${secret}}`, MODE: "read" } } } }))
+  expect(connectorSecretNeed("github")).toEqual({ fields: ["GITHUB_PERSONAL_ACCESS_TOKEN"] })
+  const f = await fixture()
+  const launches = createConnectorLaunchState("2", { retry: async () => ({ ok: true }), diagnostic: async () => ({ ok: false, error: "unavailable" }), openNetworkApproval: async () => ({ ok: false, error: "unavailable" }), chooseWorkspace: async () => ({ ok: false, error: "unavailable" }) })
+  const main = openConnectorLaunchMain({ sidecarGeneration: "2", authority: forkLauncherAuthority(f.input)!, launches, catalog: async () => ({ entries: [], version: "" }), proxyPort: undefined, post: () => {} })
+  const failed = (server: string, failure: object) => ({ type: "codepuppy.connector-launch.changed", snapshot: { identity: { directory: f.root, server, attempt: `a-${server}` }, sidecarGeneration: "2", sequence: 1, state: { phase: "failed", failure, diagnostic: `a-${server}` } } })
+  main.receive(failed("github", { kind: "unknown", detail: "401 Bad credentials" }))
+  writeFileSync(mcpPluginTargetPath(), JSON.stringify({ mcp: { github: { type: "local", command: ["npx"], environment: { GITHUB_PERSONAL_ACCESS_TOKEN: `{file:${secret}}` } }, fetch: { type: "local", command: ["uvx"], environment: { KEY: `{file:${secret}}` } } } }))
+  main.receive(failed("fetch", { kind: "download", detail: "ECONNREFUSED" }))
+  const rows = await launches.api.list(f.root)
+  expect(rows.find((row) => row.identity.server === "github")?.state).toMatchObject({ failure: { kind: "secret", fields: ["GITHUB_PERSONAL_ACCESS_TOKEN"] } })
+  expect(rows.find((row) => row.identity.server === "fetch")?.state).toMatchObject({ failure: { kind: "download" } })
+  writeFileSync(secret, "saved")
+  expect(connectorSecretNeed("github")).toBeUndefined()
+  main.dispose(); launches.dispose()
 })

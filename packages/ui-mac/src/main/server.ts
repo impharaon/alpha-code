@@ -94,6 +94,8 @@ import { createPinnedFileMainBridge, pinnedFileAuthority } from "./connector-lau
 import { createConnectorLaunchState, installConnectorLaunchState } from "./connector-launch-state"
 import { hostLauncherPlatform } from "./connector-launchers"
 import { forkLauncherAuthority, openConnectorLaunchMain } from "./connector-launch-generation"
+import type { LaunchActionResult } from "../../../util/src/codepuppy-connector-launch"
+import { attributeConnectorEgress } from "./connector-egress-attribution"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { openDocumentGeneration } from "./document-generation"
 import { documentBootstrap } from "./document-resources"
@@ -213,7 +215,7 @@ function ensureEgressPolicyProxy(): Promise<EgressProxyHandle> {
       else getLogger()?.log(line)
     }
     // Conversation approval is registered by the main composition root before the sidecar starts.
-    egressProxySingleton = startEgressPolicyProxy({ log }).then(
+    egressProxySingleton = startEgressPolicyProxy({ log, attribute: attributeConnectorEgress }).then(
       (handle) => {
         getLogger()?.log(`network egress policy proxy listening on ${handle.host}:${handle.port} — the only way out of the engine tree (REQ-137); destinations = network-egress-registry.ts`)
         return handle
@@ -956,19 +958,29 @@ export async function spawnLocalServer(
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
-  // #1760: this generation's connector-launch projection (design §4.7); network approval and folder choice join with group B.
+  // #1760: this generation's connector-launch projection (design §4.7). Every action restarts through the engine's own connect,
+  // so the new attempt goes through the same prepare path; none of them reports recovery by itself.
+  const reconnect = async (server: string, directory: string): Promise<LaunchActionResult> => {
+    try {
+      await engineClient({ url: `http://${hostname}:${port}`, username: null, password }).experimental.mcp.connect({ server, location: { directory } })
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: "unavailable", detail: serializeError(error).message }
+    }
+  }
   const launches = createConnectorLaunchState(String(options.generation ?? 0), {
-    retry: async (identity) => {
-      try {
-        await engineClient({ url: `http://${hostname}:${port}`, username: null, password }).experimental.mcp.connect({ server: identity.server, location: { directory: identity.directory } })
-        return { ok: true }
-      } catch (error) {
-        return { ok: false, error: "unavailable", detail: serializeError(error).message }
-      }
-    },
+    retry: (identity) => reconnect(identity.server, identity.directory),
     diagnostic: (identity) => connectorMain?.diagnostic(identity) ?? Promise.resolve({ ok: false, error: "unavailable" }),
-    openNetworkApproval: async () => ({ ok: false, error: "unavailable" }),
-    chooseWorkspace: async () => ({ ok: false, error: "unavailable" }),
+    // R6: the approval authority keeps no refusal memory (#1757 v3), so a restarted attempt asks again through the same card.
+    openNetworkApproval: (identity) => reconnect(identity.server, identity.directory),
+    // R8: the system folder picker; the declaration's {workspace} follows the chosen Location (engine projection), cancel keeps the fact.
+    chooseWorkspace: async (identity) => {
+      const focused = electronNs.BrowserWindow.getFocusedWindow()
+      const dialogOptions: Electron.OpenDialogOptions = { properties: ["openDirectory", "createDirectory"], defaultPath: identity.directory }
+      const picked = await (focused ? electronNs.dialog.showOpenDialog(focused, dialogOptions) : electronNs.dialog.showOpenDialog(dialogOptions))
+      const directory = picked.canceled ? undefined : picked.filePaths[0]
+      return directory ? reconnect(identity.server, directory) : { ok: false, error: "cancelled" }
+    },
   })
   const uninstallLaunches = installConnectorLaunchState(launches)
   // The ID-only bridge reaches the one pinned authority through the launcher authority (Python mirror, managed entries).
@@ -989,6 +1001,7 @@ export async function spawnLocalServer(
         authority: launcher,
         launches,
         catalog: options.connectorCatalog ?? (async () => ({ entries: [], version: "" })),
+        proxyPort: egressProxyPort,
         post: (message) => child.postMessage(message),
       })
     : undefined

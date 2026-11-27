@@ -362,3 +362,14 @@ test("document verification ignores an old registration in the same Location and
   wire.deliver({ type: "codepuppy.document.runtime.verify", task: { kind: "libreoffice", taskId: "old-task", registrationId: "old-registration", sidecarGeneration: 7, location, pinId: "libreoffice/darwin-arm64/test", pinSha256: "a".repeat(64), runtimeRoot: "/state/candidate", jobRoot: "/state/jobs/old" } })
   await cleanup(); expect(ran).toBe(0); expect(wire.sent).toHaveLength(0)
 })
+
+// Fast layer, #1760: the sidecar's launcher lane shares this parentPort; its replies are neither the hub's nor log noise.
+test("launcher-lane messages on the shared parentPort are left to the sidecar host without a log line", () => {
+  const wire = fakePort()
+  const lines: string[] = []
+  createHubBridge(wire.port, { log: (line) => void lines.push(line) })
+  wire.deliver({ type: "codepuppy.connector-launch.reply", id: 7, sidecarGeneration: "2", ok: true, value: null })
+  wire.deliver({ type: "codepuppy.pinned-file.result", id: 8, sidecarGeneration: "2", delivery: { result: { ok: false, error: "cancelled" } } })
+  wire.deliver({ type: "codepuppy.hub.request.reply", id: 9, record: null })
+  expect(lines).toEqual(["[@codepuppy/ext] hub bridge: codepuppy.hub.request.reply for no pending request ignored"])
+})

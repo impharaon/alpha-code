@@ -136,6 +136,8 @@ export function createHubBridge(
     const message = event?.data
     if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
+    // #1760: the sidecar's launcher lane (its ConnectorLaunchHost) shares this parentPort; those messages are not the hub's.
+    if (type.startsWith("codepuppy.connector-launch.") || type.startsWith("codepuppy.pinned-file.")) return
     if (type === "codepuppy.document.check-ready") {
       const ready = message as { check?: unknown; sidecarGeneration?: unknown }
       if (!isDeferredDocumentCheck(ready.check) || !Number.isSafeInteger(ready.sidecarGeneration) || Number(ready.sidecarGeneration) < 0) return log("[@codepuppy/ext] dropped malformed document ready notification")

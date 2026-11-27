@@ -31,6 +31,10 @@ test("external read exception uses the complete verified root call", () => {
   const foreign = event(); reads.evaluate(foreign); expect(foreign.effect).toBe("ask")
   reads.begin({ ...call, agent: "codepuppy-automation" }, facts)
   const automation = { ...event(), agent: "codepuppy-automation" as never }; reads.evaluate(automation); expect(automation.effect).toBe("ask")
+  // Design §10 SPEC5-03: a read running at release keeps its correlation until it ends; no read is taken in afterwards.
   reads.begin(call, facts); reads.dispose()
+  const running = event(); reads.evaluate(running); expect(running.effect).toBe("allow")
+  reads.end(call)
+  reads.begin(call, facts)
   const released = event(); reads.evaluate(released); expect(released.effect).toBe("ask")
 })

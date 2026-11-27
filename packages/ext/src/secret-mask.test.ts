@@ -227,6 +227,55 @@ test("locations and root failures stay independent", async () => {
   ])
 })
 
+// Design §10 SPEC5-03: stopping the engine releases the Location before a waiting call is refused and finishes.
+test.each(["result", "error"] as const)("a Code Mode call finishing after release still masks its %s and keeps toolCalls", async (terminal) => {
+  const { mask, values: [value] } = await setup()
+  const toolCalls = [{ id: "child", name: "probe_echo", status: "error" }]
+  await mask.begin({ call, kind: "execute" })
+  mask.dispose()
+  // Released but still running: a new root call is not taken in, so its output is withheld even though values remain.
+  const late = { ...call, id: "late" }
+  await mask.begin({ call: late, kind: "tool" })
+  expect((await mask.progress({ facts: undefined, call: late, update: { body: "late progress" } })).output).toBe(ProtectedFiles.MASKING_FAILED_TEXT)
+  expect((await mask.result({ facts: undefined, call: late, tool: "probe", result: { content: "late output" } })).content).toEqual([
+    { type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT },
+  ])
+  expect((await mask.error({ call: late, tool: "probe", error: new Tool.Error({ message: "late failure" }) })).message).toBe(ProtectedFiles.MASKING_FAILED_TEXT)
+  const safe = terminal === "result"
+    ? await mask.result({ facts: undefined, call, tool: "execute", result: { content: `ran ${value}`, metadata: { toolCalls } } })
+    : await mask.error({ call, tool: "execute", error: new Tool.Error({ message: `failed ${value}`, metadata: { toolCalls } }) })
+  const text = JSON.stringify(safe)
+  expect(text.includes(value)).toBe(false)
+  expect(text.includes(ProtectedFiles.REDACTED)).toBe(true)
+  expect((safe.metadata?.toolCalls as typeof toolCalls | undefined)?.map((child) => child.status)).toEqual(["error"])
+  // Released once the last call finished: a call that begins afterwards is not taken in, so nothing can be masked.
+  const later = { ...call, id: "later" }
+  await mask.begin({ call: later, kind: "tool" })
+  expect((await mask.result({ facts: undefined, call: later, tool: "probe", result: { content: value } })).content).toEqual([
+    { type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT },
+  ])
+})
+
+// Design §10 SPEC5-03: shell-capture material is cleared at release and never re-established, also when its creation
+// was still in progress; a running call keeps the values alive so the capture would otherwise succeed.
+test.each([false, true])("shell capture is withheld after release (release during start: %p)", async (crossing) => {
+  const { root, mask, values: [value] } = await setup()
+  await mask.begin({ call, kind: "execute" })
+  const live: string[] = []
+  const event = (phase: ShellCapture["phase"], bytes = ""): ShellCapture => ({ id: Shell.ID.make("sh_late"), file: path.join(root, "sh_late.out"), phase, bytes: Buffer.from(bytes), withheld: false, disposition: "hold", publish: async (chunk) => { live.push(Buffer.from(chunk).toString()) } })
+  const start = event("start")
+  if (!crossing) mask.dispose()
+  const started = mask.capture(start)
+  if (crossing) mask.dispose()
+  await started
+  expect(start.disposition).toBe("withhold")
+  const chunk = event("chunk", `token=${value}\n`)
+  await mask.capture(chunk)
+  expect(chunk.disposition).toBe("withhold")
+  expect(live).toEqual([])
+  expect((await readdir(root)).filter((name) => name.startsWith("sh_late"))).toEqual([])
+})
+
 test("masking failure drops previous and current dynamic key names", async () => {
   const { mask, roots } = await setup()
   const key = randomUUID()

@@ -985,6 +985,28 @@ runner 本身是一个不开窗口的 Electron main 进程：用 `packages/ui-ma
 | AC-02 | 3 次 P 的成品经 `score_pptx.py` 逐项核对 | 同上 | 对照臂 4 项 |
 | AC-03 | 3 次 X 的成品先经产品 `OfficeExcel.recalculate` 重算，再经 `check_xlsx.py` 判 12 项、公式错误数和汇总与 `sales.json` 独立结果的比对 | 同上 | 对照臂 12 项里只做到 4 项；重算没执行时公式单元格没有值，比对失败 |
 
+#### 实测记录（2026-11-27，宿主 `ed39ff759e`）
+
+证据目录 `~/.cache/alpha-orch/2026-11-27/impl-1761-ac01-03/`（`logs/`、`dry-run-4/`、`paid/`、`diag/`）。构建：`gate slot -- bun ./scripts/predev.ts`、`build-connector-launchers.ts`、`build-office-runtime.ts`、`build-video-mcp.ts`、`build-document-assets.ts`、`build-ripgrep.ts`，再 `gate slot -- bunx electron-vite build --config scripts/document-quality/electron.vite.config.ts`。宿主、启动器与构建配置的类型检查用临时配置（含 bun 类型）跑 tsgo，新文件 0 错；在 host.ts 末尾加一行类型错误时报出 `host.ts(487,7) TS2322`，确认这个检查能失败。
+
+**空跑（不花钱，第 4 次）**：`bun ./scripts/document-quality-run.ts --evidence …/dry-run-4 --key <测试 key 文件> --endpoints <桌面端 discovered-endpoints> --runs W1 --run-timeout-minutes 8 --dry-run`，exit 2：`W1: the session ended with errors and no deliverable: {"type":"provider.transport","message":"fetch failed"}`；余额 97010→97010，账本没有新记录；宿主副本没有留在 LaunchServices。前三次空跑暴露的宿主问题都在 `ed39ff759e` 之前修好：ext 要 main 的 hub 宿主应答才会激活（缺它时 sidecar 报 `plugin inventory … was never published` 拒绝 ready）；首启要先下载平台模型目录，否则平台供应商没有模型；消息分页的 cursor 不能和 order 同传；`app.exit` 偶尔让进程停在 Electron 退出流程里，改由启动器按宿主写下的退出码收尾。
+
+**付费尝试**：`… --evidence …/paid --runs W1,P1,X1,W2,P2,X2,W3,P3,X3 --sample W1 --cap-fen 3000 --prior-max-run-fen 247 --run-timeout-minutes 90`，exit 2，没有进入 W1。
+- LibreOffice 预热那一轮（经香港入口 `alpha-gateway-hk`）花了 9 分：余额 97010→97001，账本 seq 10925 之后新增 15 条记录，全部是 `model.invoke.chat`，`usage_settled` 合计 −9。
+- LibreOffice 下载：10:09:56Z 对香港 GitHub 中转 `alpha-github-hk.tidelabs.click` 上同一路径做 HEAD，返回 200，长度 299927705，与 pin 一致；60 秒内落盘 201 MB。由此推断走的是 relay，而不是 brief 预计的 GitHub 原始来源。产品没有记录这次下载的 `via`，所以这是推断。
+- 随后产品的 LibreOffice 验证失败：`fixed LibreOffice verification exited unsuccessfully; exit=1`（`verify_runtime.py` 里的 `--convert-to pdf`）。宿主按设计在 W1 之前停下，没有量到任何一次。
+
+**原因（产品，围栏 × LibreOffice 的单实例管道）**：
+1. 同一个任务目录、profile 和 fonts.conf，在围栏外直接跑 `soffice --headless … --convert-to pdf`，rc=0，出 PDF。
+2. 在被围栏的引擎里用会话 shell 复现（`session.shell`，不调模型）：`verify_runtime.py` 退出 1，直接跑 soffice 转换也退出 1 且没有任何输出；`AF_UNIX` socket 在 `$TMPDIR` 和 `/tmp` 下 `bind` 都报 `PermissionError [Errno 1]`；改 HOME、改 TMPDIR 仍然退出 1。
+3. 用 `sandbox-exec` 只加一条规则做对照：`(allow default)` → 0；加上围栏的 N1 `(deny network*)` → 1、不出 PDF；再加 `(allow network* (local unix-socket) (remote unix-socket))` → 0；只放 `(path-regex #"/OSL_PIPE_")` → 0；只放 `/private/var/folders/` 下 → 1。
+
+结论：LibreOffice 启动时要建一个 `OSL_PIPE_*` 的 unix domain socket 作单实例管道；`packages/ui-mac/src/main/process-fence-profile.ts:381` 的 N1 `(deny network*)`（注释写明「含 DNS 的 unix socket」）把它拒掉了。产品设计要求验证只在被围栏的 Location 里跑（`resources/document-runtime/verify_runtime.py` 文件头），渲染和 `OfficeExcel.recalculate` 也都在同一围栏内起 soffice。所以在 darwin 上，组合好的产品引擎里 LibreOffice 永远到不了 ready：制作之后的渲染、自查和重算都做不成。先前片 3/4 的组件证据和本节 AC-08 实测都是在围栏外跑 LibreOffice，所以没有发现。
+
+**状态**：AC-01..03 仍 pending，等围栏放行 LibreOffice 的管道（例如只放 `OSL_PIPE_` 路径的 unix socket；这是围栏的安全决定，归围栏 / #1761 的拥有者），本轮不改产品代码。修好后在新的证据目录重跑同一条命令即可：剩余授权 ≤3581 分，本轮上限还剩 2991 分（`--cap-fen 2991`）。九次 W/P/X 一次都还没跑，评分脚本只在 pilot 成品上核对过：W2 9/10（目录项不过），P1 11/11；pilot X1 11/12（第 7 项有两格会被截断）、X2 12/12，这两份 X 用的是 pilot 自己的缓存值，不是产品重算的结果。
+
 ### 偏离记录
 
 2026-11-27 · 计划外两处：没有为脚本新增套件测试（它需要真实 LibreOffice，按 test-layers 记为一次性证据）；`scripts/` 不在 ui-mac 的 tsconfig 里，新驱动另用临时配置单独做了类型检查（tsgo exit 0）。
+
+2026-11-27 · AC-01..03 实测，测量宿主的偏离（产品代码未改）：一，除计划列出的启动步骤外，宿主还调用了 `registerExtIpcHandlers` 拿 ext 的 hub 宿主（ext 激活要靠它应答），以及 `syncLiveAllowlist` 下载平台模型目录（未登录拉取，edition 为 cn，与测试租户相同）。二，产品的 shell 环境探测要先有 index.ts 从界面存储播种的围栏工作区记录，宿主没有这份记录，所以没有合并登录 shell 环境，PATH 取自启动器。三，在九次之前加了一轮 LibreOffice 预热（一次很短的模型调用，触发产品自己的准备路径），计入费用上限。四，空跑用产品的地址覆盖变量把模型代理和云 MCP 指向关闭的本机端口；覆盖变量同时关掉了 relay/direct 回退，所以空跑不会落到付费网关。五，宿主先写下退出码，再由启动器在宽限期后结束进程。没有为宿主或评分脚本新增套件测试：它们需要真实引擎、LibreOffice 和付费账号，按 test-layers 记为一次性证据。

@@ -228,6 +228,8 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     prepareMutation: async (input: EnvMutation): Promise<EnvMutation> => (await prepareMutation(input)).mutation,
     read: async (input: { call: MaskCall; file: ProtectedFiles.ProtectedFile; result: Tool.Result }): Promise<Tool.Result> => {
       const state = stateOf(input.call, "read")
+      // A protected file outside every scanned source joins later collection once read (spec v5 BR-05).
+      files.track(input.file)
       try {
         const after = input.file.view === "variables" ? new TextDecoder("utf-8", { fatal: true }).decode(await readFile(state?.read?.target ?? input.file.path)) : undefined
         if (after !== undefined) files.remember(credentialValues(input.file, Buffer.from(after)))

@@ -271,7 +271,7 @@ export function sources(
 export function match(input: { path: string; roots: ProtectedRoots }): ProtectedFile | undefined {
   const file = normalize(input.path, input.roots)
   const api = input.roots.platform === "win32" ? path.win32 : path.posix
-  const item = locatedRules(input.roots).find((item) => {
+  const item = [...locatedRules(input.roots), ...outsideProjectRules(file, input.roots)].find((item) => {
     const relative = api.relative(item.root, file).replaceAll(api.sep, "/")
     if (!relative || relative === ".." || relative.startsWith("../") || api.isAbsolute(relative)) return false
     if (item.exclude?.some((pattern) => glob(relative, pattern, input.roots.platform))) return false
@@ -380,6 +380,19 @@ function glob(value: string, pattern: string, platform: PathPlatform): boolean {
     })
     .join("")
   return new RegExp(`^${expression}$`, platform === "win32" ? "i" : "").test(value)
+}
+
+// Another project's files follow the same project rules (spec v5 BR-05). They are matched when a tool touches them and
+// never scanned, so `sources` does not include this scope.
+function outsideProjectRules(file: string, roots: ProtectedRoots): LocatedRule[] {
+  const api = roots.platform === "win32" ? path.win32 : path.posix
+  const relative = api.relative(normalize(roots.project, roots), file)
+  if (relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative)) return []
+  const root = api.parse(file).root
+  return [
+    ...PROJECT,
+    ...PROJECT_LOCATIONS.map((item) => ({ ...item, include: item.include.map((pattern) => `**/${pattern}`) })),
+  ].map((item) => ({ ...item, root, exclude: [...(item.exclude ?? []), ...DEPENDENCIES] }))
 }
 
 function locatedRules(roots: ProtectedRoots): LocatedRule[] {

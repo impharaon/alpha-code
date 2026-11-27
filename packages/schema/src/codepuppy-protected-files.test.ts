@@ -175,7 +175,6 @@ test("published sources and probes share exclusions", () => {
     ...["custom.pub", "authorized_keys", "known_hosts", "config"].map((name) => `/fixture/home/.ssh/${name}`),
     "/fixture/home/.ssh-copy/custom",
     "/fixture/home/.aws-copy/credentials",
-    "/fixture/project-copy/.env",
     "/fixture/home/Library/Application Support/Google/Chrome/Default/History",
   ]
   for (const file of excluded) {

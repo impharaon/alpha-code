@@ -32,6 +32,7 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   const files = new Map<string, string>()
   const retained = new Map<string, Uint8Array>()
   const encrypted = new Map<string, Uint8Array[]>()
+  const tracked = new Map<string, ProtectedFiles.ProtectedFile>()
   let snapshot: readonly Uint8Array[] = []
   const publishValues = () => { snapshot = [...retained.values(), ...[...encrypted.values()].flat()] }
   let pending: Promise<void> | undefined
@@ -116,6 +117,12 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
       }
       await walk(source.root)
     }
+    // Protected files outside every source (another project's, once read) are re-checked without listing their directory.
+    for (const file of tracked.values()) {
+      if (disposed) return
+      const info = await available(() => stat(file.path, { bigint: true }))
+      if (info?.isFile()) await available(() => capture(file, info))
+    }
   }
   const directoryEntries = async (directory: string, identity: BigIntStats) => {
     const version = sourceVersion(identity)
@@ -136,6 +143,9 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
   return {
     roots,
     remember,
+    track: (file: ProtectedFiles.ProtectedFile) => {
+      if (!disposed) tracked.set(file.path, file)
+    },
     values: () => snapshot,
     refresh: async () => {
       if (disposed) throw new Error("Secret files released")
@@ -153,6 +163,7 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
       disposed = true
       directories.clear()
       files.clear()
+      tracked.clear()
       retained.clear()
       for (const values of encrypted.values()) for (const value of values) value.fill(0)
       encrypted.clear()

@@ -388,6 +388,33 @@ function sourceSelects(file: string, input: ProtectedFiles.ProtectedRoots): bool
   })
 }
 
+test("outside project files follow the published project rules", () => {
+  const samples = [
+    [roots, "/fixture/other/.env", "env"],
+    [roots, "/fixture/other/app/.env.local", "env"],
+    [roots, "/fixture/home/work/other/secrets.json", "credential-json"],
+    [roots, "/fixture/other/certs/server.pem", "project-private-key"],
+    [roots, "/fixture/other/config/master.key", "rails-key"],
+    [roots, "/fixture/project-copy/.env", "env"],
+    [roots, "/fixture/other/.env.example", undefined],
+    [roots, "/fixture/other/node_modules/pkg/.env", undefined],
+    [roots, "/fixture/other/notes.txt", undefined],
+    [windows, "D:\\Other\\.ENV", "env"],
+    [windows, "\\\\server\\share\\other\\secret.env", "env"],
+    [windows, "C:\\work\\project-copy\\.env", "env"],
+    [windows, "D:\\Other\\vendor\\.env", undefined],
+  ] as const
+  for (const [platform, file, rule] of samples) {
+    const item = ProtectedFiles.match({ path: file, roots: platform })
+    expect(item?.rule, file).toBe(rule)
+    // Matched when touched, never part of the scanned sources.
+    expect(sourceSelects(file, platform), file).toBe(false)
+    expect(ProtectedFiles.probe({ text: `cat '${file}'`, roots: platform }), file).toEqual(rule ? [rule] : [])
+  }
+  expect(ProtectedFiles.match({ path: "/fixture/other/.env", roots })).toMatchObject({ path: "/fixture/other/.env", format: "env", profile: "env", view: "variables" })
+  expect(ProtectedFiles.match({ path: "/fixture/other/certs/server.pem", roots })?.view).toBe("notice")
+})
+
 test("protected root directories are not credential files", () => {
   for (const sample of [roots, windows]) {
     const api = sample.platform === "win32" ? path.win32 : path.posix

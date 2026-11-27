@@ -1791,6 +1791,45 @@ describe("safe file tools", () => {
     expect(yield* (yield* Permission.Service).list()).toEqual([])
   }))
 
+  it.live("outside project protected reads keep later outputs masked", () => Effect.gen(function* () {
+    const home = os.homedir()
+    // Another project in the isolated home, among unrelated directories the collector never scans.
+    expect(fs.realpathSync(home).startsWith(fs.realpathSync(path.dirname(os.tmpdir())) + path.sep)).toBe(true)
+    const other = path.join(home, "work", `other-${randomUUID()}`)
+    fs.mkdirSync(path.join(other, "src", "deep"), { recursive: true })
+    const file = path.join(other, ".env")
+    const first = randomUUID(), second = randomUUID()
+    fs.writeFileSync(file, `TOKEN=${first}\nPORT=3000\n`)
+    const { session } = yield* setup({ internal: [ReadTool.Plugin, ShellTool.Plugin], records: NEUTRAL, rules: [ALLOW_ALL, { action: "external_directory", resource: "*", effect: "ask" }, { action: "edit", resource: "*", effect: "ask" }], inside: async (ctx) => {
+      await ctx.tool.transform((editor) => editor.add({ name: "preview_other", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async (_input, context) => {
+        const content = fs.readFileSync(file, "utf8")
+        await ctx.permission.assert({ sessionID: context.sessionID, agent: context.agent, action: "edit", resources: [file], save: [], metadata: { diff: content }, source: { type: "tool", id: context.id, messageID: context.messageID } })
+        return { content }
+      } }))
+    } })
+    const read = yield* callRaw(session.id, "read", { path: file })
+    expect(Exit.isSuccess(read)).toBe(true)
+    expect(JSON.stringify(read).includes(first)).toBe(false)
+    expect(JSON.stringify(read)).toContain("TOKEN=[REDACTED]")
+    expect(JSON.stringify(read)).toContain("PORT=3000")
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+    // Once read, the file is re-read like a project source: a later value is masked too.
+    fs.writeFileSync(file, `TOKEN=${second}\nPORT=3000\n`)
+    const shell = yield* callRaw(session.id, "shell", { command: `cat ${JSON.stringify(file)}` })
+    expect(Exit.isSuccess(shell)).toBe(true)
+    expect([first, second].some((value) => JSON.stringify(shell).includes(value))).toBe(false)
+    expect(JSON.stringify(shell)).toContain("TOKEN=[REDACTED]")
+    const fiber = yield* Effect.forkChild(callRaw(session.id, "preview_other"))
+    const [request] = yield* pending
+    expect(request?.action).toBe("edit")
+    expect(JSON.stringify(request?.metadata).includes(second)).toBe(false)
+    yield* (yield* Permission.Service).reply({ requestID: request!.id, reply: "once" })
+    const echoed = yield* E.Fiber.join(fiber)
+    expect(Exit.isSuccess(echoed)).toBe(true)
+    expect(JSON.stringify(echoed).includes(second)).toBe(false)
+    fs.rmSync(other, { recursive: true, force: true })
+  }))
+
   it.live("foreign read tools retain their original path", () => Effect.gen(function* () {
     let rawReads = 0
     const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {

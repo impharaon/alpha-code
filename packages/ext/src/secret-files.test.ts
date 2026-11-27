@@ -180,6 +180,32 @@ console.log(JSON.stringify({unrelatedCalls:visited.filter(p=>p.includes('/Docume
 `)).toEqual({ unrelatedCalls: 0, keychain: true, aws: true, kube: true })
 })
 
+test("outside protected files are tracked without scanning a realistic home", async () => {
+  const { root, roots } = await setup()
+  for (const directory of ["Documents/unrelated/deep/tree", "Library/Keychains", ".aws", "work/other-project/src/deep"])
+    await mkdir(path.join(roots.home, directory), { recursive: true })
+  await copyFile(fixture("aws-credentials.ini"), path.join(roots.home, ".aws", "credentials"))
+  const other = path.join(roots.home, "work", "other-project", ".env")
+  await writeFile(other, "API_KEY=fixture-other-project-token\nPORT=3000\n")
+  const file = ProtectedFiles.match({ path: other, roots })
+  expect(file?.profile).toBe("env")
+  await writeFile(path.join(root, "audit.mjs"), `
+import fs from 'node:fs/promises';export const stats=[],reads=[];
+export const stat=async (...args)=>{stats.push(String(args[0]));return fs.stat(...args)};
+export const readdir=async (...args)=>{reads.push(String(args[0]));return fs.readdir(...args)};
+export const readFile=fs.readFile,realpath=fs.realpath;
+`)
+  expect(await nodeCollector(root, roots, `
+import {registerHooks} from 'node:module';
+registerHooks({resolve(name,context,next){return next(name==='node:fs/promises'&&context.parentURL?.endsWith('/collector.mjs')?new URL('./audit.mjs',import.meta.url).href:name,context)}});
+const {createSecretFiles}=await import('./collector.mjs');const roots=JSON.parse(process.argv[2]);const file=${JSON.stringify(file)};
+const files=createSecretFiles(roots);const has=()=>files.values().some(v=>Buffer.from(v).toString()==='fixture-other-project-token');
+await files.refresh();const before=has();files.track(file);await files.refresh();await files.refresh();
+const {stats,reads}=await import('./audit.mjs');const under=(list,part)=>list.filter(p=>p.includes(part)).length;
+console.log(JSON.stringify({before,after:has(),aws:files.values().some(v=>Buffer.from(v).toString()==='fixture-secret-key'),unrelatedCalls:under(stats,'/Documents')+under(reads,'/Documents')+under(stats,'/other-project/src')+under(reads,'/work'),trackedStats:stats.filter(p=>p===file.path).length}));files.dispose();
+`)).toEqual({ before: false, after: true, aws: true, unrelatedCalls: 0, trackedStats: 2 })
+})
+
 test("Node collection includes protected files below dot directories", async () => {
   const { root, roots } = await setup()
   await mkdir(path.join(roots.project, ".devcontainer"))

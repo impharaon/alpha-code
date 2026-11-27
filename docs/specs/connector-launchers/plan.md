@@ -7,7 +7,7 @@ status: active
 spec: SPEC-connector-launchers
 design: DESIGN-connector-launchers
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # PLAN-connector-launchers｜连接器启动器实施计划
@@ -815,3 +815,91 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 6. 完成真实Mac签名/打包启动链、空缓存/旧PATH/干净账户/真围栏/国内节点与入口不可达/限速/错误呈现/助手上下文/断网重启的正式AC；Windows依owner平台节奏在Windows包上实测（包括trampoline），不能把Mac组件证据写成AC-09已通过。#1759合入并不自动完成这些项。
 
 偏离/规模：本轮6文件、约358增5删（最终收据另计）；新增fixture只有同模块Host隔离/受控故障与真实进程装配，不加产品接口、依赖或配置。实际约27分钟（2026-11-26T23:47Z，起始23:20:16Z；原预期90分钟），原件/构建依赖复用已有已验缓存，未扩大任务。遗留去向：上述生产集成/正式验收→#1759合入后#1760；docs/README.md:1 index.stale等原有仓级文档结果→文档治理（本plan无新增）；Office compileall→documents已路由，原失败命令/exit1/stderr空沿r4记录，本轮未碰。没有新增ARCH观察或OPTIONAL项。
+
+## 集成片｜#1759 合入后的生产装配（r10）
+
+- 依据：[SPEC v1](spec.md) @ `31cd182e09` 的 AC-01..10 / BR-01..11；[DESIGN v2.3](design.md) @ `55c6a80d25`（origin/alpha）§4.3–4.7、v2 §4.1–4.3、v2.1 §4、v2.2 §4、v2.3 §10；本文 r8「#1759 合入后的生产工作，接口已准确固定」、r9 准确剩余清单与 :289「未闭环」；#1759 R1/R2 沿 r8 接口表，只读复核到 #1759 分支 `39cbe494b0`，签名未变（planPackageManagerCaches 仍返回 env/cacheEnv/rules/locations/excluded；R2 五个函数同表）；#1761 [plan](../document-output-quality/plan.md) 切片八 pending 清单 @ `018312f60e`（:871–936）；Issue impharaon/alpha-code#1760。实施基线是编排器把 origin/alpha（含 #1759）合入本分支后的提交，首个实施提交记录该 SHA 并再核一次 R1/R2 原签名。
+- 核对：待编排器核对；实施的首个提交按恢复 brief 的 `Phase:` 行填写本行。
+
+本片不重做 r1–r9 已接受的子链，只把它们接到运行中的应用：mandatory `bootstrap.launchers`、sidecar 发布完整 ConnectorLaunchHost、core index 构造 localLaunch、main 当前代 controller 与窄消息、文档宿主的生产调用者，以及 Host 必需但尚无 main 实现的 R5 依赖/联网归属、R6、R8 与密钥补充。正式包、干净账户、北京/香港、Windows 与打包后断网重启仍是发布层验收，下表逐条标明，不以本片的开发构建证据冒充。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/util/src/codepuppy-bootstrap.ts`（及既有 `.test.ts`） | `launchers` 改为必填并严格解析 LauncherEnvironment 全字段（两平台、64 位 pinSet、绝对路径、同平台 Python id、firstPartyCacheRoots 键为单段）；另增本代 `sidecarGeneration`（见风险 Q2）与 #1761 §4.8「DocumentEnvironment 资源路径/资产锁投影」的只读字段（Q3）。不带函数 |
+| `packages/ui-mac/src/main/server.ts`、`codepuppy-bootstrap-build.ts`（及既有 tests） | spawnLocalServer 次序改为：#1759 的本代围栏计划 → 用同次 planPackageManagerCaches 的绑定 env 建本代 createLauncherAssetAuthority → 带 launchers 构建 bootstrap（围栏输入改用同一 engineConfigDirectory 值，不再读未建好的 bootstrap）。fork 后在既有 child message/exit/stop 上装本代 controller：pinned 桥的 ensureFile 绑定 `assetAuthority.ensureFile(pinnedFileAuthority(userData), …)`（含 Python 镜像），ensureEntry 绑定 `assetAuthority.ensureEntry`（私有 context：本代 generation、state.list、受保护 manifestPath、同一 pinned authority）；changed → createConnectorLaunchState；installConnectorLaunchState 的 actions：retry 走 `engineClient(…).experimental.mcp.connect({server, location})`，diagnostic 向本代 sidecar 查询，openNetworkApproval 走 R6，chooseWorkspace 走 R8；文档 createDocumentRuntime → createDocumentHost → createDocumentMainBridge 在同一 lane 组合。退出/stop/换代逐项 dispose，晚到回包不写新代 |
+| `packages/ui-mac/src/main/connector-launchers.ts`（及既有 test） | 描述期只读包内 runtime.json 的形态/平台/pinSet，完整摘要核验仍只在 resolveAssets；本代 authority 内成功核验后复用结果，避免每个连接器每次准备重算全部启动器摘要（AC-10 时钟风险） |
+| `packages/ui-mac/src/main/connector-launch-host.ts`（`pinned-files.test.ts`） | 现有 ID-only 桥旁增补 §4.7 其余窄消息的 main 端：resolve-assets、runtime-dependencies 请求/事实、egress begin/end 与 evidence 通知、diagnostic 查询/回包；无效字段零 I/O，旧代回包丢弃 |
+| `packages/util/src/codepuppy-connector-launch.ts` | 上述消息的纯数据类型与严格解析；诊断 transcript 路径派生收为唯一 helper（core 观察器与 sidecar 应答共用），不让调用方给路径 |
+| `packages/ui-mac/src/main/sidecar.ts` | 接收 bootstrap 后、import 引擎前 publishConnectorLaunchHost 一次：parentPort 适配复用 createPinnedFileRequester（ensureFile/prepareFiles），changed 为通知，resolveAssets 回包须与 bootstrap.launchers 逐字一致，runtimeDependencies/egress 为请求，main 的 diagnostic 查询由 sidecar 读本 attempt 的派生 transcript 并核对 identity 后应答；stop/退出关闭全部等待。#1759 的 installPackageManagerEnvironment 次序不动 |
+| `packages/core/src/mcp/index.ts`（`test/codepuppy-mcp-runtime.test.ts`） | ServerEntry 为 local 条目构造 localLaunch：connectorLaunchHost()、bootstrap 的 sidecarGeneration、launchers.runtimeRoot、本条目已知的密钥值、firstParty（既有 declaredFirstPartyTools 结果 + 本代 launchers）、两类运行器的 packagePreparation → 现成 prepareConnectorLaunch；`Reflect.get(…,"launchers")` 改为类型化读取 |
+| `packages/core/src/mcp/codepuppy-connector-launch.ts`、`codepuppy-connector-diagnostic.ts`（`test/codepuppy-connector-launch.test.ts`） | 导出唯一运行器判定（uvx、uv tool run、npx、npm exec/x，经 commandHeadBase），index 与 main 预检共用；观察器改用 util 的 transcript 派生 |
+| `packages/ui-mac/src/main/connector-runtime-dependencies.ts`（新，含同名 test） | R5 的 readConnectorRuntimeDependencies / checkConnectorRuntimeDependencies 唯一谓词：从已安装声明取 runtimeDep；匹配两类运行器时 uv/node 以随包资产为准；git 先读 `/usr/bin/xcode-select -p` 及其目录与真实 git 位置，绝不执行 `/usr/bin/git`；Windows 查真实 git.exe |
+| `packages/ui-mac/src/main/ext-ipc.ts` | 安装预检 checkRuntime 改调同一谓词（design F-02），不再只看 which |
+| `packages/ui-mac/src/main/engine-explicit-config.ts`、`package-mcp-activation.ts`（既有 tests） | 撤销 uvx/npx 的合成 300000 ms startup（§4.4 计时决定）；bunx/pnpx 与 catalog/execution 时限不变 |
+| `packages/ui-mac/src/main/network-egress-proxy.ts`、`network-egress-grants.ts`（既有 tests） | R5：beginEgress 发放本代在册 attempt 标记进代理 URL userinfo；策略代理在 CONNECT 入口解析 Proxy-Authorization 仅作归属、终止不转发、不进普通日志，产出 ConnectorEgressEvidence；不参与放行判定。R6：reopenUserEgressGrant(host, port) 只供用户点击，清该目的地拒绝记忆/聚焦在途询问后走原权威 |
+| `packages/ui-mac/src/main/connector-launch-state.ts`（既有 test） | 包授权事实确认必需密钥未保存时，把本 attempt 的 unknown 补为 `secret{fields, packageId}`，不覆盖 download/egress/dependency/workspace 等具体原始故障；文档 runtime 行的投影与 bindDocumentRuntime 接线按 Q1 |
+| `packages/ui-mac/src/main/codepuppy-video.ts`、`codepuppy-video-environment.ts`（既有 video/config-injection tests） | 开机重锚：tools.json 中引用 `{codepuppyNode}` 的只有 video，其条目由 codepuppy-config-injection.ts:563 每代注入、不持久化，因此改读必填 launchers 即每代重锚到本代 Node 与缓存根；Office 条目是 Python 原生命令，仍由既有 codepuppy-office-instance 重锚 |
+| `packages/ext/src/plugin.ts`、`policy/identity.ts`、`policy/index.ts`（plugin-host / hub-bridge / identity tests） | 进程内一次 createDocumentHostBridge → publishDocumentHost（经 processState 守住 ext 按 Location 多次求值）；Location setup 调 registerDocumentTools（资源取 Q3 的 bootstrap 投影，sidecarGeneration 取 Q2），cleanup 排空；首方身份读类型化 launchers |
+| `docs/specs/connector-launchers/plan.md` | 本节、核对、偏离与回执 |
+
+### 顺序
+
+1. 本节计划单独提交（本次）。计划起始 2026-11-27T01:53:12Z。
+2. 合入后基线：记录合入 SHA，只读再核 R1/R2 签名；bootstrap.launchers 必填与 server 次序、类型化读取、视频每代重锚、300 s 撤销同一提交。跑 util `codepuppy-bootstrap.test.ts`、ui-mac `codepuppy-bootstrap-build.test.ts`、`connector-launchers.test.ts`、`engine-explicit-config.test.ts`、`package-mcp-activation.test.ts`、视频注入的既有用例，core runtime 与 ext identity 的命名例。
+3. 窄消息、sidecar Host 发布、main 本代 controller 安装/释放、retry/diagnostic 动作。跑 `pinned-files.test.ts`、`codepuppy-sidecar-wiring.test.ts`（真实 spawnLocalServer + 记录子进程）、`connector-launch-state.test.ts`。
+4. core index 的 localLaunch 与运行器判定。跑 core `codepuppy-connector-launch.test.ts` 与 `codepuppy-mcp-runtime.test.ts` 的命名例（该文件仍只有一个 Host 发布者，沿 r9 的隔离 Host fixture，不跑其引擎/时序组）。
+5. R5 依赖谓词与安装预检。跑新模块测试与 ext-ipc 预检相关用例。
+6. 文档组合与文档行（Q1）。跑 `document-runtime.test.ts`、`document-host*.test.ts`、ext `hub-bridge.test.ts`、`plugin-host.test.ts` 的文档命名例。
+7. B 组：R5 联网归属 + R6、R8 换文件夹、密钥补充。跑 `network-egress-proxy.test.ts`、`network-egress-grants.test.ts`、`connector-launch-state.test.ts`。
+8. 一次性真入口证据（下表，均 `gate slot --`，临时 home/userData，不启动窗口），结果记入本节。
+9. 收尾一次：改动 exports 的 mock/枚举消费者、core/util/ext/ui-mac `bun typecheck`、ext build、各移除臂、`affected-tests --list`、docs 检查与 `git diff --check`。
+
+每步迭代只跑在改的用例，步末整跑该步行为文件一次；不跑 gate run、bin/check、全包、计时/容量用例。实施预计约 180 分钟（A 组 2–6 约 120、B 组 7 约 60，另计 slot 排队），每步后核时间；超过 360 分钟即停在已提交的完整步骤，以 PARTIAL 返回，B 组为首选留待项。
+
+### 风险
+
+- **规模**：r8/r9 清单写作「现成的依赖/授权/egress 事实接入 Host」，实读 main 时 readConnectorRuntimeDependencies、egress 归属端口、reopenUserEgressGrant、chooseWorkspace 与密钥补充都还没有实现，文档的 main/ext 组合也没有任何生产调用者。本片因此大于单纯「接线」；顺序把能闭合 AC-01/02/04/05/06/08/10 开发入口与文档宿主的 A 组放前面。
+- **需编排器核对的实现选择**（四项都不改冻结签名，核对通过即按推荐实施）：
+  - Q1 文档 runtime 行身份：两份设计都要求文档失败复用连接器呈现与「重试」→ runtime.retry()，但没有写这一行的 LaunchIdentity。推荐：main 把自己拥有的 DocumentRuntimeState 投影为按查询 Location 的一行，server 取一个与 MCP 名不冲突的保留名、attempt 取本代准备序号，阶段映射到现有 stage 不新增，retry 经 bindDocumentRuntime 调真 runtime.retry()（即 r3 已接受用例的形状）。替代：挂到 Office 首方连接器行（失败事实不归 core 所有，状态对不上）。
+  - Q2 sidecar 代号载体：core 的 localLaunch/binding、sidecar 请求器与 #1761 的文档桥都携带 sidecarGeneration，但 sidecar 进程目前拿不到它。推荐：main 已有的 `options.generation` 作为 bootstrap 字段（每代构建一次、各 bundle 同一解析器）；替代是 start 命令加字段再另设进程内发布值（core 读不到 start 命令）。
+  - Q3 文档资源投影：#1761 §4.8 写明 bootstrap 增加 DocumentEnvironment 资源路径/资产锁投影但未定字段名；本片作为生产调用者按 `shared/document-resources.ts` 的 documentRuntimeResources/assets/templates/python 现有解析结果产出该字段，不另造路径约定。
+  - Q4 Windows 的 packageManagerEnv：#1759 的 planProductionFence 在非 darwin 返回 undefined（`39cbe494b0` 的 server.ts:376），而其设计 `child-process-write-fence/design.md:654` 写 Windows 有 R1 投影。空表会让 uv 先写到 `%APPDATA%` 再被本片核验拒绝。本片不在 win32 伪造或用候选值填充；推荐由 #1759 拥有者给 win32 的同一绑定结果，AC-09 发布层前补齐。
+- **#1759 合入冲突**：server.ts/sidecar.ts 两边都改；合并由主会话做，本片只在合入后的文本上改，若合入后 R1/R2 位置或签名与 r8 表不同即返回 SEAM-CHANGE-NEEDED。
+- **已安装声明的 runtimeDep 来源**：main 目前只有渲染层从 catalog 读 runtimeDep；实现时须找到已安装版本的记录（收据/锁定条目），找不到则返回 `BLOCKED: design — §4.5 runtimeDep`，不拿当前目录最新条目顶替。
+- **R6 与 #1757**：联网批准 v3（#1757）正在另一分支改批准面；R6 只消费实施时 alpha 上的批准权威，若其接口在合入前变化则按事实返回。
+- **文档 authorize**：createDocumentHost 的 authorize 必须绑定既有 Location/写权与本代，不自造 allowlist；以 server 现有 generationWrites/工作区真源为准，找不到合法权威即返回。
+- **开发入口 vs 正式入口**：真围栏证据用 process-fence-engine 的同一驱动与 fence preload（bun + 生产 .node），不是 Electron utilityProcess 与正式签名包；正式包证据仍归发布层。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-01 开发入口 | 一次性：真围栏驱动 + 本进程 main 桥，空 userData/空缓存，PATH 去掉 uv/node/Homebrew；五个官方条目的真实定义经生产注入 → index localLaunch → prepare → spawn，全部 connected，记录 resolved argv 为随包入口 | 一次性，记命令与输出（`gate slot --`） | 移除臂：去掉 index 的 packagePreparation 绑定，同一入口 uvx/npx 报 dependency_missing |
+| AC-01 Git | `connector-runtime-dependencies.test.ts`：xcode-select 失败/打印目录不存在 → missing=[git]，PATH 最前的 marker git 不执行；core 连接在 spawn 前得到 dependency，r3 投影显示「需要先安装 git」 | integration；受影响 PR + nightly | 只看 `/usr/bin/git` 存在或执行它取版本的实现会让 marker 执行或 missing 为空 |
+| AC-01 干净 Mac、无弹窗、正式包 | 发布层验收 | — | — |
+| AC-02 开发入口 | 一次性：真围栏驱动、空缓存，启用一条 uvx 连接器（离线本地 wheel）并完成 Python 安装，前后比对 HOME，userData 外零新增；记录三项 UV 根、npm cache、TMP/XDG、fence build ID | 一次性 | 设计 §4.7 对照臂：不设 UV_PYTHON_INSTALL_DIR、撤 R2 投影、XDG_DATA_HOME 取宿主值 → HOME 内默认 Python 位置 `Operation not permitted`；另一受限路径写入实际失败，证明不是无围栏 |
+| AC-02 正式包 utilityProcess、干净账户基线 | 发布层验收 | — | — |
+| AC-03 | 本片只把唯一 pinned authority 接入生产 Host：`pinned-files.test.ts`/`codepuppy-sidecar-wiring.test.ts` 的生产桥用例；北京与 owner 本机、入口不可达改道为发布层验收 | integration；受影响 PR + nightly | 生产桥绕过 authority 或接受 URL 时请求/磁盘断言失败 |
+| AC-04 开发入口 | 一次性：用户添加的 uvx 与 npx 连接器（各带本机模块的公开包）经生产链在真围栏下 connected | 一次性 | 同 AC-01 移除臂 |
+| AC-04 签名 Node 的本机模块 | 发布层（正式签名/公证） | — | — |
+| AC-05 | core `codepuppy-mcp-runtime.test.ts`：经 index 建立的连接，PATH 最前放 marker uv/npx，spawn 的是 prepare 给出的随包绝对入口，marker 不执行 | integration（r9 隔离 Host fixture）；受影响 PR + nightly | 去掉 localLaunch 时 marker 被执行 |
+| AC-06 | `codepuppy-sidecar-wiring.test.ts`：真实 spawnLocalServer 子进程的 changed 通知进入本代 state.list，旧代/旧序号丢弃；r3 watcher 用例保证 preparing 不入问题。一次性：本地 200 KB/s 限速 registry，行持续 preparing + 进度、问题入口为空，最终 connected | integration + 一次性 | 删 changed 桥时 list 为空，问题入口出现 SDK 失败 |
+| AC-07 下载与重试 | 一次性：首启 registry 不可达 → 行 failed「下载没有完成 + 重试」；恢复后 api.retry → engineClient mcp.connect → 新 attempt connected。组件：actions.retry 调同一 connect | integration + 一次性 | retry 不调 connect 或绕过 prepare 时仍 failed |
+| AC-07 缺密钥 | `connector-launch-state.test.ts`：包授权确认缺密钥 → secret + packageId；具体原始故障不被覆盖 | integration | 去掉补充时只显示「启动失败」 |
+| AC-07 非仓库 | 生产链用例：Git 连接器在非仓库目录经 index → prepare 得 workspace not-git（r8 谓词）；R8 换文件夹动作只按当前定义改目录 | integration | 不在 prepare 前检查时会 spawn 并报未知失败 |
+| AC-08 | `codepuppy-sidecar-wiring.test.ts`：main diagnostic 查询经本代 sidecar 读本 attempt transcript，回完整命令/退出/stderr，路径由 identity 派生且在 userData 内；一次性：真引擎下 exit 23 的连接器 → api.diagnostic 有原文；r3 助手首条用例继承 | integration + 一次性 | 去掉查询桥时 diagnostic 为 unavailable，首条没有原文 |
+| BR-08 联网 | `network-egress-proxy.test.ts`：带本代标记的 CONNECT 被拒 → 只为该 identity 产证据，无标记/他代无证据，标记不转发、不进日志；`network-egress-grants.test.ts`：reopen 只在用户入口清拒绝记忆 | integration | 去掉标记解析时 prepare 只能归为未知失败 |
+| AC-09 | 发布层（Windows 包、Windows 机器）；本片只保证 win32 编译与 Q4 的处理 | — | — |
+| AC-10 开发入口 | 一次性：AC-01 五个已准备后重启引擎驱动，策略代理拒绝全部出网，五个 connected，逐个记录从调度到 connected 的墙钟与 ensureFile/installer 调用为 0 | 一次性（计时只记录，不入测试） | 对照臂：去 localLaunch 用默认运行器，离线下 npx 连不上或超时 |
+| AC-10 正式包断网重启 | 发布层验收 | — | — |
+| 文档宿主（#1761 AC-01..03 前置） | ext `plugin-host.test.ts`/`hub-bridge.test.ts` 命名例：真插件 Location setup 后 documentHost() 可用，environment 的 node 来自本代 resolveAssets；`document-runtime.test.ts`：生产 retry 绑定到真 runtime | integration | 去掉 publish 时报 `document host was not published before engine startup` |
+| 首方 Node 重锚 | 视频注入用例：两个 pinSet 的 launchers → 条目 command[0] 与缓存根跟随本代；r6 的策略 enabled 保留证据继承 | integration | 回退可缺 launchers 时视频条目缺失或指向旧 Node |
+| bootstrap.launchers 必填 | util `codepuppy-bootstrap.test.ts`：缺失/越界/错平台被拒，main 侧在 fork 前抛 | fast | 可缺解析会让 core/ext 继续走过渡读法 |
+
+新用例都放在模块既有测试文件（新模块用同名文件），依赖经静态 import 或字面路径可被选择器追踪；不新增 scenario 层或全局必跑输入。
+
+### 偏离记录
+
+暂无。

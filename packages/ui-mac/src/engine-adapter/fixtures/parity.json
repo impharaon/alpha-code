@@ -1,23 +1,23 @@
 {
- "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at e9e073fa02: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. 0.1.26 parity probes. `dir` = a session whose mock reads the directory sub (sub/one.txt, sub/two.txt, sub/inner/). `shell` = a session whose mock runs a shell printing line1..line3 0.4 s apart: records, plus `pages` = GET /api/shell/:id/output?cursor= every 150 ms from the tool's progress frame (metadata.shellID) until the tool settled. `background` = a background subagent whose child answers after 2.5 s, so the parent goes idle first and the completion notice (a 2.x synthetic) starts a turn that writes b.txt; `diffs` asks GET /api/session/:id/diff with no from, from the user message, and from the synthetic. `watches` = POST /api/experimental/fs/watch for a directory, for `.`, and for the file w.txt; `createdFrames` = filesystem.changed after sub/three.txt and new.txt are created from outside; `unlinkFrames` = after w.txt is removed from outside.",
- "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj",
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at e1c8e7e046: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. 0.1.26 parity probes. `dir` = a session whose mock reads the directory sub (sub/one.txt, sub/two.txt, sub/inner/). `shell` = a session whose mock runs a shell printing line1..line3 0.4 s apart: records, plus `pages` = GET /api/shell/:id/output?cursor= every 150 ms from the tool's progress frame (metadata.shellID) until the tool settled. `background` = a background subagent whose child answers after 2.5 s, so the parent goes idle first and the completion notice (a 2.x synthetic) starts a turn that writes b.txt; `diffs` asks GET /api/session/:id/diff with no from, from the user message, and from the synthetic. `watches` = POST /api/experimental/fs/watch for a directory, for `.`, and for the file w.txt; `createdFrames` = filesystem.changed after sub/three.txt and new.txt are created from outside; `unlinkFrames` = after w.txt is removed from outside.",
+ "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj",
  "dir": {
-  "sessionID": "ses_de7ce9be4ffePM0t248D2L1KvB",
+  "sessionID": "ses_de54a0fd6ffe20BzzDsafTwB5K",
   "final": [
    {
-    "id": "msg_21831641e001hixnc12ubNaRGM",
+    "id": "msg_21ab5f02a001r4FKyUjI6ikyuw",
     "time": {
-     "created": 1795702219810
+     "created": 1795744460844
     },
     "text": "list the folder",
     "type": "user"
    },
    {
-    "id": "msg_218316429001C6v1A4nzFeowgF",
+    "id": "msg_21ab5f030001um4ld2NRjG6N10",
     "time": {
-     "created": 1795702219819,
-     "streamed": 1795702220013,
-     "completed": 1795702220036
+     "created": 1795744460849,
+     "streamed": 1795744461036,
+     "completed": 1795744461047
     },
     "type": "assistant",
     "agent": "build",
@@ -32,7 +32,7 @@
      },
      {
       "type": "tool",
-      "id": "call_mock_dir_9i06t",
+      "id": "call_mock_dir_8uy7k",
       "name": "read",
       "executed": false,
       "state": {
@@ -51,9 +51,9 @@
        }
       },
       "time": {
-       "created": 1795702219882,
-       "ran": 1795702220011,
-       "completed": 1795702220022
+       "created": 1795744460911,
+       "ran": 1795744461035,
+       "completed": 1795744461039
       }
      }
     ],
@@ -76,11 +76,11 @@
     }
    },
    {
-    "id": "msg_218316508001wM0GehAHyGMLr5",
+    "id": "msg_21ab5f0fa001jSkTG8sjJS3jjl",
     "time": {
-     "created": 1795702220042,
-     "streamed": 1795702220208,
-     "completed": 1795702220225
+     "created": 1795744461052,
+     "streamed": 1795744461208,
+     "completed": 1795744461216
     },
     "type": "assistant",
     "agent": "build",
@@ -113,9 +113,9 @@
     }
    },
    {
-    "id": "msg_2183165c3001YV04BWq7UN6m2n",
+    "id": "msg_21ab5f1a1002vZEXMPclCE4qes",
     "time": {
-     "created": 1795702220227
+     "created": 1795744461217
     },
     "type": "idle",
     "outcome": "succeeded"
@@ -123,28 +123,28 @@
   ]
  },
  "shell": {
-  "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+  "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
   "records": [
    {
     "frame": {
-     "id": "evt_21831661d001Bl6pTGNPUV5sDl",
-     "created": 1795702220318,
+     "id": "evt_21ab5f1bf0010EFW19kllM3nJR",
+     "created": 1795744461247,
      "type": "session.created",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "slug": "shiny-canyon",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "slug": "hidden-meadow",
       "version": "local",
-      "projectID": "c42db5cc90fe4083390a293a37429ccc54049a8c",
+      "projectID": "da555665f9a66b5df7d7eec435b0245ba3829830",
       "location": {
-       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+       "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
       },
-      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "subpath": "../../../../../../../../var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 0,
       "version": 1
      }
@@ -152,31 +152,31 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316622001xU272TJ7vkLktp",
-     "created": 1795702220322,
+     "id": "evt_21ab5f1c0002YFlDF0FleLy55I",
+     "created": 1795744461248,
      "type": "session.inbox.enqueued",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "inboxID": "msg_218316621001fYIT5cDjRfS7WX",
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "inboxID": "msg_21ab5f1c00010n8bND3Z4gtnEs",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "item": {
        "type": "user",
        "payload": {
@@ -186,7 +186,7 @@
       }
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 1,
       "version": 1
      }
@@ -194,30 +194,30 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316623001X8yu2ld2RrcOnG",
-     "created": 1795702220323,
+     "id": "evt_21ab5f1c0003e5Op84nbe6TVjY",
+     "created": 1795744461248,
      "type": "session.execution.started",
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6"
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo"
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 2,
       "version": 1
      }
@@ -225,24 +225,24 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316626001BHpCt8vmPthphn",
-     "created": 1795702220326,
+     "id": "evt_21ab5f1c100114RdqV2wYZ9xPE",
+     "created": 1795744461249,
      "metadata": {
       "instructions": {
        "initial": true
@@ -250,19 +250,19 @@
      },
      "type": "session.instructions.updated",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "delta": {
        "core/codemode": "70364fb91a447e61e71df243f6e958f57fed40a08c42fdc97085c5c1764350c7",
        "core/skill-guidance": "8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9",
-       "core/date": "a48a576869942de9a5bb254acfd0a78e89c5b28a7350d3111c7c7fcbb491f44b",
-       "core/environment": "f835282dc8b9513bd8688dd38f9cad4c99b9f4cfd597a2fa8a837bb08db11e61"
+       "core/date": "aa60042a274d756ab2b6912d1a687df27b15101c31b97dbe569c7396c72e9633",
+       "core/environment": "d38f10fbf609bc9d153ef6a11e1bed39b82dd9f252288ae3e6427a5a4dc2f8f1"
       }
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 3,
       "version": 2
      }
@@ -270,34 +270,34 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316627001PGsQnPSmdLA9j3",
-     "created": 1795702220327,
+     "id": "evt_21ab5f1c2001M47dFkXV88M4Xy",
+     "created": 1795744461250,
      "type": "session.inbox.delivered",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "inboxID": "msg_218316621001fYIT5cDjRfS7WX"
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "inboxID": "msg_21ab5f1c00010n8bND3Z4gtnEs"
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 4,
       "version": 1
      }
@@ -305,41 +305,41 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_2183166510017bKErcW8tXehqM",
-     "created": 1795702220369,
+     "id": "evt_21ab5f1e50013mGPd5uqNkKrKc",
+     "created": 1795744461285,
      "type": "session.step.started",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "agent": "build",
       "model": {
        "id": "m",
        "providerID": "mock"
       },
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
       "snapshot": "c221063e6d16b0b6cd918ae206a2a1386702da9b",
-      "started": 1795702220337
+      "started": 1795744461255
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 5,
       "version": 1
      }
@@ -347,9 +347,9 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337
+        "created": 1795744461255
        },
        "type": "assistant",
        "agent": "build",
@@ -368,35 +368,35 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316652001QL2rJklyb4uxgq",
-     "created": 1795702220370,
+     "id": "evt_21ab5f1e6001Wm66Opxux0rLSI",
+     "created": 1795744461286,
      "type": "session.text.started",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
       "ordinal": 0
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 6,
       "version": 1
      }
@@ -404,9 +404,9 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337
+        "created": 1795744461255
        },
        "type": "assistant",
        "agent": "build",
@@ -425,27 +425,27 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_21831666f0023L4eiospK5z6tD",
-     "created": 1795702220399,
+     "id": "evt_21ab5f204002XBYrAUu3FA071H",
+     "created": 1795744461316,
      "type": "session.usage.updated",
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "cost": 0,
       "tokens": {
        "input": 0,
@@ -461,9 +461,9 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337
+        "created": 1795744461255
        },
        "type": "assistant",
        "agent": "build",
@@ -478,14 +478,14 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "state": {
           "status": "streaming",
           "input": ""
          },
          "time": {
-          "created": 1795702220400
+          "created": 1795744461316
          }
         }
        ],
@@ -494,34 +494,34 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316670001jF7U82WS4jA2hw",
-     "created": 1795702220400,
+     "id": "evt_21ab5f204003dwvxRCcIO2Yj12",
+     "created": 1795744461316,
      "type": "session.renamed",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "title": "Mock title"
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 8,
       "version": 1
      }
@@ -529,9 +529,9 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337
+        "created": 1795744461255
        },
        "type": "assistant",
        "agent": "build",
@@ -546,14 +546,14 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "state": {
           "status": "streaming",
           "input": ""
          },
          "time": {
-          "created": 1795702220400
+          "created": 1795744461316
          }
         }
        ],
@@ -562,31 +562,31 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316670002hzhN7Vd4dIAd96",
-     "created": 1795702220400,
+     "id": "evt_21ab5f204004Fu0iZAPuReuTZu",
+     "created": 1795744461316,
      "type": "session.text.delta",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
       "ordinal": 0,
       "delta": "Calling shell."
      }
@@ -594,9 +594,9 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337
+        "created": 1795744461255
        },
        "type": "assistant",
        "agent": "build",
@@ -611,14 +611,14 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "state": {
           "status": "streaming",
           "input": ""
          },
          "time": {
-          "created": 1795702220400
+          "created": 1795744461316
          }
         }
        ],
@@ -627,36 +627,36 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316670003FtIXisWny7747X",
-     "created": 1795702220400,
+     "id": "evt_21ab5f204005IzRHNrtr7JgwiZ",
+     "created": 1795744461316,
      "type": "session.tool.input.started",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
-      "id": "call_mock_slowsh_zh7qx",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
+      "id": "call_mock_slowsh_asvsf",
       "name": "shell"
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 9,
       "version": 1
      }
@@ -664,9 +664,9 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337
+        "created": 1795744461255
        },
        "type": "assistant",
        "agent": "build",
@@ -681,14 +681,14 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "state": {
           "status": "streaming",
           "input": ""
          },
          "time": {
-          "created": 1795702220400
+          "created": 1795744461316
          }
         }
        ],
@@ -697,36 +697,36 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_2183166ee0019AIHCfKJQ01fi0",
-     "created": 1795702220526,
+     "id": "evt_21ab5f280001gcE0te3MoHxvKq",
+     "created": 1795744461440,
      "type": "session.tool.input.ended",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
-      "id": "call_mock_slowsh_zh7qx",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
+      "id": "call_mock_slowsh_asvsf",
       "text": "{\"command\":\"for i in 1 2 3; do echo line$i; sleep 0.4; done\"}"
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 10,
       "version": 1
      }
@@ -734,10 +734,10 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528
+        "created": 1795744461255,
+        "streamed": 1795744461441
        },
        "type": "assistant",
        "agent": "build",
@@ -752,7 +752,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -763,8 +763,8 @@
           "metadata": {}
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527
+          "created": 1795744461316,
+          "ran": 1795744461441
          }
         }
        ],
@@ -773,39 +773,39 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_2183166ef0017MDmOrq2ZtcVCa",
-     "created": 1795702220527,
+     "id": "evt_21ab5f281001Jco37n90n3ntuF",
+     "created": 1795744461441,
      "type": "session.tool.called",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
-      "id": "call_mock_slowsh_zh7qx",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
+      "id": "call_mock_slowsh_asvsf",
       "input": {
        "command": "for i in 1 2 3; do echo line$i; sleep 0.4; done"
       },
       "executed": false
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 11,
       "version": 1
      }
@@ -813,10 +813,10 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528
+        "created": 1795744461255,
+        "streamed": 1795744461441
        },
        "type": "assistant",
        "agent": "build",
@@ -831,7 +831,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -842,8 +842,8 @@
           "metadata": {}
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527
+          "created": 1795744461316,
+          "ran": 1795744461441
          }
         }
        ],
@@ -852,36 +852,36 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_2183166f0001ORQFnBdk2ERkei",
-     "created": 1795702220528,
+     "id": "evt_21ab5f2810024j0QqGGqa4Z6tx",
+     "created": 1795744461441,
      "type": "session.text.ended",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
       "ordinal": 0,
       "text": "Calling shell."
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 12,
       "version": 1
      }
@@ -889,10 +889,10 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528
+        "created": 1795744461255,
+        "streamed": 1795744461441
        },
        "type": "assistant",
        "agent": "build",
@@ -907,7 +907,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -918,8 +918,8 @@
           "metadata": {}
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527
+          "created": 1795744461316,
+          "ran": 1795744461441
          }
         }
        ],
@@ -928,34 +928,34 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_2183166f0002wwLxYGCaFN43P2",
-     "created": 1795702220528,
+     "id": "evt_21ab5f281003QB3IkPcUqbHBqQ",
+     "created": 1795744461441,
      "type": "session.step.streamed",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H"
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k"
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 13,
       "version": 1
      }
@@ -963,10 +963,10 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528
+        "created": 1795744461255,
+        "streamed": 1795744461441
        },
        "type": "assistant",
        "agent": "build",
@@ -981,7 +981,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -992,8 +992,8 @@
           "metadata": {}
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527
+          "created": 1795744461316,
+          "ran": 1795744461441
          }
         }
        ],
@@ -1002,44 +1002,44 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_2183166f50020lawC2RJrZR8Sg",
-     "created": 1795702220533,
+     "id": "evt_21ab5f284002nG2LQYxzLCP40n",
+     "created": 1795744461444,
      "type": "session.tool.progress",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
-      "id": "call_mock_slowsh_zh7qx",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
+      "id": "call_mock_slowsh_asvsf",
       "metadata": {
-       "shellID": "sh_2183166f2001giJ7RuGwfzV4S8"
+       "shellID": "sh_21ab5f283001CV3SrBRQ0g9qHP"
       }
      }
     },
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528
+        "created": 1795744461255,
+        "streamed": 1795744461441
        },
        "type": "assistant",
        "agent": "build",
@@ -1054,7 +1054,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -1065,8 +1065,8 @@
           "metadata": {}
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527
+          "created": 1795744461316,
+          "ran": 1795744461441
          }
         }
        ],
@@ -1075,32 +1075,32 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316bcd0018zg7HepnjDPRXD",
-     "created": 1795702221773,
+     "id": "evt_21ab5f7460010YUuuJ6rvalmP0",
+     "created": 1795744462662,
      "type": "session.tool.success",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
-      "id": "call_mock_slowsh_zh7qx",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
+      "id": "call_mock_slowsh_asvsf",
       "content": [
        {
         "type": "text",
@@ -1115,7 +1115,7 @@
       "executed": false
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 14,
       "version": 2
      }
@@ -1123,10 +1123,10 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528
+        "created": 1795744461255,
+        "streamed": 1795744461441
        },
        "type": "assistant",
        "agent": "build",
@@ -1141,7 +1141,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -1162,9 +1162,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -1173,31 +1173,31 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316be2001K6sJ7L3OpsdUWk",
-     "created": 1795702221794,
+     "id": "evt_21ab5f74e001RWMP78lsCcXDH3",
+     "created": 1795744462670,
      "type": "session.step.ended",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_21831662f0018IUjd3GstwhW5H",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f1c5001QuwmGJzDSPp11k",
       "finish": "tool-calls",
       "rawFinish": "tool_calls",
       "tokens": {
@@ -1214,7 +1214,7 @@
       "files": []
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 15,
       "version": 1
      }
@@ -1222,11 +1222,11 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -1241,7 +1241,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -1262,9 +1262,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -1287,27 +1287,27 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316be4001FQCfHeUFpN9HI8",
-     "created": 1795702221796,
+     "id": "evt_21ab5f74f0012sIcTl7LDUYx8D",
+     "created": 1795744462671,
      "type": "session.usage.updated",
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "cost": 0,
       "tokens": {
        "input": 5,
@@ -1323,11 +1323,11 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -1342,7 +1342,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -1363,9 +1363,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -1388,41 +1388,41 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTY2MmYwMDE4SVVqZDNHc3R3aFc1SCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWYxYzUwMDFRdXdtR0p6RFNQcDExayIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316c09001eZRJFDqnTv701q",
-     "created": 1795702221833,
+     "id": "evt_21ab5f773001pM5FDB7be7om3V",
+     "created": 1795744462707,
      "type": "session.step.started",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "agent": "build",
       "model": {
        "id": "m",
        "providerID": "mock"
       },
-      "assistantMessageID": "msg_218316be7001Q0Nl8tA8voVals",
+      "assistantMessageID": "msg_21ab5f751001TFmfNuIv3Yt8ta",
       "snapshot": "c221063e6d16b0b6cd918ae206a2a1386702da9b",
-      "started": 1795702221801
+      "started": 1795744462674
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 16,
       "version": 1
      }
@@ -1430,9 +1430,9 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316be7001Q0Nl8tA8voVals",
+       "id": "msg_21ab5f751001TFmfNuIv3Yt8ta",
        "time": {
-        "created": 1795702221801
+        "created": 1795744462674
        },
        "type": "assistant",
        "agent": "build",
@@ -1451,11 +1451,11 @@
        }
       },
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -1470,7 +1470,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -1491,9 +1491,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -1516,35 +1516,35 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTZiZTcwMDFRME5sOHRBOHZvVmFscyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWY3NTEwMDFURm1mTnVJdjNZdDh0YSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316c0a001hXe6OjYirylfG7",
-     "created": 1795702221834,
+     "id": "evt_21ab5f773002xDQpzXPKirPpz3",
+     "created": 1795744462707,
      "type": "session.text.started",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_218316be7001Q0Nl8tA8voVals",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f751001TFmfNuIv3Yt8ta",
       "ordinal": 0
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 17,
       "version": 1
      }
@@ -1552,9 +1552,9 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316be7001Q0Nl8tA8voVals",
+       "id": "msg_21ab5f751001TFmfNuIv3Yt8ta",
        "time": {
-        "created": 1795702221801
+        "created": 1795744462674
        },
        "type": "assistant",
        "agent": "build",
@@ -1573,11 +1573,11 @@
        }
       },
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -1592,7 +1592,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -1613,9 +1613,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -1638,31 +1638,31 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTZiZTcwMDFRME5sOHRBOHZvVmFscyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWY3NTEwMDFURm1mTnVJdjNZdDh0YSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316c70001LJmJKQo29z3CS7",
-     "created": 1795702221936,
+     "id": "evt_21ab5f7d9001LYjQvkR7oLSkOb",
+     "created": 1795744462809,
      "type": "session.text.delta",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_218316be7001Q0Nl8tA8voVals",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f751001TFmfNuIv3Yt8ta",
       "ordinal": 0,
       "delta": "The file says hi."
      }
@@ -1670,9 +1670,9 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316be7001Q0Nl8tA8voVals",
+       "id": "msg_21ab5f751001TFmfNuIv3Yt8ta",
        "time": {
-        "created": 1795702221801
+        "created": 1795744462674
        },
        "type": "assistant",
        "agent": "build",
@@ -1691,11 +1691,11 @@
        }
       },
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -1710,7 +1710,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -1731,9 +1731,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -1756,36 +1756,36 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTZiZTcwMDFRME5sOHRBOHZvVmFscyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWY3NTEwMDFURm1mTnVJdjNZdDh0YSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316c880019IHjF9qovLDedP",
-     "created": 1795702221960,
+     "id": "evt_21ab5f7ef001kaM3ARTjHAKaiA",
+     "created": 1795744462831,
      "type": "session.text.ended",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_218316be7001Q0Nl8tA8voVals",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f751001TFmfNuIv3Yt8ta",
       "ordinal": 0,
       "text": "The file says hi."
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 18,
       "version": 1
      }
@@ -1793,10 +1793,10 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316be7001Q0Nl8tA8voVals",
+       "id": "msg_21ab5f751001TFmfNuIv3Yt8ta",
        "time": {
-        "created": 1795702221801,
-        "streamed": 1795702221962
+        "created": 1795744462674,
+        "streamed": 1795744462832
        },
        "type": "assistant",
        "agent": "build",
@@ -1815,11 +1815,11 @@
        }
       },
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -1834,7 +1834,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -1855,9 +1855,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -1880,34 +1880,34 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTZiZTcwMDFRME5sOHRBOHZvVmFscyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWY3NTEwMDFURm1mTnVJdjNZdDh0YSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316c8a001rxbrh42Ps2UOhO",
-     "created": 1795702221962,
+     "id": "evt_21ab5f7f0001YpefGV6Hn11TYs",
+     "created": 1795744462832,
      "type": "session.step.streamed",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_218316be7001Q0Nl8tA8voVals"
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f751001TFmfNuIv3Yt8ta"
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 19,
       "version": 1
      }
@@ -1915,10 +1915,10 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316be7001Q0Nl8tA8voVals",
+       "id": "msg_21ab5f751001TFmfNuIv3Yt8ta",
        "time": {
-        "created": 1795702221801,
-        "streamed": 1795702221962
+        "created": 1795744462674,
+        "streamed": 1795744462832
        },
        "type": "assistant",
        "agent": "build",
@@ -1937,11 +1937,11 @@
        }
       },
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -1956,7 +1956,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -1977,9 +1977,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -2002,31 +2002,31 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTZiZTcwMDFRME5sOHRBOHZvVmFscyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWY3NTEwMDFURm1mTnVJdjNZdDh0YSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316c94001eAUyziYRmzAX83",
-     "created": 1795702221972,
+     "id": "evt_21ab5f7f80018j1q2ypLU1GbYo",
+     "created": 1795744462840,
      "type": "session.step.ended",
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
-      "assistantMessageID": "msg_218316be7001Q0Nl8tA8voVals",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
+      "assistantMessageID": "msg_21ab5f751001TFmfNuIv3Yt8ta",
       "finish": "stop",
       "rawFinish": "stop",
       "tokens": {
@@ -2043,7 +2043,7 @@
       "files": []
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 20,
       "version": 1
      }
@@ -2051,19 +2051,19 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316c960017fGD7SBAOjukSo",
+       "id": "msg_21ab5f7f9002U5ssWSffLd5vOc",
        "time": {
-        "created": 1795702221974
+        "created": 1795744462841
        },
        "type": "idle",
        "outcome": "succeeded"
       },
       {
-       "id": "msg_218316be7001Q0Nl8tA8voVals",
+       "id": "msg_21ab5f751001TFmfNuIv3Yt8ta",
        "time": {
-        "created": 1795702221801,
-        "streamed": 1795702221962,
-        "completed": 1795702221972
+        "created": 1795744462674,
+        "streamed": 1795744462832,
+        "completed": 1795744462840
        },
        "type": "assistant",
        "agent": "build",
@@ -2096,11 +2096,11 @@
        }
       },
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -2115,7 +2115,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -2136,9 +2136,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -2161,27 +2161,27 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTZjOTYwMDE3ZkdEN1NCQU9qdWtTbyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWY3ZjkwMDJVNXNzV1NmZkxkNXZPYyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316c95001tqDNYqHr3HdS3h",
-     "created": 1795702221973,
+     "id": "evt_21ab5f7f9001M8ni1XiWReVZb6",
+     "created": 1795744462841,
      "type": "session.usage.updated",
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "cost": 0,
       "tokens": {
        "input": 35,
@@ -2197,19 +2197,19 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316c960017fGD7SBAOjukSo",
+       "id": "msg_21ab5f7f9002U5ssWSffLd5vOc",
        "time": {
-        "created": 1795702221974
+        "created": 1795744462841
        },
        "type": "idle",
        "outcome": "succeeded"
       },
       {
-       "id": "msg_218316be7001Q0Nl8tA8voVals",
+       "id": "msg_21ab5f751001TFmfNuIv3Yt8ta",
        "time": {
-        "created": 1795702221801,
-        "streamed": 1795702221962,
-        "completed": 1795702221972
+        "created": 1795744462674,
+        "streamed": 1795744462832,
+        "completed": 1795744462840
        },
        "type": "assistant",
        "agent": "build",
@@ -2242,11 +2242,11 @@
        }
       },
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -2261,7 +2261,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -2282,9 +2282,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -2307,30 +2307,30 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTZjOTYwMDE3ZkdEN1NCQU9qdWtTbyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWY3ZjkwMDJVNXNzV1NmZkxkNXZPYyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    },
    {
     "frame": {
-     "id": "evt_218316c960017fGD7SBAOjukSo",
-     "created": 1795702221974,
+     "id": "evt_21ab5f7f9002U5ssWSffLd5vOc",
+     "created": 1795744462841,
      "type": "session.execution.succeeded",
      "data": {
-      "sessionID": "ses_de7ce99e4ffen6m5p14IGmqIX6"
+      "sessionID": "ses_de54a0e41ffeZjSRVIewaJZtAo"
      },
      "durable": {
-      "aggregateID": "ses_de7ce99e4ffen6m5p14IGmqIX6",
+      "aggregateID": "ses_de54a0e41ffeZjSRVIewaJZtAo",
       "seq": 21,
       "version": 1
      }
@@ -2338,19 +2338,19 @@
     "snapshot": {
      "data": [
       {
-       "id": "msg_218316c960017fGD7SBAOjukSo",
+       "id": "msg_21ab5f7f9002U5ssWSffLd5vOc",
        "time": {
-        "created": 1795702221974
+        "created": 1795744462841
        },
        "type": "idle",
        "outcome": "succeeded"
       },
       {
-       "id": "msg_218316be7001Q0Nl8tA8voVals",
+       "id": "msg_21ab5f751001TFmfNuIv3Yt8ta",
        "time": {
-        "created": 1795702221801,
-        "streamed": 1795702221962,
-        "completed": 1795702221972
+        "created": 1795744462674,
+        "streamed": 1795744462832,
+        "completed": 1795744462840
        },
        "type": "assistant",
        "agent": "build",
@@ -2383,11 +2383,11 @@
        }
       },
       {
-       "id": "msg_21831662f0018IUjd3GstwhW5H",
+       "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
        "time": {
-        "created": 1795702220337,
-        "streamed": 1795702220528,
-        "completed": 1795702221794
+        "created": 1795744461255,
+        "streamed": 1795744461441,
+        "completed": 1795744462670
        },
        "type": "assistant",
        "agent": "build",
@@ -2402,7 +2402,7 @@
         },
         {
          "type": "tool",
-         "id": "call_mock_slowsh_zh7qx",
+         "id": "call_mock_slowsh_asvsf",
          "name": "shell",
          "executed": false,
          "state": {
@@ -2423,9 +2423,9 @@
           }
          },
          "time": {
-          "created": 1795702220400,
-          "ran": 1795702220527,
-          "completed": 1795702221773
+          "created": 1795744461316,
+          "ran": 1795744461441,
+          "completed": 1795744462662
          }
         }
        ],
@@ -2448,28 +2448,28 @@
        }
       },
       {
-       "id": "msg_218316621001fYIT5cDjRfS7WX",
+       "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
        "time": {
-        "created": 1795702220327
+        "created": 1795744461250
        },
        "text": "slow shell",
        "type": "user"
       }
      ],
      "cursor": {
-      "previous": "eyJpZCI6Im1zZ18yMTgzMTZjOTYwMDE3ZkdEN1NCQU9qdWtTbyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
-      "next": "eyJpZCI6Im1zZ18yMTgzMTY2MjEwMDFmWUlUNWNEalJmUzdXWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+      "previous": "eyJpZCI6Im1zZ18yMWFiNWY3ZjkwMDJVNXNzV1NmZkxkNXZPYyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+      "next": "eyJpZCI6Im1zZ18yMWFiNWYxYzAwMDEwbjhiTkQzWjRndG5FcyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
      }
     }
    }
   ],
   "pages": [
    {
-    "at": 1795702220536,
+    "at": 1795744461446,
     "cursor": 0,
     "page": {
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
       "output": "",
@@ -2480,11 +2480,11 @@
     }
    },
    {
-    "at": 1795702220701,
+    "at": 1795744461598,
     "cursor": 0,
     "page": {
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
       "output": "line1\n",
@@ -2495,11 +2495,11 @@
     }
    },
    {
-    "at": 1795702220854,
+    "at": 1795744461750,
     "cursor": 6,
     "page": {
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
       "output": "",
@@ -2510,11 +2510,11 @@
     }
    },
    {
-    "at": 1795702221007,
+    "at": 1795744461902,
     "cursor": 6,
     "page": {
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
       "output": "line2\n",
@@ -2525,11 +2525,11 @@
     }
    },
    {
-    "at": 1795702221162,
+    "at": 1795744462053,
     "cursor": 12,
     "page": {
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
       "output": "",
@@ -2540,11 +2540,11 @@
     }
    },
    {
-    "at": 1795702221316,
+    "at": 1795744462205,
     "cursor": 12,
     "page": {
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
       "output": "",
@@ -2555,11 +2555,11 @@
     }
    },
    {
-    "at": 1795702221471,
+    "at": 1795744462357,
     "cursor": 12,
     "page": {
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
       "output": "line3\n",
@@ -2570,11 +2570,11 @@
     }
    },
    {
-    "at": 1795702221625,
+    "at": 1795744462508,
     "cursor": 18,
     "page": {
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
       "output": "",
@@ -2585,11 +2585,11 @@
     }
    },
    {
-    "at": 1795702221778,
+    "at": 1795744462660,
     "cursor": 18,
     "page": {
      "location": {
-      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+      "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
      },
      "data": {
       "output": "",
@@ -2602,19 +2602,19 @@
   ],
   "final": [
    {
-    "id": "msg_218316621001fYIT5cDjRfS7WX",
+    "id": "msg_21ab5f1c00010n8bND3Z4gtnEs",
     "time": {
-     "created": 1795702220327
+     "created": 1795744461250
     },
     "text": "slow shell",
     "type": "user"
    },
    {
-    "id": "msg_21831662f0018IUjd3GstwhW5H",
+    "id": "msg_21ab5f1c5001QuwmGJzDSPp11k",
     "time": {
-     "created": 1795702220337,
-     "streamed": 1795702220528,
-     "completed": 1795702221794
+     "created": 1795744461255,
+     "streamed": 1795744461441,
+     "completed": 1795744462670
     },
     "type": "assistant",
     "agent": "build",
@@ -2629,7 +2629,7 @@
      },
      {
       "type": "tool",
-      "id": "call_mock_slowsh_zh7qx",
+      "id": "call_mock_slowsh_asvsf",
       "name": "shell",
       "executed": false,
       "state": {
@@ -2650,9 +2650,9 @@
        }
       },
       "time": {
-       "created": 1795702220400,
-       "ran": 1795702220527,
-       "completed": 1795702221773
+       "created": 1795744461316,
+       "ran": 1795744461441,
+       "completed": 1795744462662
       }
      }
     ],
@@ -2675,11 +2675,11 @@
     }
    },
    {
-    "id": "msg_218316be7001Q0Nl8tA8voVals",
+    "id": "msg_21ab5f751001TFmfNuIv3Yt8ta",
     "time": {
-     "created": 1795702221801,
-     "streamed": 1795702221962,
-     "completed": 1795702221972
+     "created": 1795744462674,
+     "streamed": 1795744462832,
+     "completed": 1795744462840
     },
     "type": "assistant",
     "agent": "build",
@@ -2712,9 +2712,9 @@
     }
    },
    {
-    "id": "msg_218316c960017fGD7SBAOjukSo",
+    "id": "msg_21ab5f7f9002U5ssWSffLd5vOc",
     "time": {
-     "created": 1795702221974
+     "created": 1795744462841
     },
     "type": "idle",
     "outcome": "succeeded"
@@ -2722,22 +2722,22 @@
   ]
  },
  "background": {
-  "sessionID": "ses_de7ce9314ffekV9zp7N3qhFQNh",
+  "sessionID": "ses_de54a07f1ffescnZTRAXTA813f",
   "final": [
    {
-    "id": "msg_218316cee001twb2enTxlQJDKL",
+    "id": "msg_21ab5f810001Gr7eSp28v5EsRm",
     "time": {
-     "created": 1795702222065
+     "created": 1795744462866
     },
     "text": "slow background",
     "type": "user"
    },
    {
-    "id": "msg_218316cf7001Dq2ypoG7iSZRAE",
+    "id": "msg_21ab5f816001yeYozItHXLUjK7",
     "time": {
-     "created": 1795702222073,
-     "streamed": 1795702222270,
-     "completed": 1795702222298
+     "created": 1795744462872,
+     "streamed": 1795744463058,
+     "completed": 1795744463075
     },
     "type": "assistant",
     "agent": "build",
@@ -2752,7 +2752,7 @@
      },
      {
       "type": "tool",
-      "id": "call_mock_slowbg_8z2eg",
+      "id": "call_mock_slowbg_rmeaw",
       "name": "subagent",
       "executed": false,
       "state": {
@@ -2766,19 +2766,19 @@
        "content": [
         {
          "type": "text",
-         "text": "The subagent is working in the background (sessionID: ses_de7ce923effe09ZvecLI42VCcK). You will be notified automatically when it finishes.\nDO NOT sleep, poll for progress, ask the subagent for status, or duplicate this subagent's work; avoid working with the same files or topics it is using.\nWork on non-overlapping tasks, or briefly tell the user what you launched and end your response.\nTo send it follow-ups or change its instructions while it runs, call subagent again with this sessionID."
+         "text": "The subagent is working in the background (sessionID: ses_de54a072cffeUmQFxM4e24bfeo). You will be notified automatically when it finishes.\nDO NOT sleep, poll for progress, ask the subagent for status, or duplicate this subagent's work; avoid working with the same files or topics it is using.\nWork on non-overlapping tasks, or briefly tell the user what you launched and end your response.\nTo send it follow-ups or change its instructions while it runs, call subagent again with this sessionID."
         }
        ],
        "metadata": {
-        "sessionID": "ses_de7ce923effe09ZvecLI42VCcK",
+        "sessionID": "ses_de54a072cffeUmQFxM4e24bfeo",
         "status": "running",
         "truncated": false
        }
       },
       "time": {
-       "created": 1795702222136,
-       "ran": 1795702222266,
-       "completed": 1795702222279
+       "created": 1795744462933,
+       "ran": 1795744463058,
+       "completed": 1795744463062
       }
      }
     ],
@@ -2801,11 +2801,11 @@
     }
    },
    {
-    "id": "msg_218316ddd001gh4nJbDhiwW1AO",
+    "id": "msg_21ab5f8e5001eKEIiMnSuQLKjW",
     "time": {
-     "created": 1795702222302,
-     "streamed": 1795702222464,
-     "completed": 1795702222484
+     "created": 1795744463078,
+     "streamed": 1795744463234,
+     "completed": 1795744463242
     },
     "type": "assistant",
     "agent": "build",
@@ -2838,34 +2838,34 @@
     }
    },
    {
-    "id": "msg_218316e960018Jm3zsf5q6v43b",
+    "id": "msg_21ab5f98b0024SrxEFSY0H0P6j",
     "time": {
-     "created": 1795702222486
+     "created": 1795744463243
     },
     "type": "idle",
     "outcome": "succeeded"
    },
    {
-    "id": "msg_218316dc7001Hc6kVmScTwGo8h",
+    "id": "msg_21ab5f8d6001z4yeEuhGbfsm7B",
     "metadata": {
      "source": "subagent",
-     "childID": "ses_de7ce923effe09ZvecLI42VCcK",
+     "childID": "ses_de54a072cffeUmQFxM4e24bfeo",
      "agent": "General",
      "state": "completed"
     },
     "time": {
-     "created": 1795702224934
+     "created": 1795744465706
     },
-    "text": "<subagent sessionID=\"ses_de7ce923effe09ZvecLI42VCcK\" state=\"completed\" description=\"Say hello\">\nNow write a file.\n</subagent>",
+    "text": "<subagent sessionID=\"ses_de54a072cffeUmQFxM4e24bfeo\" state=\"completed\" description=\"Say hello\">\nNow write a file.\n</subagent>",
     "description": "Say hello",
     "type": "synthetic"
    },
    {
-    "id": "msg_218317828001ofqurc1VB6BNOt",
+    "id": "msg_21ab6032b001gHN1AOwNucA365",
     "time": {
-     "created": 1795702224938,
-     "streamed": 1795702225136,
-     "completed": 1795702225183
+     "created": 1795744465709,
+     "streamed": 1795744465897,
+     "completed": 1795744465931
     },
     "type": "assistant",
     "agent": "build",
@@ -2880,7 +2880,7 @@
      },
      {
       "type": "tool",
-      "id": "call_mock_write_cl3nl",
+      "id": "call_mock_write_nzek6",
       "name": "write",
       "executed": false,
       "state": {
@@ -2900,9 +2900,9 @@
        }
       },
       "time": {
-       "created": 1795702225003,
-       "ran": 1795702225133,
-       "completed": 1795702225141
+       "created": 1795744465772,
+       "ran": 1795744465896,
+       "completed": 1795744465899
       }
      }
     ],
@@ -2927,11 +2927,11 @@
     }
    },
    {
-    "id": "msg_2183179220017i9EYfGvTP5MHQ",
+    "id": "msg_21ab6040e001YNUtB2o367qUqa",
     "time": {
-     "created": 1795702225188,
-     "streamed": 1795702225350,
-     "completed": 1795702225367
+     "created": 1795744465936,
+     "streamed": 1795744466091,
+     "completed": 1795744466100
     },
     "type": "assistant",
     "agent": "build",
@@ -2964,9 +2964,9 @@
     }
    },
    {
-    "id": "msg_2183179d9001R6m871RVSd6WW0",
+    "id": "msg_21ab604b6001MrRhbkOnsLJwVx",
     "time": {
-     "created": 1795702225369
+     "created": 1795744466102
     },
     "type": "idle",
     "outcome": "succeeded"
@@ -3024,28 +3024,28 @@
  },
  "createdFrames": [
   {
-   "id": "evt_218317c410011xT7oVPV31vfh6",
-   "created": 1795702225985,
+   "id": "evt_21ab60734001dFc3akKOVZRxr9",
+   "created": 1795744466740,
    "type": "filesystem.changed",
    "location": {
-    "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+    "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
    },
    "data": {
-    "file": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj/w.txt",
+    "file": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj/w.txt",
     "event": "change"
    }
   }
  ],
  "unlinkFrames": [
   {
-   "id": "evt_218318222001mk2CbLsLFsXz3Q",
-   "created": 1795702227490,
+   "id": "evt_21ab60d11001F6NwnL4QlS3pS8",
+   "created": 1795744468241,
    "type": "filesystem.changed",
    "location": {
-    "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj"
+    "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj"
    },
    "data": {
-    "file": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-RykQzC/proj/w.txt",
+    "file": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-0szi9c/proj/w.txt",
     "event": "unlink"
    }
   }
@@ -3063,7 +3063,7 @@
    "packages/plugin": "f16f237205d777931695d221d76b1dfd00d6af19",
    "packages/plugin-browser": "a3fd121205a803d1a82d97514cc09245010656cb",
    "packages/protocol": "3117071f374c96909ccc2250cd5333a11d521854",
-   "packages/schema": "93b13ad289e71bac2fc70837c9b820deb125b6bc",
+   "packages/schema": "a836ea27fa7da3b4eab56fe51bbc98ad21e7ea25",
    "packages/server": "48bfa1e931af6e4c7d973119e173d28124aaa53d",
    "packages/simulation": "7b707eb9b69aa826e91677a8416cfb8cda3efcf5",
    "packages/theme": "0afba31d85d03fa7e34f8a98a38ccf355d6ec6c5",

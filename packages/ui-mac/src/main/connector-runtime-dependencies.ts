@@ -63,19 +63,21 @@ export function connectorRuntimeDependencyReader(
 }
 
 /**
- * The installed receipt pins the catalog card version (the planner records `entry.version || catalog version`); a version the
- * current catalog no longer lists declares nothing rather than borrowing the newest card.
+ * The installed receipt pins the catalog card version (the planner records `entry.version || catalog version`). Only local
+ * catalogs are read (the signed cache, then the bundled snapshot): the start path never refreshes the remote directory. The
+ * installed version's card wins; when no local catalog lists that version any more, the same connector's card still declares
+ * its programs, so the precheck is never skipped for an installed connector.
  */
-export async function installedConnectorDeclaration(input: {
+export function installedConnectorDeclaration(input: {
   identity: LaunchIdentity
   /** Project ledger root first (when the directory has one), then the global ledger root. */
   roots: readonly string[]
-  catalog: () => Promise<{ entries: readonly CatalogEntry[]; version: string }>
+  catalogs: () => readonly { entries: readonly CatalogEntry[]; version: string }[]
 }) {
   const receipt = input.roots.map((root) => findReceipt(root, "mcp", input.identity.server)).find((value) => value !== null)
   if (!receipt?.version) return undefined
-  const catalog = await input.catalog()
-  const entry = catalog.entries.find((value) => value.id === receipt.id && (value.version || catalog.version) === receipt.version)
+  const cards = input.catalogs().flatMap((catalog) => catalog.entries.filter((value) => value.id === receipt.id).map((entry) => ({ entry, version: entry.version || catalog.version })))
+  const entry = (cards.find((card) => card.version === receipt.version) ?? cards[0])?.entry
   if (entry?.installSpec?.kind !== "mcp" || !entry.installSpec.command) return undefined
   return { runtimeDep: entry.installSpec.runtimeDep ?? [], command: entry.installSpec.command }
 }

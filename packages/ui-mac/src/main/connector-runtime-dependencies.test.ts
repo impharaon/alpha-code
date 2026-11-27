@@ -80,7 +80,7 @@ test("Windows accepts only a real git.exe and keeps the other executable suffixe
   expect((await windows.checkConnectorRuntimeDependencies({ runtimeDep: ["git"], environment: { Path: root } })).executables.git).toBe(join(root, "git.exe"))
 })
 
-test("the pre-spawn read uses the installed card version's declaration and its runner role, never the newest card", async () => {
+test("the pre-spawn read prefers the installed card version from local catalogs and never borrows another connector's card", async () => {
   const root = temporary()
   const global = join(root, "global")
   const project = join(root, "project")
@@ -89,16 +89,20 @@ test("the pre-spawn read uses the installed card version's declaration and its r
   const card = (version: string, runtimeDep: string[]): CatalogEntry => ({ id: "mcp:git", type: "mcp", name: "git", displayName: "Git", description: "", source: "official", category: "dev", version, installSpec: { kind: "mcp", mcpType: "local", command: ["uvx", "mcp-server-git", "--repository", "{workspace}"], runtimeDep } } as CatalogEntry)
   const receipt = (version: string) => ({ id: "mcp:git", name: "git", type: "mcp" as const, scope: "global" as const, version, installedAt: "2026-11-27T00:00:00.000Z", origin: "catalog" as const })
   expect(addReceipt(global, receipt("1.0.0")).ok).toBe(true)
-  const catalog = async () => ({ entries: [card("2.0.0", ["uv", "git", "docker"]), { ...card("1.0.0", ["uv", "git"]), id: "mcp:other" }], version: "2026-11-27" })
+  // Local only (signed cache, then the bundled snapshot): the start path never refreshes the remote directory.
+  const catalogs = () => [{ entries: [card("2.0.0", ["uv", "git", "docker"]), { ...card("1.0.0", ["uv"]), id: "mcp:other" }], version: "2026-11-27" }, { entries: [card("1.0.0", ["uv", "git"])], version: "2026-11-01" }]
   const identity = { directory: project, server: "git", attempt: "a1" }
-  expect(await installedConnectorDeclaration({ identity, roots: [project, global], catalog })).toBeUndefined()
+  expect(installedConnectorDeclaration({ identity, roots: [project, global], catalogs })?.runtimeDep).toEqual(["uv", "git"])
+  // The installed version is in no local catalog any more: the connector's own card still declares its programs.
+  expect(installedConnectorDeclaration({ identity, roots: [project, global], catalogs: () => catalogs().slice(0, 1) })?.runtimeDep).toEqual(["uv", "git", "docker"])
+  expect(installedConnectorDeclaration({ identity: { ...identity, server: "absent" }, roots: [project, global], catalogs })).toBeUndefined()
   expect(addReceipt(project, receipt("2.0.0")).ok).toBe(true)
-  const declared = await installedConnectorDeclaration({ identity, roots: [project, global], catalog })
+  const declared = installedConnectorDeclaration({ identity, roots: [project, global], catalogs })
   expect(declared?.runtimeDep).toEqual(["uv", "git", "docker"])
   const marker = join(root, "executed")
   program(join(root, "usr-bin"), "git", marker, true)
   const facts = await connectorRuntimeDependencyReader(
-    { installed: (value) => installedConnectorDeclaration({ identity: value, roots: [project, global], catalog }), environment: () => ({ PATH: join(root, "usr-bin") }) },
+    { installed: async (value) => installedConnectorDeclaration({ identity: value, roots: [project, global], catalogs }), environment: () => ({ PATH: join(root, "usr-bin") }) },
     system(),
   )(identity)
   expect(facts.missing).toEqual(["git", "docker"])

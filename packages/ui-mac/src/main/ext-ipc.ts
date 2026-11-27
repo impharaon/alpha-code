@@ -44,7 +44,7 @@ import { extensionHealthProbeRouter } from "./ext-health-probe-router"
 import { randomUUID } from "node:crypto"
 import { pickedFiles } from "./ipc"
 import { factorySkillIds } from "./factory-skills"
-import { downloadRemoteAsset, refreshRemoteCatalog, registerPackageCatalogReadIpcHandlers } from "./remote-catalog"
+import { downloadRemoteAsset, readCachedCatalog, refreshRemoteCatalog, registerPackageCatalogReadIpcHandlers } from "./remote-catalog"
 import { applyBuiltinPolicy, normalizeBuiltinPolicy, protectionInfo, readBuiltinPolicy, resetBuiltinPolicy } from "./codepuppy-builtin-policy"
 import { factoryDeniedSkills } from "../../../ext/src/factory-deny"
 import {
@@ -1566,5 +1566,11 @@ export function registerExtIpcHandlers(
   // #1760: the pre-spawn dependency read resolves installed declarations from this same effective catalog;
   // R8 rebinds an explicit connector cwd through the existing writer and this coordinator's reload.
   const connectorWorkspace = (identity: { directory: string; server: string }, folder: string) => bindConnectorWorkspace({ identity, folder }, reloads.request)
-  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1, resolveEffectiveCatalog, connectorWorkspace }
+  // Connector starts read dependency facts from local catalogs only (signed cache, bundled snapshot), never refreshing.
+  const connectorCatalogs = () => {
+    const cached = readCachedCatalog(userDataPath)
+    const bundled = bundledCatalogJson as unknown as BundledCatalogSnapshotV1
+    return [...(cached ? [{ entries: (cached.catalog as Catalog).entries ?? [], version: cached.version }] : []), { entries: bundled.entries, version: bundled.version }]
+  }
+  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1, resolveEffectiveCatalog, connectorWorkspace, connectorCatalogs }
 }

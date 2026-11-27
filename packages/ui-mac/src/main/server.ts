@@ -175,7 +175,7 @@ type SpawnLocalServerOptions = {
    */
   codepuppySidecar?: CodePuppySidecarHost
   /** #1760: the effective catalog the pre-spawn dependency read resolves installed declarations against (ext-ipc's resolver). */
-  connectorCatalog?: () => Promise<{ entries: readonly CatalogEntry[]; version: string }>
+  connectorCatalogs?: () => readonly { entries: readonly CatalogEntry[]; version: string }[]
   /** R8: rewrite an explicit connector cwd through its existing writer; `location` means the chosen folder is the reconnect Location. */
   connectorWorkspace?: (identity: { directory: string; server: string }, folder: string) => import("./connector-workspace-binding").ConnectorWorkspaceBinding
   /**
@@ -1006,7 +1006,7 @@ export async function spawnLocalServer(
         sidecarGeneration: String(options.generation ?? 0),
         authority: launcher,
         launches,
-        catalog: options.connectorCatalog ?? (async () => ({ entries: [], version: "" })),
+        catalogs: options.connectorCatalogs ?? (() => []),
         proxyPort: egressProxyPort,
         post: (message) => child.postMessage(message),
       })

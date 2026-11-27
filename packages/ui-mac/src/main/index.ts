@@ -1084,7 +1084,7 @@ const main = Effect.gen(function* () {
   // 一次注入,IPC/planner/预热同一份。
   const registryChannel = catalogRegistryChannel()
   // #390:解构出恢复-gate 包装的 global 技能安装器,传给首启 ecosystem gate(不绕恢复准入)。
-  const { ledgerReady: extLedgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, resolveEffectiveCatalog: connectorCatalog, connectorWorkspace } = registerExtIpcHandlers(
+  const { ledgerReady: extLedgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, connectorCatalogs, connectorWorkspace } = registerExtIpcHandlers(
     app.getPath("userData"),
     registryChannel,
     () => Effect.runPromise(Deferred.await(serverReady)),
@@ -1492,7 +1492,7 @@ const main = Effect.gen(function* () {
         timelineContext: "boot",
         generation: spawnGen,
         codepuppySidecar,
-        connectorCatalog,
+        connectorCatalogs,
         connectorWorkspace,
         fenceRun: fenceWorkspaces, // INT-safety R3: this run's writable history carries into the next generation
         // DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时 / 主进程读不出表 ⇒ 既有的 credential-change 重启
@@ -1650,7 +1650,7 @@ const main = Effect.gen(function* () {
         timelineContext: "respawn",
         generation: spawnGen,
         codepuppySidecar,
-        connectorCatalog,
+        connectorCatalogs,
         connectorWorkspace,
         fenceRun: fenceWorkspaces, // INT-safety R3: this run's writable history carries into the next generation
         // DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时 / 主进程读不出表 ⇒ 既有的 credential-change 重启

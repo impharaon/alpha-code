@@ -43,7 +43,8 @@ export function openConnectorLaunchMain(input: {
   sidecarGeneration: string
   authority: NonNullable<ReturnType<typeof forkLauncherAuthority>>
   launches: Pick<ReturnType<typeof createConnectorLaunchState>, "changed">
-  catalog: () => Promise<{ entries: readonly CatalogEntry[]; version: string }>
+  /** Local catalogs only (signed cache, bundled snapshot): a start never waits on the network. */
+  catalogs: () => readonly { entries: readonly CatalogEntry[]; version: string }[]
   /** The policy proxy port of this generation; undefined where no proxy runs (no attribution, the inherited environment). */
   proxyPort: number | undefined
   /** Main's package/secret facts for a server (connectorSecretNeed); they refine only an unclassified failure. */
@@ -58,11 +59,11 @@ export function openConnectorLaunchMain(input: {
     changed: (value) => input.launches.changed(withSecretNeed(value, input.secretNeed ?? connectorSecretNeed)),
     resolveAssets: () => input.authority.resolveAssets(),
     runtimeDependencies: connectorRuntimeDependencyReader({
-      installed: (identity) =>
+      installed: async (identity) =>
         installedConnectorDeclaration({
           identity,
           roots: [codepuppyRoot(identity.directory), codepuppyGlobalRoot()].filter((root): root is string => root !== null),
-          catalog: input.catalog,
+          catalogs: input.catalogs,
         }),
       environment: hostProgramEnvironment,
     }),

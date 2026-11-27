@@ -68,7 +68,7 @@ test.skipIf(!platform)("main answers the sidecar host with this authority's asse
   expect(addReceipt(process.env.CODEPUPPY_GLOBAL_DIR!, { id: "mcp:git", name: "git", type: "mcp", scope: "global", version: "1.0.0", installedAt: "2026-11-27T00:00:00.000Z", origin: "catalog" }).ok).toBe(true)
   const launches = createConnectorLaunchState("2", { retry: async () => ({ ok: true }), diagnostic: async () => ({ ok: false, error: "unavailable" }), openNetworkApproval: async () => ({ ok: false, error: "unavailable" }), chooseWorkspace: async () => ({ ok: false, error: "unavailable" }) })
   let toSidecar: (message: unknown) => void = () => {}
-  const main = openConnectorLaunchMain({ sidecarGeneration: "2", authority, launches, catalog: async () => ({ entries: [card], version: "catalog-1" }), proxyPort: 4433, post: (message) => queueMicrotask(() => toSidecar(structuredClone(message))) })
+  const main = openConnectorLaunchMain({ sidecarGeneration: "2", authority, launches, catalogs: () => [{ entries: [card], version: "catalog-1" }], proxyPort: 4433, post: (message) => queueMicrotask(() => toSidecar(structuredClone(message))) })
   const sidecar = createConnectorLaunchSidecarHost({ sidecarGeneration: "2", launchers: structuredClone(authority.environment), post: (message) => queueMicrotask(() => main.receive(structuredClone(message))) })
   toSidecar = (message) => void sidecar.receive(message)
   try {
@@ -110,7 +110,7 @@ test("main's secret facts refine only an unclassified failure", async () => {
   expect(connectorSecretNeed("github")).toEqual({ fields: ["GITHUB_PERSONAL_ACCESS_TOKEN"] })
   const f = await fixture()
   const launches = createConnectorLaunchState("2", { retry: async () => ({ ok: true }), diagnostic: async () => ({ ok: false, error: "unavailable" }), openNetworkApproval: async () => ({ ok: false, error: "unavailable" }), chooseWorkspace: async () => ({ ok: false, error: "unavailable" }) })
-  const main = openConnectorLaunchMain({ sidecarGeneration: "2", authority: forkLauncherAuthority(f.input)!, launches, catalog: async () => ({ entries: [], version: "" }), proxyPort: undefined, post: () => {} })
+  const main = openConnectorLaunchMain({ sidecarGeneration: "2", authority: forkLauncherAuthority(f.input)!, launches, catalogs: () => [], proxyPort: undefined, post: () => {} })
   const failed = (server: string, failure: object) => ({ type: "codepuppy.connector-launch.changed", snapshot: { identity: { directory: f.root, server, attempt: `a-${server}` }, sidecarGeneration: "2", sequence: 1, state: { phase: "failed", failure, diagnostic: `a-${server}` } } })
   main.receive(failed("github", { kind: "unknown", detail: "401 Bad credentials" }))
   writeFileSync(mcpPluginTargetPath(), JSON.stringify({ mcp: { github: { type: "local", command: ["npx"], environment: { GITHUB_PERSONAL_ACCESS_TOKEN: `{file:${secret}}` } }, fetch: { type: "local", command: ["uvx"], environment: { KEY: `{file:${secret}}` } } } }))

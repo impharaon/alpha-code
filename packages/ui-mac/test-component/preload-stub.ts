@@ -112,6 +112,8 @@ export type AbsentOnPurposeKey =
   | "onWorkspaceWritableChanged"
   | "startupTimeline"
   // ② 按需由消费方经 extras 注入(返回值就是该文件的判据)
+  | "describeDirectoryAccess"
+  | "approveDirectoryWrite"
   | "workspaceDefaultDir"
   | "workspaceEnsureDefault"
   // `#1669`:只有生产的模块级 engineFetch 读它;这四个文件的引擎请求不经那份适配器

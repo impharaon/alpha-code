@@ -270,6 +270,10 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   }
 
   const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/codepuppy/package-manager/process") {
+      void import("./package-manager-execution").then(({ handlePackageManagerProcess }) => handlePackageManagerProcess(req, res)).catch(() => res.destroy())
+      return
+    }
     const capability = bound(req.headers["proxy-authorization"])
     const url = URL.canParse(req.url ?? "") ? new URL(req.url!) : undefined
     if (capability && url && capability.transport === "sse" && capability.events.size && req.method === "POST" && req.headers[PLUGIN_MCP_SSE_ENDPOINT_HEADER] === capability.binding.serverUrl && pluginMcpLoopback(url) && url.origin === new URL(capability.binding.serverUrl).origin)
@@ -314,6 +318,9 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
     // `Connection: close` 是给客户端看的;实际把连接收掉这件事不交给运行时的 keep-alive 策略(bun 实测不关)。
     res.end(body, () => res.socket?.end())
   })
+
+  // Helper stdin is a live duplex stream, governed by the original Shell timeout.
+  server.requestTimeout = 0
 
   server.on("connect", (req, duplex, head) => {
     const id = `${runID}:${++seq}`

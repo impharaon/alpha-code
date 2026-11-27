@@ -60,7 +60,7 @@ async function boot(name: string, variant = "production") {
     { userDataPath: userData, appStateRoot: join(root, "codepuppy-state"), codepuppyGlobalRoot: globalRoot, engineConfigDirectory: join(roots.configHome, "opencode"), roots },
     { realpath: (path) => realpathSync.native(path), mkdirp: (path) => void mkdirSync(path, { recursive: true }) },
   ).configFence
-  let profile = renderProcessFenceProfile({ workspaces: [A], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: env.XDG_STATE_HOME, roots, egressProxyPort: 59999, configFence, credentialStores: planCredentialStores(credentialStores({ userDataPath: userData }), { realpath: (path) => realpathSync.native(path) }) })
+  let profile = renderProcessFenceProfile({ workspaces: [A], codepuppyGlobalRoot: globalRoot, userDataPath: userData, stateHome: env.XDG_STATE_HOME, roots, egressProxyPort: 59999, configFence, homebrewFence: [], credentialStores: planCredentialStores(credentialStores({ userDataPath: userData }), { realpath: (path) => realpathSync.native(path) }) })
   if (variant === "file-only") profile = profile.replace(/\(deny file-issue-extension[\s\S]*?\(extension-class "[^"]+"\)\)/, `(deny file-issue-extension (extension-class "${WORKSPACE_WRITE_EXTENSION_CLASS}"))`)
   if (variant === "no-deny") profile = profile.replace(/\(deny file-issue-extension[\s\S]*?\(extension-class "[^"]+"\)\)/, "")
   // Keep the test helper outside asar: it is an independently executed Mach-O signed with the package.

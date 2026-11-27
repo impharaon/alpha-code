@@ -1,3 +1,5 @@
+import { buildWriteScopeRequest, buildWriteScopeReply, parseWriteScopeReply } from "./codepuppy-sidecar-messages"
+import { buildPackageManagerControlRequest, buildPackageManagerControlReply, parsePackageManagerControlReply } from "./codepuppy-sidecar-messages"
 // REQ-234 `#1529` I6:parentPort `codepuppy.*` 消息族封闭 —— 只认三种 ext → main 的形状,其余(含未知 alpha.* type、
 // main → ext 方向、形状不对)一律 undefined,由收方丢弃。
 import { describe, expect, test } from "bun:test"
@@ -17,6 +19,21 @@ import {
   parseReloadRequest,
   type HubView,
 } from "./codepuppy-sidecar-messages"
+
+test("prepared package-manager wire accepts only host identity and private binary input", () => {
+  const input = { shellID: "sh_1", sessionID: "ses_1", messageID: "msg_1", callID: "call_1", command: "brew --prefix", cwd: "/project", shell: "/bin/sh" }
+  const request = buildPackageManagerControlRequest(1, { op: "authorize", input })
+  expect(parseCodePuppySidecarInbound(request)).toEqual(request)
+  for (const forged of [{ ...input, env: {} }, { ...input, approved: true }, { ...input, callID: undefined }]) expect(parseCodePuppySidecarInbound({ ...request, request: { op: "authorize", input: forged } })).toBeUndefined()
+  const lease = { executionID: "execution", nodes: [{ nodeID: "node" }], helperService: "service", executionSource: "source", shellPrivateInput: { fd: 3, data: new Uint8Array([10]) } }
+  const reply = buildPackageManagerControlReply(1, { ok: true, lease })
+  expect(parsePackageManagerControlReply(reply)).toEqual(reply)
+  for (const privateInput of [{ fd: 10, data: lease.shellPrivateInput.data }, { fd: 3, data: "secret" }]) expect(parsePackageManagerControlReply({ ...reply, result: { ok: true, lease: { ...lease, shellPrivateInput: privateInput } } })).toBeUndefined()
+  for (const op of [{ op: "bind" as const, executionID: "execution", pid: 42 }, { op: "finish" as const, executionID: "execution" }, { op: "cancel" as const, executionID: "execution", reason: "timeout" as const }]) {
+    expect(parseCodePuppySidecarInbound(buildPackageManagerControlRequest(2, op))).toEqual(buildPackageManagerControlRequest(2, op))
+    expect(parseCodePuppySidecarInbound(buildPackageManagerControlRequest(2, { ...op, argv: [] } as never))).toBeUndefined()
+  }
+})
 
 test("无人值守快照和回执成对解析,坏输入与反方向消息被丢弃", () => {
   const live = buildUnattendedLive({ seq: 1, nonce: "random-nonce", sessions: [{ sessionID: "ses_a", promptID: "msg_a" }] })
@@ -295,6 +312,17 @@ test("package option and version states round trip while sensitive values never 
   expect(messages.parsePackageAuthorizationReply(invalid)).toBeUndefined()
 })
 
+
+test("external write scope has one read-only contract and rejects malformed or granting messages", () => {
+  const targets = [{ absolute: "/outside/a", directory: "/outside" }]
+  const query = buildWriteScopeRequest(1, { access: "write", targets })
+  expect(parseCodePuppySidecarInbound(query)).toEqual(query)
+  const reply = buildWriteScopeReply(1, { revision: 3, targets: [{ absolute: targets[0]!.absolute, outcome: "needs-approval" }] })
+  expect(parseWriteScopeReply(reply)).toEqual(reply)
+  for (const bad of [{ ...query, register: true }, { ...query, targets: [{ absolute: "relative", directory: "/outside" }] }, { ...query, access: "execute" }, { ...query, id: -1 }]) expect(parseCodePuppySidecarInbound(bad)).toBeUndefined()
+  expect(parseWriteScopeReply({ ...reply, result: { revision: 3, targets: [{ absolute: "/outside/a", outcome: "granted" }] } })).toBeUndefined()
+  expect(parseCodePuppySidecarInbound(reply)).toBeUndefined()
+})
 import { parseDocumentRuntimeMessage } from "./codepuppy-sidecar-messages"
 test("document runtime notifications validate phase, progress and generation without accepting malformed payloads", () => {
   const value = { type: "codepuppy.document.runtime.changed", sidecarGeneration: 2, sequence: 3, state: { phase: "preparing", stage: "download", received: 30, total: 100 } }

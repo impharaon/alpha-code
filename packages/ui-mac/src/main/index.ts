@@ -1,3 +1,6 @@
+import { stopPackageManagerExecutions } from "./package-manager-execution"
+import { createDirectoryWriteApproval } from "./directory-write-approval"
+import type { WorkspaceWritableChanged } from "./workspace-write-probe"
 import { createNetworkEgressApproval } from "./network-egress-approval"
 import { createEgressSiteStore, createEgressPassStore } from "./egress-grant-records"
 import { networkEgressActivity } from "./network-egress-activity"
@@ -71,6 +74,7 @@ import {
   pushCredentialsToSidecar,
   getDefaultServerUrl,
   preferAppEnv,
+  startupShellProbeFence,
   setDefaultServerUrl,
   spawnLocalServer,
   type SidecarListener,
@@ -78,7 +82,6 @@ import {
 import { applyPlatformCredentialsHot } from "./codepuppy-secret-files"
 import { setupAutoUpdater, showUpdaterDialog } from "./updater"
 import { revealWindow, windowClose } from "./window-close"
-import { createPluginSessionQuitHandler } from "./plugin-session-lifecycle"
 import {
   createMainWindow,
   productWindows,
@@ -469,6 +472,13 @@ function observeEnsureFreshToken(path: "boot" | "scheduled") {
   return refreshing
 }
 
+// The tracker invokes this callback for user actions after IPC registration, not while it boots.
+function publishWorkspaceWritable(change: WorkspaceWritableChanged) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.webContents.isDestroyed()) win.webContents.send("workspace-writable-changed", change)
+  }
+}
+
 const main = Effect.gen(function* () {
   contextMenu({ showSaveImageAs: true, showLookUpSelection: false, showSearchWithGoogle: false })
 
@@ -549,6 +559,7 @@ const main = Effect.gen(function* () {
     },
   )
   const stopSidecars = async () => {
+    await stopPackageManagerExecutions()
     await killSidecar()
     wslServers.stopAll()
   }
@@ -630,7 +641,6 @@ const main = Effect.gen(function* () {
   if (naming.kind === "ready" || (naming.kind === "skip" && naming.reason === "complete"))
     configureProjectHiddenDirMigration({ logPath: join(app.getPath("userData"), MIGRATION_DIR, PROJECTS_LOG), fs: createMigrationFs })
 
-  preferAppEnv(app.getPath("userData"))
   let keychainRenamed = false
   if (naming.kind === "ready") {
     const db = runNamingMigrationDbStep(naming.journal, { packaged: app.isPackaged, env: process.env, home: homedir() })
@@ -680,6 +690,42 @@ const main = Effect.gen(function* () {
   // Load the endpoint resolver (userData pin + persisted login discovery) BEFORE initAuthEnv, so the
   // proxy URL it derives reflects discovery/pin, not just the hardcoded default. See codepuppy-endpoints.ts.
   initEndpoints(app.getPath("userData"), reportContractFailure, (line) => logger.log(line))
+  const serverReady = Deferred.makeUnsafe<EngineConnection, unknown>()
+  // REQ-014:冷启动 tabs 毒键预清 —— tier-1 格式级同步执行(此刻窗口未建,写回零竞态);tier-2 存在性
+  // 校验等 serverReady(时限 fail-open)。renderer 对 tabs 两键的首读经 store-get gate 等 done(ipc.ts),
+  // 故窗口照常先开(A1 window-first),只有 tabs 路由恢复数据最多晚数秒。
+  const tabsPreclean = runTabsPreclean({
+    getValue: (key) => getStore(GLOBAL_RENDERER_STORE).get(key),
+    setValue: (key, value) => getStore(GLOBAL_RENDERER_STORE).set(key, value),
+    log: (line) => logger.log(line),
+    awaitServer: () => Effect.runPromise(Deferred.await(serverReady)).catch(() => null),
+    checkSession: checkSessionExistsViaFetch,
+  })
+  // `#1394`(REQ-159 `#1390` 第二步):围栏工作区清单的真源 —— 首次启动从 store 播种一次,之后只经 store-set IPC 更新
+  // (process-fence-workspaces.ts 文件头)。位置必须在 tier-1 预清**之后**(播种读的是预清后的 store)、IPC 注册与首次 fork
+  // **之前**(计划器读的是这里播好 / 装好的文件;IPC 一来就要有 tracker 接)。store 读挂不炸 boot:按空 store 处理并出声。
+  const fenceWorkspaces = bootFenceWorkspaceTruth({
+    truthPath: fenceWorkspaceTruthPath(codepuppyEnv.casBaseRoot, codepuppyEnv.environment),
+    eligibility: {
+      homeDir: homedir(), appStateRoot: codepuppyEnv.casBaseRoot, configFenceRoots: currentConfigFenceRoots, realpath: realpathSync.native,
+      isDirectory: (directory) => statSync(directory).isDirectory(),
+    },
+    onWritableChanged: publishWorkspaceWritable,
+    store: (() => {
+      try {
+        const store = getStore(GLOBAL_RENDERER_STORE)
+        return { tabs: store.get(TABS_KEY), recent: store.get(TABS_RECENT_KEY), info: store.get(TABS_INFO_KEY) }
+      } catch (error) {
+        logger.error("process fence: renderer tab store unreadable at boot — workspace truth seeding / quarantine see an empty store", error)
+        return { tabs: undefined, recent: undefined, info: undefined }
+      }
+    })(),
+    fs: { readFileSync, writeFileSync, renameSync, mkdirSync, rmSync },
+    log: (line) => logger.log(line),
+  })
+  // A failing probe preparation is logged and skips only the login-shell merge; each engine fork still plans its own fence (fail-closed).
+  const probeFence = yield* Effect.promise(() => startupShellProbeFence())
+  preferAppEnv(app.getPath("userData"), probeFence)
   // ⚠️ initAuthEnv / initByokKeys 不能在这里调(REQ-002 联调实锤,2026-07-03):它们解密 safeStorage
   // 凭证,而 macOS 上 app ready 之前 safeStorage 不可用 → 解密静默失败 → 每次冷启动都"未登录"、
   // BYOK 钥匙库曾因此走明文兜底。已移至 whenReady 之后、sidecar fork 之前(见下)。
@@ -718,12 +764,18 @@ const main = Effect.gen(function* () {
   // #1753:macOS 点程序坞图标 ⇒ 把(关窗时隐藏的)同一个窗口带回来。
   app.on("activate", () => revealWindow(productWindows()))
 
-  const settlePluginQuit = createPluginSessionQuitHandler(stopSidecars, () => app.quit())
+  let quitCleanup: Promise<void> | undefined
+  let quitReady = false
   app.on("before-quit", (event) => {
     windowClose.markQuitting() // #1753:退出期的关窗不再被拦成"隐藏"
     quittingApp = true // B5:退出期的 sidecar exit 不触发自愈
     if (selfHealTimer) clearTimeout(selfHealTimer)
-    settlePluginQuit(event)
+    if (quitReady) return
+    event.preventDefault()
+    quitCleanup ??= stopSidecars().then(() => { quitReady = true; app.quit() }, (error) => {
+      writeLog("utility", "application child cleanup failed", { error: String(error) }, "error")
+      quitCleanup = undefined
+    })
   })
 
   app.on("will-quit", () => {
@@ -753,7 +805,6 @@ const main = Effect.gen(function* () {
   }
 
   // I8:main 内部的连接(带口令);renderer 经 await-initialization 只拿到 rendererEngineView 投影出的 `{ url }`。
-  const serverReady = Deferred.makeUnsafe<EngineConnection, unknown>()
   let authScheduler: ReturnType<typeof createAuthRenewalScheduler> | null = null
   let pendingAuthRespawn: SidecarRespawnTrigger | null = null
   // SPEC-stored-credentials-fence §4.2:引擎拉取凭据表超时 / 主进程读不出表 ⇒ credential-change;boot 那一代早于重启队列,记下、队列建好后补发
@@ -970,43 +1021,13 @@ const main = Effect.gen(function* () {
   }
   registerRendererProtocol()
   setDockIcon()
+  const directoryWrites = createDirectoryWriteApproval({
+    eligibility: { homeDir: homedir(), appStateRoot: codepuppyEnv.casBaseRoot, configFenceRoots: currentConfigFenceRoots, realpath: realpathSync.native, isDirectory: (directory) => statSync(directory).isDirectory() },
+    tracker: fenceWorkspaces,
+    sidecar: () => server,
+    current: (sessionID, requestID) => server?.permissionRequest(sessionID, requestID) ?? Promise.resolve(undefined),
+  })
   const updater = setupAutoUpdater(stopSidecars)
-  // REQ-014:冷启动 tabs 毒键预清 —— tier-1 格式级同步执行(此刻窗口未建,写回零竞态);tier-2 存在性
-  // 校验等 serverReady(时限 fail-open)。renderer 对 tabs 两键的首读经 store-get gate 等 done(ipc.ts),
-  // 故窗口照常先开(A1 window-first),只有 tabs 路由恢复数据最多晚数秒。
-  const tabsPreclean = runTabsPreclean({
-    getValue: (key) => getStore(GLOBAL_RENDERER_STORE).get(key),
-    setValue: (key, value) => getStore(GLOBAL_RENDERER_STORE).set(key, value),
-    log: (line) => logger.log(line),
-    awaitServer: () => Effect.runPromise(Deferred.await(serverReady)).catch(() => null),
-    checkSession: checkSessionExistsViaFetch,
-  })
-  // `#1394`(REQ-159 `#1390` 第二步):围栏工作区清单的真源 —— 首次启动从 store 播种一次,之后只经 store-set IPC 更新
-  // (process-fence-workspaces.ts 文件头)。位置必须在 tier-1 预清**之后**(播种读的是预清后的 store)、IPC 注册与首次 fork
-  // **之前**(计划器读的是这里播好 / 装好的文件;IPC 一来就要有 tracker 接)。store 读挂不炸 boot:按空 store 处理并出声。
-  const fenceWorkspaces = bootFenceWorkspaceTruth({
-    truthPath: fenceWorkspaceTruthPath(codepuppyEnv.casBaseRoot, codepuppyEnv.environment),
-    eligibility: {
-      homeDir: homedir(), appStateRoot: codepuppyEnv.casBaseRoot, configFenceRoots: currentConfigFenceRoots, realpath: realpathSync.native,
-      isDirectory: (directory) => statSync(directory).isDirectory(),
-    },
-    onWritableChanged: (change) => {
-      for (const win of BrowserWindow.getAllWindows()) {
-        if (!win.webContents.isDestroyed()) win.webContents.send("workspace-writable-changed", change)
-      }
-    },
-    store: (() => {
-      try {
-        const store = getStore(GLOBAL_RENDERER_STORE)
-        return { tabs: store.get(TABS_KEY), recent: store.get(TABS_RECENT_KEY), info: store.get(TABS_INFO_KEY) }
-      } catch (error) {
-        logger.error("process fence: renderer tab store unreadable at boot — workspace truth seeding / quarantine see an empty store", error)
-        return { tabs: undefined, recent: undefined, info: undefined }
-      }
-    })(),
-    fs: { readFileSync, writeFileSync, renameSync, mkdirSync, rmSync },
-    log: (line) => logger.log(line),
-  })
   const networkEgress = process.platform === "darwin" ? createNetworkEgressApproval({
     available: true, activity: networkEgressActivity,
     store: createEgressSiteStore((line) => logger.warn(line)), log: (line) => logger.warn(line),
@@ -1015,6 +1036,8 @@ const main = Effect.gen(function* () {
   if (networkEgress) configureEgressGrantApproval(networkEgress)
   registerNetworkEgressIpcHandlers({ ipc: ipcMain, windows: productWindows, service: networkEgress })
   registerIpcHandlers({
+    directoryWrites,
+    isAppRenderer: (id) => BrowserWindow.getAllWindows().some((window) => window.webContents.id === id),
     tabsPrecleanDone: tabsPreclean.done,
     fenceWorkspaces,
     killSidecar: () => killSidecar(),

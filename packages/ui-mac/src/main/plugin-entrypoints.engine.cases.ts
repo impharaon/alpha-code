@@ -171,7 +171,7 @@ beforeAll(async () => {
   const { buildEngineServerOptions } = await import("./engine-server-options")
   const { withEngineAuthorization, engineAuthorization } = await import("./engine-authorization")
   const { engineProjectTrust } = await import("./engine-project-trust")
-  const engine = await startEngine({ ...buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password: "cp-plugin-entrypoints", engineVersion: "test", databasePath: host.slot.databasePath, configDirectory: host.slot.configDirectory, config: { content: JSON.stringify(host.content), file: injection.config.file }, models: { fetch: false }, filewatcher: true, platform: process.platform }), fetch: globalThis.fetch }, { projectTrust: engineProjectTrust })
+  const engine = await startEngine({ ...buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password: "cp-plugin-entrypoints", engineVersion: "test", databasePath: host.slot.databasePath, configDirectory: host.slot.configDirectory, config: { content: JSON.stringify(host.content), file: injection.config.file }, models: { fetch: false }, filewatcher: true, platform: process.platform }), fetch: globalThis.fetch }, { packageManagerEnvironment: {}, projectTrust: engineProjectTrust })
   const dispatch = withEngineAuthorization(engine.dispatch, "cp-plugin-entrypoints")
   running = {
     url: engine.url, authorization: engineAuthorization("cp-plugin-entrypoints"), fetch: dispatch, close: engine.close,

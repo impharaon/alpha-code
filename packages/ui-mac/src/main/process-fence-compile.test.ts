@@ -35,7 +35,7 @@ describeSandbox("trialCompileProfile —— 真 sandbox-exec", () => {
       { realpath: (p) => p, mkdirp: () => {} },
     ).configFence,
     // SPEC-stored-credentials-fence:C1 两块(拒读拒写块 + 上级目录块)同样进真编译器;只编译,不碰盘
-    credentialStores: planCredentialStores(credentialStores({ userDataPath, officialRuntimeParent: join(tmpdir(), "codepuppy-connectors-501-0123456789abcdef") }), { realpath: (p) => p }),
+    homebrewFence: [], credentialStores: planCredentialStores(credentialStores({ userDataPath, officialRuntimeParent: join(tmpdir(), "codepuppy-connectors-501-0123456789abcdef") }), { realpath: (p) => p }),
   }
 
   test("[已知的坏 ①] 撞 65535 字节墙的 profile ⇒ ok:false,原因含 `exceeds maximum`", () => {

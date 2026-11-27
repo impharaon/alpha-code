@@ -145,7 +145,7 @@ export default { id: "test.oauth-observer", setup: async (ctx) => {
       filewatcher: false,
       platform: process.platform,
     }),
-    { projectTrust: engineProjectTrust },
+    { packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   engines.push(engine)
   engineUrl = engine.url

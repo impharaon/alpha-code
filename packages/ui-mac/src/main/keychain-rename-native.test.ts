@@ -5,7 +5,7 @@
 //      在代码里(去掉注释后)恰好调用一次,第一参来自 build_query(、第二参来自 build_update_attributes(。
 //   ② 用生产构建脚本把模块编到临时目录,在本进程 dlopen,调 keychainUpdateAttributeKeys() —— 它用占位值
 //      调**同一个** build_update_attributes,返回更新字典的真实键名,必须恰为 acct / svce;再用 `nm -u`
-//      看两片二进制实际引用的 Security 函数恰为 SecItemCopyMatching / SecItemUpdate。这一步不碰钥匙串。
+//      看两片二进制实际引用的条目 API 恰为 SecItemCopyMatching / SecItemUpdate，另有 H4 的六项代码签名核验 API。这一步不碰钥匙串。
 // 每条判据先过已知坏的样本(同文件的自检用例),不会红的判据不算证据。
 // 非 darwin 或没有 clang 时 ② 响亮跳过(打印原因),① 照跑。
 
@@ -61,7 +61,7 @@ describe("AC4 ① 源码:只改属性,不碰秘密 (ac#1571)", () => {
 
 describe.skipIf(!canBuild)("AC4 ② 编出来的模块:更新字典只有 acct / svce (ac#1571)", () => {
   test(
-    "生产构建脚本编到临时目录 → dlopen → keychainUpdateAttributeKeys() 恰为 [acct, svce];两片只引用 SecItemCopyMatching / SecItemUpdate",
+    "生产构建脚本编到临时目录 → dlopen → keychainUpdateAttributeKeys() 恰为 [acct, svce];两片精确枚举条目与 H4 签名 API",
     () => {
       const scratch = mkdtempSync(join(tmpdir(), "codepuppy-keychain-rename-"))
       try {
@@ -78,7 +78,10 @@ describe.skipIf(!canBuild)("AC4 ② 编出来的模块:更新字典只有 acct /
             .map((line) => line.trim())
             .filter((symbol) => symbol.startsWith("_Sec"))
             .sort()
-          expect(security, `${arch} 片引用的 Security 函数`).toEqual(["_SecItemCopyMatching", "_SecItemUpdate"])
+          expect(security, `${arch} 片引用的 Security 函数`).toEqual([
+            "_SecCodeCheckValidity", "_SecCodeCopyGuestWithAttributes", "_SecCodeCopySelf", "_SecCodeCopySigningInformation",
+            "_SecItemCopyMatching", "_SecItemUpdate", "_SecStaticCodeCheckValidity", "_SecStaticCodeCreateWithPath",
+          ])
         }
       } finally {
         rmSync(scratch, { recursive: true, force: true })

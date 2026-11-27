@@ -19,6 +19,8 @@ import {
 import { DOCUMENT_ASSET_BUILD_DIR, readDocumentAssets } from "./src/main/document-resources"
 import { assertReleaseSource } from "./scripts/release-source"
 import { isReleaseBuild } from "./scripts/build-identity"
+import { signPackageManagerHelper } from "./scripts/build-package-manager-helper"
+import { PACKAGE_MANAGER_HELPER } from "./src/main/package-manager-helper"
 
 // REQ-089 AC3: the OS protocol list has exactly one source. The installer metadata that makes a
 // cold-start deep link reach the app at all is derived from the same manifest the runtime
@@ -205,7 +207,7 @@ const getBase = (appId: string): Configuration => ({
           {
             from: "native/codepuppy-fence/build/",
             to: "codepuppy-fence/",
-            filter: ["codepuppy_fence.node"],
+            filter: ["codepuppy_fence.node", PACKAGE_MANAGER_HELPER],
           },
           // DESIGN-domestic-cloud-connectivity §4.8:搜索工具随包的 ripgrep(prebuild 里 scripts/build-ripgrep.ts 按引擎 binary.ts
           // 钉住的版本与 sha256 取目标架构那一份)。落点 <resources>/ripgrep/rg,server.ts 把这个目录追加到引擎 PATH 末尾;
@@ -240,6 +242,8 @@ const getBase = (appId: string): Configuration => ({
     gatekeeperAssess: false,
     entitlements: "resources/entitlements.plist",
     entitlementsInherit: "resources/entitlements.plist",
+    // This helper must retain its strict signature without Electron JIT/injection entitlements.
+    signIgnore: [`/codepuppy-fence/${PACKAGE_MANAGER_HELPER}$`],
     identity: shouldSign ? (process.env.CODEPUPPY_SIGN_IDENTITY ?? undefined) : "-",
     sign: async (options) => {
       const { finalizeVideoSignatures } = await import("./scripts/video-runtime-artifacts")
@@ -298,6 +302,19 @@ const getBase = (appId: string): Configuration => ({
     if (mac) assertPackagedEngineAssets({ resourcesDir, packingArch: Arch[context.arch] })
     const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
     await checkVideoRuntime(path.join(resourcesDir, "video-mcp"), mac ? "darwin-arm64" : "win32-x64")
+    if (mac) {
+      const helper = path.join(resourcesDir, "codepuppy-fence", PACKAGE_MANAGER_HELPER)
+      if (shouldSign) {
+        // Reuse the packager's identity resolution and temporary keychain; no second signing configuration.
+        const packager = context.packager
+        if (!("codeSigningInfo" in packager) || !("helper" in packager)) throw new Error("Mac signing context missing")
+        const keychainFile = (await packager.codeSigningInfo.value).keychainFile
+        const config = packager.platformSpecificBuildOptions
+        const identity = await packager.helper.findSigningIdentity(false, config.type === "development", config.identity ?? undefined, keychainFile, config)
+        if (!identity) throw new Error("package-manager helper signing identity missing")
+        signPackageManagerHelper(helper, identity.hash, keychainFile ?? undefined)
+      } else signPackageManagerHelper(helper, "-")
+    }
   },
   afterSign: async (context) => {
     const mac = context.electronPlatformName === "darwin"

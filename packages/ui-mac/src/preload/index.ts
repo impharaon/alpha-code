@@ -180,6 +180,8 @@ const api: ElectronAPI = {
   workspaceEnsureDefault: (dir) => ipcRenderer.invoke("codepuppy-workspace-ensure", dir),
   engineInternalDirectories: () => ipcRenderer.invoke("codepuppy-engine-internal-directories"),
   workspaceWriteProbe: (input) => ipcRenderer.invoke("workspace-write-probe", input),
+  describeDirectoryAccess: (input) => ipcRenderer.invoke("directory-access-describe", input),
+  approveDirectoryWrite: (input) => ipcRenderer.invoke("directory-write-approve", input),
   recordWorkspaceOpen: (input) => ipcRenderer.invoke("workspace-open-record", input),
   onWorkspaceWritableChanged: (cb) => {
     const handler = (_: unknown, change: WorkspaceWritableChanged) => cb(change)

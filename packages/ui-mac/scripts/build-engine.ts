@@ -21,7 +21,10 @@ import { mainConfig } from "../../cli/vite.node.config"
 import { nodeTarget } from "../../cli/src/node/target"
 import { collectNodeAssets, hashNodeAssets } from "../../cli/script/node-assets"
 import { bundledModelsSnapshot } from "../../core/script/models-snapshot"
+import { projectDirectoryAccessSource } from "../engine/file-access-transform"
 import { transformV1MigrationSource } from "../engine/v1-migration-transform"
+import { packageManagerScannerPlugin } from "./package-manager-build"
+import { packageManagerShellSource } from "../engine/package-manager-shell-transform"
 
 const uiMac = path.resolve(import.meta.dirname, "..")
 export const ENGINE_OUT_DIR = path.join(uiMac, "dist-engine")
@@ -29,6 +32,11 @@ export const ENGINE_BUNDLE = "engine.mjs"
 const entry = path.join(uiMac, "engine", "engine-embed.ts")
 const v1Migration = path.resolve(uiMac, "..", "core", "src", "database", "v1-migration.bun.ts")
 const bunSqliteShim = path.join(uiMac, "engine", "bun-sqlite-shim.ts")
+const packageManagerAdapters = [
+  { specifier: "@opencode/core/pty", original: path.resolve(uiMac, "../core/src/pty.ts"), adapter: path.join(uiMac, "engine/package-manager-pty-service.ts") },
+  { specifier: "@opencode/util/cross-spawn-spawner", original: path.resolve(uiMac, "../util/src/cross-spawn-spawner.ts"), adapter: path.join(uiMac, "engine/package-manager-spawner.ts") },
+  { specifier: "@opencode/util/npm-config", original: path.resolve(uiMac, "../util/src/npm-config.ts"), adapter: path.join(uiMac, "engine/package-manager-npm-config.ts") },
+]
 
 const target = nodeTarget(process.platform, process.arch)
 const assets = await collectNodeAssets(target)
@@ -51,14 +59,25 @@ const config = mainConfig({
   target,
 })
 config.plugins = [
+  packageManagerScannerPlugin(),
   {
     name: "codepuppy:v1-migration-on-node",
     enforce: "pre" as const,
-    resolveId(id: string) {
+    resolveId(id: string, importer?: string) {
+      if (id === "#pty") return path.join(uiMac, "engine/package-manager-pty.ts")
+      for (const entry of packageManagerAdapters) {
+        if (importer && [entry.original, entry.adapter].includes(path.resolve(importer))) continue
+        const relative = importer && id.startsWith(".") ? path.resolve(path.dirname(importer), id).replace(/\.(?:js|ts)$/, "") : undefined
+        if (id === entry.specifier || relative === entry.original.slice(0, -3)) return entry.adapter
+      }
       if (id === "#v1-migration") return v1Migration
       if (id === "bun:sqlite") return bunSqliteShim
     },
     transform(code: string, id: string) {
+      const delegated = packageManagerShellSource(code, path.resolve(id))
+      const directoryAccess = projectDirectoryAccessSource(delegated ?? code, path.resolve(id))
+      if (directoryAccess !== undefined) return directoryAccess
+      if (delegated !== undefined) return delegated
       if (path.resolve(id) !== v1Migration) return
       return transformV1MigrationSource(code)
     },

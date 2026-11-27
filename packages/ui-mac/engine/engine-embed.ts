@@ -25,6 +25,7 @@ import { Global } from "@opencode/util/global"
 import { AppProcess } from "@opencode/util/process"
 import { Effect, Exit, Scope } from "effect"
 import { HttpEffect, HttpServer } from "effect/http"
+import { installPackageManagerEnvironment, type PackageManagerEnvironment } from "../src/shared/package-manager-environment"
 
 declare const OPENCODE_VERSION: string | undefined
 
@@ -74,11 +75,14 @@ export async function startEngine(
   hooks: {
     onDispatch?: (dispatch: EmbeddedEngine["dispatch"]) => void
     projectTrust: (directory: string) => boolean
+    packageManagerEnvironment: PackageManagerEnvironment
+    refreshPackageManagerEnvironment?: () => Promise<PackageManagerEnvironment>
   },
 ): Promise<EmbeddedEngine> {
   if (typeof hooks?.projectTrust !== "function")
     throw new Error("startEngine: hooks.projectTrust is required — the project config gate cannot run without the trust reader (#1713)")
   CodePuppyProjectGate.install({ trusted: hooks.projectTrust })
+  installPackageManagerEnvironment(hooks.packageManagerEnvironment, hooks.refreshPackageManagerEnvironment)
   const scope = Scope.makeUnsafe()
   let dispatch: EmbeddedEngine["dispatch"] | undefined
   try {

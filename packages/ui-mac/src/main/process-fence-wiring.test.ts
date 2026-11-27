@@ -1,3 +1,4 @@
+import { planPackageManagerCaches } from "./process-fence-plan"
 // REQ-159 (`#1321`) —— main 侧接线:生产 spawnLocalServer 在 fork 前做围栏计划,把它放进线上的 start 命令;
 // 计划做不出来 ⇒ **这一代 fork 被拒**(fail-closed,原因可读),fork 一次都不发生。
 //
@@ -211,10 +212,17 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
       healthCheck: async () => true,
       egressProxy: async () => proxy,
       planFence: (input) => {
-        profile = renderProcessFenceProfile({
+        const caches = planPackageManagerCaches({ platform: "darwin", goInstallBin: null, xdgCacheHome: null, bunInstall: null, home: isolated.HOME, userDataPath: input.userDataPath,
+          configHome: isolated.XDG_CONFIG_HOME, appData: join(root, "appData"), localAppData: join(isolated.HOME, "Library/Caches"),
+          truthPath: join(root, "state/fence-workspaces/dev-write-locations.json"),
+          eligibility: { homeDir: isolated.HOME, appStateRoot: join(root, "state"), configFenceRoots: () => [], realpath: realpathSync.native,
+            isDirectory: (p) => fs.statSync(p).isDirectory() },
+        })
+        Object.assign(input.sidecarEnv, caches.env)
+        profile = renderProcessFenceProfile({ packageManagerCaches: caches.rules,
           workspaces: [workspace], codepuppyGlobalRoot: isolated.CODEPUPPY_GLOBAL_DIR,
           userDataPath: input.userDataPath, stateHome: isolated.XDG_STATE_HOME,
-          roots: resolveEngineRoots(input.sidecarEnv, isolated.HOME), egressProxyPort: input.egressProxyPort!, configFence: [], credentialStores: [],
+          roots: resolveEngineRoots(input.sidecarEnv, isolated.HOME), egressProxyPort: input.egressProxyPort!, configFence: [], homebrewFence: [], credentialStores: [],
         })
         return { profile, addonPath: "/unused-by-sandbox-exec" }
       },
@@ -275,12 +283,12 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
       connected(connector.format, cached)
       expect(cached.stderr).not.toMatch(/Downloading|Installed/)
     }
-    expect(env.UV_CACHE_DIR).toBe(join(root, "userData", "uv-cache"))
+    expect(env.UV_CACHE_DIR).toBe(join(root, "userData", "package-managers", "uv", "cache"))
     expect(env.UV_OFFLINE).toBeUndefined()
   }, 180_000)
 
   test("AC2: empty app cache downloads pinned Word dependencies through the real policy proxy and reconnects", async () => {
-    expect(fs.existsSync(join(root, "userData", "uv-cache"))).toBe(false)
+    expect(fs.readdirSync(join(root, "userData", "package-managers", "uv", "cache"))).toEqual([])
     const cold = await exchange("word")
     connected("word", cold)
     expect(cold.stderr).toContain("Installed")
@@ -328,7 +336,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
       expect(messages.find((message) => message.id === 3)?.result?.content?.[0]?.text).toContain(connector.format === "excel" ? "East" : "Runtime check")
     }
     expect(proxyLog).toEqual([])
-    expect(fs.existsSync(join(root, "userData", "uv-cache"))).toBe(false)
+    expect(fs.readdirSync(join(root, "userData", "package-managers", "uv", "cache"))).toEqual([])
   }, 900_000)
 })
 
@@ -665,8 +673,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
   // 冻结的状态根、真 sandbox-exec 试编译、真 .node 路径解析(predev 编出的那份);唯一的替身是 fork(假子进程记录线上 start 命令)。
   // 判据落在 start 命令里 profile 的 W1 行 —— 那串字节就是 sidecar 拿去 sandbox_init 的(临时目录本身在 W12 之下,所以这里量的是
   // 「围栏的定义里有没有这一行」,不是「临时路径写不写得进」)。期望值手写字面量。
-  // 如实:bun 的 os.homedir() 不认 HOME 覆盖,所以计划器眼里的 HOME 仍是开发机的家目录 —— W4–W7 的父目录预建落在真家目录
-  // (任何跑过这个应用的机器上它们早就在;与 process-fence-engine.test.ts 同一代价)。伪造目录取 `<临时 home>/Library/LaunchAgents`,
+  // HOME 与 userData 都隔离;生产规划消费 sidecar 同一份可信 HOME。伪造目录取 `<临时 home>/Library/LaunchAgents`,
   // 形状与票面那条相同(相对于「一个家目录」的 Library/LaunchAgents),与真 HOME 无关,所以 HOME 规则不会替本用例把它挡掉。
   // 先红后绿:在 server.ts 仍从 store 读清单的那一版上,①的 profile 含伪造目录、②的 profile 不含真源里的目录(两条各红一次)。
   type FenceHarness = {
@@ -686,12 +693,15 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
     const forged = join(home, "Library", "LaunchAgents")
     const opened = join(home, "opened-later")
     for (const d of [proj, forged, opened, join(home, "dot-opencode"), join(home, "xdg-opencode")]) mkdirSync(d, { recursive: true })
-    const savedKeys = ["CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_ENV_BASE_DIR", "CODEPUPPY_USER_WORKSPACE_DIR", "CODEPUPPY_OPENCODE_HOME", "OPENCODE_CONFIG_DIR"] as const
+    const savedKeys = ["HOME", "CODEPUPPY_GLOBAL_DIR", "CODEPUPPY_ENV_BASE_DIR", "CODEPUPPY_USER_WORKSPACE_DIR", "CODEPUPPY_OPENCODE_HOME", "OPENCODE_CONFIG_DIR"] as const
     const before: Record<string, string | undefined> = {}
     for (const k of savedKeys) {
       before[k] = process.env[k]
       delete process.env[k]
     }
+    process.env.HOME = home
+    const fenceUserData = join(root, "fence-userData")
+    mkdirSync(fenceUserData, { recursive: true })
     process.env.CODEPUPPY_USER_WORKSPACE_DIR = join(home, "code-puppy")
     // provider 的另外两条读取路径指进临时目录,免得读到开发机自己的配置(与 `#1379` 那条同一做法)
     process.env.CODEPUPPY_OPENCODE_HOME = join(home, "dot-opencode")
@@ -702,7 +712,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       creditDanglingSweepForSpawn()
       logLines.length = 0
       const result = await spawnLocalServer("127.0.0.1", port, "password", {
-        userDataPath,
+        userDataPath: fenceUserData,
         healthCheck: async () => true,
         fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
         egressProxy: fakeEgress(),

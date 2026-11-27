@@ -60,7 +60,7 @@ beforeAll(() => {
       { realpath: (p) => realpathSync.native(p), mkdirp: (p) => void mkdirSync(p, { recursive: true }) },
     ).configFence,
     // SPEC-stored-credentials-fence:生产 profile 同样带 C1(生产计划器那一步落真实路径)
-    credentialStores: planCredentialStores(credentialStores({ userDataPath: join(run, "userData") }), { realpath: (p) => realpathSync.native(p) }),
+    homebrewFence: [], credentialStores: planCredentialStores(credentialStores({ userDataPath: join(run, "userData") }), { realpath: (p) => realpathSync.native(p) }),
   })
   const issueDeny = /\(deny file-issue-extension[^\n]+\(extension-class "[^"]+"\)\)/
   const config = join(run, "config.json")

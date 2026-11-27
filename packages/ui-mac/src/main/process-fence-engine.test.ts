@@ -108,7 +108,7 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
         egressProxyPort: egressProxy.port,
         carriedWorkspaces: [],
         engineConfigDirectory: join(home, ".config", "opencode"),
-        credentialStores: credentialStores({ userDataPath: userData }),
+        homebrewFence: [], credentialStores: credentialStores({ userDataPath: userData }),
       },
       {
         homeDir: () => home,
@@ -259,8 +259,11 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
     const sessionID = (session.json as { data: { id: string } }).data.id
 
     // shell:会话里的一条命令写界内 + 界外(2.x `session.shell`,经 Shell 服务执行,结局记成一条会话消息)。不发模型请求。
+    // 先 `exec 2>&1`:shell 自己的报错与最后的 `done` 走同一条流、按程序顺序落进输出。Shell 服务记的是两根管道的
+    // 到达顺序合流(util cross-spawn-spawner `Stream.merge(stdout, stderr)`),不保证先后;AC2 以「最后一行是 done」
+    // 证明「命令跑到了最后一句」,所以这一句必须读得到程序顺序。
     const shell = await api(engine, "POST", `/api/session/${sessionID}/shell`, {
-      command: `echo x > "${join(ws, `shelltool-${arm}.txt`)}"; echo x > "${join(esc, `shelltool-${arm}.txt`)}"; echo done`,
+      command: `exec 2>&1; echo x > "${join(ws, `shelltool-${arm}.txt`)}"; echo x > "${join(esc, `shelltool-${arm}.txt`)}"; echo done`,
     })
     expect(shell.status, `shell ${JSON.stringify(shell.json).slice(0, 500)}`).toBe(204)
     // 读回那条 `type: "shell"` 消息的终态:退出码与 shell 自己的输出(不是命令原文 —— 原文里也有 "done")。
@@ -349,9 +352,9 @@ describeDarwin("REQ-159 真引擎(OpenCode 2)+ 真 ext 在进程围栏下:三类
     expect(String(bare!.configShell ?? "")).not.toContain(join(globalRoot, "bin"))
   })
 
-  test("计划器在真 sandbox-exec 上一次编过;围栏下引擎的 provider 缓存根(W4/W5/W6/W7)都被预建", () => {
+  test("计划器在真 sandbox-exec 上一次编过;围栏下引擎的 provider 缓存根(W4/W5 及引擎配置目录)都被预建", () => {
     expect(planLog.some((l) => /process fence planned: workspaces=1 .*compile attempts=1/.test(l))).toBe(true)
-    for (const d of [join(home, ".local", "share", "opencode"), join(home, ".cache", "opencode"), join(home, ".config", "opencode"), join(home, ".npm")])
+    for (const d of [join(home, ".local", "share", "opencode"), join(home, ".cache", "opencode"), join(home, ".config", "opencode")])
       expect(existsSync(d), d).toBe(true)
   })
 

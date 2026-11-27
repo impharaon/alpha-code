@@ -8,6 +8,7 @@ import { buildIdentityDefine } from "./scripts/build-identity"
 import { patchUpstreamPlugin } from "./scripts/patch-upstream"
 import { UPSTREAM_LOGO_ALIAS } from "./scripts/upstream-logo-alias"
 import { nodePtyPackage, resolveTargetArch } from "./scripts/target-arch"
+import { packageManagerScannerPlugin } from "./scripts/package-manager-build"
 
 // `#1667`(#1662 L5,清点表 H2):嵌进 sidecar 的 OpenCode 2 引擎包,由 prebuild 里的 scripts/build-engine.ts 用上游 Node 构建配置
 // 产出(入口 engine/engine-embed.ts);原生资源在它旁边的 assets/,前导代码按 `import.meta.url` 找。
@@ -80,6 +81,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
       externalizeDeps: { include: [nodePtyPkg], exclude: ["@codepuppy/contracts-consumer"] },
     },
     plugins: [
+      packageManagerScannerPlugin(),
       {
         name: "opencode:node-pty-narrower",
         enforce: "pre",

@@ -4,11 +4,14 @@
 // 试编译丢尾、原生模块缺失即拒、默认工作区不在盘上即拒。真编译器与真 profile 的判据在别的文件。
 
 import { describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { spawnSync } from "node:child_process"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { planConfigFence, planProcessFence, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
-import { processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
+import { planConfigFence, planPackageManagerCaches, planUserWritableLocations, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
+import { writableLocationTruthPath } from "./process-fence-workspaces"
+import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
+import { renderProcessFenceProfile, processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
 import { credentialStores } from "./codepuppy-secret-files"
 
@@ -21,6 +24,364 @@ const GLOBAL = `${HOME}/Library/Application Support/codepuppy-state/env/prod`
 const STATE_ROOT = `${HOME}/Library/Application Support/codepuppy-state`
 const ADDON = "/App/Contents/Resources/codepuppy-fence/codepuppy_fence.node"
 const OFFICIAL_RUNTIME = "/private/var/folders/xy/T/codepuppy-connectors-501-ab"
+
+function withLocationDisk(run: (disk: { root: string; home: string; state: string; protected: string; truthPath: string; eligibility: Parameters<typeof planWritableLocations>[0]["eligibility"] }) => void) {
+  const base = resolve(import.meta.dir, "../../node_modules/.cache")
+  mkdirSync(base, { recursive: true })
+  const root = realpathSync(mkdtempSync(join(base, "writable-locations-")))
+  const home = join(root, "home")
+  const state = join(root, "state")
+  const protectedRoot = join(home, ".config", "opencode")
+  for (const dir of [home, state, protectedRoot]) mkdirSync(dir, { recursive: true })
+  try {
+    run({ root, home, state, protected: protectedRoot, truthPath: writableLocationTruthPath(state, "dev"), eligibility: { homeDir: home, appStateRoot: state, configFenceRoots: () => [protectedRoot], realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory(), stat: (path) => statSync(path, { bigint: true }) } })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+describe("planWritableLocations", () => {
+  test("fixed installs and user files use identity truth and concrete version roots", () => {
+    withLocationDisk((disk) => {
+      // Existing real filesystem fixtures; system prefixes are excluded to keep this Mac untouched.
+      const version = join(disk.home, ".nvm/versions/node/v24.0.0")
+      mkdirSync(version, { recursive: true })
+      const input = { platform: "darwin" as const, home: disk.home, userDataPath: join(disk.root, "ud"), configHome: join(disk.home, ".config"), appData: join(disk.home, "Library/Application Support"), localAppData: join(disk.home, "Library/Caches"), goInstallBin: null, xdgCacheHome: null, bunInstall: null, truthPath: disk.truthPath, eligibility: { ...disk.eligibility, configFenceRoots: () => [disk.protected, "/opt/homebrew", "/usr/local"] } }
+      const first = planUserWritableLocations(input)
+      const cover = (target: string) => processFenceRulesCover({ allow: first.rules, deny: [] }, target, "file")
+      for (const target of [join(disk.home, ".bun/bin/cli"), join(version, "lib/node_modules/cli/package.json"), join(disk.home, ".gitconfig.lock"), join(disk.home, ".zshrc")]) expect(cover(target), target).toBe(true)
+      for (const target of [disk.home, join(disk.home, ".nvm/arbitrary"), join(disk.home, ".config/git/other"), join(disk.home, "private")]) expect(cover(target), target).toBe(false)
+      expect(existsSync(join(disk.home, ".zshrc"))).toBe(false)
+      expect(existsSync(join(version, "bin"))).toBe(true)
+      const other = join(disk.root, "other")
+      mkdirSync(other)
+      rmSync(join(disk.home, ".bun/bin"), { recursive: true })
+      symlinkSync(other, join(disk.home, ".bun/bin"))
+      symlinkSync(join(disk.protected, "settings"), join(disk.home, ".zshrc"))
+      const next = planUserWritableLocations(input)
+      expect(next.excluded).toContain(join(disk.home, ".bun/bin"))
+      expect(next.excluded).toContain(join(disk.home, ".zshrc"))
+      expect(processFenceRulesCover({ allow: next.rules, deny: [] }, join(other, "cli"), "file")).toBe(false)
+    })
+  })
+
+  test("version-manager locations are bound only where that manager is already installed", () => {
+    withLocationDisk((disk) => {
+      const input = { platform: "darwin" as const, home: disk.home, userDataPath: join(disk.root, "ud"), configHome: join(disk.home, ".config"), appData: join(disk.home, "Library/Application Support"), localAppData: join(disk.home, "Library/Caches"), goInstallBin: null, xdgCacheHome: null, bunInstall: null, truthPath: disk.truthPath, eligibility: disk.eligibility }
+      mkdirSync(join(disk.home, ".volta/bin"), { recursive: true })
+      const plan = planUserWritableLocations(input)
+      const cover = (target: string) => processFenceRulesCover({ allow: plan.rules, deny: [] }, target, "file")
+      for (const missing of [".nvm", ".config/nvm", "Library/Application Support/fnm", ".local/share/fnm", ".fnm", ".asdf", ".local/share/mise", ".volta/tools", ".volta/tmp", ".volta/log"]) expect(existsSync(join(disk.home, missing)), missing).toBe(false)
+      expect(cover(join(disk.home, ".volta/bin/tool"))).toBe(true)
+      expect(cover(join(disk.home, ".asdf/shims/node"))).toBe(false)
+      // Ordinary fixed install locations keep their existing binding.
+      expect(cover(join(disk.home, ".bun/bin/cli"))).toBe(true)
+      expect(cover(join(disk.home, ".local/lib/python3.12/site-packages/x"))).toBe(true)
+    })
+  })
+  test("binds concrete directories and missing literal files without creating user files", () => {
+    withLocationDisk((disk) => {
+      const candidates = [{ sourcePath: join(disk.home, ".bun", "bin"), kind: "directory" as const }, { sourcePath: join(disk.home, ".config", "git", "config"), kind: "file" as const }]
+      const result = planWritableLocations({ candidates: [...candidates, candidates[0]!], truthPath: disk.truthPath, eligibility: disk.eligibility })
+      expect(result).toEqual({ locations: candidates.map((candidate) => ({ ...candidate, targetPath: candidate.sourcePath })), excluded: [] })
+      expect(statSync(candidates[0]!.sourcePath).isDirectory()).toBe(true)
+      expect(existsSync(candidates[1]!.sourcePath)).toBe(false)
+      expect(statSync(join(disk.home, ".config", "git")).isDirectory()).toBe(true)
+      const before = readFileSync(disk.truthPath, "utf8")
+      expect(planWritableLocations({ candidates, truthPath: disk.truthPath, eligibility: disk.eligibility })).toEqual(result)
+      expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+      expect(planWritableLocations({ candidates: [], truthPath: disk.truthPath, eligibility: disk.eligibility }).locations).toEqual([])
+      expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+    })
+  })
+
+  test("accepts an initial legal symlink but never follows a re-point across planning calls", () => {
+    withLocationDisk((disk) => {
+      const a = join(disk.root, "a")
+      const b = join(disk.root, "b")
+      for (const dir of [a, b]) mkdirSync(dir)
+      const sourcePath = join(disk.home, ".bun")
+      symlinkSync(a, sourcePath)
+      const input = { candidates: [{ sourcePath, kind: "directory" as const }], truthPath: disk.truthPath, eligibility: disk.eligibility }
+      const first = planWritableLocations(input)
+      expect(first.locations).toEqual([{ sourcePath, targetPath: a, kind: "directory" }])
+      const before = readFileSync(disk.truthPath, "utf8")
+      for (const target of [b, disk.home, disk.state, disk.protected]) {
+        unlinkSync(sourcePath)
+        symlinkSync(target, sourcePath)
+        expect(planWritableLocations({ ...input, candidates: [] }).locations).toEqual([])
+        expect(planWritableLocations(input), target).toEqual({ locations: [], excluded: [sourcePath] })
+        expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+      }
+      unlinkSync(sourcePath)
+      symlinkSync(a, sourcePath)
+      expect(planWritableLocations(input)).toEqual(first)
+    })
+  })
+
+  test("checks a missing directory below a symlink before creating it", () => {
+    withLocationDisk((disk) => {
+      const a = join(disk.root, "a")
+      const b = join(disk.root, "b")
+      for (const dir of [a, b]) mkdirSync(dir)
+      const link = join(disk.home, ".bun")
+      symlinkSync(a, link)
+      const sourcePath = join(link, "bin")
+      const input = { candidates: [{ sourcePath, kind: "directory" as const }], truthPath: disk.truthPath, eligibility: disk.eligibility }
+      expect(planWritableLocations(input).locations).toEqual([{ sourcePath, targetPath: join(a, "bin"), kind: "directory" }])
+      unlinkSync(link)
+      symlinkSync(b, link)
+      expect(planWritableLocations(input)).toEqual({ locations: [], excluded: [sourcePath] })
+      expect(existsSync(join(b, "bin"))).toBe(false)
+    })
+  })
+
+  test("file identities survive atomic replacement and reject symlink re-point", () => {
+    withLocationDisk((disk) => {
+      const file = join(disk.home, "shell-config")
+      writeFileSync(file, "before")
+      const sourcePath = join(disk.home, ".zshrc")
+      symlinkSync(file, sourcePath)
+      const input = { candidates: [{ sourcePath, kind: "file" as const }], truthPath: disk.truthPath, eligibility: disk.eligibility }
+      const first = planWritableLocations(input)
+      expect(first.locations).toEqual([{ sourcePath, targetPath: file, kind: "file" }])
+      writeFileSync(`${file}.tmp`, "after")
+      renameSync(`${file}.tmp`, file)
+      expect(planWritableLocations(input)).toEqual(first)
+      const other = join(disk.home, "other")
+      writeFileSync(other, "unchanged")
+      unlinkSync(sourcePath)
+      symlinkSync(other, sourcePath)
+      expect(planWritableLocations(input)).toEqual({ locations: [], excluded: [sourcePath] })
+      expect(readFileSync(other, "utf8")).toBe("unchanged")
+    })
+  })
+
+  test("protected targets are excluded before mkdir and an ordinary HOME file remains eligible", () => {
+    withLocationDisk((disk) => {
+      const candidates = [
+        { sourcePath: disk.home, kind: "directory" as const },
+        { sourcePath: disk.root, kind: "directory" as const },
+        { sourcePath: join(disk.state, "new"), kind: "directory" as const },
+        { sourcePath: join(disk.protected, "new"), kind: "directory" as const },
+        { sourcePath: join(disk.protected, "config.json"), kind: "file" as const },
+      ]
+      const result = planWritableLocations({ candidates: [...candidates, { sourcePath: join(disk.home, ".gitconfig"), kind: "file" }], truthPath: disk.truthPath, eligibility: disk.eligibility })
+      expect(result.excluded).toEqual(candidates.map((candidate) => candidate.sourcePath))
+      expect(result.locations).toEqual([{ sourcePath: join(disk.home, ".gitconfig"), targetPath: join(disk.home, ".gitconfig"), kind: "file" }])
+      expect(existsSync(join(disk.state, "new"))).toBe(false)
+      expect(existsSync(join(disk.protected, "new"))).toBe(false)
+    })
+  })
+
+  test("invalid or unreadable truth stops before preparing candidates", () => {
+    withLocationDisk((disk) => {
+      mkdirSync(join(disk.state, "fence-workspaces"))
+      const sourcePath = join(disk.home, "not-created", "bin")
+      const input = { candidates: [{ sourcePath, kind: "directory" as const }], truthPath: disk.truthPath, eligibility: disk.eligibility }
+      writeFileSync(disk.truthPath, "broken")
+      expect(() => planWritableLocations(input)).toThrow("writable location truth")
+      expect(readFileSync(disk.truthPath, "utf8")).toBe("broken")
+      expect(existsSync(sourcePath)).toBe(false)
+      expect(() => planWritableLocations({ ...input, truthPath: disk.state })).toThrow("writable location truth")
+      expect(existsSync(sourcePath)).toBe(false)
+    })
+  })
+})
+
+describe("package manager cache planning", () => {
+  const inputFor = (disk: Parameters<Parameters<typeof withLocationDisk>[0]>[0]) => ({
+    platform: "darwin" as const, goInstallBin: null, xdgCacheHome: null, bunInstall: null, home: disk.home, userDataPath: join(disk.root, "userData"), configHome: join(disk.home, ".config"),
+    appData: join(disk.home, "Library", "Application Support"), localAppData: join(disk.home, "Library", "Caches"),
+    truthPath: disk.truthPath, eligibility: disk.eligibility,
+  })
+  test("prepares and binds every cache before exposing one environment projection", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const plan = planPackageManagerCaches(input)
+      expect(plan.cacheEnv.GOCACHE).toBe(join(input.userDataPath, "package-managers", "go", "build"))
+      expect(plan.env.PNPM_HOME).toBe(join(disk.home, "Library", "pnpm"))
+      expect(plan.cacheEnv.PNPM_HOME).toBeUndefined()
+      expect(plan.cacheEnv.CARGO_INSTALL_ROOT).toBeUndefined()
+      expect(Object.keys(plan.cacheEnv)).toHaveLength(17)
+      expect(plan.cacheEnv.BUN_INSTALL).toBe(join(disk.home, ".bun"))
+      expect(plan.locations.filter((entry) => entry.kind === "directory").every((entry) => statSync(entry.targetPath).isDirectory())).toBe(true)
+      expect(plan.env.CARGO_HOME).toBeUndefined()
+      expect(plan.cacheEnv.CARGO_HOME).toBeUndefined()
+      for (const entry of plan.locations.filter((entry) => entry.kind === "file")) expect(existsSync(entry.targetPath)).toBe(false)
+      expect(planPackageManagerCaches(input)).toEqual(plan)
+    })
+  })
+  test("paired GOBIN survives the cache projection without granting its installation directory", () => {
+    withLocationDisk((disk) => {
+      const input = { ...inputFor(disk), goInstallBin: join(disk.home, "original-go/bin") }
+      mkdirSync(input.userDataPath)
+      const plan = planPackageManagerCaches(input)
+      expect(plan.cacheEnv.GOBIN).toBe(input.goInstallBin)
+      expect(plan.cacheEnv.GOPATH).toBe(join(input.userDataPath, "package-managers/go/gopath"))
+      expect(plan.rules.some((rule) => rule.value === input.goInstallBin)).toBe(false)
+      expect(existsSync(input.goInstallBin)).toBe(false)
+    })
+  })
+  test("an app-owned cache root replaced by a symlink is recreated in place; nothing is created outside", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const outside = join(disk.root, "outside")
+      mkdirSync(outside)
+      symlinkSync(outside, join(input.userDataPath, "package-managers"))
+      const plan = planPackageManagerCaches(input)
+      expect(lstatSync(join(input.userDataPath, "package-managers")).isSymbolicLink()).toBe(false)
+      expect(plan.cacheEnv.GOCACHE).toBe(join(input.userDataPath, "package-managers", "go", "build"))
+      expect(plan.excluded).toEqual([])
+      expect(readdirSync(outside)).toEqual([])
+    })
+  })
+  test("one bad cache entry, plan still succeeds: an app-owned cache re-pointed at HOME keeps its first identity", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const plan = planPackageManagerCaches(input)
+      const before = readFileSync(disk.truthPath, "utf8"), homeBefore = readdirSync(disk.home).sort()
+      rmSync(plan.cacheEnv.GOCACHE!, { recursive: true })
+      symlinkSync(disk.home, plan.cacheEnv.GOCACHE!)
+      expect(planPackageManagerCaches(input)).toEqual(plan)
+      expect(lstatSync(plan.cacheEnv.GOCACHE!).isDirectory()).toBe(true)
+      expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+      expect(readdirSync(disk.home).sort()).toEqual(homeBefore)
+    })
+  })
+  test("one unresolvable user path excludes only its own rule; a dangling Cargo configuration excludes only Cargo caches", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const cargo = join(disk.home, ".cargo")
+      mkdirSync(cargo)
+      symlinkSync(join(disk.root, "missing-registry"), join(cargo, "registry"))
+      const plan = planPackageManagerCaches(input)
+      expect(plan.excluded).toEqual([join(cargo, "registry")])
+      expect(plan.rules.some((rule) => rule.value.startsWith(cargo))).toBe(true)
+      expect(plan.cacheEnv.GOCACHE).toBe(join(input.userDataPath, "package-managers", "go", "build"))
+      unlinkSync(join(cargo, "registry"))
+      symlinkSync(join(disk.root, "missing-config"), join(cargo, "config.toml"))
+      const dangling = planPackageManagerCaches(input)
+      expect(dangling.rules.some((rule) => rule.value.startsWith(cargo))).toBe(false)
+      expect(dangling.excluded.length).toBeGreaterThan(0)
+      expect(dangling.cacheEnv.GOCACHE).toBe(join(input.userDataPath, "package-managers", "go", "build"))
+    })
+  })
+  test.skipIf(process.platform !== "darwin")("package manager cache rules deny old HOME caches and preserve CF/C1", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const caches = planPackageManagerCaches(input)
+      const project = join(disk.root, "project")
+      mkdirSync(project)
+      const protectedFile = join(caches.env.GOCACHE!, "protected")
+      const credentialFile = join(caches.env.UV_CACHE_DIR!, "credential")
+      for (const file of [protectedFile, credentialFile]) writeFileSync(file, "own-before")
+      const profile = renderProcessFenceProfile({ workspaces: [project], packageManagerCaches: caches.rules,
+        roots: { home: disk.home, configHome: input.configHome, dataHome: join(disk.home, ".local/share"), cacheHome: join(disk.home, ".cache") },
+        userDataPath: input.userDataPath, stateHome: input.userDataPath, codepuppyGlobalRoot: disk.state, egressProxyPort: 4443,
+        configFence: [{ kind: "literal", path: protectedFile }], homebrewFence: [], credentialStores: [{ kind: "literal", path: credentialFile }],
+      })
+      const attempt = (file: string) => spawnSync(SANDBOX_EXEC, ["-p", profile, "/bin/sh", "-c", 'printf changed > "$1"', "probe", file], { encoding: "utf8" })
+      for (const file of [join(caches.env.GOCACHE!, "positive"), join(disk.home, ".cargo/registry/positive"), join(disk.home, ".cargo/.package-cache"), join(project, "positive")]) expect(attempt(file).status).toBe(0)
+      for (const dir of [".npm", ".cache/bun", "Library/Caches/bun", ".cargo/bin"]) {
+        const parent = join(disk.home, dir)
+        mkdirSync(parent, { recursive: true })
+        expect(attempt(join(parent, "negative")).status, dir).not.toBe(0)
+        expect(existsSync(join(parent, "negative"))).toBe(false)
+      }
+      for (const file of [protectedFile, credentialFile]) expect(attempt(file).status).not.toBe(0)
+      expect(readFileSync(protectedFile, "utf8")).toBe("own-before")
+    })
+  })
+  test("Cargo preserves original files, binds external cache links and rejects reserved targets", () => {
+    withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const cargo = join(disk.home, ".cargo")
+      mkdirSync(cargo)
+      for (const name of ["config", "config.toml", "credentials", "credentials.toml"]) writeFileSync(join(cargo, name), `own-${name}`)
+      const external = join(disk.root, "external-registry")
+      mkdirSync(external)
+      symlinkSync(external, join(cargo, "registry"))
+      const plan = planPackageManagerCaches(input)
+      expect(plan.rules).toContainEqual({ kind: "subpath", value: external })
+      for (const name of ["config", "config.toml", "credentials", "credentials.toml"]) expect(readFileSync(join(cargo, name), "utf8")).toBe(`own-${name}`)
+      expect(existsSync(join(input.userDataPath, "package-managers", "cargo"))).toBe(false)
+      unlinkSync(join(cargo, "registry"))
+      symlinkSync(join(cargo, "git"), join(cargo, "registry"))
+      // The re-pointed link keeps no grant; every other cache is still planned.
+      const repointed = planPackageManagerCaches(input)
+      expect(repointed.excluded).toEqual([join(cargo, "registry")])
+      expect(repointed.rules).not.toContainEqual({ kind: "subpath", value: external })
+      expect(repointed.cacheEnv.GOCACHE).toBe(plan.cacheEnv.GOCACHE)
+    })
+    for (const name of ["", "bin", "bin/nested", ".crates.toml", ".crates2.json", "config", "config.toml", "credentials", "credentials.toml", "env"]) withLocationDisk((disk) => {
+      const input = inputFor(disk)
+      mkdirSync(input.userDataPath)
+      const cargo = join(disk.home, ".cargo")
+      mkdirSync(cargo)
+      const target = join(cargo, name)
+      if (name && !name.includes(".")) mkdirSync(target, { recursive: true })
+      else if (name) writeFileSync(target, "own-reserved")
+      const link = join(cargo, name.includes(".") ? ".package-cache" : "registry")
+      symlinkSync(target, link)
+      const plan = planPackageManagerCaches(input)
+      expect(plan.excluded, name).toContain(link)
+      expect(plan.rules.some((rule) => processFenceRulesCover({ allow: [rule], deny: [] }, target, "file")), name).toBe(false)
+      if (name.includes(".")) expect(readFileSync(target, "utf8")).toBe("own-reserved")
+    })
+  })
+})
+
+test.skipIf(process.platform !== "darwin")("writable location truth stays fenced: production planner denies overwrite and rename; unfenced controls land", () => {
+  withLocationDisk((disk) => {
+    const project = join(disk.root, "project")
+    const userData = join(disk.root, "userData")
+    mkdirSync(project)
+    const bound = planWritableLocations({ candidates: [{ sourcePath: join(disk.home, ".bun", "bin"), kind: "directory" }], truthPath: disk.truthPath, eligibility: disk.eligibility })
+    expect(bound.locations).toHaveLength(1)
+    const before = readFileSync(disk.truthPath, "utf8")
+    const plan = planProcessFence({
+      userDataPath: userData, sidecarEnv: { HOME: disk.home },
+      addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../../out/main"), exists: existsSync },
+      egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: disk.protected, homebrewFence: [], credentialStores: [],
+    }, {
+      homeDir: () => disk.home, codepuppyGlobalRoot: () => join(disk.state, "env", "dev"), appStateRoot: () => disk.state,
+      realpath: realpathSync.native, defaultWorkspace: () => project, readWorkspaces: () => [],
+      isDirectory: (path) => statSync(path).isDirectory(), stat: (path) => statSync(path, { bigint: true }), lstat: (path) => lstatSync(path, { bigint: true }),
+      mkdirp: (path) => void mkdirSync(path, { recursive: true }), compile: trialCompileProfile, log: () => {},
+    })
+    const attempt = (fenced: boolean, command: string, args: string[]) => spawnSync(fenced ? SANDBOX_EXEC : command, fenced ? ["-p", plan.profile, command, ...args] : args, {
+      encoding: "utf8", env: { HOME: disk.home, PATH: "/usr/bin:/bin" }, timeout: 10_000,
+    })
+    const overwrite = ["-c", 'printf compromised > "$1"', "truth-write", disk.truthPath]
+    const moved = join(project, "stolen-truth.json")
+    const rename = [disk.truthPath, moved]
+    for (const [command, args] of [["/bin/sh", overwrite], ["/bin/mv", rename]] as const) {
+      const denied = attempt(true, command, args)
+      expect(denied.error).toBeUndefined()
+      expect(denied.status).not.toBeNull()
+      expect(denied.status).toBeGreaterThan(0)
+      expect(denied.stderr.toLowerCase()).toContain("permitted")
+      expect(readFileSync(disk.truthPath, "utf8")).toBe(before)
+      expect(existsSync(moved)).toBe(false)
+    }
+    const marker = join(project, "marker")
+    expect(attempt(true, "/bin/sh", ["-c", 'printf project > "$1"', "project-write", marker]).status).toBe(0)
+    expect(readFileSync(marker, "utf8")).toBe("project")
+    expect(attempt(false, "/bin/sh", overwrite).status).toBe(0)
+    expect(readFileSync(disk.truthPath, "utf8")).toBe("compromised")
+    writeFileSync(disk.truthPath, before)
+    expect(attempt(false, "/bin/mv", rename).status).toBe(0)
+    expect(existsSync(disk.truthPath)).toBe(false)
+    expect(readFileSync(moved, "utf8")).toBe(before)
+  })
+})
 
 function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new Set<string>([ADDON])) {
   const made: string[] = []
@@ -54,7 +415,7 @@ function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new S
     // SPEC-engine-config-fence:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory)
     engineConfigDirectory: `${HOME}/.config/opencode`,
     // SPEC-stored-credentials-fence §4.5:受保护集这几条只判自己那一轴,存放点清单空(空 ⇒ C1 两块不渲染);C1 的测试自己给 server.ts 交的那份
-    credentialStores: [],
+    homebrewFence: [], credentialStores: [],
   }
   return { deps, input, made, logs }
 }
@@ -84,7 +445,7 @@ describeDarwin("planProcessFence", () => {
     expect(h.logs.some((l) => /credentialStores=8 rules/.test(l))).toBe(true)
   })
 
-  test("正向:并集 = 默认 → recent → tab 栏;父目录 W4/W5/W7 与受保护目录预建;addonPath 解析到 extraResources;日志一行账", () => {
+  test("正向:并集 = 默认 → recent → tab 栏;父目录 W4/W5 与受保护目录预建;addonPath 解析到 extraResources;日志一行账", () => {
     const h = harness()
     const plan = planProcessFence(h.input, h.deps)
     expect(plan.workspaces).toEqual([`${HOME}/code-puppy`, `${HOME}/proj-b`, `${HOME}/proj-a`])
@@ -94,7 +455,7 @@ describeDarwin("planProcessFence", () => {
     expect(plan.profileBytes).toBe(Buffer.byteLength(plan.profile))
     // SPEC-engine-config-fence I4:围栏冻结的每个目录节点在 fork 前已存在(引擎 Global 的 mkdir 只会得到 EEXIST);~/.opencode 谁都不建
     expect(h.made).toEqual([
-      `${HOME}/.local/share/opencode`, `${HOME}/.cache/opencode`, `${HOME}/.npm`,
+      `${HOME}/.local/share/opencode`, `${HOME}/.cache/opencode`,
       STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`,
       // CF-11(片 ③):工具策略目录,像其它目录位置一样预建
       `${HOME}/.local/share/opencode/codepuppy-tool-policy`,

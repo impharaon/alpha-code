@@ -1,7 +1,15 @@
 import { requestSidecarStop } from "./sidecar-stop"
 import { createPluginSessionRequester, watchPluginSessionNotifications } from "./plugin-session-lifecycle"
-import { publishVideoEnvironment } from "./codepuppy-video-environment"
 import type { CodePuppySidecarHost } from "./hub-view"
+import { HOMEBREW_PREFIXES } from "./platform/darwin"
+import { packageManagerHelperPath } from "./package-manager-helper"
+import type { HomebrewInstallation } from "./homebrew-installation"
+import { readHomebrewInstallations, homebrewFenceLocations } from "./homebrew-installation"
+import { engineAuthorization } from "./engine-authorization"
+import { toV1PermissionRequest } from "../engine-adapter/opencode2/v1-shapes"
+import type { WriteScopeRequest, WriteScopeReply } from "./codepuppy-sidecar-messages"
+import { parsePackageManagerEnvironmentRequest, type PackageManagerEnvironmentReply } from "../shared/package-manager-environment"
+import { publishVideoEnvironment } from "./codepuppy-video-environment"
 import { engineClient } from "./engine-client"
 import { configurePluginMcpProxy, attachPluginMcpProxyPublisher, pluginMcpProxySnapshot } from "./plugin-mcp-proxy"
 import type { PluginMcpProxies } from "@opencode/util/codepuppy-plugin-mcp"
@@ -47,7 +55,7 @@ import { posixModesEffective } from "./platform"
 import { pollUntilHealthy } from "./health-poll"
 import { getLogger, rotateServerLogs, write } from "./logging"
 import { createSidecarEnv, sidecarEgressProxyEnv } from "./sidecar-env"
-import { getUserShell, loadShellEnv } from "./shell-env"
+import { applyTrustedShellEnvironment, getUserShell, loadShellEnv, queryGoInstallTarget, minimalProbeEnv, useGenerationFence, type ShellProbeFenceContext } from "./shell-env"
 import { probeShellEnvAsync, readShellEnvCache, sanitizeCachedShellEnv, writeShellEnvCache } from "./shell-env-cache"
 import { getStore } from "./store"
 import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
@@ -59,7 +67,7 @@ import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
 // sidecar 在 import 引擎之前 apply。计划做不出来 = 拒绝 fork(fail-closed,原因可读),不静默无围栏。
-import { planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
+import { plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
 import { trialCompileProfile } from "./process-fence-compile"
 import type { ProcessFenceStartInput } from "./process-fence-apply"
 // REQ-137 `#1337`:网络出网的强制半场接线。围栏(profile N1–N4)把 sidecar 那棵树的出网收成 loopback 上**一个**端口,
@@ -78,10 +86,10 @@ import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteGrantRequester, createWriteProbeRequester, type WorkspaceWriteGrantReply, type WorkspaceWriteProbeFact } from "./workspace-write-probe"
 import { loadFenceAddon } from "./process-fence-apply"
-import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRules } from "./process-fence-profile"
+import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule, type ProcessFenceWriteRules } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
-import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, type FenceRunWritable } from "./process-fence-workspaces"
+import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, writableLocationTruthPath, type FenceRunWritable } from "./process-fence-workspaces"
 import { homedir } from "node:os"
 import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
@@ -103,7 +111,11 @@ type SidecarMessage =
   | { type: "stopped" }
   | { type: "error"; error: { message: string; stack?: string } }
 
+let writeScopeRevision = 0
+
 export type SidecarListener = {
+  permissionRequest(sessionID: string, requestID: string): Promise<ReturnType<typeof toV1PermissionRequest> | undefined>
+  readWriteScope(request: Pick<WriteScopeRequest, "access" | "targets">): Promise<WriteScopeReply["result"]>
   projectConfigView: (directory: string) => Promise<ProjectConfigView | undefined>
   stop: () => Promise<void>
   kill: () => void
@@ -141,7 +153,7 @@ type SpawnLocalServerOptions = {
    * 测试用假子进程时注入替身。返回 undefined 只允许在非 darwin(那里没有 seatbelt);darwin 上
    * 生产计划器要么给出计划、要么抛出 —— 抛出 = 这一代 fork 被拒(与 codepuppy-secrets sync 失败同一条路)。
    */
-  planFence?: (input: ProductionFenceInput) => PlannedFence | undefined
+  planFence?: (input: ProductionFenceInput) => PlannedFence | undefined | Promise<PlannedFence | undefined>
   /** INT-safety R3: main's run-lifetime writable history (the workspace tracker). Absent ⇒ nothing is carried. */
   fenceRun?: FenceRunWritable
   /**
@@ -292,7 +304,18 @@ function refreshConfiguredEgressDestinations(userDataPath: string): void {
  * The plan's own W1 list (the authority that rendered the profile) travels with it; required when fenceRun is set.
  * `configFenceRoots`: the protected configuration directories that same plan rendered (eligibility reads them, below).
  */
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; roots?: ProcessFencePlan["roots"] }
+// Main owns the user values before R8 fills absent roots. Keyed by the app data identity.
+const packageManagerUserEnvironments = new Map<string, { xdgCacheHome: string | null; bunInstall: string | null }>()
+function capturePackageManagerUserEnvironment(userDataPath: string, source: Record<string, string | undefined>) {
+  const known = packageManagerUserEnvironments.get(userDataPath)
+  if (known) return known
+  const exported = usableExportedPaths({ env: source, home: homedir(), log: (line) => getLogger()?.warn(line) })
+  const snapshot = Object.freeze({ xdgCacheHome: exported.env.XDG_CACHE_HOME || null, bunInstall: source.BUN_INSTALL || null })
+  packageManagerUserEnvironments.set(userDataPath, snapshot)
+  return snapshot
+}
+
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; roots?: ProcessFencePlan["roots"] }
 
 type ProductionFenceInput = {
   userDataPath: string
@@ -336,24 +359,42 @@ export function preplanConfigFenceRoots(input: { env: Record<string, string | un
 }
 
 /** 生产计划器:把 electron / store / fs 接进 electron-free 的 planProcessFence。 */
-function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | undefined {
+async function planProductionFence(input: ProductionFenceInput): Promise<PlannedFence | undefined> {
   if (process.platform !== "darwin") return undefined
   if (input.egressProxyPort === undefined) throw new Error("process fence plan: no egress proxy port on darwin — the fence's only outbound door is unknown, refusing to plan")
+  const egressProxyPort = input.egressProxyPort
   const moduleDir = dirname(fileURLToPath(import.meta.url))
-  return planProcessFence(
+  const info = tryGetCodePuppyEnvironment()
+  if (!info) throw new Error("package manager cache: application environment not initialized")
+  const exported = usableExportedPaths({ env: input.sidecarEnv, home: homedir(), log: (line) => getLogger()?.warn(line) })
+  const roots = resolveEngineRoots(exported.env, exported.home)
+  const userEnvironment = packageManagerUserEnvironments.get(input.userDataPath) ?? { xdgCacheHome: exported.env.XDG_CACHE_HOME || null, bunInstall: input.sidecarEnv.BUN_INSTALL || null }
+  const locationInput = { platform: "darwin" as const, goInstallBin: null, xdgCacheHome: userEnvironment.xdgCacheHome, bunInstall: userEnvironment.bunInstall, home: roots.home, userDataPath: input.userDataPath, configHome: roots.configHome,
+    appData: electronNs.app.getPath("appData"), localAppData: join(roots.home, "Library", "Caches"), truthPath: writableLocationTruthPath(info.casBaseRoot, info.environment),
+    eligibility: { homeDir: roots.home, appStateRoot: info.casBaseRoot, configFenceRoots: () => preplanConfigFenceRoots({ env: input.sidecarEnv, home: roots.home, userDataPath: input.userDataPath, appStateRoot: info.casBaseRoot, codepuppyGlobalRoot: codepuppyGlobalRoot() }), realpath: realpathSync.native, isDirectory: (path) => statSync(path).isDirectory() },
+  } satisfies Parameters<typeof planPackageManagerCaches>[0]
+  const prepareCaches = (goInstallBin: string | null) => planPackageManagerCaches({ ...locationInput, goInstallBin })
+  if (userEnvironment.bunInstall !== null) input.sidecarEnv.BUN_INSTALL = userEnvironment.bunInstall
+  else delete input.sidecarEnv.BUN_INSTALL
+  const caches = prepareCaches(null)
+  if (caches.excluded.length) getLogger()?.warn(`process fence: excluded package manager cache locations ${JSON.stringify(caches.excluded)}`)
+  const originalEnv = { ...input.sidecarEnv }
+  const makePlan = (homebrewFence: Parameters<typeof planProcessFence>[0]["homebrewFence"], userWritableLocations: Parameters<typeof planProcessFence>[0]["userWritableLocations"]) => planProcessFence(
     {
+      userWritableLocations,
       userDataPath: input.userDataPath,
+      packageManagerCaches: caches.rules,
       sidecarEnv: input.sidecarEnv,
       addon: { packaged: electronNs.app.isPackaged, resourcesPath: process.resourcesPath, moduleDir, exists: existsSync },
-      egressProxyPort: input.egressProxyPort,
+      egressProxyPort,
       carriedWorkspaces: input.carriedWorkspaces,
       engineConfigDirectory: input.engineConfigDirectory,
       ...(input.envFile ? { envFile: input.envFile } : {}),
       // DESIGN-stored-credentials-fence §4.5:C1 的存放点与 T1 / P / T2 的表同一份清单
-      credentialStores: mainCredentialStores(input.userDataPath),
+      homebrewFence, credentialStores: mainCredentialStores(input.userDataPath),
     },
     {
-      homeDir: homedir,
+      homeDir: () => roots.home,
       codepuppyGlobalRoot,
       // `#1390`:应用状态根 = 冻结环境快照的 casBaseRoot(index.ts 在任何根消费方之前 initCodePuppyEnvironment,失败即 app.exit)。
       // 没有快照就没有可信的状态根 ⇒ 不做计划(fail-closed,与别的计划失败同一条「拒 fork」路),不拿 CODEPUPPY_GLOBAL_DIR 反推。
@@ -386,6 +427,39 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
       log: (line) => getLogger()?.log(line),
     },
   )
+  // Discover from the existing fenced write set, before adding any global-bin permissions.
+  const initial = makePlan([], [])
+  const installations = readHomebrewInstallations(HOMEBREW_PREFIXES, processFenceWriteRules(initial.profile).allow)
+  const protectedInstallations = planProtectedLocations(homebrewFenceLocations(installations), undefined, { realpath: realpathSync.native }).configFence.filter((rule) => rule.kind !== "dat-files")
+  const userLocations = planUserWritableLocations(locationInput)
+  if (userLocations.excluded.length) getLogger()?.warn(`process fence: excluded fixed writable locations ${JSON.stringify(userLocations.excluded)}`)
+  const helperProtection = planProtectedLocations([{ kind: "literal", path: packageManagerHelperPath(initial.addonPath) }], undefined, { realpath: realpathSync.native }).configFence.filter((rule) => rule.kind !== "dat-files")
+  const plan = makePlan([...protectedInstallations, ...helperProtection], userLocations.rules)
+  const cancellation = new AbortController()
+  // The Go query and main's own helper commands run under this generation's profile and command environment.
+  const generation: ShellProbeFenceContext = { profile: plan.profile, env: originalEnv, roots: { ...roots, stateHome: plan.roots.stateHome, engineConfigDirectory: input.engineConfigDirectory } }
+  useGenerationFence(generation)
+  let target: Awaited<ReturnType<typeof queryGoInstallTarget>> = null
+  let projected = caches
+  let pending: Promise<Readonly<Record<string, string>>> | undefined
+  const refreshGoEnvironment = (): Promise<Readonly<Record<string, string>>> => {
+    if (target) return Promise.resolve(projected.cacheEnv)
+    if (pending) return pending
+    pending = queryGoInstallTarget(generation, dirname(caches.env.GOCACHE!), (reason) => getLogger()?.warn(reason), cancellation.signal).then((found) => {
+      target = found
+      if (found) {
+        projected = prepareCaches(found.directory)
+        // Keep a configured GOBIN native, so later go env -w changes remain visible.
+        if (found.configured) { delete projected.env.GOBIN; delete projected.cacheEnv.GOBIN }
+      }
+      return projected.cacheEnv
+    }).finally(() => { pending = undefined })
+    return pending
+  }
+  await refreshGoEnvironment()
+  Object.assign(input.sidecarEnv, projected.env)
+  // The R7-verified R1/R3 fixed table: the write scope reports these targets as "fixed" (R6).
+  return { ...plan, fixedWritable: userLocations.rules, homebrewInstallations: installations, cacheEnv: projected.cacheEnv, refreshGoEnvironment, cancelGoQuery: () => cancellation.abort() }
 }
 
 export function getDefaultServerUrl(): string | null {
@@ -412,10 +486,60 @@ export function setDefaultServerUrl(url: string | null) {
   getStore().delete(DEFAULT_SERVER_URL_KEY)
 }
 
-export function preferAppEnv(userDataPath: string) {
+export function resolveShellProbeRoots(input: { env: Record<string, string | undefined>; home: string; userDataPath: string }): Pick<ShellProbeFenceContext, "roots" | "env" | "defaults"> {
+  const exported = usableExportedPaths({ env: input.env, home: input.home, log: (line) => getLogger()?.warn(line) })
+  const roots = resolveEngineRoots(exported.env, exported.home)
+  const stateHome = exported.env.XDG_STATE_HOME || input.userDataPath
+  const engineConfigDirectory = engineGlobalConfigDirectory(exported.env, exported.home)
+  const defaults = ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "OPENCODE_CONFIG_DIR"].filter((key) => !exported.env[key])
+  return { roots: { ...roots, stateHome, engineConfigDirectory }, defaults, env: {
+    ...minimalProbeEnv(exported.env), HOME: roots.home,
+    XDG_CONFIG_HOME: roots.configHome, XDG_DATA_HOME: roots.dataHome, XDG_CACHE_HOME: roots.cacheHome, XDG_STATE_HOME: stateHome,
+    OPENCODE_CONFIG_DIR: engineConfigDirectory,
+    ...(exported.env.BUN_INSTALL ? { BUN_INSTALL: exported.env.BUN_INSTALL } : {}),
+    ...Object.fromEntries(["OPENCODE_CONFIG", "OPENCODE_DB"].flatMap((key) => exported.env[key] === undefined ? [] : [[key, exported.env[key]!]])),
+  } }
+}
+
+export async function prepareShellProbeFence(): Promise<ShellProbeFenceContext> {
+  const userDataPath = electronNs.app.getPath("userData")
+  const info = tryGetCodePuppyEnvironment()
+  if (!info) throw new Error("shell probe fence: application environment not initialized")
+  // A probe may not take the engine planner's missing-truth fallback.
+  readWorkspaceTruthOrThrow(fenceWorkspaceTruthPath(info.casBaseRoot, info.environment), { readFileSync })
+  capturePackageManagerUserEnvironment(userDataPath, process.env)
+  const snapshot = resolveShellProbeRoots({ env: { ...process.env }, home: homedir(), userDataPath })
+  const port = process.platform === "darwin" ? (await ensureEgressPolicyProxy()).port : undefined
+  const env = { ...snapshot.env, ...(port === undefined ? {} : sidecarEgressProxyEnv(port)) }
+  const fence = await planProductionFence({ userDataPath, sidecarEnv: env, egressProxyPort: port, carriedWorkspaces: [], engineConfigDirectory: snapshot.roots.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
+  return { ...snapshot, env, profile: fence?.profile ?? "" }
+}
+
+/** Startup: a failing preparation (planning, proxy, truth) must not end startup; preferAppEnv then skips only the login-shell merge. */
+export async function startupShellProbeFence(): Promise<ShellProbeFenceContext | undefined> {
+  try {
+    return await prepareShellProbeFence()
+  } catch (error) {
+    getLogger()?.error(`shell probe fence unavailable — starting without the login-shell environment: ${error instanceof Error ? error.message : String(error)}`)
+    return undefined
+  }
+}
+
+export function preferAppEnv(userDataPath: string, probe: ShellProbeFenceContext | undefined) {
+  // Without a probe fence the trusted roots still come from the same resolver; only the login-shell probe/cache merge is skipped.
+  const context = probe ?? { ...resolveShellProbeRoots({ env: { ...process.env }, home: homedir(), userDataPath }), profile: "" }
+  const userEnvironment = capturePackageManagerUserEnvironment(userDataPath, process.env)
+  const apply = (source: Record<string, string>) => {
+    // A default injected into the probe is not a user export when it comes back through env -0/cache.
+    const inherited = Object.fromEntries(Object.entries(source).filter(([key]) => key !== "BUN_INSTALL"))
+    applyTrustedShellEnvironment(process.env, inherited, context)
+    if (userEnvironment.bunInstall === null) delete process.env.BUN_INSTALL
+    else process.env.BUN_INSTALL = userEnvironment.bunInstall
+  }
+  apply({})
   const logger = getLogger()
   const logShellEnvCache = (message: string, extra?: Record<string, unknown>) => write("main", message, extra)
-  const shell = process.platform === "win32" ? null : getUserShell()
+  const shell = process.platform === "win32" || !probe ? null : getUserShell()
   // 1. Login-shell env first -- a real `export` wins over the secrets file and ordinary defaults;
   //    the websearch capability controls below are explicit local sovereignty overrides.
   // B1:缓存命中 → 0ms 套用 + 后台异步真探测(成功即更新缓存、按「真 export 赢」套差异,新值下次
@@ -423,9 +547,9 @@ export function preferAppEnv(userDataPath: string) {
   if (shell) {
     const cached = readShellEnvCache(userDataPath, shell, logShellEnvCache)
     if (cached) {
-      Object.assign(process.env, cached)
+      apply(cached)
       logger.log(`[server] Shell env from cache (${Object.keys(cached).length} vars) — refreshing in background`)
-      void probeShellEnvAsync(shell)
+      void probeShellEnvAsync(shell, context)
         .then((fresh) => {
           if (!fresh) return
           // REQ-098 #301:新鲜异步探测结果同样要剥离会话级控制键(CODEPUPPY_GLOBAL_DIR / OPENCODE_CONFIG_DIR
@@ -437,13 +561,13 @@ export function preferAppEnv(userDataPath: string) {
               `[server] [req301] stripped session-control keys from refreshed shell env: ${stripped.join(", ")}`,
             )
           writeShellEnvCache(userDataPath, shell, cleanFresh, logShellEnvCache)
-          Object.assign(process.env, cleanFresh)
+          apply(cleanFresh)
           logger.log(`[server] Shell env refreshed in background (${Object.keys(cleanFresh).length} vars)`)
         })
         .catch(() => {})
     } else {
-      const probed = loadShellEnv(shell, logger)
-      Object.assign(process.env, probed ?? {})
+      const probed = loadShellEnv(shell, logger, context)
+      apply(probed ?? {})
       if (probed) writeShellEnvCache(userDataPath, shell, probed, logShellEnvCache)
     }
   }
@@ -545,8 +669,6 @@ export async function spawnLocalServer(
   // 与上面 codepuppy-secrets sync 失败同一条 fail-closed 路径)。env 先算好:计划要读的 XDG_* / HOME
   // 必须是 sidecar 将拿到的那一份,不是 main 自己的 process.env。
   const sidecarEnv = createSidecarEnv()
-  // uv's default ~/.cache/uv is outside the fence; keep Office dependencies under the existing W3 root.
-  sidecarEnv.UV_CACHE_DIR = join(options.userDataPath, "uv-cache")
   // DESIGN-domestic-cloud-connectivity §4.8:随包 ripgrep 的目录追加在 PATH 末尾 —— 用户自己装的 rg 照旧优先;没有时引擎的 which
   // 找到随包这一份,不再从 GitHub 下载。它因此也在用户 shell 命令与 MCP 子进程的 PATH 末尾(只在用户没有 rg 时被用到)。
   sidecarEnv.PATH = [sidecarEnv.PATH, join(resourcesRoot(), "ripgrep")].filter(Boolean).join(delimiter)
@@ -562,6 +684,7 @@ export async function spawnLocalServer(
   refreshConfiguredEgressDestinations(options.userDataPath)
   // REQ-137:策略代理先于计划 —— 端口要渲染进 profile(N4)并改写进 sidecar env。起不来 = 拒 fork(fail-closed)。
   // 只在 darwin:围栏只在那里;别的平台既没有强制层也不装策略层(sidecar env 的代理变量照旧 = 用户导出的值)。
+  const originalProxies = Object.fromEntries(Object.keys(sidecarEgressProxyEnv(1)).map((key) => [key, sidecarEnv[key]]))
   let egressProxyPort: number | undefined
   if (process.platform === "darwin") {
     try {
@@ -631,7 +754,7 @@ export async function spawnLocalServer(
 
   let fence: PlannedFence | undefined
   try {
-    fence = (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
+    fence = await (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
   } catch (error) {
     getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
     throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
@@ -642,6 +765,24 @@ export async function spawnLocalServer(
     throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
   if (fence?.configFenceRoots) plannedConfigFenceRoots = fence.configFenceRoots
 
+  const packageManagerEnvironment = { ...sidecarEnv, ...fence?.cacheEnv }
+  for (const [key, value] of Object.entries(originalProxies)) {
+    if (value === undefined) delete packageManagerEnvironment[key]
+    else packageManagerEnvironment[key] = value
+  }
+  // Lazy import keeps the virtual scanner in the production build, out of ordinary server-test startup.
+  let packageManagers: ReturnType<typeof import("./package-manager-execution").openPackageManagerGeneration> | undefined
+  const packageManagerControl: import("./codepuppy-sidecar-messages").PackageManagerControlHandler = async (request) => {
+    if (exited || !fence || egressProxyPort === undefined) return { ok: false, error: "unavailable" }
+    if (request.op === "authorize") Object.assign(packageManagerEnvironment, await (fence.refreshGoEnvironment?.() ?? Promise.resolve(fence.cacheEnv ?? {})))
+    if (!packageManagers) {
+      const { openPackageManagerGeneration } = await import("./package-manager-execution")
+      // A generation can exit while its first authorization is awaiting a Go query/import.
+      if (exited) return { ok: false, error: "unavailable" }
+      packageManagers ??= openPackageManagerGeneration({ env: packageManagerEnvironment, installations: fence.homebrewInstallations ?? [], port: egressProxyPort, addon: fence.addonPath })
+    }
+    return packageManagers.control(request)
+  }
   const sidecar = join(dirname(fileURLToPath(import.meta.url)), "sidecar.js")
   rotateServerLogs()
   const runtimeGeneration = tryGetCodePuppyEnvironment() ? restoreCommittedOfficialConnectors() : []
@@ -682,6 +823,7 @@ export async function spawnLocalServer(
     }
   })()
   let exited = false
+  ++writeScopeRevision
   // #613:ready IPC 带回的注入失败。在此立即 error(main 侧无条件可观测,不依赖后续健康结果),
   // 并随返回值交给终态生产者(armBoot/armRespawnGenerationTerminal)发布 "injection-failed"。
   let injectionFailure: { message: string; stack?: string } | undefined
@@ -751,6 +893,7 @@ export async function spawnLocalServer(
         const result = await writeGrants.request(issued.token)
         if (result.outcome === "granted" && !exited) {
           grantedDirectories.add(directory)
+          ++writeScopeRevision
           getLogger()?.log(`process fence: grant granted directory=${JSON.stringify(directory)} roundTripMs=${(performance.now() - started).toFixed(3)}`)
           return { outcome: "granted" }
         }
@@ -767,6 +910,16 @@ export async function spawnLocalServer(
     granting.set(directory, grant)
     void grant.finally(() => granting.delete(directory))
     return grant
+  }
+  const readWriteScope: SidecarListener["readWriteScope"] = async (request) => {
+    if (exited || (fence && !writeRules)) return { error: "unavailable" }
+    return { revision: writeScopeRevision, targets: request.targets.map((target) => {
+      if (!fence) return { absolute: target.absolute, outcome: "no-fence" as const }
+      const actual = plannedWritableTarget(target.absolute, realpathSync.native).target
+      const protectedTarget = processFenceRulesCover({ allow: writeRules!.deny, deny: [] }, actual, "file")
+      if (!protectedTarget && processFenceRulesCover({ allow: [...(fence.fixedWritable ?? [])], deny: writeRules!.deny }, actual, "file")) return { absolute: target.absolute, outcome: "fixed" as const }
+      return { absolute: target.absolute, outcome: protectedTarget ? "protected" as const : processFenceRulesCover({ allow: [...writeRules!.allow, ...[...grantedDirectories].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules!.deny }, actual, "file") ? "writable" as const : "needs-approval" as const }
+    }) }
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   let pluginNotifications: ReturnType<typeof watchPluginSessionNotifications> | undefined
@@ -793,8 +946,18 @@ export async function spawnLocalServer(
     if (writeProbes.receive(message)) return
     if (writeGrants.receive(message)) return
     if (answerCredentialsMessage(message, credentialReplies)) return
+    const cacheRequest = parsePackageManagerEnvironmentRequest(message)
+    if (cacheRequest) {
+      void (fence?.refreshGoEnvironment?.() ?? Promise.resolve(fence?.cacheEnv ?? {})).catch(() => {
+        getLogger()?.warn("Go cache environment refresh unavailable")
+        return fence?.cacheEnv ?? {}
+      }).then((environment) => {
+        if (!exited) child.postMessage({ type: "package-manager-environment.result", id: cacheRequest.id, environment } satisfies PackageManagerEnvironmentReply)
+      }).catch(() => {}) // A port closed during the query belongs to an exited generation.
+      return
+    }
     if (receiveToolPolicyWrite(message, { baseDir: toolPolicyBaseDir, post: (reply) => child.postMessage(reply), log: (line) => getLogger()?.warn(line) })) return
-    options.codepuppySidecar?.receive(message, postCodePuppy)
+    options.codepuppySidecar?.receive(message, postCodePuppy, readWriteScope, packageManagerControl)
   })
   let detachCodePuppy: ((reason: string) => void) | undefined
   // 实现期修订 1:读不出的条目、软链条目每代只记一次(拉取每次装载都来)
@@ -827,6 +990,8 @@ export async function spawnLocalServer(
     stopExplicitConfigWatch()
     if (explicitConfigWatch === stopExplicitConfigWatch) explicitConfigWatch = undefined
     exited = true
+    fence?.cancelGoQuery?.()
+    void packageManagers?.close().catch((error) => getLogger()?.error("package-manager generation cleanup failed", error))
     electronNs.app.off("child-process-gone", onProcessGone)
     void pluginNotifications?.stop()
     packageSessions.close()
@@ -906,6 +1071,7 @@ export async function spawnLocalServer(
       port,
       password,
       bootstrap,
+      packageManagerEnvironment: fence?.cacheEnv ?? {},
       credentials,
       pluginMcpProxies: pluginMcpProxySnapshot(),
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。
@@ -953,6 +1119,13 @@ export async function spawnLocalServer(
   let stopping: Promise<void> | undefined
 
   const listener: SidecarListener = {
+      permissionRequest: async (sessionID, requestID) => {
+        const response = await fetch(`http://${hostname}:${port}/api/session/${encodeURIComponent(sessionID)}/permission/${encodeURIComponent(requestID)}`, { headers: { authorization: engineAuthorization(password) } })
+        if (response.status === 404) return
+        if (!response.ok) throw new Error("permission request unavailable")
+        return toV1PermissionRequest((await response.json()).data)
+      },
+      readWriteScope,
       kill: () => {
         if (!exited) child.kill()
       },

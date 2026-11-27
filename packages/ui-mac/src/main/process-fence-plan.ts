@@ -13,29 +13,227 @@
 // ── 父目录必须由未被围栏的一方预先建好(勘破 §6.3.1 第 3 条)────────────────────────
 // `(subpath "<X>/.local/share/opencode")` 放行的是该目录**之下**;`<X>/.local/share` 不存在时,
 // 被围栏的引擎 `mkdir -p` 会在父层 EPERM —— 而 packages/core/src/global.ts 在**模块装载时**就
-// mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5/W7 建好;W3 由 main 的 boot 序早已建好;
+// mkdir 四个根(data/config/state/tmp/log/bin/repos)。所以 main 在这里把 W4/W5 建好;W3 由 main 的 boot 序早已建好;
 // `~/code-puppy` 走 ensureUserWorkspaceDir(唯一的 lazy 供给点)。受保护配置集里的目录(状态根、环境根、引擎配置目录、连接记录、
 // 两个引擎全局配置目录 —— 后者就是原来的 W6 —— 与工具策略目录 CF-11)由 planConfigFence 预建:它们与每一级上级目录节点都被末尾的拒写块冻结,引擎与子进程在
 // 其中只能得到 EEXIST(SPEC-engine-config-fence I4)。
 // **刻意不建** `~/.opencode`:它整个是受保护配置位置 CF-9,任何进程都不建它(BR-07;W16 已删,计划目录在引擎数据目录下,
-// 这里本来就预建数据目录,`plan` 由写文件工具懒建);W17/W18(dev-only)也不建。
+// 这里本来就预建数据目录,`plan` 由写文件工具懒建)。
 
-import { lstatSync } from "node:fs"
-import { basename, dirname, join, resolve } from "node:path"
+import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs"
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
 import {
   assertSeatbeltSafePath,
   configFenceLocations,
+  checkWorkspaceDirectory,
+  PACKAGE_MANAGERS_DIRNAME,
+  resolvePackageManagerLocations,
+  userConfigurationLocations,
+  processFenceRulesCover,
+  type ProcessFenceWriteRule,
   resolveEngineRoots,
   selectWorkspaceUnion,
   trimUntilCompiles,
   type ConfigFenceRule,
   type CredentialStoreRule,
   type EngineRoots,
+  type PackageManagerLocationInput,
   type TrialCompile,
   type WorkspaceExclusion,
   type WorkspaceDirectoryInput,
 } from "./process-fence-profile"
+import { readWritableLocationTruth, writeWritableLocationTruth, type WritableLocationTruth } from "./process-fence-workspaces"
+
+/** Static install/config candidates share R7 with caches; no user file is written here. */
+export function planUserWritableLocations(input: PackageManagerLocationInput & { truthPath: string; eligibility: WorkspaceDirectoryInput }) {
+  const template = (rule: ProcessFenceWriteRule) => {
+    // Only the fixed resolver's path templates enter here. Split before the first pattern segment.
+    const match = /^\^((?:\\.|[^\\[(*+?{$])+)(.*)$/.exec(rule.value)!
+    const prefix = match[1]!.replace(/\\(.)/g, "$1")
+    const root = prefix.endsWith("/") ? prefix.slice(0, -1) : dirname(prefix)
+    return { root, suffix: (prefix.endsWith("/") ? "" : basename(prefix)) + match[2]! }
+  }
+  const present = (path: string) => { try { lstatSync(path); return true } catch { return false } }
+  const rules: ProcessFenceWriteRule[] = [
+    // A version manager's location is bound only where it already exists; nothing is created for an absent manager.
+    ...resolvePackageManagerLocations(input).writable.filter((entry) => entry.purpose === "global-install" &&
+      (!entry.onlyIfExisting || present(entry.rule.kind === "regex" ? template(entry.rule).root : entry.rule.value))).map((entry) => entry.rule),
+    ...userConfigurationLocations(input).flatMap((rule) => rule.kind === "dat-files" ? [] : [{ kind: rule.kind, value: rule.path }]),
+  ]
+  const patterns = rules.filter((rule) => rule.kind === "regex").map(template)
+  const base = planWritableLocations({ ...input, candidates: [
+    ...rules.filter((rule) => rule.kind !== "regex").map((rule) => ({ sourcePath: rule.value, kind: rule.kind === "literal" ? "file" as const : "directory" as const })),
+    ...patterns.map((pattern) => ({ sourcePath: pattern.root, kind: "directory" as const })),
+  ] })
+  const targets = new Map(base.locations.map((entry) => [entry.sourcePath, entry.targetPath]))
+  const writable: ProcessFenceWriteRule[] = rules.flatMap((rule) => rule.kind !== "regex" && targets.has(rule.value) ? [{ ...rule, value: targets.get(rule.value)! }] : [])
+  const excluded = [...base.excluded]
+  for (const pattern of patterns) {
+    const root = targets.get(pattern.root)
+    if (!root) continue
+    // Version-manager templates enumerate concrete versions before binding bin/package roots.
+    const version = /^\[\^\/\]\+\/\((.*)\)\(\/\.\*\)\?\$$/.exec(pattern.suffix)
+    if (version) {
+      const versions = readdirSync(root).map((name) => join(pattern.root, name))
+      const bound = planWritableLocations({ ...input, candidates: versions.map((sourcePath) => ({ sourcePath, kind: "directory" })) })
+      const installs = planWritableLocations({ ...input, candidates: bound.locations.flatMap((entry) => version[1]!.split("|").map((suffix) => ({ sourcePath: join(entry.sourcePath, suffix), kind: "directory" as const }))) })
+      writable.push(...installs.locations.map((entry) => ({ kind: "subpath" as const, value: entry.targetPath })))
+      excluded.push(...bound.excluded, ...installs.excluded)
+      continue
+    }
+    const escaped = root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    writable.push({ kind: "regex", value: `^${escaped}/${pattern.suffix}` })
+  }
+  return { rules: [...new Map(writable.map((rule) => [JSON.stringify(rule), rule])).values()], excluded: [...new Set(excluded)] }
+}
+
+export function planPackageManagerCaches(input: PackageManagerLocationInput & { truthPath: string; eligibility: WorkspaceDirectoryInput }) {
+  const anchor = checkWorkspaceDirectory(input.eligibility, input.userDataPath)
+  if (!anchor.eligible) throw new Error("package manager cache: invalid application data anchor")
+  const resolved = resolvePackageManagerLocations(input)
+  const caches = resolved.writable.filter((entry) => entry.purpose === "cache")
+  const cachePaths = new Set(caches.map((entry) => entry.rule.value))
+  const cargoHome = join(input.home, ".cargo")
+  const cargoInstalls = resolved.writable.filter((entry) => entry.manager === "cargo" && entry.purpose === "global-install").map((entry) => entry.rule)
+  // One bad entry excludes only itself. A reserved Cargo path that cannot be resolved leaves Cargo overlap unprovable.
+  let reservedUnresolved = false
+  const reserved = [cargoHome, ...cargoInstalls.map((rule) => rule.value),
+    ...userConfigurationLocations(input).flatMap((rule) => rule.kind !== "dat-files" && dirname(rule.path) === cargoHome ? [rule.path] : []),
+    ...["credentials", "credentials.toml", "env"].map((name) => join(cargoHome, name)),
+  ].flatMap((path) => {
+    try { return [path, plannedWritableTarget(path, input.eligibility.realpath).target] } catch { reservedUnresolved = true; return [path] }
+  })
+  const appRoot = join(input.userDataPath, PACKAGE_MANAGERS_DIRNAME)
+  const candidates = [{ sourcePath: appRoot, kind: "directory" as const },
+    ...caches.map((entry) => ({ sourcePath: entry.rule.value, kind: entry.rule.kind === "literal" ? "file" as const : "directory" as const })),
+  ]
+  const excluded = new Set<string>()
+  for (const candidate of candidates) {
+    // App-owned caches: a node replaced by a symlink is removed (never followed) and recreated at the same path.
+    if (candidate.sourcePath === appRoot || insideLexically(appRoot, candidate.sourcePath)) unlinkSymlinkedNodes(input.userDataPath, candidate.sourcePath)
+    let target: string
+    try { target = plannedWritableTarget(candidate.sourcePath, input.eligibility.realpath).target } catch { excluded.add(candidate.sourcePath); continue }
+    const cache = caches.find((entry) => entry.rule.value === candidate.sourcePath)
+    if (cache?.manager === "cargo") {
+      const rule = { ...cache.rule, value: target }
+      try {
+        if (reservedUnresolved || reserved.some((path) => processFenceRulesCover({ allow: [rule], deny: [] }, path)) ||
+          cargoInstalls.filter((entry) => entry.kind === "subpath").some((entry) =>
+            [entry.value, plannedWritableTarget(entry.value, input.eligibility.realpath).target].some((value) => processFenceRulesCover({ allow: [{ ...entry, value }], deny: [] }, target))))
+          excluded.add(candidate.sourcePath)
+      } catch { excluded.add(candidate.sourcePath) }
+      continue
+    }
+    const inside = relative(anchor.directory, target)
+    if (inside === "" || inside === ".." || inside.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(inside)) excluded.add(candidate.sourcePath)
+  }
+  const plan = planWritableLocations({ candidates: candidates.filter((candidate) => !excluded.has(candidate.sourcePath)), truthPath: input.truthPath, eligibility: input.eligibility })
+  for (const path of plan.excluded) excluded.add(path)
+  const targets = new Map(plan.locations.map((entry) => [entry.sourcePath, entry.targetPath]))
+  // An excluded location never reaches the environment, so no tool is pointed at an unplanned path.
+  const projected = Object.entries(resolved.env).filter(([, value]) => !excluded.has(value))
+  const env = Object.fromEntries(projected.map(([key, value]) => [key, targets.get(value) ?? value]))
+  const cacheEnv = Object.fromEntries(projected.filter(([key, value]) => (cachePaths.has(value) || key === "GOBIN" || key === "BUN_INSTALL")).map(([key, value]) => [key, targets.get(value) ?? value]))
+  const rules: ProcessFenceWriteRule[] = caches.filter((entry) => targets.has(entry.rule.value)).map((entry) => ({ ...entry.rule, value: targets.get(entry.rule.value)! }))
+  return { env, cacheEnv, rules, locations: plan.locations, excluded: [...excluded] }
+}
+
+function insideLexically(root: string, path: string) {
+  const inside = relative(root, path)
+  return inside !== "" && inside !== ".." && !inside.startsWith(`..${sep}`) && !isAbsolute(inside)
+}
+
+/** Walk from below `anchor` to `path`; a symlinked node is unlinked so the planner recreates a real directory there. */
+function unlinkSymlinkedNodes(anchor: string, path: string) {
+  let node = anchor
+  for (const part of relative(anchor, path).split(sep)) {
+    node = join(node, part)
+    try {
+      if (lstatSync(node).isSymbolicLink()) unlinkSync(node)
+      else continue
+    } catch { /* missing below here: the planner creates it */ }
+    return
+  }
+}
+
+/** Main-only identity planning. New locations are usable only after the truth is committed. */
+export function planWritableLocations(input: {
+  candidates: readonly { sourcePath: string; kind: "directory" | "file" }[]
+  truthPath: string
+  eligibility: WorkspaceDirectoryInput
+}): { locations: WritableLocationTruth["entries"]; excluded: readonly string[] } {
+  if (!isAbsolute(input.truthPath)) throw new Error("writable location truth: expected an absolute truthPath")
+  for (const candidate of input.candidates)
+    if (!isAbsolute(candidate.sourcePath) || (candidate.kind !== "directory" && candidate.kind !== "file")) throw new Error("writable location truth: invalid candidate")
+  const fs = { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync }
+  const read = readWritableLocationTruth(input.truthPath, fs)
+  if (!read.ok && !read.absent) throw new Error(`writable location truth: ${read.reason}`)
+  const candidates = [...new Map(input.candidates.map((candidate) => [JSON.stringify([candidate.sourcePath, candidate.kind]), candidate])).values()]
+  const entries = read.ok ? [...read.entries] : []
+  const locations: WritableLocationTruth["entries"][number][] = []
+  const excluded: string[] = []
+  for (const candidate of candidates) {
+    const known = entries.find((entry) => entry.sourcePath === candidate.sourcePath && entry.kind === candidate.kind)
+    try {
+      const planned = plannedWritableTarget(candidate.sourcePath, input.eligibility.realpath)
+      if (!planned.missing.has(planned.target) && input.eligibility.isDirectory(planned.target) !== (candidate.kind === "directory")) {
+        excluded.push(candidate.sourcePath)
+        continue
+      }
+      const check = checkWritableTarget(input.eligibility, planned)
+      if (!check.eligible || (known && known.targetPath !== check.directory)) {
+        excluded.push(candidate.sourcePath)
+        continue
+      }
+      // Create the canonical target, never a wider ancestor grant or an unverified source symlink.
+      mkdirSync(candidate.kind === "directory" ? check.directory : dirname(check.directory), { recursive: true })
+      const prepared = checkWritableTarget(input.eligibility, plannedWritableTarget(candidate.sourcePath, input.eligibility.realpath))
+      if (!prepared.eligible || prepared.directory !== check.directory) {
+        excluded.push(candidate.sourcePath)
+        continue
+      }
+      const entry = { ...candidate, targetPath: prepared.directory }
+      if (!known) entries.push(entry)
+      locations.push(entry)
+    } catch {
+      excluded.push(candidate.sourcePath)
+    }
+  }
+  if (!read.ok || JSON.stringify(read.entries) !== JSON.stringify(entries)) writeWritableLocationTruth(input.truthPath, { v: 1, entries }, fs)
+  return { locations, excluded }
+}
+
+/** Resolve through the deepest existing parent; an unresolved symlink is not a missing directory. */
+export function plannedWritableTarget(source: string, realpath: WorkspaceDirectoryInput["realpath"]): { target: string; missing: Set<string> } {
+  try {
+    return { target: resolve(realpath(source)), missing: new Set() }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT" || dirname(source) === source) throw error
+    try {
+      lstatSync(source)
+    } catch (missing) {
+      if ((missing as NodeJS.ErrnoException)?.code !== "ENOENT") throw missing
+      const parent = plannedWritableTarget(dirname(source), realpath)
+      const target = join(parent.target, basename(source))
+      parent.missing.add(target)
+      return { target, missing: parent.missing }
+    }
+    throw new Error("writable location target is an unresolved symlink")
+  }
+}
+
+export function checkWritableTarget(input: WorkspaceDirectoryInput, planned: { target: string; missing: Set<string> }) {
+  const stat = input.stat ?? ((path: string) => statSync(path, { bigint: true }))
+  // Preview only the not-yet-created nodes through the existing identity predicate. Existing ancestors
+  // keep their real device/inode; a file is checked as one node, without granting its parent directory.
+  return checkWorkspaceDirectory({
+    ...input,
+    realpath: (path) => planned.missing.has(resolve(path)) ? resolve(path) : input.realpath(path),
+    stat: (path) => planned.missing.has(resolve(path)) ? { dev: "planned", ino: resolve(path) } : stat(path),
+    isDirectory: (path) => path === planned.target || input.isDirectory(path),
+  }, planned.target)
+}
 
 export type ProcessFencePlan = {
   profile: string
@@ -51,6 +249,9 @@ export type ProcessFencePlan = {
 }
 
 export type PlanProcessFenceInput = {
+  homebrewFence: readonly Exclude<ConfigFenceRule, { kind: "dat-files" }>[]
+  userWritableLocations?: readonly ProcessFenceWriteRule[]
+  packageManagerCaches?: readonly ProcessFenceWriteRule[]
   userDataPath: string
   /** createSidecarEnv() 的输出 —— XDG_* / HOME 从**这一份**取,它才是引擎将看到的 env。 */
   sidecarEnv: Record<string, string | undefined>
@@ -85,12 +286,21 @@ export function planConfigFence(
   deps: Pick<PlanProcessFenceDeps, "realpath" | "mkdirp" | "lstat">,
 ): { configFence: ConfigFenceRule[]; configFenceRoots: string[]; unexpressed: string[] } {
   /** 残留 R11:写不进 profile(引号、反斜杠、控制字符)因而不被冻结 / 保护的路径,计划器记一行点名。 */
-  const unexpressed: string[] = []
   const locations = configFenceLocations({ ...input, configHome: input.roots.configHome, home: input.roots.home, dataHome: input.roots.dataHome })
   const envFile = input.envFile ? resolve(input.envFile) : undefined
   // CF-9 那一条不预建(BR-07:应用从不建 `~/.opencode`;不存在时 subpath 规则照样挡住任何形式的新建)。按这一条跳过,不按路径串:
   // 用户把同一个目录指定为引擎全局配置目录(CF-8)时照常预建(审查 R1)
   for (const location of locations) if (location.kind === "subpath" && !location.neverCreate) deps.mkdirp(location.path)
+  return planProtectedLocations(locations, envFile, deps)
+}
+
+/** The same canonical/alias-node protection for CF and Homebrew installation identities. */
+export function planProtectedLocations(
+  locations: readonly ConfigFenceRule[],
+  envFile: string | undefined,
+  deps: Pick<PlanProcessFenceDeps, "realpath" | "lstat">,
+): { configFence: ConfigFenceRule[]; configFenceRoots: string[]; unexpressed: string[] } {
+  const unexpressed: string[] = []
   const target = (path: string) => {
     try {
       return deps.realpath(path)
@@ -239,7 +449,6 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   for (const dir of [
     join(roots.dataHome, "opencode"),
     join(roots.cacheHome, "opencode"),
-    join(home, ".npm"),
     ...(stateHome === input.userDataPath ? [] : [join(stateHome, "opencode")]),
   ]) {
     deps.mkdirp(dir)
@@ -279,7 +488,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
   // DESIGN-stored-credentials-fence §4.5:存放点落到真实路径(userData 的真实路径求不出 ⇒ 抛 ⇒ 拒 fork)
   const credentialRules = planCredentialStores(input.credentialStores, deps)
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
+    { workspaces: union.selected, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)

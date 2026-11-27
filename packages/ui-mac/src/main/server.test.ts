@@ -70,10 +70,14 @@ mock.module("./codepuppy-keychain-backend", () => ({
 // <tempdir>/codepuppy-secrets,无 ALPHA 密钥环境变量时 no-op,afterEach 清理)。全局 mock.module 会跨文件
 // 泄漏残缺导出面,撞坏 codepuppy-secret-files.test.ts 的 `import { secretFileRef, ... }`(2026-07-21 Linux CI 实锤)。
 
+// The host's two system prefixes are not test fixtures; keep all new preparation in isolated HOME.
+const fencePlanner = { ...await import("./process-fence-plan") }
+mock.module("./process-fence-plan", () => ({ ...fencePlanner, planUserWritableLocations: (input: Parameters<typeof fencePlanner.planUserWritableLocations>[0]) => fencePlanner.planUserWritableLocations({ ...input, eligibility: { ...input.eligibility, configFenceRoots: () => [...input.eligibility.configFenceRoots(), "/opt/homebrew", "/usr/local"] } }) }))
+
 const { applyPlatformCredentialsHot, hasSecretFile, secretFilePath } = await import("./codepuppy-secret-files")
 const { clearByokKeys, initByokKeys, storeByokKey } = await import("./codepuppy-byok-keys")
 const { writeShellEnvCache } = await import("./shell-env-cache")
-const { forkedSecretNames, preferAppEnv, preplanConfigFenceRoots, pushCredentialsToSidecar, spawnLocalServer } = await import("./server")
+const { forkedSecretNames, resolveShellProbeRoots, preferAppEnv, preplanConfigFenceRoots, pushCredentialsToSidecar, spawnLocalServer, startupShellProbeFence } = await import("./server")
 const { configFenceLocations, resolveEngineRoots } = await import("./process-fence-profile")
 const { bootFenceWorkspaceTruth, readWorkspaceTruthOrThrow, writeWorkspaceTruth } = await import("./process-fence-workspaces")
 const { GLOBAL_RENDERER_STORE, TABS_KEY } = await import("./tabs-preclean")
@@ -99,6 +103,7 @@ const keylessWebSearchFlags = [
   "OPENCODE_EXPERIMENTAL_PARALLEL",
 ] as const
 const managedEnv = [
+  "BUN_INSTALL",
   "PATH", // preferAppEnv applies the cached shell PATH; restore it before the next test file.
   "SHELL",
   "CODEPUPPY_GLOBAL_DIR",
@@ -196,7 +201,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // `webSearch.killSwitch`(此前是两个恒等于它的 CODEPUPPY_*_WEBSEARCH_DENY 环境变量;那两个名字已不在 fork 环境里,由下面
   // 「#1698 fork 的环境与 start 消息」一组判)。
   test("登录用户冷启动:main 不写任何 keyless flag;两条腿的拒绝判决都不置位", async () => {
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     expect(keylessFlagsOf(process.env)).toEqual(noKeylessFlags)
 
     applyAuthEnvLikeLogin()
@@ -209,7 +214,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   test("用户 shell export 的 keyless flag 照旧原样进 sidecar —— kill-switch 也不再改写它(判决走启动文档)", async () => {
     process.env.OPENCODE_ENABLE_PARALLEL = "1"
 
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
@@ -222,7 +227,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   test("logged-out/BYOK:main 不写任何 keyless flag,也不置位拒绝判决", async () => {
     process.env.CODEPUPPY_CLOUD_MCP_URL = "https://cloud.example/mcp" // URL 在场但无密钥文件 = 未登录
 
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
 
     const { env, bootstrap } = await forkSidecarWithBootstrap()
     expect(keylessFlagsOf(env)).toEqual(noKeylessFlags)
@@ -230,7 +235,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   })
 
   test("re-forking without an auth change is idempotent", async () => {
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
 
     const first = await forkSidecarWithBootstrap()
@@ -243,7 +248,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // 断言走真实 fork,证明判决确实进了交给 sidecar 的启动文档(`#1698`;此前是 sidecar env)。
   test("the sovereignty verdict reaches the sidecar so the tool itself can refuse", async () => {
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
 
     expect(await forkedKillSwitch()).toBe(true)
   })
@@ -252,7 +257,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // 代付也置位本地拒绝判决。代付不再关本地腿 ⇒ 这条判决在代付态必须缺席,否则工具自身那道最终闸
   // 会把本地腿在**执行时**拒掉(permission 层看不出来,模型只会拿到一句「别重试」)。
   test("代付不再把本地拒绝判决送进 sidecar —— 两条腿的通道都保持干净", async () => {
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
 
     expect(await forkedKillSwitch()).toBe(false)
@@ -260,7 +265,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
 
   test("`#1195` 判据换轴:登录但无 mcp_access(旧轴文件在、新轴文件缺)不算代付,本地腿不被拒", async () => {
     // pre-T1 服务端 / 信封未带字段的真实形态:applyAuthEnv 写了 CODEPUPPY_CLOUD_TOKEN,没写 CODEPUPPY_MCP_TOKEN。
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
     delete process.env.CODEPUPPY_MCP_TOKEN
 
@@ -272,7 +277,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // 置位它的状态。登出那一格追加一条:它在任何方向上都不该让判决重新出现。
   test("kill-switch 关掉之后 respawn 清掉本地拒绝判决,而不是把工具留在死状态", async () => {
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
     expect(await forkedKillSwitch()).toBe(true)
 
@@ -291,7 +296,7 @@ describe("web search sovereignty at sidecar fork (#621)", () => {
   // kill-switch 下真定义仍在文档的 `cloudMcp` 里(ext 的 installCloudMcp 据它在闸就位之后装,R5),只是带 {file:} 引用、不带令牌。
   test("the kill switch ships a cloud verdict to the sidecar; platform-pays does not", async () => {
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     applyAuthEnvLikeLogin()
     const killed = await forkSidecarWithBootstrap()
     expect(killed.bootstrap.webSearch.killSwitch).toBe(true)
@@ -406,14 +411,14 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
     }
 
     test("登录代付:第三方 web search 可用(本地腿也活着,拦它护不住任何能力)", async () => {
-      preferAppEnv(userDataPath)
+      preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
       applyAuthEnvLikeLogin()
 
       expect(thirdPartyDenial(await forkSidecarWithBootstrap())).toBeUndefined()
     })
 
     test("登出 / BYOK:第三方 web search 可用", async () => {
-      preferAppEnv(userDataPath)
+      preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
 
       expect(thirdPartyDenial(await forkSidecarWithBootstrap())).toBeUndefined()
     })
@@ -422,7 +427,7 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
     // 它同时证明上面两条不是「怎么测都绿」。
     test("kill-switch:第三方 web search 照样被关", async () => {
       process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-      preferAppEnv(userDataPath)
+      preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
       applyAuthEnvLikeLogin()
 
       expect(thirdPartyDenial(await forkSidecarWithBootstrap())).toContain("kill switch")
@@ -430,7 +435,7 @@ describe("`#1411` / `#1443` web search 按账户态的在场性", () => {
 
     test("kill-switch 关掉之后,下一次 fork 第三方回来", async () => {
       process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
-      preferAppEnv(userDataPath)
+      preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
       applyAuthEnvLikeLogin()
       expect(thirdPartyDenial(await forkSidecarWithBootstrap())).toContain("kill switch")
 
@@ -457,6 +462,99 @@ describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
     return script
   }
 
+  test("Bun probe defaults stay child-only through cached, fresh and synchronous environment merges", async () => {
+    const original = process.env.BUN_INSTALL
+    try {
+      for (const mode of ["cached", "synchronous", "configured"] as const) {
+        const slot = join(userDataPath, mode)
+        mkdirSync(slot)
+        const root = join(process.env.HOME!, mode === "configured" ? "configured-bun" : ".bun")
+        if (mode === "configured") process.env.BUN_INSTALL = root
+        else delete process.env.BUN_INSTALL
+        const context = { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: { ...process.env }, home: process.env.HOME!, userDataPath: slot }) }
+        context.env.BUN_INSTALL = root
+        process.env.SHELL = fakeLoginShell(`bun-${mode}.sh`, { BUN_INSTALL: mode === "configured" ? "/wrong/probed-bun" : root, R8_PROBE_MARKER: "fresh", PATH: "/usr/bin:/bin" })
+        if (mode === "cached") writeShellEnvCache(slot, process.env.SHELL, { BUN_INSTALL: root, R8_PROBE_MARKER: "cached", PATH: "/usr/bin:/bin" })
+        preferAppEnv(slot, context)
+        expect(process.env.BUN_INSTALL).toBe(mode === "configured" ? root : undefined)
+        if (mode === "cached") {
+          const deadline = Date.now() + 2_000
+          while (process.env.R8_PROBE_MARKER !== "fresh" && Date.now() < deadline) await Bun.sleep(5)
+          expect(process.env.R8_PROBE_MARKER).toBe("fresh")
+          expect(process.env.BUN_INSTALL).toBeUndefined()
+        }
+      }
+    } finally {
+      if (original === undefined) delete process.env.BUN_INSTALL
+      else process.env.BUN_INSTALL = original
+      delete process.env.R8_PROBE_MARKER
+    }
+  })
+
+  test("a failing probe-fence preparation does not end startup: the login-shell merge is skipped, the rest still applies", async () => {
+    // No application environment here, so the real preparation throws as planning/proxy/truth failures do at startup.
+    process.env.SHELL = fakeLoginShell("unfenced-probe.sh", { R8_PROBE_MARKER: "fresh", PATH: "/usr/bin:/bin" })
+    writeShellEnvCache(userDataPath, process.env.SHELL, { R8_PROBE_MARKER: "cached", PATH: "/usr/bin:/bin" })
+    const stateHome = process.env.XDG_STATE_HOME
+    delete process.env.XDG_STATE_HOME
+    const before = errored.length
+    try {
+      const probeFence = await startupShellProbeFence()
+      expect(probeFence).toBeUndefined()
+      expect(errored.slice(before).join("\n")).toContain("shell probe fence unavailable")
+      preferAppEnv(userDataPath, probeFence)
+      await Bun.sleep(50)
+      expect(process.env.R8_PROBE_MARKER).toBeUndefined()
+      expect(process.env.XDG_STATE_HOME).toBe(userDataPath)
+    } finally {
+      delete process.env.R8_PROBE_MARKER
+      if (stateHome === undefined) delete process.env.XDG_STATE_HOME
+      else process.env.XDG_STATE_HOME = stateHome
+    }
+  })
+
+  test("app-supplied root defaults reach the probe child but never main's own environment, so a relaunch cannot mistake them for user exports", () => {
+    const keys = ["XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "OPENCODE_CONFIG_DIR"] as const
+    const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]))
+    try {
+      for (const key of keys) delete process.env[key]
+      process.env.XDG_DATA_HOME = join(process.env.HOME!, "user-data-root")
+      const context = { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: { ...process.env }, home: process.env.HOME!, userDataPath }) }
+      expect(context.env.XDG_CACHE_HOME).toBe(context.roots.cacheHome)
+      preferAppEnv(userDataPath, context)
+      expect(process.env.XDG_CACHE_HOME).toBeUndefined()
+      expect(process.env.XDG_CONFIG_HOME).toBeUndefined()
+      expect(process.env.OPENCODE_CONFIG_DIR).toBeUndefined()
+      expect(process.env.XDG_DATA_HOME).toBe(join(process.env.HOME!, "user-data-root"))
+    } finally {
+      for (const key of keys) if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]
+    }
+  })
+
+  test("trusted probe roots survive cached input and the real asynchronous refresh", async () => {
+    const context = { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: { ...process.env }, home: process.env.HOME!, userDataPath }) }
+    process.env.SHELL = fakeLoginShell("root-refresh.sh", { HOME: "/wrong/fresh", XDG_CONFIG_HOME: "/wrong/fresh", XDG_DATA_HOME: "/wrong/fresh", OPENCODE_DB: "/wrong/fresh.db", R8_PROBE_MARKER: "fresh", PATH: "/usr/bin:/bin" })
+    writeShellEnvCache(userDataPath, process.env.SHELL, { HOME: "/wrong/cache", XDG_CONFIG_HOME: "/wrong/cache", XDG_DATA_HOME: "/wrong/cache", R8_PROBE_MARKER: "cached", PATH: "/usr/bin:/bin" })
+    try {
+      preferAppEnv(userDataPath, context)
+      expect(process.env.R8_PROBE_MARKER).toBe("cached")
+      expect(process.env.HOME).toBe(context.roots.home)
+      expect(process.env.XDG_CONFIG_HOME).toBe(context.roots.configHome)
+      const deadline = Date.now() + 2_000
+      while (process.env.R8_PROBE_MARKER !== "fresh" && Date.now() < deadline) await Bun.sleep(5)
+      expect(process.env.R8_PROBE_MARKER).toBe("fresh")
+      expect(process.env.HOME).toBe(context.roots.home)
+      expect(process.env.XDG_CONFIG_HOME).toBe(context.roots.configHome)
+      expect(process.env.XDG_DATA_HOME).toBe(context.roots.dataHome)
+      expect(process.env.OPENCODE_DB).toBe(context.env.OPENCODE_DB)
+      const { env, bootstrap } = await forkSidecarWithBootstrap()
+      expect(env.XDG_CONFIG_HOME).toBe(context.roots.configHome)
+      expect(bootstrap.paths.engineConfigDirectory).toBe(context.roots.engineConfigDirectory)
+    } finally {
+      delete process.env.R8_PROBE_MARKER
+    }
+  })
+
   // `#1667`(清点表 E2):v1 时代这里钉的是「force-off 之前截取的基线必须是真实 shell 导入之后的值」。main 不再写这 4 个 flag
   // 之后,那套基线不复存在;新事实更简单:真实 shell 导入的值原样留在 env 里,登录、登出、kill-switch 开关一整圈都不改写它。
   test("a shell-exported keyless flag is never rewritten: login, logout and the kill-switch round trip all leave it alone", async () => {
@@ -466,7 +564,7 @@ describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
     })
     expect(process.env.OPENCODE_ENABLE_PARALLEL).toBeUndefined()
 
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     expect(process.env.OPENCODE_ENABLE_PARALLEL).toBe("1")
     expect((await forkSidecar()).OPENCODE_ENABLE_PARALLEL).toBe("1")
 
@@ -488,7 +586,7 @@ describe("login-shell import vs the keyless flags (#223 Major 3)", () => {
     process.env.SHELL = shell
     writeShellEnvCache(userDataPath, shell, { PATH: "/usr/bin:/bin", OPENCODE_ENABLE_PARALLEL: "1" })
 
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     expect(process.env.OPENCODE_ENABLE_PARALLEL).toBe("1")
 
     process.env.CODEPUPPY_WEBSEARCH_DISABLE = "1"
@@ -1199,7 +1297,7 @@ describe("#1562 fork 给 sidecar 的环境里没有 OTEL_*", () => {
   })
 
   test("main 自己的环境里带着整套 OTLP 变量,fork 出去的 sidecar 环境里一个都没有", async () => {
-    preferAppEnv(userDataPath)
+    preferAppEnv(userDataPath, { profile: "(version 1)(allow default)(deny file-write*)", ...resolveShellProbeRoots({ env: process.env, home: process.env.HOME!, userDataPath }) })
     const env = await forkSidecar()
     expect(env.PATH).toBeDefined() // 拿到的确实是 fork 用的那份环境
     expect(Object.keys(env).filter((name) => /^otel_/i.test(name))).toEqual([])
@@ -1332,4 +1430,20 @@ describe("§4.8 随包 ripgrep 进引擎 PATH", () => {
       rmSync(engineBin, { recursive: true, force: true })
     }
   })
+})
+
+test("external write scope uses the actual rendered rules for files and keeps protected denies", async () => {
+  const { renderProcessFenceProfile } = await import("./process-fence-profile")
+  // R3 fixed user-config file, as the planner's R7-verified userWritableLocations deliver it.
+  const fixedWritable = [{ kind: "literal" as const, value: "/fence-home/.zshrc" }]
+  const profile = renderProcessFenceProfile({ roots: { home: "/fence-home", configHome: "/fence-home/.config", dataHome: "/fence-home/.local/share", cacheHome: "/fence-home/.cache" }, workspaces: ["/opened"], userWritableLocations: fixedWritable, userDataPath: "/fence-data", stateHome: "/fence-state", codepuppyGlobalRoot: "/fence-global", egressProxyPort: 4443, configFence: [{ kind: "literal", path: "/opened/protected" }], homebrewFence: [], credentialStores: [{ kind: "subpath", path: "/vault/credentials" }] })
+  creditDanglingSweepForSpawn()
+  const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: () => ({ ...fakePlanFence(), profile, fixedWritable }), fork: fakeFork })
+  try {
+    await result.health.wait
+    const before = await result.listener.readWriteScope({ access: "write", targets: ["/opened/file", "/outside/file", "/opened/protected", "/vault/credentials/key", "/fence-home/.zshrc"].map((absolute) => ({ absolute, directory: parse(absolute).dir })) })
+    // C-1: only the fixed-table target is "fixed"; other writable sources stay "writable".
+    expect(before).toMatchObject({ targets: [{ absolute: "/opened/file", outcome: "writable" }, { absolute: "/outside/file", outcome: "needs-approval" }, { absolute: "/opened/protected", outcome: "protected" }, { absolute: "/vault/credentials/key", outcome: "protected" }, { absolute: "/fence-home/.zshrc", outcome: "fixed" }] })
+    expect(await result.listener.readWriteScope({ access: "write", targets: [] })).toMatchObject({ revision: (before as { revision: number }).revision, targets: [] })
+  } finally { await result.listener.stop() }
 })

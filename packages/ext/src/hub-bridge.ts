@@ -21,7 +21,15 @@ import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/p
 import { createUnattendedState } from "./policy/unattended"
 import { parseDocumentHostReply, isDeferredDocumentCheck, type DocumentHostRequest, type DocumentHostReplyMessage, type DeferredDocumentCheck, type DocumentCheckAdmission } from "../../util/src/codepuppy-document"
 import type { ToolPolicyWriter } from "./policy/resolver"
+import type { PackageManagerExecutionLease, PreparedShellExecution, PreparedShellDelegate } from "@opencode/plugin/codepuppy-package-manager"
 import {
+  buildPackageManagerControlRequest,
+  parsePackageManagerControlReply,
+  type PackageManagerControl,
+  buildWriteScopeRequest,
+  parseWriteScopeReply,
+  type WriteScopeRequest,
+  type WriteScopeReply,
   buildToolPolicyWriteRequest,
   parseToolPolicyWriteReply,
   buildPackageAuthorizationQuery,
@@ -64,10 +72,15 @@ export type HubInstallSubject = { readonly name: string; readonly source: Plugin
 type VideoAction = VideoBridgeRequest extends infer Request ? Request extends VideoBridgeRequest ? Omit<Request,"type"|"id"> : never : never
 
 export type HubBridge = {
+  authorizePackageManagerExecution(input: PreparedShellExecution): Promise<PackageManagerExecutionLease>
+  bindPackageManagerShell(input: { executionID: string; pid: number }): Promise<void>
+  finishPackageManagerExecution(input: { executionID: string }): Promise<void>
+  cancelPackageManagerExecution(input: Omit<Extract<PackageManagerControl, { op: "cancel" }>, "op">): Promise<void>
   video(input: VideoAction): Promise<VideoBridgeReply | BridgeFailure>
   readonly network: ReturnType<typeof createNetworkEgress>
   readonly unattended: ReturnType<typeof createUnattendedState>
   onPackageSession(handler: (message: PackageSessionMessage) => Promise<boolean>): () => void
+  readWriteScope(request: Pick<WriteScopeRequest, "access" | "targets">): Promise<WriteScopeReply["result"]>
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
   search(input: { directory: string; query: string }): Promise<{ ok: true; result: SourceSearchResultV1 } | BridgeFailure>
@@ -247,13 +260,31 @@ export function createHubBridge(
     return result.backup !== undefined ? { backup: result.backup } : {}
   }
 
+  const packageManagerControl = async (request: PackageManagerControl) => {
+    const result = await ask((id) => buildPackageManagerControlRequest(id, request), (message) => parsePackageManagerControlReply(message)?.result)
+    if (!result.ok) throw new Error("the app could not prepare the package-manager execution")
+    return result
+  }
+
   return {
+    authorizePackageManagerExecution: async (input) => {
+      const result = await packageManagerControl({ op: "authorize", input })
+      if (!result.lease) throw new Error("the app did not return the package-manager execution plan")
+      return result.lease
+    },
+    bindPackageManagerShell: async (input) => { await packageManagerControl({ op: "bind", ...input }) },
+    finishPackageManagerExecution: async (input) => { await packageManagerControl({ op: "finish", ...input }) },
+    cancelPackageManagerExecution: async (input) => { await packageManagerControl({ op: "cancel", ...input }) },
     video: (input) => ask((id)=>({type:"codepuppy.video.understand",id,...input}),parseVideoBridgeReply),
     network,
     unattended,
     onPackageSession: handler => {
       packageSessions.add(handler)
       return () => { packageSessions.delete(handler) }
+    },
+    readWriteScope: async (request) => {
+      const result = await ask((id) => buildWriteScopeRequest(id, request), (message) => parseWriteScopeReply(message)?.result)
+      return "ok" in result ? { error: "unavailable" } : result
     },
     available: !!port,
     onDocumentRuntimeMessage(handler) {
@@ -323,6 +354,29 @@ export function createHubBridge(
       for (const message of early.splice(0)) handler(message)
     },
   }
+}
+
+let authorizationFailureLogged = false
+export async function delegatePackageManagerShell(shell: { delegatePreparedShell(handler: (input: PreparedShellExecution) => Promise<PreparedShellDelegate | undefined>): Promise<void> }, bridge: HubBridge) {
+  await shell.delegatePreparedShell(async (input) => {
+    // No lease (main unavailable, bridge failure): the original spawn runs unchanged; logged once so a fenced fallback is diagnosable.
+    const lease = await bridge.authorizePackageManagerExecution(input).catch((error) => {
+      if (!authorizationFailureLogged) {
+        authorizationFailureLogged = true
+        console.error(`[@codepuppy/ext] package-manager authorization failed; the Shell runs as spawned: ${error instanceof Error ? error.message : String(error)}`)
+      }
+      return undefined
+    })
+    if (!lease || lease.nodes.length === 0) return
+    return {
+      executionSource: lease.executionSource,
+      privateInput: lease.shellPrivateInput,
+      bindProcess: (input) => bridge.bindPackageManagerShell({ executionID: lease.executionID, ...input }),
+      // Notifications to main: a failure must not stop the Shell's own timeout kill, removal or completion.
+      cancel: (reason) => bridge.cancelPackageManagerExecution({ executionID: lease.executionID, reason }).catch(() => {}),
+      finish: () => bridge.finishPackageManagerExecution({ executionID: lease.executionID }).catch(() => {}),
+    }
+  })
 }
 
 /** 本引擎进程的 parentPort(Electron utilityProcess);CLI / 测试宿主里没有。 */

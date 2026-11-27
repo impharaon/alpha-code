@@ -81,7 +81,7 @@ export default {id:"test.package-effect",setup:async(ctx)=>{
   const previous = process.cwd()
   process.chdir(slot.projectDirectory)
   const { startEngine } = await import("../../engine/engine-embed")
-  const engine = await startEngine(buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password, engineVersion: "test", databasePath: slot.databasePath, configDirectory: slot.configDirectory, config: { file }, models: { fetch: false }, filewatcher: false, platform: process.platform }), { projectTrust: () => true })
+  const engine = await startEngine(buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password, engineVersion: "test", databasePath: slot.databasePath, configDirectory: slot.configDirectory, config: { file }, models: { fetch: false }, filewatcher: false, platform: process.platform }), { packageManagerEnvironment: {}, projectTrust: () => true })
   connection = { url: engine.url, username: "opencode", password }
   const client = engineClient(connection)
   const session = await client.session.create({ permissions: [{ action: "*", resource: "*", effect: "allow" }] })

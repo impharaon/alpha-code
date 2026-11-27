@@ -1,3 +1,7 @@
+import { buildWriteScopeReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
+import { buildPackageManagerControlReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
+import { delegatePackageManagerShell } from "./hub-bridge"
+import type { PreparedShellDelegate, PreparedShellExecution } from "@opencode/plugin/codepuppy-package-manager"
 // REQ-234 `#1531`:ext 侧 parentPort 请求簿记(hub-bridge.ts)。假 port 只替换 Electron 的 parentPort 那两样(postMessage / on),
 // 应答由 main 侧**生产**构造器(buildHubViewReply / buildHubRequestReply / buildReloadRequest)造 —— 合同只有一份。
 import { describe, expect, test } from "bun:test"
@@ -35,6 +39,49 @@ function fakePort() {
   }
   return { port, sent, deliver: (data: unknown) => listeners.forEach((listener) => listener({ data })) }
 }
+
+test("prepared Shell delegation uses the same host request ledger and binds cleanup to its lease", async () => {
+  const wire = fakePort(), bridge = createHubBridge(wire.port, { log: () => {} })
+  let handler: (input: PreparedShellExecution) => Promise<PreparedShellDelegate | undefined>
+  await delegatePackageManagerShell({ delegatePreparedShell: async (callback) => { handler = callback } }, bridge)
+  const input = { shellID: "sh_1", sessionID: "ses_1", messageID: "msg_1", callID: "call_1", command: "brew --prefix", cwd: "/project", shell: "/bin/sh" }
+  const pending = handler!(input)
+  expect(parseCodePuppySidecarInbound(wire.sent[0])).toMatchObject({ request: { op: "authorize", input } })
+  const lease = { executionID: "execution", nodes: [{ nodeID: "node" }], helperService: "service", executionSource: "source", shellPrivateInput: { fd: 3, data: new Uint8Array([10]) } }
+  wire.deliver(buildPackageManagerControlReply(1, { ok: true, lease }))
+  const delegate = (await pending)!
+  expect(delegate.privateInput).toEqual(lease.shellPrivateInput)
+  expect(delegate.executionSource).toBe(lease.executionSource)
+  const bind = delegate.bindProcess({ pid: 42 })
+  wire.deliver(buildPackageManagerControlReply(2, { ok: true }))
+  await bind
+  const cancel = delegate.cancel("timeout")
+  wire.deliver(buildPackageManagerControlReply(3, { ok: true }))
+  await cancel
+  const finish = delegate.finish()
+  wire.deliver(buildPackageManagerControlReply(4, { ok: true }))
+  await finish
+  expect(wire.sent.slice(1).map((message) => (message as { request: unknown }).request)).toEqual([{ op: "bind", executionID: "execution", pid: 42 }, { op: "cancel", executionID: "execution", reason: "timeout" }, { op: "finish", executionID: "execution" }])
+})
+
+test("a failed authorization keeps the original spawn; failed cancel/finish never fail the Shell's own timeout or cleanup", async () => {
+  const wire = fakePort(), bridge = createHubBridge(wire.port, { log: () => {} })
+  let handler: (input: PreparedShellExecution) => Promise<PreparedShellDelegate | undefined>
+  await delegatePackageManagerShell({ delegatePreparedShell: async (callback) => { handler = callback } }, bridge)
+  const input = { shellID: "sh_1", sessionID: "ses_1", messageID: "msg_1", callID: "call_1", command: "brew --prefix", cwd: "/project", shell: "/bin/sh" }
+  const refused = handler!(input)
+  wire.deliver(buildPackageManagerControlReply(1, { ok: false, error: "unavailable" }))
+  expect(await refused).toBeUndefined()
+  const pending = handler!(input)
+  wire.deliver(buildPackageManagerControlReply(2, { ok: true, lease: { executionID: "execution", nodes: [{ nodeID: "node" }], helperService: "service", executionSource: "source", shellPrivateInput: { fd: 3, data: new Uint8Array([10]) } } }))
+  const delegate = (await pending)!
+  const cancel = delegate.cancel("timeout")
+  wire.deliver(buildPackageManagerControlReply(3, { ok: false, error: "unavailable" }))
+  await expect(cancel).resolves.toBeUndefined()
+  const finish = delegate.finish()
+  wire.deliver(buildPackageManagerControlReply(4, { ok: false, error: "unavailable" }))
+  await expect(finish).resolves.toBeUndefined()
+})
 
 const view: HubView = { directory: "/work/a", rows: [], warnings: [] }
 
@@ -295,6 +342,21 @@ test("private package SessionEnd awaits the owning Location and replies only aft
   expect(wire.sent).toHaveLength(2)
 })
 
+
+test("external write scope uses the existing parent port and has no registration operation", async () => {
+  const wire = fakePort()
+  const bridge = createHubBridge(wire.port, { log: () => {} })
+  const input = { access: "write" as const, targets: [{ absolute: "/outside/file", directory: "/outside" }] }
+  const promise = bridge.readWriteScope(input)
+  expect(parseCodePuppySidecarInbound(wire.sent[0])).toEqual({ type: "codepuppy.write-scope.request", id: 1, ...input })
+  wire.deliver(buildWriteScopeReply(1, { revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable" }] }))
+  expect(await promise).toEqual({ revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable" }] })
+  // C-1: a fixed global/user-config target crosses the same R6 reply.
+  const fixed = bridge.readWriteScope(input)
+  wire.deliver(buildWriteScopeReply(2, { revision: 1, targets: [{ absolute: "/outside/file", outcome: "fixed" }] }))
+  expect(await fixed).toEqual({ revision: 1, targets: [{ absolute: "/outside/file", outcome: "fixed" }] })
+  expect(await createHubBridge(undefined, { log: () => {} }).readWriteScope(input)).toEqual({ error: "unavailable" })
+})
 import { bindDocumentRuntimeVerification } from "./document-runtime-bridge"
 import type { Location } from "../../schema/src/location"
 import type { DocumentRuntimeVerifyTask } from "../../util/src/codepuppy-document"

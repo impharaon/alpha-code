@@ -203,6 +203,17 @@ describe("authority minting (ADR-041 §5)", () => {
 })
 
 
+test("R6: only fixed global/user-config targets skip external_directory; other writable targets keep the engine's decision", async () => {
+  const targets = [{ absolute: "/tmp/out/file", directory: "/tmp/out" }, { absolute: "/Users/me/.zshrc", directory: "/Users/me" }]
+  const ask = () => ({ action: "external_directory", effect: "ask" as "allow" | "ask" | "deny", metadata: { directoryAccess: { access: "write" as const, targets } } })
+  const scope = (first: string, second: string) => async () => ({ revision: 1, targets: [{ absolute: targets[0]!.absolute, outcome: first }, { absolute: targets[1]!.absolute, outcome: second }] }) as never
+  for (const [first, second, effect] of [["fixed", "fixed", "allow"], ["writable", "writable", "ask"], ["writable", "fixed", "ask"], ["needs-approval", "fixed", "ask"], ["protected", "fixed", "deny"]] as const) {
+    const event = ask()
+    await evaluateDirectoryWrite(event, scope(first, second))
+    expect({ first, second, effect: event.effect }).toEqual({ first, second, effect })
+  }
+})
+
 test("external write scope preserves read and deny while asking for an unapproved write", async () => {
   const targets = [{ absolute: "/outside/file", directory: "/outside" }]
   for (const access of ["read", "write"] as const) for (const outcome of ["writable", "needs-approval", "protected", "no-fence"] as const) {

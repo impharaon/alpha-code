@@ -750,7 +750,8 @@ export function parseToolPolicyWriteReply(value: unknown): ToolPolicyWriteReply 
 
 
 export type WriteScopeRequest = { type: "codepuppy.write-scope.request"; id: number; access: "read" | "write"; targets: readonly DirectoryAccessTarget[] }
-export type WriteScopeReply = { type: "codepuppy.write-scope.reply"; id: number; result: { revision: number; targets: readonly { absolute: string; outcome: "writable" | "needs-approval" | "protected" | "no-fence" }[] } | { error: "unavailable" } }
+/** `fixed`: writable because the target matched the R7-verified R3 fixed global-install/user-config table; `writable`: any other source (/tmp, caches, run-approved folders). */
+export type WriteScopeReply = { type: "codepuppy.write-scope.reply"; id: number; result: { revision: number; targets: readonly { absolute: string; outcome: "fixed" | "writable" | "needs-approval" | "protected" | "no-fence" }[] } | { error: "unavailable" } }
 
 export function parseWriteScopeRequest(value: unknown): WriteScopeRequest | undefined {
   if (!isRecord(value) || Object.keys(value).length !== 4 || value.type !== "codepuppy.write-scope.request" || !isId(value.id) || (value.access !== "read" && value.access !== "write")) return
@@ -768,7 +769,7 @@ export function parseWriteScopeReply(value: unknown): WriteScopeReply | undefine
   if (Object.keys(result).length === 1 && result.error === "unavailable") return { type: value.type, id: value.id, result: { error: "unavailable" } }
   if (Object.keys(result).length !== 2 || !isId(result.revision) || !Array.isArray(result.targets)) return
   const targets = result.targets
-  if (!targets.every((target) => isRecord(target) && Object.keys(target).length === 2 && parseDirectoryAccessTargets([{ absolute: target.absolute, directory: target.absolute }]) && ["writable", "needs-approval", "protected", "no-fence"].includes(target.outcome as string))) return
+  if (!targets.every((target) => isRecord(target) && Object.keys(target).length === 2 && parseDirectoryAccessTargets([{ absolute: target.absolute, directory: target.absolute }]) && ["fixed", "writable", "needs-approval", "protected", "no-fence"].includes(target.outcome as string))) return
   return { type: value.type, id: value.id, result: { revision: result.revision, targets } }
 }
 export function buildWriteScopeReply(id: number, result: WriteScopeReply["result"]): WriteScopeReply {

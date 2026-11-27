@@ -1407,13 +1407,16 @@ describe("§4.8 随包 ripgrep 进引擎 PATH", () => {
 
 test("external write scope uses the actual rendered rules for files and keeps protected denies", async () => {
   const { renderProcessFenceProfile } = await import("./process-fence-profile")
-  const profile = renderProcessFenceProfile({ roots: { home: "/fence-home", configHome: "/fence-home/.config", dataHome: "/fence-home/.local/share", cacheHome: "/fence-home/.cache" }, workspaces: ["/opened"], userDataPath: "/fence-data", stateHome: "/fence-state", codepuppyGlobalRoot: "/fence-global", egressProxyPort: 4443, configFence: [{ kind: "literal", path: "/opened/protected" }], homebrewFence: [], credentialStores: [{ kind: "subpath", path: "/vault/credentials" }] })
+  // R3 fixed user-config file, as the planner's R7-verified userWritableLocations deliver it.
+  const fixedWritable = [{ kind: "literal" as const, value: "/fence-home/.zshrc" }]
+  const profile = renderProcessFenceProfile({ roots: { home: "/fence-home", configHome: "/fence-home/.config", dataHome: "/fence-home/.local/share", cacheHome: "/fence-home/.cache" }, workspaces: ["/opened"], userWritableLocations: fixedWritable, userDataPath: "/fence-data", stateHome: "/fence-state", codepuppyGlobalRoot: "/fence-global", egressProxyPort: 4443, configFence: [{ kind: "literal", path: "/opened/protected" }], homebrewFence: [], credentialStores: [{ kind: "subpath", path: "/vault/credentials" }] })
   creditDanglingSweepForSpawn()
-  const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: () => ({ ...fakePlanFence(), profile }), fork: fakeFork })
+  const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: () => ({ ...fakePlanFence(), profile, fixedWritable }), fork: fakeFork })
   try {
     await result.health.wait
-    const before = await result.listener.readWriteScope({ access: "write", targets: ["/opened/file", "/outside/file", "/opened/protected", "/vault/credentials/key"].map((absolute) => ({ absolute, directory: parse(absolute).dir })) })
-    expect(before).toMatchObject({ targets: [{ absolute: "/opened/file", outcome: "writable" }, { absolute: "/outside/file", outcome: "needs-approval" }, { absolute: "/opened/protected", outcome: "protected" }, { absolute: "/vault/credentials/key", outcome: "protected" }] })
+    const before = await result.listener.readWriteScope({ access: "write", targets: ["/opened/file", "/outside/file", "/opened/protected", "/vault/credentials/key", "/fence-home/.zshrc"].map((absolute) => ({ absolute, directory: parse(absolute).dir })) })
+    // C-1: only the fixed-table target is "fixed"; other writable sources stay "writable".
+    expect(before).toMatchObject({ targets: [{ absolute: "/opened/file", outcome: "writable" }, { absolute: "/outside/file", outcome: "needs-approval" }, { absolute: "/opened/protected", outcome: "protected" }, { absolute: "/vault/credentials/key", outcome: "protected" }, { absolute: "/fence-home/.zshrc", outcome: "fixed" }] })
     expect(await result.listener.readWriteScope({ access: "write", targets: [] })).toMatchObject({ revision: (before as { revision: number }).revision, targets: [] })
   } finally { await result.listener.stop() }
 })

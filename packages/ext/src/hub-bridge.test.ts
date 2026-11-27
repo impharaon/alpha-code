@@ -321,5 +321,9 @@ test("external write scope uses the existing parent port and has no registration
   expect(parseCodePuppySidecarInbound(wire.sent[0])).toEqual({ type: "codepuppy.write-scope.request", id: 1, ...input })
   wire.deliver(buildWriteScopeReply(1, { revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable" }] }))
   expect(await promise).toEqual({ revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable" }] })
+  // C-1: a fixed global/user-config target crosses the same R6 reply.
+  const fixed = bridge.readWriteScope(input)
+  wire.deliver(buildWriteScopeReply(2, { revision: 1, targets: [{ absolute: "/outside/file", outcome: "fixed" }] }))
+  expect(await fixed).toEqual({ revision: 1, targets: [{ absolute: "/outside/file", outcome: "fixed" }] })
   expect(await createHubBridge(undefined, { log: () => {} }).readWriteScope(input)).toEqual({ error: "unavailable" })
 })

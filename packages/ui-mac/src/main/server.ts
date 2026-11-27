@@ -83,7 +83,7 @@ import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteGrantRequester, createWriteProbeRequester, type WorkspaceWriteGrantReply, type WorkspaceWriteProbeFact } from "./workspace-write-probe"
 import { loadFenceAddon } from "./process-fence-apply"
-import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRules } from "./process-fence-profile"
+import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule, type ProcessFenceWriteRules } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, writableLocationTruthPath, type FenceRunWritable } from "./process-fence-workspaces"
@@ -328,7 +328,7 @@ function capturePackageManagerUserEnvironment(userDataPath: string, source: Reco
   return snapshot
 }
 
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[] }
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[] }
 
 type ProductionFenceInput = {
   userDataPath: string
@@ -471,7 +471,8 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
   }
   await refreshGoEnvironment()
   Object.assign(input.sidecarEnv, projected.env)
-  return { ...plan, homebrewInstallations: installations, cacheEnv: projected.cacheEnv, refreshGoEnvironment, cancelGoQuery: () => cancellation.abort() }
+  // The R7-verified R1/R3 fixed table: the write scope reports these targets as "fixed" (R6).
+  return { ...plan, fixedWritable: userLocations.rules, homebrewInstallations: installations, cacheEnv: projected.cacheEnv, refreshGoEnvironment, cancelGoQuery: () => cancellation.abort() }
 }
 
 export function getDefaultServerUrl(): string | null {
@@ -922,6 +923,7 @@ export async function spawnLocalServer(
       if (!fence) return { absolute: target.absolute, outcome: "no-fence" as const }
       const actual = plannedWritableTarget(target.absolute, realpathSync.native).target
       const protectedTarget = processFenceRulesCover({ allow: writeRules!.deny, deny: [] }, actual, "file")
+      if (!protectedTarget && processFenceRulesCover({ allow: [...(fence.fixedWritable ?? [])], deny: writeRules!.deny }, actual, "file")) return { absolute: target.absolute, outcome: "fixed" as const }
       return { absolute: target.absolute, outcome: protectedTarget ? "protected" as const : processFenceRulesCover({ allow: [...writeRules!.allow, ...[...grantedDirectories].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules!.deny }, actual, "file") ? "writable" as const : "needs-approval" as const }
     }) }
   }

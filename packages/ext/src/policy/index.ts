@@ -300,5 +300,9 @@ export async function evaluateDirectoryWrite(event: { action: string; effect: "a
   if (!result || "error" in result) { event.effect = "ask"; return }
   if (result.targets.length !== request.targets.length || result.targets.some((target, index) => target.absolute !== request.targets[index]!.absolute)) { event.effect = "ask"; return }
   if (result.targets.every((target) => target.outcome === "no-fence")) return
-  event.effect = result.targets.some((target) => target.outcome === "protected") ? "deny" : result.targets.some((target) => target.outcome === "needs-approval") ? "ask" : "allow"
+  if (result.targets.some((target) => target.outcome === "protected")) { event.effect = "deny"; return }
+  if (result.targets.some((target) => target.outcome === "needs-approval")) { event.effect = "ask"; return }
+  // R6: only fixed global-install/user-config targets skip external_directory; for /tmp, caches and run-approved
+  // folders the engine's own decision stands (BR-08).
+  if (result.targets.every((target) => target.outcome === "fixed")) event.effect = "allow"
 }

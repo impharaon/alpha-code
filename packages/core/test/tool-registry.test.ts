@@ -1275,6 +1275,33 @@ for (const mode of ["rewrite", "defect", "dispose"] as const)
     expect(result.content).toEqual([{ type: "text", text: mode === "rewrite" ? "done" : ProtectedFiles.MASKING_FAILED_TEXT }])
   }))
 
+// codepuppy(#1804, U-45): stopping the engine interrupts the turn after rejecting pending approvals. A post-hook chain that
+// has already started runs to its end, and what it returned becomes the call's last snapshot, which the interrupted record
+// keeps (the publisher's failure snapshot is the last progress).
+it.effect("an interrupted call keeps its running post-hook chain's result as its last snapshot", () => Effect.gen(function* () {
+  const service = yield* Tool.Service
+  const hooks = yield* PluginHooks.Service
+  const updates: unknown[] = []
+  const entered = yield* Deferred.make<void>()
+  const release = yield* Deferred.make<void>()
+  yield* hooks.register("tool", "execute.after", (event) => Effect.gen(function* () {
+    yield* Deferred.succeed(entered, undefined)
+    yield* Deferred.await(release)
+    if (event.status === "completed") event.result = { ...event.result, metadata: { toolCalls: [{ status: "error" }] } }
+  }))
+  yield* transform(service, { held: { name: "held", description: "fixture", input: Schema.Struct({}), execute: (_input, context) => Effect.gen(function* () {
+    yield* context.progress({ toolCalls: [{ status: "running" }] })
+    return { content: "done", metadata: { toolCalls: [{ status: "running" }] } }
+  }) } }, { codemode: false })
+  const snapshot = yield* service.snapshot()
+  const fiber = yield* snapshot.execute({ ...call("held"), progress: (update) => Effect.sync(() => { updates.push(update) }) }).pipe(Effect.forkChild)
+  yield* Deferred.await(entered)
+  const stopping = yield* Fiber.interrupt(fiber).pipe(Effect.forkChild)
+  yield* Deferred.succeed(release, undefined)
+  yield* Fiber.join(stopping)
+  expect(updates.at(-1)).toEqual({ toolCalls: [{ status: "error" }] })
+}))
+
 it.effect("progress hook failure removes every prior dynamic key", () => Effect.gen(function* () {
   const service = yield* Tool.Service
   const hooks = yield* PluginHooks.Service

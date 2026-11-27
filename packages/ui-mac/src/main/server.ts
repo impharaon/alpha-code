@@ -83,6 +83,9 @@ import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { receiveToolPolicyWrite } from "../../../ext/src/policy/store"
 import { createPinnedFileMainBridge, pinnedFileAuthority } from "./connector-launch-host"
+import { createConnectorLaunchState, installConnectorLaunchState } from "./connector-launch-state"
+import { hostLauncherPlatform } from "./connector-launchers"
+import { openDocumentGeneration } from "./document-generation"
 import { documentBootstrap } from "./document-resources"
 import { readPinnedFiles } from "./pinned-files"
 
@@ -781,6 +784,39 @@ export async function spawnLocalServer(
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   const pinnedFiles = createPinnedFileMainBridge(spawned.files, String(options.generation ?? 0), (message) => child.postMessage(message))
+  // #1760: this generation's connector-launch projection (design §4.7). Core's changed/diagnostic bridge and the network/workspace
+  // actions bind with the #1759-dependent launcher host; until then they answer `unavailable`.
+  const launches = createConnectorLaunchState(String(options.generation ?? 0), {
+    retry: async (identity) => {
+      try {
+        await engineClient({ url: `http://${hostname}:${port}`, username: null, password }).experimental.mcp.connect({ server: identity.server, location: { directory: identity.directory } })
+        return { ok: true }
+      } catch (error) {
+        return { ok: false, error: "unavailable", detail: serializeError(error).message }
+      }
+    },
+    diagnostic: async () => ({ ok: false, error: "unavailable" }),
+    openNetworkApproval: async () => ({ ok: false, error: "unavailable" }),
+    chooseWorkspace: async () => ({ ok: false, error: "unavailable" }),
+  })
+  const uninstallLaunches = installConnectorLaunchState(launches)
+  // #1761 production composition on this lane; Node is the launcher authority's, bound together with it after #1759.
+  const launcherPlatform = hostLauncherPlatform()
+  const documents = bootstrap.documents && launcherPlatform
+    ? openDocumentGeneration({
+        sidecarGeneration: options.generation ?? 0,
+        userData: realpathSync(options.userDataPath),
+        resourcesRoot: realpathSync(resourcesRoot()),
+        packaged: electronNs.app.isPackaged,
+        platform: launcherPlatform,
+        documents: bootstrap.documents,
+        manifest: readPinnedFiles(),
+        node: () => Promise.reject(new Error("bundled Node is not bound to this generation yet")),
+        ensureFile: (id, signal, progress) => spawned.files.ensureFile(id, signal, progress),
+        writable: (directory) => generationWrites(directory),
+        launches,
+      })
+    : undefined
   // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
   let credentialRespawnRequested = false
   const credentialReplies = {
@@ -798,6 +834,7 @@ export async function spawnLocalServer(
   const toolPolicyBaseDir = defaultPolicyBaseDir(dataDir)
   child.on("message", (message: unknown) => {
     if (pinnedFiles.receive(message)) return
+    if (documents?.receive(message, (reply) => child.postMessage(reply))) return
     if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
     if (writeGrants.receive(message)) return
@@ -806,6 +843,7 @@ export async function spawnLocalServer(
     options.codepuppySidecar?.receive(message, postCodePuppy)
   })
   let detachCodePuppy: ((reason: string) => void) | undefined
+  let detachDocuments: (() => void) | undefined
   // 实现期修订 1:读不出的条目、软链条目每代只记一次(拉取每次装载都来)
   const credentialLines = new Set<string>()
   const credentialLog = (line: string) => {
@@ -816,6 +854,8 @@ export async function spawnLocalServer(
   const pushThisGeneration = () => child.postMessage({ type: "credentials", credentials: credentialTable(options.userDataPath, credentialLog) } satisfies CredentialsMessage)
   child.once("exit", (code) => {
     void pinnedFiles.dispose()
+    void documents?.dispose()
+    uninstallLaunches()
     if (pushCredentialTable === pushThisGeneration) pushCredentialTable = undefined
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
     stopExplicitConfigWatch()
@@ -827,6 +867,7 @@ export async function spawnLocalServer(
     writeGrants.close(`sidecar exited with code ${code}`)
     grantedDirectories.clear()
     detachCodePuppy?.(`sidecar exited with code ${code}`)
+    detachDocuments?.()
     options.onExit?.(code)
     exit.resolve(code)
   })
@@ -910,6 +951,7 @@ export async function spawnLocalServer(
   // REQ-234 `#1529`:ready 之后接上重载请求的发送口(重发 main 记录里仍在途的 generation)。
   if (!exited) {
     const client = engineClient({ url: `http://${hostname}:${port}`, username: null, password })
+    detachDocuments = documents?.attach((message) => child.postMessage(message))
     detachCodePuppy = options.codepuppySidecar?.attach(postCodePuppy, options.generation, {
       session: async (ref) => {
         const info = await client.session.get({ sessionID: ref.sessionID })

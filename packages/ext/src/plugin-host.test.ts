@@ -1657,6 +1657,44 @@ it.live("document ready admission uses the real promise plugin Session API and e
 )
 
 
+// #1760 / #1761: the production ext publishes the bridge-backed document host once and registers each Location from the bootstrap
+// projection; main is a fake parentPort that answers the host requests. Without the projection nothing is published or registered.
+it.live("the document host is published and each Location registers its fixed verification from the bootstrap projection", () => Effect.gen(function* () {
+  const holder = globalThis as Record<symbol, unknown>
+  const savedState = holder[PROCESS_STATE_KEY]
+  const posted: Array<{ type?: string; id?: number; sidecarGeneration?: number; request?: { operation?: string; location?: { directory?: string } } }> = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  const port = {
+    postMessage: (message: (typeof posted)[number]) => queueMicrotask(() => {
+      posted.push(message)
+      if (message.type === "codepuppy.document.host.request")
+        for (const listener of listeners) listener({ data: { type: "codepuppy.document.host.reply", id: message.id, sidecarGeneration: message.sidecarGeneration, ok: true, value: null } })
+    }),
+    on: (_event: string, listener: (event: { data: unknown }) => void) => void listeners.push(listener),
+  }
+  delete holder[PROCESS_STATE_KEY]
+  ;(process as unknown as { parentPort?: unknown }).parentPort = port
+  yield* Effect.addFinalizer(() => Effect.sync(() => {
+    delete (process as unknown as { parentPort?: unknown }).parentPort
+    holder[PROCESS_STATE_KEY] = savedState
+    delete holder[Symbol.for("codepuppy.document.host")]
+    delete holder[Symbol.for("codepuppy.ext.document-host-bridge")]
+  }))
+  const { documentHost } = yield* Effect.promise(() => import("../../util/src/codepuppy-document"))
+  env({})
+  yield* activate(CodePuppyExt)
+  expect(() => documentHost()).toThrow("not published")
+  const pin = { id: "libreoffice/darwin-arm64/26.8.3", family: "libreoffice", target: "darwin-arm64", version: "26.8.3", originUrl: "https://example.test/lo.dmg", sha256: "a".repeat(64), bytes: 1, provenanceUrl: "https://example.test/release" } as const
+  env({}, { sidecarGeneration: 2, documents: { python: process.execPath, assets: scratch, templates: scratch, documentRuntimeRoot: join(scratch, "document-runtime"), verify: join(scratch, "verify.py"), render: join(scratch, "render.py"), recalculate: join(scratch, "recalculate.py"), libreoffice: [pin] } })
+  yield* activate(CodePuppyExt)
+  const location = yield* Location.Service
+  expect(typeof documentHost().environment).toBe("function")
+  yield* Effect.promise(() => new Promise<void>((resolve) => setTimeout(resolve, 20)))
+  const operations = posted.filter((message) => message.type === "codepuppy.document.host.request" && message.request?.location?.directory === location.directory)
+  expect(operations.map((message) => message.request?.operation).sort()).toEqual(["ready-register", "verify-register"])
+  expect(operations.every((message) => message.sidecarGeneration === 2)).toBe(true)
+}))
+
 it.live("an unavailable document projection cannot invalidate a successfully merged MCP ownership", () => Effect.gen(function* () {
   const token = join(scratch, "document-unavailable-token")
   writeFileSync(token, "fixture-token")

@@ -54,7 +54,7 @@ import { AbsolutePath } from "../../schema/src/schema"
 import { readPackageAllowSet } from "./gen-skill-paths"
 import { managedMcpAllowedHere, managedSkillAllowedHere, managedSkillIdentity } from "./package-scope"
 import { modelFacts } from "./model-facts"
-import { documentSessionActive, recordDocumentPageView } from "./document-register"
+import { documentSessionActive, publishedDocumentHost, recordDocumentPageView, registerDocumentTools } from "./document-register"
 import { cloudVisionToolId } from "./cloud-vision"
 import { createCloudVisionHooks } from "./cloud-vision-hooks"
 import { createAttachmentReaderHooks } from "./attachment-reader-hooks"
@@ -521,6 +521,26 @@ export const CodePuppyExt: Plugin.Plugin = {
       })().catch((cause) => {
         if (!events.signal.aborted) error(`[@codepuppy/ext] event subscription ended: ${describe(cause)}`)
       })
+
+      // #1761 的生产调用者(#1760):本进程一个经桥的文档宿主,本 Location 按 main 的启动文档投影登记;缺投影(没有文档资源的构建)
+      // 时不登记,文档工具如实报未登记。失败只记一行,不撤掉已挂的闸。
+      try {
+        const documents = bootstrap.documents
+        if (documents && bootstrap.sidecarGeneration !== undefined) {
+          const published = publishedDocumentHost(hubBridge, bootstrap.sidecarGeneration)
+          cleanups.push(
+            await registerDocumentTools(context, {
+              host: published.host,
+              chromium: published.chromium,
+              sidecarGeneration: bootstrap.sidecarGeneration,
+              manifest: { schemaVersion: 1, files: documents.libreoffice },
+              resources: { python: documents.python, assets: documents.assets, templates: documents.templates, documentRuntimeRoot: documents.documentRuntimeRoot, verify: documents.verify, render: documents.render, recalculate: documents.recalculate },
+            }),
+          )
+        }
+      } catch (cause) {
+        error(`[@codepuppy/ext] document tools not registered: ${describe(cause)}`)
+      }
 
       // ── 项目插件扇出(P10):`.codepuppy/plugins/*.js`,信任门之后才加载;它们的钩子排在 ext 自己的之后、seal 之前;
       //    它们只许动自己注册的工具:同名 add、改 / 删别人的工具 ⇒ 拒绝(ADR-041,projectPluginContext)──

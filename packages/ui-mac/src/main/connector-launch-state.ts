@@ -90,23 +90,31 @@ export function createConnectorLaunchState(
 }
 
 let installed: ReturnType<typeof createConnectorLaunchState> | undefined
+let release: (() => void) | undefined
 const subscribers = new Set<(snapshot: LaunchSnapshot) => void>()
 const unavailable = async (): Promise<Extract<LaunchActionResult, { ok: false }>> => ({
   ok: false,
   error: "unavailable",
 })
-/** Process-local composition port; never serialized or exposed as a renderer setter. */
+/**
+ * Process-local composition port; never serialized or exposed as a renderer setter. A new sidecar generation replaces the
+ * previous projection even if the old one's exit has not been observed yet: only the current generation is ever shown.
+ */
 export function installConnectorLaunchState(value: ReturnType<typeof createConnectorLaunchState>) {
-  if (installed) throw Error("connector launch state already installed")
-  installed = value
+  release?.()
   const unsubscribe = value.api.subscribe((snapshot) => {
     for (const listener of subscribers) listener(snapshot)
   })
-  return () => {
+  const uninstall = () => {
     unsubscribe()
     value.dispose()
-    if (installed === value) installed = undefined
+    if (installed !== value) return
+    installed = undefined
+    release = undefined
   }
+  installed = value
+  release = uninstall
+  return uninstall
 }
 export const connectorLaunchApi: ConnectorLaunchApi = {
   list: (directory) => installed?.api.list(directory) ?? Promise.resolve([]),

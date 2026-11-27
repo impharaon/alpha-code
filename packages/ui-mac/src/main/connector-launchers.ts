@@ -20,6 +20,13 @@ export const CONNECTOR_LAUNCHER_BUILD_DIR = "native/connector-launchers/build"
 export const launcherPinSet = createHash("sha256").update(JSON.stringify(lock)).digest("hex")
 export type LauncherBundle = { schemaVersion: 1; platform: LauncherPlatform; pinSet: string; form: "expanded" | "archives"; files: Record<string, string>; preparedFiles?: Record<string, string> }
 
+/** The two shipped targets (owner 2026-11-26: Apple-silicon Mac, later Windows x64); any other host has no launcher assets. */
+export function hostLauncherPlatform(platform: NodeJS.Platform = process.platform, arch: string = process.arch): LauncherPlatform | undefined {
+  if (platform === "darwin" && arch === "arm64") return "darwin-arm64"
+  if (platform === "win32" && arch === "x64") return "win32-x64"
+  return undefined
+}
+
 export function launcherEntries(platform: LauncherPlatform) {
   const windows = platform === "win32-x64"
   const npm = windows ? "node/node_modules/npm" : "node/lib/node_modules/npm"

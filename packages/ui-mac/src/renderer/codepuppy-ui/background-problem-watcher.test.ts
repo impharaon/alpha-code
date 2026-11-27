@@ -325,3 +325,24 @@ test("launcher snapshots suppress preparing problems and use the row projection 
   await settle()
   expect(entry()).toBeNull()
 })
+
+// #1760 Q1, functional component proof: the document runtime row uses its reserved name; the entry shows the localized label and
+// the shared download reason/action, never the raw reserved identifier.
+test("the document runtime's failed preparation row appears under its own label with the shared retry", async () => {
+  const { DOCUMENT_RUNTIME_LAUNCH_SERVER } = await import("../../../../util/src/codepuppy-document")
+  const source = engine({})
+  const snapshot: LaunchSnapshot = { identity: { directory: "/project", server: DOCUMENT_RUNTIME_LAUNCH_SERVER, attempt: "document-runtime:7" }, sidecarGeneration: "7", sequence: 3, state: { phase: "failed", failure: { kind: "download", detail: "ECONNREFUSED relay" }, diagnostic: "document-runtime:7" } }
+  ;(window as unknown as { api: unknown }).api = {
+    workspaceDefaultDir: async () => "/project",
+    awaitInitialization: async () => ({ url: source.server().baseUrl }),
+    sidecarGeneration: { subscribe: () => () => {} },
+    connectorLaunch: { list: async () => [snapshot], subscribe: () => () => {}, retry: async () => ({ ok: true }) },
+  }
+  mount(source)
+  await settle()
+  await openList()
+  expect(items()[0]?.textContent).toContain("文档制作环境")
+  expect(items()[0]?.textContent).toContain("下载没有完成")
+  expect(items()[0]?.textContent).not.toContain(DOCUMENT_RUNTIME_LAUNCH_SERVER)
+  expect(items()[0]?.querySelector(".codepuppy-problems-act")?.textContent).toBe("重试")
+})

@@ -76,3 +76,23 @@ test("main API uses only the installed current generation and unregisters the pr
   }
   expect(await connectorLaunchApi.list(identity.directory)).toEqual([])
 })
+
+// Integration layer: a respawned generation installs before the old exit is seen; the old projection must not linger or throw.
+test("a new generation's install replaces the previous projection, and the old uninstall leaves the new one in place", async () => {
+  const old = createConnectorLaunchState("7", actions)
+  const uninstallOld = installConnectorLaunchState(old)
+  old.changed(snapshot)
+  const next = createConnectorLaunchState("8", actions)
+  const uninstallNext = installConnectorLaunchState(next)
+  try {
+    expect(await connectorLaunchApi.list(identity.directory)).toEqual([])
+    expect(old.changed({ ...snapshot, sequence: snapshot.sequence + 1 })).toBe(false)
+    const current = { ...snapshot, sidecarGeneration: "8" }
+    expect(next.changed(current)).toBe(true)
+    uninstallOld()
+    expect(await connectorLaunchApi.list(identity.directory)).toEqual([current])
+  } finally {
+    uninstallNext()
+  }
+  expect(await connectorLaunchApi.list(identity.directory)).toEqual([])
+})

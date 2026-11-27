@@ -202,6 +202,7 @@ export const dict = {
   "codepuppy.problems.entry": "Unresolved problems: {{count}}",
   "codepuppy.problems.title": "Unresolved problems",
   "codepuppy.problems.hint": "Removed automatically once resolved",
+  "codepuppy.problems.documentRuntime": "Document tools",
   "codepuppy.problems.view": "View",
   "codepuppy.problems.connectorFailed": "{{name}} couldn’t connect",
   "codepuppy.problems.connectorNeedsAuth": "{{name}} needs you to sign in again",

@@ -213,6 +213,30 @@ test("#1565 / #1698: fork 的启动文档带 paths.officeMcpManifest,引擎据�
   await result.listener.stop()
 })
 
+// #1760 Q2 + launch state: the fork's document carries main's own generation, and this generation's connector-launch projection is
+// installed for exactly the child's lifetime (renderer reads go to it, not to a stale one). A build without document assets still forks.
+test("#1760: the fork carries this generation; its launch projection lives exactly as long as the child", async () => {
+  const { connectorLaunchApi } = await import("./connector-launch-state")
+  const identity = { directory: userDataPath, server: "git", attempt: "a1" }
+  const child = new RecordingChild()
+  creditDanglingSweepForSpawn()
+  const result = await spawnLocalServer("127.0.0.1", 4394, "password", {
+    userDataPath,
+    generation: 5,
+    healthCheck: async () => true,
+    fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
+    egressProxy: async () => ({ port: 4433 }),
+    planFence: () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/codepuppy_fence.node" }),
+  })
+  await result.health.wait
+  const start = child.wire.find((message) => (message as { type?: unknown }).type === "start") as { bootstrap: { sidecarGeneration?: number; documents?: unknown } }
+  expect(start.bootstrap.sidecarGeneration).toBe(5)
+  expect(start.bootstrap.documents).toBeUndefined()
+  expect(await connectorLaunchApi.retry(identity)).toEqual({ ok: false, error: "not-current" })
+  await result.listener.stop()
+  expect(await connectorLaunchApi.retry(identity)).toEqual({ ok: false, error: "unavailable" })
+})
+
 // REQ-236 `#1575` AC4:生产 spawnLocalServer 在 fork 时按**当刻的登录账户**写启动文档的 policy.account(ext 据它选工具策略
 // 分区),未登录不写(退回 anonymous)。登录态走真 codepuppy-auth:dev 短路令牌(未打包时 DEV_PLATFORM_TOKEN)的
 // `account.read` 的 sub。值里混入本安装的随机持久标识(artifact-service 的安装级 machine id,boot 时初始化):同一账户换一台

@@ -201,6 +201,7 @@ export const dict = {
   "codepuppy.problems.entry": "{{count}} 个问题未恢复",
   "codepuppy.problems.title": "未恢复的问题",
   "codepuppy.problems.hint": "恢复后自动移除",
+  "codepuppy.problems.documentRuntime": "文档制作环境",
   "codepuppy.problems.view": "查看",
   "codepuppy.problems.connectorFailed": "「{{name}}」未能连接",
   "codepuppy.problems.connectorNeedsAuth": "「{{name}}」需要重新登录",

@@ -56,6 +56,8 @@ export function sameDocumentVerifyRef(a: DocumentRuntimeVerifyRef, b: DocumentRu
 }
 
 export const DOCUMENT_WORK_DIR = ".document-output"
+/** #1760 Q1: the connector-launch row for the document runtime. The colon keeps it outside every MCP server name. */
+export const DOCUMENT_RUNTIME_LAUNCH_SERVER = "codepuppy:documents"
 
 // Pure render contract shared by ext, main and artifact discovery.
 export type DocumentStage = "generate" | "render" | "inspect"

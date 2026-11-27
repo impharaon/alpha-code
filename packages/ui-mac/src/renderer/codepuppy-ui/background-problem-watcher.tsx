@@ -1,3 +1,4 @@
+import { DOCUMENT_RUNTIME_LAUNCH_SERVER } from "../../../../util/src/codepuppy-document"
 import { useConnectorLaunchSnapshots } from "../extensions/connector-launch-client"
 import { connectorLaunchPresentation } from "../extensions/connector-launch-presentation"
 import { runConnectorLaunchAction } from "../extensions/connector-launch-actions"
@@ -46,6 +47,8 @@ async function cloudWithheld(): Promise<boolean> {
 
 /** 用户认得的名字:随包目录里的显示名,找不到才用服务名。 */
 function displayName(name: string): string {
+  // #1760 Q1: the document runtime's preparation row has a reserved name that no catalog entry can carry.
+  if (name === DOCUMENT_RUNTIME_LAUNCH_SERVER) return t("codepuppy.problems.documentRuntime")
   return catalog().entries.find((entry) => entry.type === "mcp" && entry.name === name)?.displayName ?? name
 }
 

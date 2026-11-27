@@ -1,15 +1,15 @@
 ---
 id: DESIGN-child-process-write-fence
 title: 子进程写入围栏技术设计
-summary: 保留既有围栏、Homebrew 与 Cargo 裁决；v4.2 将 Go 的 GOPATH/sumdb 缓存迁入应用数据，并固定原生 GOBIN，保持全局安装目标与校验语义；v4.4 让 Homebrew 节点只能由实际执行到的语法叶领取；v4.5 以 PID 加进程启动时间认定根 Shell，跨 exec 不变；v6 增量（SPEC v7，I-55）从命令报错里认出被拦的完整路径，经同一张 external_directory 卡与 R4 事后放行，R6 增 ineligible。
+summary: 保留既有围栏、Homebrew 与 Cargo 裁决；v4.2 将 Go 的 GOPATH/sumdb 缓存迁入应用数据，并固定原生 GOBIN，保持全局安装目标与校验语义；v4.4 让 Homebrew 节点只能由实际执行到的语法叶领取；v4.5 以 PID 加进程启动时间认定根 Shell，跨 exec 不变；v6 增量（SPEC v7，I-55）从命令报错里认出被拦的完整路径，经同一张 external_directory 卡与 R4 事后放行，R6 增 ineligible 与 realDirectory；R1 修订补上取消撤回、合并拒绝传递、后台完成路径与按完整调用键记录。
 kind: tech-design
 status: frozen
 spec: SPEC-child-process-write-fence
 spec_version: 7
 review:
-  rounds: 0
-  reviewed_sha: ""
-  verdict: "v6 increment (SPEC v7, I-55) drafted 2026-11-27, independent review not yet run; earlier increments frozen-per-r8, scoped review flagged for Go install-location capture and coupled projection"
+  rounds: 1
+  reviewed_sha: "555fef4e9daa95273ac4ee25113bef047ff45743"
+  verdict: "v6 increment (SPEC v7, I-55): R1 fix-then-merge, 6 Major accepted and corrected 2026-11-27, awaiting orchestrator freeze; earlier increments frozen-per-r8, scoped review flagged for Go install-location capture and coupled projection"
 owners: [owner]
 last_reviewed: 2026-11-27
 ---
@@ -1244,7 +1244,7 @@ K1/K2 不变：档位/审批照旧，固定位置仍只在 R1，消费者不推�
 
 # v6 增量｜命令运行中被拦下的写入事后批准（SPEC v7，INT-safety I-55）
 
-**状态：待审（draft）。** designer Claude Opus 5.5 受编排者委派起草；独立审查尚未进行，本节不声称 frozen。前文 v2–v5、v4.1–v4.5 的决定与收据不变。本增量只新增 AB1–AB4，并给 R6 回答增加一个结果值 `ineligible`（§4.2），其余接缝原样消费：没有新 IPC 通道、新消息类型、新原生能力或引擎改动。
+**状态：R1 已处置并修订，待编排者冻结。** designer Claude Opus 5.5 受编排者委派起草（送审稿 `555fef4e9d`）；R1 独立审查的 6 项 Major 均按编排者裁决修正，见 §10「R1 审查及处置」，不声称修订稿又获复审。前文 v2–v5、v4.1–v4.5 的决定与收据不变。本增量新增 AB1–AB5，并给 R6 回答增加结果值 `ineligible` 与字段 `realDirectory`（§4.2），其余接缝原样消费：没有新 IPC 通道、新消息类型、新原生能力或引擎改动。
 
 ## 1. 基线
 
@@ -1270,17 +1270,18 @@ K1/K2 不变：档位/审批照旧，固定位置仍只在 R1，消费者不推�
 | AB-P09（读） | 插件 `PermissionDomain.assert`（`packages/plugin/src/promise/permission.ts:24-31`）：需要批准时弹卡并等待；deny 规则或带反馈的拒绝抛 `Tool.Error`；普通拒绝抛出的错误结束本步，须原样抛出。ext 已在工具执行中使用它：安装工具 `hub-tools.ts:71` → `askInstall`（`policy/index.ts:284-289`）→ `confirm` → `gate.ts:189`。seal 阶段的 `context.tool.transform` 已包住每个工具的 execute（`policy/index.ts:324-327`；`:456-458`，`wrapForDisplay` `display.ts:38-63`）。core 先等 execute、再等 execute.after，才把结果交给模型（`packages/core/src/tool.ts:132-180`）。插件 Context 没有 FileAccess（`packages/plugin/src/promise/plugin.ts:27-58`） | ext 可以在命令结束、结果交给模型之前弹同一张卡；不需要引擎挂点 |
 | AB-P10（读） | R4 `approveDirectoryWrite` 只接受待决的 `external_directory` 请求且 metadata 带 `directoryAccess`、access 为 write（`directory-write-approval.ts:31-35`）；本代已可写的目录跳过（`:83`）；`protected` 拒（`:72`）；`checkWritableTarget`（`process-fence-plan.ts:226-236`）不合格拒（`:77-81`）。R6 `readWriteScope`（`ui-mac/src/main/server.ts:905-913`；`:914`）只按规则分类：`protected` = deny 规则覆盖；直接位于 HOME 的文件是 `needs-approval`，所以今天写前卡会出现，批准后才在卡上显示主目录那句（`PermissionDialog.tsx:105-111`）。R6 线上类型与 parser 在 `codepuppy-sidecar-messages.ts:776-798`（`:799-811`） | R4 与卡片可原样复用；R6 缺一个「不能批准」的结果值 |
 | AB-P11（读） | BR-08 写前请求的形状：`FileAccess.authorizeExternal`（`packages/core/src/file-access.ts:120-137`）发 `action: "external_directory"`、`resources: <dir>/*`、`save: <Project.root(dir) 或 dir>/*`、来源为该调用；R5 transform 加 `metadata.directoryAccess`（`packages/ui-mac/engine/file-access-transform.ts:16`）。`resolve` 对已存在目录取其本身，否则取 dirname（`:90-118`） | 事后请求按同一形状构造 |
+| AB-P12（读，R1 处置时补） | 插件适配层：`tool.transform` 的 `update` 让被包 execute 经 `executePromiseTool` 运行并拿到调用的 `signal`（`plugin/src/promise/adapter.ts:529-541`、`:694-703`）；execute.after 钩子是 `Effect.promise(run)`，其中抛出的错误成为缺陷（`:686-692`）；`permission.assert` 用 `run(...)` 独立运行，不接调用的 signal（`:485-486`）；`permission.list` / `reply` 可用（`:482`、`:484`）。core：请求在中断时由 `ensuring` 删除（`core/src/permission.ts:347-351`）；ADR-038 有界等待，到时发 replied 收回卡片并以缺陷失败（`:320-337`，默认 300 000 ms，`util/src/codepuppy-bootstrap.ts:108-119`）；reply 发 replied 事件（`:379-383`），reject 连带同会话全部待决请求、带不带反馈都一样（`:385-405`）；promise 工具抛出的拒绝即使被包成 `Tool.Error` 也恢复为「结束本步」（`core/src/session/model-request.ts:418-436`）。后台：`background: true` 或运行中移到后台时 execute 立即返回运行中结果（`core/src/tool/plugin/shell.ts:241-254`），完成结果由 `notifyWhenDone`（`:144-176`）作为 synthetic 送进会话（`core/src/shell/result.ts:45-61`），不经 execute/execute.after；ext 已注册的 `session.hook("context")`（`policy/index.ts:202`）拿到可改的 LLM `messages`（`plugin/src/promise/session.ts:25-40`）。调用键 `toolCallKey`（`ext/src/policy/identity.ts:231`）。脚本化模型入口 `scriptedModel`（`ui-mac/test-component/codepuppy-engine.ts:43`）与 `CP-CALL` shell 调用（`project-writable.engine.cases.ts:419`）；`session.shell` 走 `SessionShell.start`（`core/src/session/shell.ts:10`）直接启动 Shell | R1 六项修正所依赖的接缝事实；无需引擎改动 |
 
 **结论 AB-V（探针结论）。** 系统拒绝记录不能作为认出路径的来源：会静默漏条（AB-P03 Node/Bun 11 报 5，AB-P04 满载时丢引擎 pid 那条，都没有丢失提示），要求管理员账户（AB-P05），同一窗口混有本机其它被围栏进程的大量拒绝（AB-P02 4 066 行），并且记在实际写盘的后代进程名下（AB-P02 相对路径那行）——要归到某次命令就得追进程树，而这些进程毫秒级就退出。延迟不是问题。命令自己的报错在 21 种写法里有 18 种写出了被拒对象的绝对路径，而且天然属于这一次工具调用，不需要归属。因此本增量走 I-55 允许的窄版本：只在报错写出了完整路径时提供批准，并由 main 的现有判定核对这个路径确实是围栏不放行、且能批准的位置。
 
 ## 4. 接口契约
 
-### 4.1 AB1 输出里点名的被拒写入（ext 纯函数）
+### 4.1 AB1 输出里点名的被拒写入（ext 纯函数；R1-F1 修订）
 
 ```ts
 // packages/ext/src/policy/ 下；不读文件系统、不发消息
 function refusedWritePaths(output: string): readonly string[]
-// 返回绝对路径，已做词法规范化；按首次出现排序、去重；没有数量上限
+// 返回报错里写出的绝对路径原文，不做任何规范化；按首次出现排序，按字符串完全相同去重；没有数量上限
 ```
 
 - 只看含 `operation not permitted`（不分大小写）的行。`Permission denied`（EACCES）、`No such file or directory` 不算。
@@ -1295,54 +1296,85 @@ function refusedWritePaths(output: string): readonly string[]
 | `EPERM: operation not permitted, <调用> '<P>'` | Node、Bun | P |
 | `could not lock config file <P>: Operation not permitted`、`cannot mkdir <P>: Operation not permitted` | git | P |
 
-- P 必须以 `/` 开头。只做词法规范化（`path.posix.normalize`，含 `..`），不跟随软链，真实目标由 R6/R4 解析。相对路径丢弃：命令里的 `cd` 让它的基准不可知（AB-P02 相对路径那行）。
+- P 必须以 `/` 开头，原样返回：不做词法规范化，不处理 `..`、软链或大小写。`P/link/../b`（`link → O/sub`）实际写的是 `O/b`，词法规范化会得到 `P/b`，P 可写时就漏掉了卡（R1-F1）。真实目标只由 main 按文件系统语义解析（AB2）。相对路径丢弃：命令里的 `cd` 让它的基准不可知（AB-P02 相对路径那行）。
 - 引号形态以引号定界；冒号形态取 `: ` 之后第一个 `/` 起、到 `: Operation not permitted` 之前，所以 P 里有空格也完整。`rename … to …` 中路径含空格时无法唯一定界，该行不产出。
 - 名字说的是概念「输出里点名的被拒写入」，输入只有输出文本；不按工具名分函数，不设条数。夹具用 AB-P02/AB-P06 的原样输出（CLAUDE.md 原则 7）。
 
-### 4.2 AB2 能否批准：R6 增 `ineligible`
+### 4.2 AB2 能否批准：R6 增 `ineligible` 与 `realDirectory`（R1-F1 修订）
 
 ```ts
 // codepuppy-sidecar-messages.ts 的 R6 回答（既有权威；parser/build 与 HubBridge 同一类型，同一提交）
 type WriteScopeOutcome = "fixed" | "writable" | "needs-approval" | "ineligible" | "protected" | "no-fence"
+type WriteScopeReplyTarget = {
+  absolute: string         // 请求里的原文，原样回显（顺序与请求相同）
+  outcome: WriteScopeOutcome
+  realDirectory: string    // plannedWritableTarget(target.directory, realpathSync.native).target，与 R4 卡上显示的是同一个解析
+}
 ```
 
-- main `readWriteScope`（`server.ts:905-913`）的判定次序：`no-fence` → `protected`（deny 规则覆盖，原样）→ `fixed` → `writable` → **`ineligible`**：该目标的 `directory` 经 `plannedWritableTarget` 后，`checkWritableTarget` 用 R4 的同一份 eligibility 判为不合格（主目录及其祖先、`/`、应用状态根及其相关目录、不是目录）→ 其余 `needs-approval`。
+- main `readWriteScope`（`server.ts:905-913`）对 `target.absolute` 与 `target.directory` 都按文件系统语义解析（`realpathSync.native`，软链与 `..` 由系统解析），不先做词法规范化。判定次序：`no-fence` → `protected`（deny 规则覆盖，原样）→ `fixed` → `writable` → **`ineligible`**：`realDirectory` 经 `checkWritableTarget`（R4 的同一份 eligibility）判为不合格（主目录及其祖先、`/`、应用状态根及其相关目录、不是目录）→ 其余 `needs-approval`。
+- `realDirectory` 只供 ext 按真实目录去重与合并（AB3）。解析失败（例如未解析的软链）沿现有路径整条答不可用：`readWriteScope` 抛出 → `hub-view.ts:537-538` 回 `{ error: "unavailable" }` → 不出卡。
 - 仍是只读投影：不登记、不签发、不改 revision 的含义。资格判定仍只有 `checkWritableTarget` 一份（K2）；main 在规划处与 R4 已持有同一 eligibility 输入（`server.ts:370`；`directory-write-approval.ts:13-18`）。
-- 消费者：`evaluateDirectoryWrite`（BR-08 写前）把 `ineligible` 与今天的 `needs-approval` 放在同一分支（ask），BR-08 写前行为不变（§10 留档第 1 行）。R4 不变：它只读 `protected`，资格仍由自己调用 `checkWritableTarget` 判。AB3 只对 `needs-approval` 提供批准。
-- parser 遇到不认识的结果值仍整条拒收（`codepuppy-sidecar-messages.ts:794`），所以新值的 main 与 ext 两端同一提交。
+- 消费者：`evaluateDirectoryWrite`（BR-08 写前）把 `ineligible` 与今天的 `needs-approval` 放在同一分支（ask），忽略 `realDirectory`，BR-08 写前行为不变（§10 留档第 1 行）。R4 不变：它只读 `protected`，资格与真实目录仍自己解析。AB3/AB5 只对 `needs-approval` 提供批准。
+- parser 遇到不认识的结果值或多余、缺少的键仍整条拒收（`codepuppy-sidecar-messages.ts:794`，每个 target 由 2 个键改为 3 个），所以 main 与 ext 两端同一提交。
 
-### 4.3 AB3 事后批准：同一张卡、同一个授予（ext）
+### 4.3 AB3 事后批准：同一张卡、同一个授予（ext；R1-F2/F3/F5 修订）
 
-位置：seal 阶段既有的 `context.tool.transform`（`policy/index.ts:324-327`；`:456-458`）里，再给 `shell` 工具的 execute 包一层。它在内层 execute 正常返回之后、结果交回 core（随后才是 execute.after）之前运行。不放在 execute.after：在 after 钩子里抛出拒绝的语义未核实，而在 execute 内 assert 是既有路径（AB-P09 安装卡）。
+位置：seal 阶段既有的 `context.tool.transform`（`policy/index.ts:324-327`；`:456-458`）里，再给 `shell` 工具的 execute 包一层。被包住的 execute 经插件适配层的 `executePromiseTool` 运行，拿到该调用的 `signal`（`plugin/src/promise/adapter.ts:529-541`、`:694-703`）。它在内层 execute 正常返回之后、结果交回 core（随后才是 execute.after）之前运行。不放在 execute.after：在 after 钩子里抛出的错误是缺陷而不是工具失败（`adapter.ts:686-692`）；execute 内 assert 是既有路径（AB-P09 安装卡）。
 
 ```ts
-type RefusedWriteCall = { sessionID: string; agent?: string; messageID: string; id: string }
+type RefusedWriteCall = { sessionID: string; agent?: string; messageID: string; id: string; signal: AbortSignal }
 // "approved"：本次调用的被拒目录全部获准，且 R6 复读为可写；"not-offered"：没有提供批准，原处理不变。
-// 用户拒绝或规则 deny：原样抛出 permission.assert 的错误，与工具自己的 assert 相同。
+// 卡被拒绝、规则 deny 或 ADR-038 到时：抛出该卡 assert 的同一个错误对象（见第 4 步）。
 function approveRefusedWrites(call: RefusedWriteCall, output: string): Promise<"approved" | "not-offered">
 ```
 
-1. 不提供（返回 `not-offered`）：会话处于无人值守档位（`profile(sessionID, agent) !== undefined`，同 `policy/index.ts:215` 的判定）——没有人能点卡，保持今天的结果与说明；结果不是 completed、或 `output.output` 不是字符串；`refusedWritePaths` 为空。
-2. 分类：`targets = paths.map((p) => ({ absolute: p, directory: dirname(p) }))`，调 `readWriteScope({ access: "write", targets })`（`ext/src/hub-bridge.ts:80`、`:264`）。回答是 `{ error }` 或长度、顺序对不上 → `not-offered`。只留 `needs-approval`，按 `directory` 去重，每个目录留第一次出现的 absolute；为空 → `not-offered`。
-   - 文件夹取被拒对象的 dirname：创建、写、改名都发生在对象的父目录里，授予父目录即覆盖它。不复刻 `FileAccess.resolve` 对已存在目录取其本身的分支（插件拿不到它，AB-P09/AB-P11）；对象本身是已存在目录时授予的是它的父目录，卡上照实显示。
-3. 同会话合并：sidecar 内存 `Map<sessionID + "\0" + directory, Promise<void>>`。某目录在同一会话已有在途的事后批准卡 → 等那张卡（它被拒绝只算该目录未获准，别的调用的拒绝不抛给本调用）；其余目录合成**一张**卡：
+1. 不提供（返回 `not-offered`）：会话处于无人值守档位（`profile(sessionID, agent) !== undefined`，同 `policy/index.ts:215` 的判定）——没有人能点卡，保持今天的结果与说明；结果不是 completed、或 `output.output` 不是字符串；结果是后台运行（`metadata.status === "running"`，带 `shellID`）——此时只按 AB5 登记，不在这里处理；`refusedWritePaths` 为空。
+2. 分类：`targets = paths.map((p) => ({ absolute: p, directory: path.dirname(p) }))`（`path.dirname` 只截最后一段，不规范化），调 `readWriteScope({ access: "write", targets })`（`ext/src/hub-bridge.ts:80`、`:264`）。回答是 `{ error }`、或长度与顺序对不上 → `not-offered`。只留 `needs-approval`，按回答的 `realDirectory` 去重，每个真实目录留第一次出现的原文 target；为空 → `not-offered`。
+   - 文件夹取被拒对象的所在目录：创建、写、改名都发生在对象的父目录里，授予父目录即覆盖它。不复刻 `FileAccess.resolve` 对已存在目录取其本身的分支（插件拿不到它，AB-P09/AB-P11）；对象本身是已存在目录时授予的是它的父目录，卡上照实显示。
+3. 卡与关联：sidecar 内存 `cards: Map<sessionID + "\0" + realDirectory, Card>`，`Card = { owner: { messageID: string; id: string }; members: Set<string /* toolCallKey */>; decision: Promise<void> }`。调用键一律用 `toolCallKey({ sessionID, messageID, id })`（`ext/src/policy/identity.ts:231`）。同一会话某真实目录已有卡 → 把本调用的键加进它的 `members` 并等它；其余真实目录合成**一张**新卡（`owner` 为本调用），以这些真实目录各登记一次：
 
 ```ts
-await context.permission.assert({
+const decision = context.permission.assert({
   sessionID, agent,
   action: "external_directory",
-  resources: dirs.map((d) => `${d}/*`),
-  save: dirs.map((d) => `${d}/*`),
-  metadata: { directoryAccess: { access: "write", targets } }, // R5 的同一形状；targets 为这些目录各自的 { absolute, directory }
+  resources: realDirectories.map((d) => `${d}/*`),
+  save: realDirectories.map((d) => `${d}/*`),
+  metadata: { directoryAccess: { access: "write", targets } }, // R5 的同一形状；targets 为各真实目录第一次出现的原文 { absolute, directory }
   source: { type: "tool", messageID, id },
 })
 ```
 
-   这个请求经过既有 evaluate 钩子：`evaluateDirectoryWrite` 再查一次 R6，`needs-approval` → ask（两档同，AB-P08），风险分类照常附上。renderer 按 `directoryAccess` 走 R4 的 describe/approve：显示真实路径、点击时核对 dev+ino、先授予后回复。R4 不改。`save` 取目录本身，不取它的项目根：插件没有 `Project.root`，本增量不另写一份；后果是在这张卡上点「始终允许」记住的是该目录，而 BR-08 写前卡记住的是它的项目根。
-4. 结果：assert 正常返回 → 对本调用的全部目录复读 R6，全部为 `writable`、`fixed` 或 `no-fence` → `approved`（以 main 的事实为准，不只看 assert 返回）；否则 `not-offered`。assert 抛出 → 原样抛出（普通拒绝结束本步；带反馈的拒绝或 deny 是 `Tool.Error`），同时清掉本调用的在途记录。
-5. 不加超时、有效期或次数上限。卡等用户决定期间工具调用保持「运行中」，与 BR-08 写前卡相同。
+   这个请求经过既有 evaluate 钩子：`evaluateDirectoryWrite` 再查一次 R6，`needs-approval` → ask（两档同，AB-P08），风险分类照常附上。renderer 按 `directoryAccess` 走 R4 的 describe/approve：显示真实路径、点击时核对 dev+ino、先授予后回复。R4 不改。`save` 取真实目录本身，不取它的项目根：插件没有 `Project.root`，本增量不另写一份；后果是在这张卡上点「始终允许」记住的是该目录，而 BR-08 写前卡记住的是它的项目根。
+4. 结果（R1-F3 修订）：
+   - 卡的 assert 正常返回 → 每个仍在等的成员对**自己**的目录复读 R6，全部为 `writable`、`fixed` 或 `no-fence` → `approved`（以 main 的事实为准，不只看 assert 返回）；否则 `not-offered`。
+   - 卡的 assert 抛出（普通拒绝的 `DeclinedError`、带反馈的拒绝或 deny 的 `Tool.Error`、ADR-038 到时）→ 每个仍在等的成员都抛出**同一个错误对象**，与卡的发起调用相同。这与引擎一致：一次 reject 本来就让同会话所有待决请求一起被拒（`core/src/permission.ts:385-405`）；promise 工具抛出的拒绝即使被包成 `Tool.Error` 也按「结束本步」恢复（`core/src/session/model-request.ts:418-436`）。合并的成员不会在拒绝后返回原输出。
+   - 卡结束（任一结果）即从 `cards` 删除它的全部登记。
+5. 取消（R1-F2 修订）：成员调用的 `signal` 中止 → 该成员从 `members` 移出、停止等待（适配层已放弃这次调用）。`members` 变空时：先从 `cards` 删除这张卡的全部登记，之后的调用不会再合并到它；再撤回请求——用 `context.permission.list`（`adapter.ts:482`）找本会话中 `action === "external_directory"` 且 `source` 为卡的 `owner` 的待决请求，`context.permission.reply({ requestID, reply: "reject" })`（`:484`），引擎发出 replied 事件收回卡片（`permission.ts:379-383`）。请求还没建立时（中止发生在 core 建立请求之前），卡记为已撤回；ext 的 evaluate 钩子（`policy/index.ts:224` 调 `evaluateDirectoryWrite` 处）对 `source` 指向已撤回卡的 external_directory 请求置 `effect = "deny"`，不建立卡片。剩下的窗口（evaluate 钩子已返回、core 尚未建立请求时中止）由现有 ADR-038 期限收回（`permission.ts:320-337`，默认 300 000 ms，`util/src/codepuppy-bootstrap.ts:108-119`），不新增计时器。
+   - 用 reject 撤回不会误伤：引擎的 reject 会连带本会话所有待决请求。调用的 `signal` 只在这一步被中断（停止会话）或结束（同一步另一调用的拒绝）时中止，此时本会话其它待决请求所属的调用也正被中断（推，§6 证明第 6 条）。
+6. 不新增超时、有效期或次数上限。ADR-038 的既有期限对这些请求与对 BR-08 写前卡一样适用：到时这次调用按工具自己的请求到时失败，合并成员按第 4 步同样失败。
 
-### 4.4 AB4 告诉助手重试（既有注入通道）
+### 4.3.1 AB5 后台命令的完成路径（R1-F4 新增）
+
+事实：`background: true` 或运行中被移到后台时，execute 立即返回 `status: "running"` 与 `shellID`（`core/src/tool/plugin/shell.ts:241-254`；ext 已按此识别，`network-egress.ts:142-145`）。完成结果之后由 `notifyWhenDone`（`shell.ts:144-176`）作为 synthetic 消息送进会话，正文是 `<shell id="<shellID>" state="…" command="…">\n<输出>\n</shell>`（`core/src/shell/result.ts:45-61`；job id 即 shell id，`shell.ts:228`）。这条路不经过 execute 与 execute.after，synthetic 也没有插件钩子。模型在下一次主请求里读到它；ext 已注册的 `session.hook("context")`（`policy/index.ts:202`）拿得到可改的请求 `messages`（`plugin/src/promise/session.ts:25-40`）。
+
+```ts
+type BackgroundRefusedWrite = { sessionID: string; agent?: string; messageID: string; id: string; shellID: string }
+// 在 AB3 包装看到后台结果时登记；键为 sessionID + "\0" + shellID
+function approveBackgroundRefusedWrites(call: BackgroundRefusedWrite, output: string): Promise<"approved" | "rejected" | "not-offered">
+```
+
+1. 登记：AB3 包装遇到后台结果（第 1 步的 `running` 分支）→ 记入 sidecar 内存 `background: Map<sessionID\0shellID, BackgroundRefusedWrite>`。调用照旧立即返回，后台语义不变。
+2. 触发：context 钩子里，对请求中正文以引擎标签 `<shell id="<shellID>" state="` 开头、且 (sessionID, shellID) 已登记而尚未有结果的消息，取标签内的输出，按 AB3 第 1、2 步处理（含无人值守不提供）。
+3. 卡：与 AB3 同一个 `cards` 合并表与同一个 assert 形状，`source` 为原调用的 `{ messageID, id }`；同一 shellID 已有待决卡时，后来的 context 钩子等它，不出第二张。context 钩子等用户决定，期间这次模型请求等待，与前台调用在卡上等待相同。后台语义保留：命令运行期间什么都不等，只有读取它的结果时才等。
+4. 结果按 shellID 记在 sidecar 内存：
+   - 获准（R6 复读为可写）→ `approved`，用 AB4 的重试说明。
+   - assert 抛出（任何错误）→ 在钩子内接住，记 `rejected`，附 `WRITE_REFUSED_NOTE`（停下并告诉用户哪个写入被拒）。不能把错误抛出钩子：那会让这次模型请求失败，而这里没有运行中的工具调用可以结束；助手停在这个写入上，是 BR-08 拒绝「结束本步」最接近的对应。引擎的 reject 连带照常。
+   - 不提供 → 不变（今天后台结果没有任何说明）。
+5. 说明的附加：context 钩子的修改只作用于这一次请求；ext 在 sidecar 存活期间，于之后每次请求里给同一条结果消息附上已记录的说明（历史稳定）。sidecar 重启后记录消失，历史里只剩原输出。
+6. 取消：context 钩子没有取消信号；被停止的请求放弃等待，但卡属于已经结束的后台命令，不属于被停止的请求，因此保留（仍受 ADR-038 期限约束），结果照样记录，在下一次请求时附上。卡结束即清除登记。
+
+### 4.4 AB4 告诉助手重试（既有注入通道；R1-F5 修订）
 
 ```ts
 // context-injection.ts，登记进 CONTEXT_INJECTIONS（与 WRITE_REFUSED_NOTE 同为 sink "tool-failure"、上限 CAP_DESCRIPTION）
@@ -1351,7 +1383,8 @@ export const WRITE_APPROVED_RETRY_NOTE =
   "The user approved writing to the folder this command was refused in; it is writable now. Re-run only the part of the command that failed - the parts before it already ran once."
 ```
 
-- AB3 把 `approved` 记在 ext 内存里按调用 id 的集合中（与既有 `displays`、`installAsks` 一样在 execute.after 里清除）。`attachWriteDenied`（`display.ts:105-131`）处理 shell 结果时：该调用为 `approved` → 追加 `WRITE_APPROVED_RETRY_NOTE`，不追加 `WRITE_REFUSED_NOTE`；其余行为不变。给模型哪一句只在这一处决定（K2）。
+- AB3 把 `approved` 记在 ext 内存中按 `toolCallKey` 的集合里；登记、读取与删除一律用该键（`identity.ts:231`），不同会话里相同的调用 id 不会串用。删除与既有 `displays`、`installAsks` 一样在 execute.after 里做。
+- `attachWriteDenied`（`display.ts:105-131`）处理 shell 结果时：该调用的键为 `approved` → 追加 `WRITE_APPROVED_RETRY_NOTE`，不追加 `WRITE_REFUSED_NOTE`；其余行为不变。AB5 用同一个选择函数（获准 → 重试说明；拒绝 → `WRITE_REFUSED_NOTE`；其余无），给模型哪一句只在这一处决定（K2）。
 - 措辞可以在实施中按登记簿上限微调；含义冻结：已获准、现在可写、只重跑失败的部分。
 - 应用不替助手重跑。重跑是一次普通的 shell 调用，走原 gate：「全部批准」直接运行，「请求审批」照常出命令卡（K1 不变）。
 
@@ -1359,23 +1392,28 @@ export const WRITE_APPROVED_RETRY_NOTE =
 
 | 依赖能力 | 可合法调用的现有符号 / 本次 raise | 状态 |
 | --- | --- | --- |
-| 拿到完整输出，并在交给模型之前处理 | seal 阶段 `context.tool.transform` 包 execute（`policy/index.ts:324-327`；`:456-458`）；core 先等 execute 再等 execute.after（`core/src/tool.ts:132-180`） | 现有；AB3 新增一层包装 |
+| 拿到完整输出，并在交给模型之前处理 | seal 阶段 `context.tool.transform` 包 execute（`policy/index.ts:324-327`；`:456-458`），经 `executePromiseTool` 运行（`adapter.ts:529-541`）；core 先等 execute 再等 execute.after（`core/src/tool.ts:132-180`） | 现有；AB3 新增一层包装 |
+| 调用取消信号 | 被包 execute 的 `context.signal`（`adapter.ts:694-703`） | 现有 |
 | 认出路径 | AB1 `refusedWritePaths` | 新纯函数（ext） |
-| 是否围栏不放行、能否批准 | R6 `readWriteScope`（`hub-bridge.ts:80`、`:264` → `server.ts:905-913`）；资格 `checkWritableTarget`（`process-fence-plan.ts:226`） | 现有；AB2 增 `ineligible`，两端同一 raise |
-| 弹同一张卡 | `context.permission.assert`（`plugin/src/promise/permission.ts:24-31`；ext 现用 `policy/index.ts:171`）；`evaluateDirectoryWrite`（`:365-377`）；`PermissionDialog` 目录写入分支（`:74-111`） | 现有，不改 |
+| 是否围栏不放行、能否批准、真实目录 | R6 `readWriteScope`（`hub-bridge.ts:80`、`:264` → `server.ts:905-913`）；资格 `checkWritableTarget`（`process-fence-plan.ts:226`）；解析 `plannedWritableTarget`（`:208`） | 现有；AB2 增 `ineligible` 与 `realDirectory`，两端同一 raise |
+| 弹同一张卡 | `context.permission.assert`（`adapter.ts:485-486`；ext 现用 `policy/index.ts:171`）；`evaluateDirectoryWrite`（`:365-377`）；`PermissionDialog` 目录写入分支（`:74-111`） | 现有，不改 |
+| 撤回待决请求 | `context.permission.list` / `reply`（`adapter.ts:482`、`:484`）；evaluate 钩子置 deny；ADR-038 收回（`permission.ts:320-337`） | 现有 |
 | 批准即授予、先授予后回复 | R4 `describeDirectoryAccess` / `approveDirectoryWrite`（`directory-write-approval.ts:38-101`）→ `userOpened.register` → `tracker.grantWrite` → 原生 `issueFileExtensionToProcess` | 现有，不改 |
+| 调用键 | `toolCallKey`（`ext/src/policy/identity.ts:231`） | 现有 |
+| 后台完成结果 | `notifyWhenDone` 的 synthetic（`shell.ts:144-176`，`shell/result.ts:45-61`）；ext `session.hook("context")`（`policy/index.ts:202`）的可改 `messages` | 现有；AB5 新增处理 |
 | 无人值守判定 | ext `profile(sessionID, agent)`（`policy/index.ts:215`） | 现有 |
 | 给模型的说明 | `attachWriteDenied`（`display.ts:105`）、`CONTEXT_INJECTIONS`（`context-injection.ts:551`） | 现有；AB4 新增一条登记文本 |
 
 ## 5. 数据与失败
 
-- 没有持久化。合并表与按调用记录只在 sidecar 内存，换代随进程消失；换代时还开着的卡由 R4 返回 `conflict`/`expired`，与 BR-08 相同。
+- 没有持久化。`cards`、`background`、按调用记录与后台结果记录只在 sidecar 内存，换代随进程消失；换代时还开着的卡由 R4 返回 `conflict`/`expired`，与 BR-08 相同。
 - R6 不可用或回答形状不对 → 不弹卡，原说明。
 - R4 授予失败（`grant-failed` 等）→ 卡上显示既有那句、不回复 allow；用户可再点（R4 对失败的决定可重试）或拒绝。
 - assert 返回后 R6 复读不是可写（例如这期间换代）→ `not-offered`，原说明；不让模型去重试一次注定失败的写入。
 - 报错是 EPERM 但原因不在围栏（隐私授权、系统完整性保护、不可变标志等），而路径在围栏看来又是 `needs-approval` → 出一次卡；批准后重跑仍失败，此时 R6 答 `writable` → 不再提供，原说明。不会循环。
 - 用户拒绝后，模型若再次运行同一写入 → 再出卡，与拒绝 BR-08 写前卡后模型再写相同。
-- 并发：同一调用里的多个路径 → 一张卡；同一会话并行的调用 → 合并到在途那张；不同会话 → 各一张，后批准的那张在 R4 里是对已可写目录的空操作（`directory-write-approval.ts:83`）。可达窗口：另一会话的卡在本调用分类之前已批准 → 本调用看到 `writable`，不出卡、给原说明而不是重试说明；后果是模型停下，用户可让它再试，没有数据影响。
+- 并发：同一调用里的多个路径 → 一张卡；同一会话并行的调用 → 合并到同一张，按真实目录合并，结果（获准或同一个拒绝错误）传给每个成员；不同会话 → 各一张，后批准的那张在 R4 里是对已可写目录的空操作（`directory-write-approval.ts:83`）。可达窗口：另一会话的卡在本调用分类之前已批准 → 本调用看到 `writable`，不出卡、给原说明而不是重试说明；后果是模型停下，用户可让它再试，没有数据影响。
+- 取消：成员全部中止 → 合并登记清除、请求撤回（§4.3 第 5 步）；建立前后的窗口由 ADR-038 期限收回。后台卡不随请求取消（§4.3.1 第 6 步）。
 - 被拒对象之前的命令部分已执行一次（I-55 列出的代价）。AB4 提醒只重跑失败的部分；模型仍可能整条重跑，不加机制。
 
 ## 6. 架构落点
@@ -1383,34 +1421,39 @@ export const WRITE_APPROVED_RETRY_NOTE =
 | 新增/改动的代码 | 落在哪个模块 | 依赖谁 | 复用的已有权威 |
 | --- | --- | --- | --- |
 | AB1 `refusedWritePaths` | `packages/ext/src/policy/`（与 `attachWriteDenied` 同处） | 无 | 无；新的纯解析，夹具取 AB-P02/AB-P06 原样输出 |
-| AB3 包装、同会话合并表、按调用记录 | `packages/ext/src/policy/index.ts` seal 阶段 | AB1、HubBridge、`context.permission` | `wrapForDisplay` 所在的同一 transform；`profile`；`displays` / `installAsks` 的按调用记录做法 |
+| AB3 包装、`cards` 合并表、取消撤回、按调用记录；AB5 后台登记与 context 钩子处理 | `packages/ext/src/policy/index.ts` seal 阶段与既有 context 钩子 | AB1、HubBridge、`context.permission`、`toolCallKey` | `wrapForDisplay` 所在的同一 transform；`profile`；`displays` / `installAsks` 的按调用记录做法 |
 | AB4 说明 | `packages/ext/src/context-injection.ts`、`policy/display.ts` | 无 | `CONTEXT_INJECTIONS`、`attachWriteDenied` |
-| AB2 `ineligible` | `packages/ui-mac/src/main/server.ts` 的 `readWriteScope`；`codepuppy-sidecar-messages.ts` 的类型/parser/build；ext `evaluateDirectoryWrite` 的映射 | `process-fence-plan.ts` | `checkWritableTarget`、`plannedWritableTarget`、R6 既有消息 |
+| AB2 `ineligible` 与 `realDirectory` | `packages/ui-mac/src/main/server.ts` 的 `readWriteScope`；`codepuppy-sidecar-messages.ts` 的类型/parser/build；ext `evaluateDirectoryWrite` 的映射 | `process-fence-plan.ts` | `checkWritableTarget`、`plannedWritableTarget`、R6 既有消息 |
 
 - 新目录/新模块：无；`docs/architecture/modules.md` 不变。
-- 不新增 IPC 或消息：判定走 R6 既有 `codepuppy.write-scope.*`，询问走插件既有 `permission.assert`，授予走 R4 既有 preload IPC，说明走既有工具结果。main 不做观察点：main 拿不到工具输出，它能读到的系统拒绝记录不可靠（AB-V）。
-- 不改引擎：包装经插件 `tool.transform`；U-40 之后的引擎挂点数不变。
-- 架构约束：K1 档位判定仍只在 `evaluateDirectoryWrite`；K2 资格只在 `checkWritableTarget`，经 R6 投影给 ext，ext 不复制主目录、状态根判断；文件夹取 dirname 是本增量自己的概念，不复刻 `FileAccess.resolve`。无新偏离。
-- 工程标准 §6：AB1 名为「输出里点名的被拒写入」，输入是任意输出文本；AB3 名为「批准被拒写入」，参数是调用身份与输出；不按工具名、档位或路径种类分函数，不设上限。
+- 不新增 IPC 或消息：判定走 R6 既有 `codepuppy.write-scope.*`，询问与撤回走插件既有 `permission.assert`/`list`/`reply`，授予走 R4 既有 preload IPC，说明走既有工具结果与既有 context 钩子。main 不做观察点：main 拿不到工具输出，它能读到的系统拒绝记录不可靠（AB-V）。
+- 不改引擎：包装经插件 `tool.transform`，后台经插件 context 钩子；已批准的两处引擎改动（SC-01/U-38、SC-02/U-40）之外不增加。
+- 架构约束：K1 档位判定仍只在 `evaluateDirectoryWrite`；K2 资格只在 `checkWritableTarget`，真实路径只在 main 的 `plannedWritableTarget`，经 R6 投影给 ext，ext 不复制主目录、状态根或路径解析；文件夹取 dirname 是本增量自己的概念，不复刻 `FileAccess.resolve`。无新偏离。
+- 工程标准 §6：AB1 名为「输出里点名的被拒写入」，输入是任意输出文本；AB3/AB5 名为「批准被拒写入」，参数是调用身份与输出；不按工具名、档位或路径种类分函数，不设上限。
 - 安全面：
-  - 威胁边界不变。被围栏的引擎进程树（模型产生的命令）控制输出文本，因此能让卡片点名任意路径；这与模型直接用写文件工具写该路径、触发 BR-08 写前卡等价。卡显示 R4 解析的真实路径，只有用户点击才登记与签发（BR-05 不变）。
-  - 不变量：AB-S1 本路径只提议、不授予，授予仍只经 R4（v4 §4.4 的「本人批准」来源）。AB-S2 `protected` 与 `ineligible` 不出卡；就算出现，R4 仍拒（`directory-write-approval.ts:72`、`:77-81`）。AB-S3 R6 仍只读，新值不带登记、签发语义；没有新的 sidecar → main 扩权消息。AB-S4 X1/X2、令牌绑定、运行内历史不变。
+  - 威胁边界不变。被围栏的引擎进程树（模型产生的命令）控制输出文本，因此能让卡片点名任意路径。**接受的残留（R1 复核）**：伪造的报错可以为任意文件夹弹出卡片；但只有用户点击才登记与签发，卡上显示的是 R4 解析出的真实文件夹，所以 BR-05「只有用户本人的动作能扩大可写范围」成立。这与模型直接用写文件工具写该路径、触发 BR-08 写前卡等价，不另加机制。
+  - 不变量：AB-S1 本路径只提议、不授予，授予仍只经 R4（v4 §4.4 的「本人批准」来源）。AB-S2 `protected` 与 `ineligible` 不出卡；就算出现，R4 仍拒（`directory-write-approval.ts:72`、`:77-81`）。AB-S3 R6 仍只读，新值与新字段不带登记、签发语义；没有新的 sidecar → main 扩权消息；撤回只用 reject，不能产生授予。AB-S4 X1/X2、令牌绑定、运行内历史不变。
 - 被否决的替代：
   - 读系统拒绝记录（`log stream` / OSLog）：漏条、要管理员、噪声、进程归属（AB-V）。
   - 用 `sandbox_check` 一类内核查询发现路径：它只回答「某路径是否被拒」，仍得先知道路径；同一问题本增量由 R6 回答，不需要新原生能力（未实测）。
   - Endpoint Security / dtrace 跟踪写操作：需 root 或专用 entitlement（同 v4.4、v4.5 的否决理由）。
   - 批准后由应用自己重跑整条命令：前半段在没有判断的情况下再执行一次；「请求审批」档下等于用文件夹卡代替命令卡，改变 K1。
   - 相对路径按调用起始目录解析：命令里的 `cd` 会让它指向错误的文件夹，卡上会照实显示一个用户没打算写的目录。
-  - 在 core `ShellTool` 结束处加引擎挂点：插件包装已足够；引擎改动按 U-40 需 owner 逐处允许。
-  - 在 execute.after 里 assert：after 钩子里抛出拒绝的语义未核实；execute 内 assert 是既有路径。
+  - 在 ext 里对路径做词法规范化后去重（R1-F1）：会改变真实目标。
+  - 给插件 `permission.assert` 加 `signal` 参数，让中断直接取消请求：最干净，但要改插件适配层（上游文件），算第三处引擎改动，需 owner 逐处允许；ext 侧撤回已能满足。
+  - 在 core `ShellTool` 结束处或 `notifyWhenDone` 里加引擎挂点：插件包装与 context 钩子已足够；引擎改动需 owner 逐处允许。
+  - 用 shell capture 钩子的 `replace` 把说明写进后台命令输出：会把给模型的说明写进用户看得到的命令输出。
+  - 在 execute.after 里 assert：after 钩子里抛出的错误是缺陷而不是工具失败（`adapter.ts:686-692`）。
 - 实施必须拿出的证据（每条都要能失败；用例、文件与顺序归 plan.md）：
-  1. 真入口 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence → session.shell`，「全部批准」与「请求审批」两档：`echo a > <项目>/a.txt && touch <项目外>/b.txt` → 卡写明 `<项目外>` 的真实路径 → 批准 → R4 granted、引擎 pid 不变 → 结果带 AB4 说明、不带 `WRITE_REFUSED_NOTE` → 重跑后 `b.txt` 落盘（「请求审批」档重跑先出命令卡）。Node 报错写法再跑一次批准臂。
+  1. 入口是**真实的助手工具调用链**：脚本化模型（`ui-mac/test-component/codepuppy-engine.ts:43` 的 `scriptedModel`）经会话 prompt 发出 `CP-CALL {"name":"shell",…}`（同 `project-writable.engine.cases.ts:419` 的写法），经 agent 循环 → `Tool.execute` → ext 包装 → 原命令 gate 与权限；不用 `session.shell`（它经 `core/src/session/shell.ts:10` 直接启动 Shell，不经过 Tool.execute、AB3 与命令审批）。生产围栏经 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence`。「全部批准」与「请求审批」两档：命令 `echo a >> <项目>/a.txt && touch <项目外>/b.txt` → 卡写明 `<项目外>` 的真实路径 → 批准 → R4 granted、引擎 pid 不变 → 结果带 AB4 说明、不带 `WRITE_REFUSED_NOTE` → 脚本化模型只重跑 `touch <项目外>/b.txt` → `b.txt` 落盘，`a.txt` 只有一行（前半段只执行过一次，重试没有重复写入）；「请求审批」档重跑先出命令卡。Node 报错写法再跑一次批准臂。
   2. 拒绝 → `b.txt` 0 落盘，本步结束。
-  3. 不出卡各一臂：`cd` 后相对路径；测试 HOME 下直接写文件（R6 答 `ineligible`）；受保护位置（R6 答 `protected`）；无人值守会话。每臂都是原说明、0 落盘。
-  4. 已知的坏：去掉 AB3 包装 → 第 1 条的命令没有卡、0 落盘；去掉 AB2（主目录按 `needs-approval` 答）→ 第 3 条主目录臂出卡，必须红。
-  5. 并发：同一会话两条并行命令拒在同一目录 → 一张卡，批准后两条都得 AB4 说明；两个会话 → 两张卡，第二张批准是空操作。
-  6. AB1 以 AB-P02/AB-P06 的原样输出为夹具逐形态测；`Permission denied`、`No such file or directory`、不带路径的 EPERM 行产出为空；`rename` 两条路径都产出。
-  7. BR-08 写前不变：R6 对主目录文件答 `ineligible` 时，写文件工具仍出卡（现有 AC-10 用例照过）。
+  3. 不出卡各一臂：`cd` 后相对路径；测试 HOME 下直接写文件（R6 答 `ineligible`）；受保护位置（R6 答 `protected`）；无人值守会话。每臂都是原说明、0 落盘。另一臂 `P/link/../b`（`link → <项目外>/sub`，P 为已打开项目）：卡写明 `<项目外>` 的真实目录，批准后落盘；已知的坏：ext 做词法规范化 → 不出卡，必须红（R1-F1）。
+  4. 已知的坏：同一入口、同一命令，只去掉 AB3 包装 → 没有卡、0 落盘；去掉 AB2（主目录按 `needs-approval` 答）→ 第 3 条主目录臂出卡，必须红。
+  5. 合并与调用键：同一会话两条并行命令拒在同一目录 → 一张卡；用户普通拒绝 → 两条调用都以同一个拒绝结束，第二条不返回原输出（R1-F3）；批准 → 两条都得 AB4 说明。两个会话各有一条调用 id 相同的命令，一条获准、一条未获准 → 说明不串（R1-F5）。
+  6. 取消：卡待决时停止会话 → `permission.list` 里不再有该请求，合并表为空；同会话随后的新命令拒在同一目录 → 出新卡，而不是等旧卡（R1-F2）。已知的坏：去掉撤回 → 停止后请求仍待决，必须红。另核对另一个会话里待决的无关请求不受影响，并核对调用的 `signal` 只在这一步被中断时中止。
+  7. 后台：`background: true` 的命令写项目外 → 运行期间不出卡、调用立即返回；结果被模型读取时出卡；批准 → 该次请求里结果后附 AB4 说明；拒绝 → 附 `WRITE_REFUSED_NOTE`，请求不失败；停止请求后卡仍在，决定后在下一次请求里附上说明。已知的坏：去掉 AB5 → 同一后台命令没有卡。
+  8. AB1 以 AB-P02/AB-P06 的原样输出为夹具逐形态测；`Permission denied`、`No such file or directory`、不带路径的 EPERM 行产出为空；`rename` 两条路径都产出；`..` 原样保留。
+  9. BR-08 写前不变：R6 对主目录文件答 `ineligible` 时，写文件工具仍出卡（现有 AC-10 用例照过）。
 
 ## 8. 拆分决定
 
@@ -1431,12 +1474,24 @@ export const WRITE_APPROVED_RETRY_NOTE =
 | 5. 档位沿 `evaluateDirectoryWrite`：「请求审批」「全部批准」都出卡；无人值守会话不出卡 | AB-P08 |
 | 6. 重试由模型做，经 AB4 说明；应用不自己重跑；重跑命令走原档位 | I-55「助手重试这条命令」；K1 |
 | 7. 文件夹取被拒对象的 dirname；`save` 取目录本身 | AB-P09、AB-P11；后果见 §4.3 第 2、3 步 |
-| 8. 并发：调用内一张卡、同会话合并、跨会话各一张；是否给重试说明以 R6 复读为准 | AB-P10（R4 幂等）；§5 |
-| 9. 拒绝沿 `permission.assert` 的既有语义，原样抛出 | AB-P09 |
+| 8. 并发：调用内一张卡、同会话按真实目录合并、跨会话各一张；是否给重试说明以 R6 复读为准 | AB-P10（R4 幂等）；§5 |
+| 9. 拒绝沿 `permission.assert` 的既有语义，原样抛出；合并成员抛出同一个错误 | AB-P09；R1-F3 |
 
-审查：本增量含外部行为假设（工具报错形态、插件在 execute 包装内 assert 时普通拒绝结束本步）和一个共享契约改动（R6 结果值），按 delivery-review §2 应做一轮对抗审查，尚未进行。建议范围：§2 的 AB-V、§4.2–§4.4、§5、§6 安全面。
+### R1 审查及处置（审查 `555fef4e9d` 的 v6 增量，SPEC v7 `10bae65505`）
 
-**传播核对**：`rg -n -c '"needs-approval"' docs --glob '*.md'` 只命中本设计（1 行，v4 §4.4 的 R6 线上形状；新联合在本增量 §4.2 给出，不改历史段）。代码消费者 `rg -n -l '"needs-approval"' packages --glob '!**/node_modules/**'`：`packages/ext/src/policy/index.ts`、`packages/ui-mac/src/main/server.ts`、`packages/ui-mac/src/main/codepuppy-sidecar-messages.ts` 及其测试（`identity.test.ts`、`directory-write-approval.test.ts`、`server.test.ts`、`hub-view.test.ts`、`codepuppy-sidecar-messages.test.ts`），归实施的同一提交。
+审查方：Codex（gpt-6.1-sol，xhigh，只读），第 1 轮，结论 FIX-THEN-MERGE，6 项 Major；编排者全部采纳，要求在一次提交里修正设计，不重开 owner 方向、日志结论与 R4。审查方对 R6 两端同步、不可批准目标过滤、两档审批、无人值守不出卡、应用不自行重跑、单调用普通拒绝结束本步（`model-request.ts:424`）无异议。下面的「已修」指设计修订，不是实现已通过。
+
+| finding / 处置 | 修订决定及依据 | 核对 / 尚待实施证明 |
+| --- | --- | --- |
+| R1-F1 Major（原 :1298）词法规范化改变真实目标，accepted / corrected | AB1 原样返回绝对路径，不做规范化；R6 按文件系统语义解析 `absolute` 与 `directory`，回答增 `realDirectory`；ext 按它去重与合并（§4.1、§4.2、§4.3 第 2、3 步） | §6 证明第 3 条 `P/link/../b` 臂与词法规范化的已知坏；第 8 条 `..` 原样保留 |
+| R1-F2 Major（原 :1319）取消没有接入批准生命周期，accepted / corrected | AB3 带调用的 `signal`（`adapter.ts:694-703`）；卡有成员集合，成员全部中止时清除合并登记并以 `permission.list`/`reply` 撤回，未建立时 evaluate 钩子置 deny，剩余窗口由 ADR-038 收回；不加计时器。插件 `assert` 加 `signal` 的引擎改动被否决（§6）（§4.3 第 5 步） | §6 证明第 6 条；「signal 只在这一步被中断时中止」仍为推断 |
+| R1-F3 Major（原 :1328）共享卡的拒绝被等待者吞掉，accepted / corrected | 合并成员抛出卡的同一个错误对象，与引擎 reject 连带（`permission.ts:385-405`）及拒绝恢复（`model-request.ts:418-436`）一致（§4.3 第 4 步） | §6 证明第 5 条 |
+| R1-F4 Major（原 :1325）后台命令永远漏接，accepted / corrected | 新增 AB5：包装登记后台 shellID；结果经 `notifyWhenDone` 的 synthetic 进入下一次请求时，在既有 context 钩子里同样认路径、出同一张卡、附说明；拒绝在钩子内接住、附停止说明；后台语义不变（§4.3.1） | §6 证明第 7 条；synthetic 在请求 `messages` 里以标签开头的文本出现，按 `shell/result.ts:53` 推断，未实跑 |
+| R1-F5 Major（原 :1354）批准标记只按调用 id，accepted / corrected | 登记、读取、删除一律用 `toolCallKey`（`identity.ts:231`）；卡的成员同样用它（§4.3 第 3 步、§4.4） | §6 证明第 5 条的同 id 两会话臂 |
+| R1-F6 Major（原 :1407）AC-13 证明入口绕过被验证接线，accepted / corrected | 证明入口改为脚本化模型发出的真实助手工具调用（`codepuppy-engine.ts:43`、`project-writable.engine.cases.ts:419`）；去掉臂在同一入口只去掉 AB3；核对 `a.txt` 只写一次（§6 证明第 1、4 条） | 归实施 plan.md |
+| 伪造报错可为任意文件夹出卡，record（接受的残留，不改） | 只有用户点击才授予，卡显示 R4 解析的真实文件夹，BR-05 成立；与模型用写文件工具触发 BR-08 写前卡等价（§6 安全面） | 无新机制、无新限制 |
+
+**传播核对**：`rg -n -c '"needs-approval"' docs --glob '*.md'` 只命中本设计（v4 §4.4 的 R6 线上形状一处；新联合与新字段在本增量 §4.2 给出，不改历史段）。代码消费者 `rg -n -l '"needs-approval"' packages --glob '!**/node_modules/**'`：`packages/ext/src/policy/index.ts`、`packages/ui-mac/src/main/server.ts`、`packages/ui-mac/src/main/codepuppy-sidecar-messages.ts` 及其测试（`identity.test.ts`、`directory-write-approval.test.ts`、`server.test.ts`、`hub-view.test.ts`、`codepuppy-sidecar-messages.test.ts`），归实施的同一提交。
 
 **留档**
 
@@ -1446,7 +1501,8 @@ export const WRITE_APPROVED_RETRY_NOTE =
 | `mkdir ~/新文件夹` 中途被拦 → 文件夹是主目录 → 不出卡 | 在主目录下新建项目文件夹是常见写法；BR-08 写前对 `~/新文件夹/x` 会给 `~/新文件夹` 出卡 | 按 I-55「主目录本身不能批准」如实落地；把「要新建的文件夹本身」当批准目标是新的产品取舍 | owner 若要，经 intent 提出 |
 | Node/Bun 的拒绝在系统记录里静默缺失 | AB-P03；`sandbox-denial-stream.ts` 依赖同一记录，engine-config-fence A3 已改成「先看到才算」 | 不在本增量 | 有夜间用例以「没看到」判绿时 |
 | 应用内终端里用户自己运行的命令被拦 | SPEC v7 范围外 | I-55 说的是助手重试 | owner 提出时 |
+| 安装卡（`hub-tools.ts:71`）的 assert 同样不随调用取消 | 与 R1-F2 同类的既有现象，本增量只修 AB3 自己的卡 | 不是本增量引入 | 编排者按 delivery-review §5 路由 |
 
-**仍属推断或未验证**：非管理员账户不能 `log stream`（只见二进制里的提示串）；在 execute 包装内 assert、普通拒绝时「结束本步」与工具自身 assert 一致（据插件 API 注释与安装卡先例）；普通拒绝后命令输出不再交给模型（本步以拒绝错误结束）；Python `os.makedirs` 等未逐一核对的报错形态；生产签名进程树下的报错与本机探针一致。没有 owner 待决项。
+**仍属推断或未验证**：非管理员账户不能 `log stream`（只见二进制里的提示串）；调用的 `signal` 只在这一步被中断时中止，因此用 reject 撤回不会连带活着的请求；synthetic 后台结果在 context 钩子的 `messages` 里以引擎标签开头的文本出现；普通拒绝结束本步与合并成员抛同一错误的运行时行为（有代码依据，未实跑）；普通拒绝后命令输出不再交给模型；Python `os.makedirs` 等未逐一核对的报错形态；生产签名进程树下的报错与本机探针一致。没有 owner 待决项。
 
-**交接收据**：依据 SPEC v7 `10bae65505` 与 U-44/I-55。designer Claude Opus 5.5 跑完 §2 的两轮系统记录探针与报错形态探针（临时目录已删），核对 R4、R6、`evaluateDirectoryWrite`、`attachWriteDenied`、插件 `permission.assert` 与 core 工具执行顺序的现有符号；每项依赖能力都映射到现有符号或本节明确的 raise（§4.5）。下一步：编排者选定对抗审查；通过后冻结，再交 #1759 实施车道写 plan.md 切片。只改 spec.md 与 design.md，未实现、未推送。
+**交接收据**：依据 SPEC v7 `10bae65505`、设计 v6 送审稿 `555fef4e9d` 与 R1 审查（Codex gpt-6.1-sol，FIX-THEN-MERGE，6 Major）。designer Claude Opus 5.5 按编排者处置修订 §4.1–§4.5、§5、§6、§10，新增 §2 AB-P12 与 §4.3.1 AB5；核对插件适配层、core 权限请求的中断与 reject 连带、ADR-038 期限、后台 shell 路径、`toolCallKey` 与脚本化模型入口的现有符号；每项依赖能力都映射到现有符号或本节明确的 raise（§4.5）。下一步：编排者决定冻结，再交 #1759 实施车道写 plan.md 切片。只改 design.md，未实现、未推送。

@@ -52,6 +52,7 @@ const { spawnLocalServer } = await import("../src/main/server")
 const { creditDanglingSweepForSpawn } = await import("../src/main/dangling-sweep-latch")
 const { collectMcpFileRefPaths } = await import("../src/main/codepuppy-mcp-secrets")
 const { findMcpServerRecord } = await import("../src/main/mcp-server-lifecycle")
+const { installGenerationFence } = await import("./generation-fence")
 const saved: Record<string, string | undefined> = {}
 const envKeys = ["SHELL", "CODEPUPPY_SECRETS_DISABLE", "CODEPUPPY_GLOBAL_DIR", "XDG_DATA_HOME", "XDG_STATE_HOME"]
 beforeEach(() => {
@@ -74,6 +75,7 @@ beforeEach(() => {
   process.env.XDG_DATA_HOME = join(home, "xdg-data")
   process.env.XDG_STATE_HOME = join(home, "xdg-state")
   warnings.length = 0
+  installGenerationFence(scratch)
 })
 afterEach(() => {
   clearOfficialConnectorRuntime()

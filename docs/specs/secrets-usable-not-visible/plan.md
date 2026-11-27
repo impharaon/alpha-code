@@ -815,7 +815,7 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 ## ⑥ 规格 v5：项目外读到的名单文件、env 只遮凭据字段
 
 - 依据：[规格 v5](spec.md) @ `5d56d0cae1`：BR-05、BR-06 的 v5 句与 AC-11、AC-12（来源：协调仓安全意图 U-43，owner 2026-11-27「intent 全部按照你的建议。」对 I-50、I-51 的批准）；[冻结设计](design.md) v3.3 §4.1、§4.3、§4.4、§4.5 的入口与契约不改签名；#1758。代码基线 `88c88edcee`（origin/alpha，含已合入的 `6a55937acd`）。继承 ①..⑤ 与 r9..r15 收据，不重审已定范围。
-- 核对：2026-11-27 编排器派单（Claude Opus 5.5）要求先改规格、写本节，再由同一会话先红后实施；规格 v5 与本节的编排器核对结果待回填。
+- 核对：2026-11-27 编排器（Claude Opus 5.5）核对：规格 v5 与本节通过（没有新增用户限制；全部批准档读项目外 `.env` 不再出卡、项目外 `.pem` 只给说明，均属 U-43「同一规则」）；另要求一项修正：值里内嵌的连接地址密码属凭据字段，见下文「⑥ 核对修正」。
 
 ### 改动
 
@@ -875,3 +875,12 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 - 静态：schema `bun typecheck` 145 files 无错；ext `bun typecheck` exit 0；ui-mac `bun typecheck` exit 0；14 个改动 TS 的 oxlint 0 warnings / 0 errors；ext `bun run build` exit 0；`git diff --check` 通过；`core.hooksPath` 仍为 `.githooks`，未安装依赖。
 - `affected-tests --list` exit 0：`affected tests: 138 of 746 test files`；含本节改动的 ext 六个测试文件、fixture-identity、old-name-scan、permission-risk。Schema 的 `packages/schema/src/codepuppy-protected-files.test.ts` 不在任何 `.gate-tests` runner 根下（schema 根为 `packages/schema/test/codepuppy-*.test.ts`），PR 门与夜间都不跑它；本节行为另由 ext 的受选用例覆盖。
 - 观察：生产「全部批准」档在 v5 前读项目外 `.env` 并非不问——引擎底座 `read *.env` ask 会出一张卡，批准后原值交给模型；`credentials.json`、`*.pem`、`.envrc` 等不带 `.env` 后缀的名单文件则不问且原样。v5 后两者都不问、返回安全视图（AC-11「读取没有批准卡片」）。
+
+### ⑥ 核对修正：值里内嵌的密码
+
+- 依据：编排器对 I-51 的核对修正（「只遮凭据类字段」中，值里内嵌的密码也是凭据字段）；规格 v5 BR-06 补句与 AC-12 扩写（同一版本，批准不变；v5 批准行的遗留只保留 BR-05 的「读前打印」边界）。设计文档、Schema 的 `.gate-tests` 根与文档检查器引用按编排器指示不在本轮处理。
+- 改动：`secret-values.ts` 新增 `urlPasswords`（`scheme://用户:密码@主机` 形状的值取出密码的书写形与解码形）与 `envView`（凭据名整值遮；否则只遮内嵌密码；源文里找不到该密码原文时整值遮），env、结构化文档每个叶子、assignments 每一行都经同一 `embedded` 采集密码，不论变量/字段名。`secret-read.ts` 的 `projectEnvRows` 按 `envView` 只把密码段换成遮盖符，截断在密码中间时不露出密码前缀。追加必要范围：`secret-mutations.ts`——视图里出现 `postgres://app:[REDACTED]@…` 后，write/edit/patch 写回时把「其余部分与当前值一致」的这一值恢复为当前 RHS，模板按同一视图匹配；否则会把占位符写进密码。register-policy 精确条数 99→100；场景 AC-12 行加 `DATABASE_URL`。
+- 红例 `cf39dc46d1`（当前实现上全部失败，密码原样到达）：secret-values `embedded URL passwords are credential fields in every format` 0/1；secret-read `env read view masks only embedded URL passwords` 0/1；secret-mutations `embedded URL password view restores through write/edit/patch` 0/3；register-policy `env URL values mask only the embedded password` 0/1。
+- 绿：ext 逐文件 secret-values 6、secret-read 5、secret-diff 2、secret-mutations 12、secret-mask 11、secret-files 10、register-policy 100；Schema 8；ui-mac gate-file-registry 25；场景 `gate slot -- … -t 'protected files ordinary env values stay visible'` 1 pass / 49 filtered。均 exit 0。
+- 移除臂（临时改写后 `git restore` 回到已暂存的修正）：`urlPasswords` 恒为空 → 上述四个文件的具名例各红（1+1+3+1 FAIL）；写回不认内嵌占位符 → secret-mutations 三条全红。第一次还原时修正尚未暂存，`git restore` 连带撤回了 `secret-values.ts` 的修正；已按原文重做、暂存后重跑全部改动文件，结果同上，之后的臂都还原到暂存版本。
+- 静态：schema、ext、ui-mac `bun typecheck` 均 exit 0；8 个改动 TS 的 oxlint 0 warnings / 0 errors。

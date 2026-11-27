@@ -443,7 +443,7 @@
 # 2026-11-24 退役(ADR-0014,1 个单用例宿主并进 packages/ui-mac/src/main/engine-cases.test.ts 的表,条数逐行判):packages/ui-mac/src/main/platform-credential-error.engine.test.ts
 # 2026-11-24 退役(ADR-0014,2 个单用例宿主并进 packages/ui-mac/src/main/subprocess-cases.scenario.test.ts 的表,条数逐行判):packages/ui-mac/src/main/catalog-refresher.scenario.test.ts、packages/ui-mac/src/main/models-catalog-v2.wiring.scenario.test.ts
 # 2026-11-24 退役(ADR-0014,3 个单用例宿主并进 packages/ui-mac/src/main/subprocess-cases.test.ts 的表,条数逐行判):packages/ui-mac/src/main/cloud-dispatch-gate.test.ts、packages/ui-mac/src/main/codepuppy-auth.test.ts、packages/ui-mac/src/main/codepuppy-platform-catalog.test.ts
-1	packages/ui-mac	src/main/network-egress.engine.scenario.test.ts	-	scenario 真引擎独立宿主;原 engine-cases.scenario 表的一行,退出码、精确 pass/0 fail 与单文件断言不变。 #1795:内层 darwin 9 条(原 6 条),其它平台 0 条;外层仍为 1 条。
+1	packages/ui-mac	src/main/network-egress.engine.scenario.test.ts	-	scenario 真引擎独立宿主;原 engine-cases.scenario 表的一行,退出码、精确 pass/0 fail 与单文件断言不变。 #1795:内层 darwin 9 条(原 6 条),其它平台 0 条;外层仍为 1 条。 #1757 I-46:内层 darwin 11 条(增 AC-14 两条)。
 1	packages/ui-mac	src/main/composer-tier-matrix.engine.scenario.test.ts	-	scenario 真引擎独立宿主;原 engine-cases.scenario 表的一行,退出码、精确 pass/0 fail 与单文件断言不变。
 1	packages/ui-mac	src/main/package-effect.engine.scenario.test.ts	-	scenario 真引擎独立宿主;原 engine-cases.scenario 表的一行,退出码、精确 pass/0 fail 与单文件断言不变。
 1	packages/ui-mac	src/main/project-config-commands.engine.scenario.test.ts	-	scenario 真引擎独立宿主;原 engine-cases.scenario 表的一行,退出码、精确 pass/0 fail 与单文件断言不变。

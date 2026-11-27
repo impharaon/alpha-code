@@ -463,10 +463,10 @@
 3	packages/ui-mac	src/main/package-manager-environment.test.ts	-	#1759 R2:真实 Node spawner/PTY 与 NpmConfig 薄适配的最终缓存投影、继承/删除键/管道/退出和加载失败回落;不以直接跑上游源码代替最终 spawn。精确条数=实测 3。
 2	packages/ui-mac	engine/file-access-transform.test.ts	-	R5 真实 FileAccess 源码执行的目标/读写元数据与精确构建变换锚；不复制服务。
 3	packages/ui-mac	src/main/directory-write-approval.test.ts	-	R4 真盘身份快照、真实 tracker、缺失目标准备、冲突/过期/换代、保护与原生失败重试；原生消费另由场景证明。
-19	packages/ext	src/hub-bridge.test.ts	-	既有 parentPort 请求簿的真实 builder/parser 应答；R6 只读写范围查询复用同一 id 与关闭/失败路径。
+21	packages/ext	src/hub-bridge.test.ts	-	既有 parentPort 请求簿的真实 builder/parser 应答；R6 只读写范围查询复用同一 id 与关闭/失败路径。
 8	packages/ui-mac	engine/package-manager-plan.test.ts	-	#1759 H1/H4:同一真实 scanner 的 source span/分支规划与三方言真实私有输入、重定向及 xtrace/allexport 与生产 electron-vite 配置加载路径;无包安装。精确条数=实测 8。
 2	packages/ui-mac	engine/package-manager-shell-transform.test.ts	-	#1759 H2:实际 Core/Plugin 构建适配与真实 Node spawner 的 Shell.create 私有描述符/准备次序/PID/终态;精确条数=实测 2。
-18	packages/ui-mac	src/main/codepuppy-sidecar-messages.test.ts	-	既有 sidecar 封闭消息解析与 #1759 H2 私有输入/真实调用身份;本轮变动文件据实登记，精确条数=实测 18。
+19	packages/ui-mac	src/main/codepuppy-sidecar-messages.test.ts	-	既有 sidecar 封闭消息解析与 #1759 H2 私有输入/真实调用身份;本轮变动文件据实登记;#1776 片 6 原生来源 sync 消息 +1,精确条数=实测 19。
 1	packages/ui-mac	src/main/package-manager-helper.test.ts	-	#1759 H4 native:真实双片 addon/strict adhoc helper、内核 audit 与 pidversion/映像、字节流和 fenced stdin;无 brew 安装或 Electron。精确条数=实测 1。
 1	packages/ui-mac	src/main/package-manager-execution.test.ts	-	#1759 H3/H4:真实 Node 节点簿、native helper claim/格式与一次消费、启动前 HTTP 零 spawn、启动后坏帧及正常退出清理全部进程组;不安装 brew。精确条数=实测 1。
 

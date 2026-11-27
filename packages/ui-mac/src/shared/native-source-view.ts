@@ -1,6 +1,7 @@
 // D6 片 6b(DESIGN-local-plugin-install §4.6;界面依据 design/current/customization-center/design.html#hub-native):
 // 定制中心本机文件条目的安全视图。身份与状态沿 §4.6 的 NativeFileState;其余是 main 算好的呈现事实。main 与 renderer 共用。
 import type { NativeFileRef, NativeFileState } from "../../../schema/src/codepuppy-project-config"
+import { PROJECT_HIDDEN_DIR } from "./project-hidden-dir"
 
 export type NativeSourceScopeV1 = "global" | "project"
 export type NativeSourceRowV1 = NativeFileState & {
@@ -55,7 +56,7 @@ export function nativeSourceScope(file: string, input: { home: string; project?:
     const ancestor = parts.slice(0, length).join("/") || "/"
     if (ancestor === input.home) break
     const prefix = ancestor === "/" ? "" : ancestor
-    if ([".opencode", ".codepuppy", ".claude", ".agents"].some((name) => file.startsWith(`${prefix}/${name}/`))) return "project"
+    if ([".opencode", PROJECT_HIDDEN_DIR, ".claude", ".agents"].some((name) => file.startsWith(`${prefix}/${name}/`))) return "project"
     if (file === `${prefix}/opencode.json` || file === `${prefix}/opencode.jsonc`) return "project"
   }
   return "global"

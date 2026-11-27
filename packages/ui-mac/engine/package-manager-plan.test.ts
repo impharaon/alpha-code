@@ -82,7 +82,9 @@ test("H3 environment carries only exported variables and the leaf's own prefix a
   }
   const sources = ["X=1; brew --prefix", "export X=1; brew --prefix", "X=1 brew --prefix", "X=1; export X; brew --prefix", "export X; X=1; brew --prefix", "set -a; X=1; brew --prefix", "set -a; set +a; X=1; brew --prefix", "PATH=/bin:/usr/bin; brew --prefix", "VALUE=changed; brew --prefix",
     "brew --prefix", "cd p && brew --prefix", "pushd p >/dev/null && brew --prefix", "cd p && cd - >/dev/null && brew --prefix", "export X=1; unset X; brew --prefix",
-    "unset VALUE; brew --prefix", "unset VALUE; VALUE=again; brew --prefix", "unset VALUE; export VALUE=again; brew --prefix", "VALUE=x brew --prefix; unset VALUE"]
+    "unset VALUE; brew --prefix", "unset VALUE; VALUE=again; brew --prefix", "unset VALUE; export VALUE=again; brew --prefix", "VALUE=x brew --prefix; unset VALUE",
+    // A branch-only unset is not certain; quoted operands and `--` are ordinary shell words.
+    "[ -n \"\" ] && unset VALUE; brew --prefix", "unset \"VALUE\"; brew --prefix", "unset 'VALUE'; brew --prefix", "unset -- VALUE; brew --prefix"]
   // A snapshot with an inherited OLDPWD/PWD: bash and sh drop OLDPWD at startup, every shell replaces PWD.
   for (const start of [snapshot, { ...snapshot, OLDPWD: "/inherited/old", PWD: "/inherited/pwd" }]) for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) for (const source of sources) {
     const real = spawnSync(shell, ["-c", source.replace("brew --prefix", "/usr/bin/env")], { cwd: physical, env: start, encoding: "utf8" })
@@ -91,6 +93,8 @@ test("H3 environment carries only exported variables and the leaf's own prefix a
     const expected = plannedAt(source, shell, start)
     for (const name of ["X", "PATH", "VALUE", "PWD", "OLDPWD"]) expect(`${shell} ${source} ${name}=${expected[name]}`).toBe(`${shell} ${source} ${name}=${actual[name]}`)
   }
+  // An unset operand that cannot be determined leaves the rest of the command unplanned.
+  expect(planner.planPackageManagerExecution({ manager: "homebrew", command: "unset $NOT_IN_SNAPSHOT; brew --prefix", shell: "/bin/bash", cwd: physical, env: snapshot })).toEqual([])
 })
 
 test("H1 a planned leaf's argv and cwd match the real shell; undeterminable words stay unplanned", () => {

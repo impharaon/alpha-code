@@ -147,6 +147,8 @@ export function createSecretFiles(roots: ProtectedFiles.ProtectedRoots) {
     // Protected files outside every source (another project's, once read) are re-checked without listing their directory.
     for (const file of tracked.values()) {
       if (disposed) return
+      // SPEC5-04 holds for registered files too: a link is read only while its literal target stays inside a source.
+      if ((await literalTarget(file.path, inside)) === undefined) continue
       const info = await available(() => stat(file.path, { bigint: true }))
       if (info?.isFile()) await available(() => capture(file, info))
     }

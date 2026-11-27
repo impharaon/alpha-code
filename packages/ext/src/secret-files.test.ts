@@ -242,6 +242,7 @@ console.log(JSON.stringify({first:first>0,later,edited:files.values().some(v=>Bu
 
 // Design §10 SPEC5-04: a link whose literal target (readlink, hop by hop) leaves every source is never walked, resolved or
 // read — e.g. a workspace link into the app's own fenced credential stores; links that stay inside a source still alias.
+// Files registered later (a command or the read tool named them) keep the same boundary; real files outside still register.
 test("links whose literal target leaves every source are not followed, also through several hops", async () => {
   const { root, roots } = await setup()
   const outside = path.join(root, "outside")
@@ -255,7 +256,12 @@ test("links whose literal target leaves every source are not followed, also thro
   await writeFile(path.join(roots.project, "data", "env.txt"), "API_KEY=fixture-chain-token\n")
   await symlink(path.join(roots.project, "data", "env.txt"), path.join(roots.project, "hop-c"))
   await symlink(path.join(roots.project, "hop-c"), path.join(roots.project, ".env.chain"))
-  const followed = [path.join(roots.project, "link-store"), path.join(roots.project, "hop-a"), path.join(roots.project, "hop-b")]
+  await writeFile(path.join(outside, "linked.env"), "API_KEY=fixture-linked-token\n")
+  await symlink(path.join(outside, "linked.env"), path.join(roots.project, ".env.link"))
+  await mkdir(path.join(root, "other"))
+  await writeFile(path.join(root, "other", ".env"), "API_KEY=fixture-registered-token\n")
+  const registered = [path.join(roots.project, ".env.link"), path.join(root, "other", ".env")]
+  const followed = [path.join(roots.project, "link-store"), path.join(roots.project, "hop-a"), path.join(roots.project, "hop-b"), registered[0]]
   await writeFile(path.join(root, "audit.mjs"), `
 import fs from 'node:fs/promises';export const touched=[];
 const followed=${JSON.stringify(followed)},outside=${JSON.stringify(outside + path.sep)};
@@ -265,10 +271,13 @@ export const stat=audit('stat',fs.stat),realpath=audit('realpath',fs.realpath),r
   expect(await nodeCollector(root, roots, `
 import {registerHooks} from 'node:module';
 registerHooks({resolve(name,context,next){return next(name==='node:fs/promises'&&context.parentURL?.endsWith('/collector.mjs')?new URL('./audit.mjs',import.meta.url).href:name,context)}});
-const {createSecretFiles}=await import('./collector.mjs');const audit=await import('./audit.mjs');
-const files=createSecretFiles(JSON.parse(process.argv[2]));await files.refresh();await files.refresh();
-console.log(JSON.stringify({touched:audit.touched,chain:files.values().some(v=>Buffer.from(v).toString()==='fixture-chain-token')}));files.dispose();
-`)).toEqual({ touched: [], chain: true })
+const {createSecretFiles,resolveProtectedFile}=await import('./collector.mjs');const audit=await import('./audit.mjs');
+const roots=JSON.parse(process.argv[2]),files=createSecretFiles(roots);await files.refresh();
+for(const file of ${JSON.stringify(registered)})files.track(await resolveProtectedFile(file,roots));
+await files.refresh();await files.refresh();
+const has=(token)=>files.values().some(v=>Buffer.from(v).toString()===token);
+console.log(JSON.stringify({touched:audit.touched,chain:has('fixture-chain-token'),linked:has('fixture-linked-token'),registered:has('fixture-registered-token')}));files.dispose();
+`)).toEqual({ touched: [], chain: true, linked: false, registered: true })
 })
 
 test("refresh arriving during capture waits for a fresh generation", async () => {

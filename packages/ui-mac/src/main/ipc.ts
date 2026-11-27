@@ -29,7 +29,9 @@ import { engineInternalDirectories } from "./engine-internal-directories"
 import { resolveAppPath } from "./apps"
 import { editorCliName } from "./platform"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
-import { registerComposerMedia } from "./composer-media-attachment"
+import { composerMediaDuration, registerComposerMedia } from "./composer-media-attachment"
+import { videoFfprobe } from "./codepuppy-video-environment"
+import { getLogger } from "./logging"
 import { stageComposerAttachment } from "./composer-attachment-stage"
 import { getStore } from "./store"
 import { GLOBAL_RENDERER_STORE, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
@@ -300,8 +302,11 @@ export function registerIpcHandlers(deps: Deps) {
   })
 
   // REQ-236 `#1553` AC2:PDF / Office 附件在用户选择、拖入、粘贴时存进会话实例目录的隐藏目录(composer-attachment-stage.ts)。
-  ipcMain.handle("composer-media-register", (_event, filePath: unknown, name: unknown, bytes: unknown, mime: unknown) =>
-    registerComposerMedia(filePath, name, bytes, mime),
+  ipcMain.handle("composer-media-register", (event, filePath: unknown, name: unknown, bytes: unknown, mime: unknown) =>
+    registerComposerMedia(event.sender.id, filePath, name, bytes, mime),
+  )
+  ipcMain.handle("composer-media-duration", (event, filePath: unknown) =>
+    composerMediaDuration(event.sender.id, filePath, videoFfprobe(), (line) => getLogger()?.warn(line)),
   )
   ipcMain.handle("composer-attachment-stage", (_event, directory: unknown, name: unknown, reader: unknown, bytes: unknown) =>
     stageComposerAttachment(directory, name, reader, bytes),

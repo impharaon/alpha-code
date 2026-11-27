@@ -883,7 +883,7 @@ r13 执行：新 worktree 无随包 native/runtime 目录，原声明生成器�
 ## #1760 集成
 
 - 依据：规格 v1 用户路径与 AC-01/02/15 的开发构建部分 @ impharaon/alpha-work `25afeda628`；视频设计 §4.1（附件 metadata「时长探测异步补回附件条，已准备时直接展示」「不等待 ffprobe 准备才允许发送」）、§4.2 L1、§10 @ impharaon/alpha-work `d8379759a8`；本仓 launcher 设计 v2 §4.2/§4.3（VIDEO-L1-v2）、v2.1、v2.2、v2.4 V24-R3 @ `aedea8af9f`；alpha-code#1775 正文「下一步 ②」。界面沿用 D1 附件条与 D4 工具卡，不另出稿。
-- 核对：<由实施提交按续派 Phase 行填写>
+- 核对：计划提交 `69a6d8b70d`；本轮 brief 的 Phase 为 PLAN then IMPLEMENT 同轮，无独立计划核对收据，不代写通过记录。
 
 ### 读码确定的开发构建缺口（origin/alpha `aedea8af9f`）
 
@@ -941,4 +941,4 @@ r13 执行：新 worktree 无随包 native/runtime 目录，原声明生成器�
 
 ### 偏离记录
 
-暂无。
+2026-11-27 · 时长实施提交：改动表之外的必要同链文件——`src/main/connector-launch-generation.ts` 只把清单 `formats` 的类型放宽到含 `recipe`（同一读取，launcher authority 已持有）；`resources/office-mcp/tools.json` 因 `assets.ts` 提取两个导出改变 `server.js` 字节，只用原生成器 `renderOfficeMcpTools` 的结果同步 `video-mcp/server.js` 摘要，两项原生摘要保持安装包 producer 的值（本机重建字节不同，见上节）；新增夹具 `src/main/fixtures/video/speech-en.ffprobe.json` 是 pinned ffprobe 9.1 对同目录 `speech-en.wav` 的真实输出，来源记入同目录 `provenance.json`。

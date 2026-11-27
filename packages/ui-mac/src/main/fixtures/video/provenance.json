@@ -62,5 +62,12 @@
       ]
     ],
     "scene_capture": "Unchanged progress frame= lines; copyts/null out_time_us remains zero, so processing progress uses the actual unfiltered frame count."
+  },
+  "speech-en.ffprobe.json": {
+    "source": "captured stdout of the pinned ffprobe on speech-en.wav in the same fixture directory",
+    "codec_pin": "ffmpeg/darwin-arm64/9.1-openh264-2.7.0-dav1d-1.5.3",
+    "codec_archive_sha256": "f3b4b956ccd84f0415f1e1cece5b18cc336e95fa345507f92b14fa345bdf4288",
+    "operation": "ffprobe -v error -show_format -show_streams -of json speech-en.wav (ffprobe version 9.1)",
+    "sha256": "bed88f35265f8a35712ba530b8a12742ac8656aabd06dd4eb41590bed8da9b08"
   }
 }

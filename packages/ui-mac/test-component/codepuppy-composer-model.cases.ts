@@ -5224,6 +5224,7 @@ describe("media attachments in the production composer", () => {
     let stages = 0
     installApi({ extras: { attachments: {
       media: async () => ({ ok: true as const, media }),
+      mediaDuration: () => new Promise<number | null>(() => {}),
       stage: async () => { stages++; throw new Error("media must not be copied") },
     } } })
     const mounted = mount(() => createComponent(CodePuppyComposerRuntime, {
@@ -5257,9 +5258,37 @@ describe("media attachments in the production composer", () => {
     mounted.dispose()
   })
 
+  test("media duration fills in on the same attached card after it is already sendable", async () => {
+    const durations = new Map<string, ReturnType<typeof deferred<number | null>>>()
+    installApi({ extras: { attachments: {
+      media: async (file: File) => ({ ok: true as const, media: { kind: "video" as const, path: `/outside/${file.name}`, name: file.name, bytes: 0, durationMs: null } }),
+      mediaDuration: (path: string) => { const pending = deferred<number | null>(); durations.set(path, pending); return pending.promise },
+      stage: async () => { throw new Error("media must not be copied") },
+    } } })
+    const mounted = mount(() => createComponent(CodePuppyComposerRuntime, {
+      mode: "home", directory: () => "/project", command, initialText: "总结视频", projects,
+      modelContract: { list: async () => platformModels, current: async () => undefined, switch: async () => {} },
+    }))
+    await waitFor(() => expect(composerModel()).not.toBeNull())
+    const input = mounted.host.querySelector<HTMLInputElement>('input[type="file"]')!
+    Object.defineProperty(input, "files", { configurable: true, value: [new File([], "kept.mp4", { type: "video/mp4" }), new File([], "removed.mp4", { type: "video/mp4" })] })
+    input.dispatchEvent(new Event("change", { bubbles: true }))
+    await waitFor(() => expect(durations.size).toBe(2))
+    const cards = () => [...mounted.host.querySelectorAll('.a-comp-att[data-kind="video"]')]
+    expect(cards()).toHaveLength(2)
+    expect(mounted.host.querySelector<HTMLButtonElement>(".a-comp-send")!.disabled).toBe(false)
+    cards()[1]!.querySelector<HTMLButtonElement>(".a-comp-att-x")!.click()
+    durations.get("/outside/removed.mp4")!.resolve(61_000)
+    durations.get("/outside/kept.mp4")!.resolve(754_000)
+    await waitFor(() => expect(cards()[0]!.textContent).toContain("12:34"))
+    expect(cards()).toHaveLength(1)
+    expect(mounted.host.textContent).not.toContain("01:01")
+    mounted.dispose()
+  })
+
   test("a pending selected media registration belongs to its draft after remount", async () => {
     const pending = deferred<{ ok: true; media: { kind: "audio"; path: string; name: string; bytes: number; durationMs: null } }>()
-    installApi({ extras: { attachments: { media: () => pending.promise, stage: async () => { throw new Error("not a document") } } } })
+    installApi({ extras: { attachments: { media: () => pending.promise, mediaDuration: async () => null, stage: async () => { throw new Error("not a document") } } } })
     const snapshot: Array<Parameters<NonNullable<CodePuppyComposerRuntimeProps["onDraftSnapshot"]>>[0]> = []
     const props = { mode: "home" as const, projects, directory: () => "/project", command,
       modelContract: { list: async () => platformModels, current: async () => undefined, switch: async () => {} } }

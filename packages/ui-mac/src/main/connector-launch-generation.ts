@@ -34,7 +34,7 @@ export function forkLauncherAuthority(input: {
     input.log(`connector launchers are not built in this dev tree (${bundleDirectory}); package runners keep their declared commands`)
     return undefined
   }
-  const manifest = JSON.parse(readFileSync(input.officeMcpManifest, "utf8")) as { formats: Record<string, { command: readonly string[] }> }
+  const manifest = JSON.parse(readFileSync(input.officeMcpManifest, "utf8")) as { formats: Parameters<typeof createLauncherAssetAuthority>[0]["declarations"] }
   return createLauncherAssetAuthority({ bundleDirectory, userData: input.userData, platform, bundle, pins: input.pins, packageManagerEnv: input.packageManagerEnv, declarations: manifest.formats })
 }
 

@@ -8,7 +8,7 @@ import { promisify } from "node:util"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { LauncherEnvironment, LauncherPlatform, ConnectorLaunchApi, ConnectorLaunchHost, ManagedFirstPartyBinding, ManagedPinnedFilesResult, PinnedEntryRecipe, PinnedPreparationProgress, DownloadFailureEvidence, PinnedFileDelivery } from "../../../util/src/codepuppy-connector-launch"
 import { canonicalJsonDigest } from "../../../util/src/codepuppy-hash"
-import { declaredFirstPartyTools } from "../../../core/src/mcp/codepuppy-first-party-mcp"
+import { declaredFirstPartyTools, pinnedRecipeSha256 } from "../../../core/src/mcp/codepuppy-first-party-mcp"
 import { ensurePinnedDirectory } from "./pinned-files"
 import type { PinnedFiles, PinnedFileId, EnsurePinnedFileResult } from "../../../util/src/codepuppy-pinned-files"
 import lock from "../../resources/connector-launchers/lock.json"
@@ -172,7 +172,7 @@ export async function checkLauncherBundle(directory: string, platform: LauncherP
 }
 
 /** This descriptor consumes #1759's already computed env; it never computes package-manager locations. */
-export function describeLauncherEnvironment(input: { bundleDirectory: string; userData: string; platform: LauncherPlatform; bundle: LauncherBundle; pins: PinnedFiles; packageManagerEnv: LauncherEnvironment["packageManagerEnv"]; declarations: Record<string, { command: readonly string[] }> }): LauncherEnvironment {
+export function describeLauncherEnvironment(input: { bundleDirectory: string; userData: string; platform: LauncherPlatform; bundle: LauncherBundle; pins: PinnedFiles; packageManagerEnv: LauncherEnvironment["packageManagerEnv"]; declarations: Record<string, { command: readonly string[]; recipe?: readonly PinnedEntryRecipe[] }> }): LauncherEnvironment {
   if (input.bundle.platform !== input.platform || input.bundle.pinSet !== launcherPinSet) throw Error("launcher descriptor differs from bundle")
   const userData = realpathSync(input.userData)
   const runtimeRoot = join(userData, USER_DATA_LAYOUT.connectorRuntime)
@@ -302,16 +302,28 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
         { kind: "other", detail: "Managed pinned-file binding, declaration or recipe is not current" },
       )
     }
-    const files: Extract<ManagedPinnedFilesResult, { ok: true }>["files"] = []
+    return prepareRecipeEntries(context.files, recipes, binding.recipeSha256, ids, signal, (update) => report({ ...update, sequence: ++sequence }))
+  }
+  /** One download → unpack → verify path and one in-flight table for every consumer of a bundled recipe. */
+  const prepareRecipeEntries = async (
+    files: Pick<ConnectorLaunchHost, "ensureFile">,
+    recipes: ReadonlyMap<string, PinnedEntryRecipe>,
+    recipeSha256: string,
+    ids: readonly string[],
+    signal: AbortSignal,
+    report: (update: Omit<PinnedPreparationProgress, "sequence">) => void,
+  ): Promise<{ result: ManagedPinnedFilesResult; delivery: PinnedFileDelivery }> => {
+    const pins = new Map(input.pins.files.map((file) => [file.id, file]))
+    const prepared: Extract<ManagedPinnedFilesResult, { ok: true }>["files"] = []
     const deliveries: PinnedFileDelivery[] = []
     for (const id of ids) {
-      const recipe = recipes.get(id as PinnedEntryRecipe["id"])!
+      const recipe = recipes.get(id)!
       const pin = pins.get(recipe.id)!
       const emit = (update: Omit<PinnedPreparationProgress, "id" | "sequence">) => {
-        if (!signal.aborted) report({ ...update, id: recipe.id, sequence: ++sequence })
+        if (!signal.aborted) report({ ...update, id: recipe.id })
       }
       emit({ phase: "download", receivedBytes: 0, totalBytes: pin.bytes })
-      const delivery = await context.files.ensureFile(recipe.id, signal, (receivedBytes, totalBytes) =>
+      const delivery = await files.ensureFile(recipe.id, signal, (receivedBytes, totalBytes) =>
         emit({ phase: "download", receivedBytes, totalBytes }),
       )
       if (!delivery.result.ok) {
@@ -328,7 +340,7 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
       const key = canonicalJsonDigest({
         id: recipe.id,
         sha256: pin.sha256,
-        recipeSha256: binding.recipeSha256,
+        recipeSha256,
         platform: input.platform,
       })
       const shared =
@@ -338,14 +350,14 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
             environment,
             pin,
             recipe,
-            binding.recipeSha256,
+            recipeSha256,
             archive,
             realpathSync(input.userData),
           ).finally(() => entries.delete(key))
           entries.set(key, work)
           return work
         })()
-      const prepared = await new Promise<
+      const entry = await new Promise<
         | { ok: true; path: string }
         | { ok: false; error: "disk" | "integrity" | "cancelled"; failure?: DownloadFailureEvidence }
       >((resolve) => {
@@ -373,22 +385,22 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
           },
         )
       })
-      if (!prepared.ok) {
+      if (!entry.ok) {
         emit({
-          phase: prepared.error === "cancelled" ? "cancelled" : "failed",
-          error: prepared.error,
-          ...(prepared.failure ? { failure: prepared.failure } : {}),
+          phase: entry.error === "cancelled" ? "cancelled" : "failed",
+          error: entry.error,
+          ...(entry.failure ? { failure: entry.failure } : {}),
         })
-        return failed({ ok: false, error: prepared.error }, prepared.failure)
+        return failed({ ok: false, error: entry.error }, entry.failure)
       }
       emit({ phase: "verify" })
-      files.push({ id: recipe.id, path: prepared.path })
-      deliveries.push({ result: { ...delivery.result, path: prepared.path } })
+      prepared.push({ id: recipe.id, path: entry.path })
+      deliveries.push({ result: { ...delivery.result, path: entry.path } })
       emit({ phase: "ready" })
     }
     return signal.aborted
       ? failed({ ok: false, error: "cancelled" })
-      : { result: { ok: true, files }, delivery: deliveries.at(-1)! }
+      : { result: { ok: true, files: prepared }, delivery: deliveries.at(-1)! }
   }
   return {
     environment,
@@ -433,6 +445,19 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
       report: (update: PinnedPreparationProgress) => void,
     ): Promise<PinnedFileDelivery> {
       return (await prepareFiles(context, { binding, ids: [id] }, signal, report)).delivery
+    },
+    /** Main's own use of a bundled declaration's entry (no managed service asks): same recipe digest, so the service's later ensure reuses it. */
+    async prepareBundledEntry(
+      files: Pick<ConnectorLaunchHost, "ensureFile">,
+      declarationId: string,
+      id: PinnedFileId,
+      signal: AbortSignal,
+    ): Promise<ManagedPinnedFilesResult> {
+      const recipe = Object.hasOwn(input.declarations, declarationId) ? input.declarations[declarationId]!.recipe : undefined
+      const recipes = new Map(recipe?.map((entry) => [entry.id, entry]))
+      const pin = input.pins.files.find((file) => file.id === id)
+      if (!recipes.has(id) || !pin || (pin.target !== "any" && pin.target !== input.platform)) return { ok: false, error: "unknown-file" }
+      return (await prepareRecipeEntries(files, recipes, pinnedRecipeSha256(recipe), [id], signal, () => {})).result
     },
   }
 }

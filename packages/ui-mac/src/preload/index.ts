@@ -142,6 +142,7 @@ const api: ElectronAPI = {
   // REQ-236 `#1553` AC2:PDF / Office 附件存一份到会话实例目录的隐藏目录(main/composer-attachment-stage.ts)。
   attachments: {
     media: (file) => ipcRenderer.invoke("composer-media-register", webUtils.getPathForFile(file), file.name, file.size, file.type),
+    mediaDuration: (path) => ipcRenderer.invoke("composer-media-duration", path),
     stage: (directory, name, reader, bytes) => ipcRenderer.invoke("composer-attachment-stage", directory, name, reader, bytes),
   },
   getDefaultServerUrl: () => ipcRenderer.invoke("get-default-server-url"),

@@ -950,6 +950,19 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     const directory = props.directory()
     if (directory) setAttachments((xs) => revalidateStagedDirectory(xs, directory))
   })
+  // #1775 (design §4.1): a media attachment is attached and sendable at once; its duration fills in when main's probe
+  // answers. Only the same attachment in this instance receives it; one removed or carried to another draft does not.
+  const durationRequested = new Set<string>()
+  createEffect(() => {
+    for (const item of attachments()) {
+      if ((item.kind !== "video" && item.kind !== "audio") || item.durationMs !== null || durationRequested.has(item.id)) continue
+      durationRequested.add(item.id)
+      void window.api.attachments.mediaDuration(item.path).then((durationMs) => {
+        if (disposed || durationMs === null) return
+        setAttachments((xs) => xs.map((x) => (x.id === item.id && (x.kind === "video" || x.kind === "audio") && x.path === item.path ? { ...x, durationMs } : x)))
+      })
+    }
+  })
   const [dragOver, setDragOver] = createSignal(false)
   // REQ-126:有附件正在读盘(FileReader 未 settle)。这段窗口里内容既不在 attachments() 里、
   // 也无处可存 —— 宿主据此拦住会触发重挂的操作(见 onAttachmentReadPending)。

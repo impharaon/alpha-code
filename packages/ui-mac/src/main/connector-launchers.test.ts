@@ -15,7 +15,7 @@ import { basename, dirname, join, resolve } from "node:path"
 import pins from "../../resources/pinned-files.json"
 import type { LauncherPlatform, ManagedFirstPartyBinding, PinnedEntryRecipe, PinnedPreparationProgress } from "../../../util/src/codepuppy-connector-launch"
 import type { PinnedFiles } from "../../../util/src/codepuppy-pinned-files"
-import { checkLauncherBundle, connectorNodeSigningOptions, createLauncherAssetAuthority, describeLauncherEnvironment, extractLauncherArchive, finalizeLauncherSignatures, launcherFileDigest, launcherPinSet, writeLauncherInventory } from "./connector-launchers"
+import { checkLauncherBundle, connectorNodeSigningOptions, createLauncherAssetAuthority, describeLauncherEnvironment, extractLauncherArchive, finalizeLauncherSignatures, hostLauncherPlatform, launcherBundleDirectory, launcherFileDigest, launcherPinSet, writeLauncherInventory } from "./connector-launchers"
 import { buildConnectorLaunchers } from "../../scripts/build-connector-launchers"
 import { launcherFixtureSamples, launcherHeader, writeLauncherFixture } from "../../test-component/connector-launcher-fixture"
 
@@ -29,7 +29,7 @@ async function fixture(platform: LauncherPlatform = "darwin-arm64") {
   const canonical = await realpath(root)
   const resources = join(canonical, "resources")
   const { directory, entries, bundle } = await writeLauncherFixture(resources, platform)
-  const input = { resources, userData: canonical, platform, bundle, pins: pins as PinnedFiles, packageManagerEnv: { npm_config_cache: join(canonical, "r1-cache") }, declarations: { video: { command: ["{codepuppyNode}", "server.js", "--cache-root", "{codepuppyCacheRoot}"] } } }
+  const input = { bundleDirectory: directory, userData: canonical, platform, bundle, pins: pins as PinnedFiles, packageManagerEnv: { npm_config_cache: join(canonical, "r1-cache") }, declarations: { video: { command: ["{codepuppyNode}", "server.js", "--cache-root", "{codepuppyCacheRoot}"] } } }
   return { root: canonical, resources, directory, entries, bundle, input }
 }
 
@@ -360,4 +360,19 @@ test("Python mirror stages the authority's decoded filename and repairs corrupt 
   expect(await readFile(mirror)).toEqual(bytes)
   expect(downloads).toBe(1)
   expect((await readdir(dirname(mirror)))).toEqual([basename(mirror)])
+})
+
+// Integration layer: a dev run reads the exact prebuild output the packager copies; only the two shipped targets have one.
+test("the launcher bundle directory follows the packager's copy source in dev and its destination when packaged", async () => {
+  const { getConfig } = await import("../../electron-builder.config")
+  const entries = getConfig("prod").extraResources
+  const entry = Array.isArray(entries) ? entries.find((item) => typeof item !== "string" && item.to === "connector-launchers/") : undefined
+  if (!entry || typeof entry === "string") throw Error("launchers are not packaged")
+  const root = "/repo/packages/ui-mac/resources"
+  for (const [platform, os] of [["darwin-arm64", "mac-arm64"], ["win32-x64", "win-x64"]] as const) {
+    // Trailing separators are the packager's directory-copy spelling, not part of the location.
+    expect(launcherBundleDirectory({ resourcesRoot: root, packaged: false, platform })).toBe(join(root, "..", entry.from.replace("${os}-${arch}", os)).replace(/\/$/, ""))
+    expect(launcherBundleDirectory({ resourcesRoot: "/App/Contents/Resources", packaged: true, platform })).toBe(join("/App/Contents/Resources", entry.to).replace(/\/$/, ""))
+  }
+  expect([hostLauncherPlatform("darwin", "arm64"), hostLauncherPlatform("win32", "x64"), hostLauncherPlatform("darwin", "x64"), hostLauncherPlatform("linux", "x64")]).toEqual(["darwin-arm64", "win32-x64", undefined, undefined])
 })

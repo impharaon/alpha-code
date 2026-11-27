@@ -27,6 +27,11 @@ export function hostLauncherPlatform(platform: NodeJS.Platform = process.platfor
   return undefined
 }
 
+/** The shipped bundle sits in the packaged resources; a dev run reads the same prebuild output the packager copies from. */
+export function launcherBundleDirectory(input: { resourcesRoot: string; packaged: boolean; platform: LauncherPlatform }) {
+  return input.packaged ? join(input.resourcesRoot, "connector-launchers") : join(input.resourcesRoot, "..", CONNECTOR_LAUNCHER_BUILD_DIR, input.platform === "darwin-arm64" ? "mac-arm64" : "win-x64")
+}
+
 export function launcherEntries(platform: LauncherPlatform) {
   const windows = platform === "win32-x64"
   const npm = windows ? "node/node_modules/npm" : "node/lib/node_modules/npm"
@@ -158,11 +163,11 @@ export async function checkLauncherBundle(directory: string, platform: LauncherP
 }
 
 /** This descriptor consumes #1759's already computed env; it never computes package-manager locations. */
-export function describeLauncherEnvironment(input: { resources: string; userData: string; platform: LauncherPlatform; bundle: LauncherBundle; pins: PinnedFiles; packageManagerEnv: LauncherEnvironment["packageManagerEnv"]; declarations: Record<string, { command: readonly string[] }> }): LauncherEnvironment {
+export function describeLauncherEnvironment(input: { bundleDirectory: string; userData: string; platform: LauncherPlatform; bundle: LauncherBundle; pins: PinnedFiles; packageManagerEnv: LauncherEnvironment["packageManagerEnv"]; declarations: Record<string, { command: readonly string[] }> }): LauncherEnvironment {
   if (input.bundle.platform !== input.platform || input.bundle.pinSet !== launcherPinSet) throw Error("launcher descriptor differs from bundle")
   const userData = realpathSync(input.userData)
   const runtimeRoot = join(userData, USER_DATA_LAYOUT.connectorRuntime)
-  const root = input.bundle.form === "expanded" ? join(realpathSync(input.resources), "connector-launchers") : join(userData, USER_DATA_LAYOUT.connectorLaunchers, launcherPinSet, input.platform)
+  const root = input.bundle.form === "expanded" ? realpathSync(input.bundleDirectory) : join(userData, USER_DATA_LAYOUT.connectorLaunchers, launcherPinSet, input.platform)
   const pin = input.pins.files.find((file) => file.family === "python" && file.target === input.platform)
   if (!pin) throw Error("launcher Python pin missing")
   const build = new URL(pin.originUrl).pathname.split("/").at(-2)!
@@ -185,7 +190,7 @@ export function createLauncherAssetAuthority(input: Parameters<typeof describeLa
   let pythonMirror: Promise<void> | undefined
   let pending: Promise<LauncherEnvironment> | undefined
   const resolveAssets = async () => {
-    const bundled = join(input.resources, "connector-launchers")
+    const bundled = input.bundleDirectory
     await checkLauncherBundle(bundled, input.platform)
     if (input.bundle.form === "expanded") return environment
     const destination = dirname(dirname(environment.uv))

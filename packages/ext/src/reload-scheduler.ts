@@ -21,7 +21,8 @@
 //   · 有会话在跑且不是 force ⇒ 零重载,等下一次会话事件再判(重载会取消任何一个会话里开着的审批卡,所以等的是全进程)。
 //   · 全部明确空闲(或 force)⇒ **再查一次**(把「查到重载」的窗口压到一次进程内往返;这一次也不许查不到)
 //     ⇒ 恰好一次 `location/reload` ⇒ 向 main 逐个 generation 报 reloaded。
-//   · 重载失败 ⇒ 保留队列、报 failed、下一次事件再试;连败 3 次停止自动重试(仍报最后一条 failed)。绝不降级成「可用」。
+//   · 重载失败 ⇒ 保留队列、报 failed;稍后自己再判一次(引擎空闲就重载,有会话在跑就照常等会话事件),不依赖还会不会有
+//     下一次事件;连败 3 次停止自动重试(仍报最后一条 failed)。绝不降级成「可用」。
 //   · 一直忙(> 5 分钟):只记一行日志,继续等 —— 不打断(约束 4);用户要立刻生效走 force。
 //
 // 实例登记:每个 Location 的 ext `setup` 登记 { directory, token };**只因该 setup 返回的 Cleanup 注销**,且只注销
@@ -81,6 +82,8 @@ export type ReloadScheduler = {
 type Queued = { generation?: number; scope: ReloadScope; reason: string; force: boolean; since: number }
 
 const STATUS_TIMEOUT_MS = 3_000
+/** After a failed reload, when the scheduler judges again by itself (a busy engine still waits for its session events). */
+const RETRY_DELAY_MS = 1_000
 const MAX_FAILURES = 3
 const LONG_WAIT_MS = 5 * 60 * 1000
 const UNAVAILABLE = "engine status unavailable — restart the app if this persists"
@@ -92,9 +95,11 @@ export function createReloadScheduler(deps: {
   log: (line: string) => void
   error: (line: string) => void
   statusTimeoutMs?: number
+  retryDelayMs?: number
   now?: () => number
 }): ReloadScheduler {
   const statusTimeoutMs = deps.statusTimeoutMs ?? STATUS_TIMEOUT_MS
+  const retryDelayMs = deps.retryDelayMs ?? RETRY_DELAY_MS
   const now = deps.now ?? Date.now
   const instances = new Map<string, object>()
   let queue: Queued[] = []
@@ -103,6 +108,16 @@ export function createReloadScheduler(deps: {
   let again = false
   const lastWaiting = new Map<number, string>()
   let longWaitLogged: Queued | undefined
+  let retry: ReturnType<typeof setTimeout> | undefined
+  /** A failed reload is judged again without waiting for an event that may never come. */
+  function retryLater() {
+    if (retry) return
+    retry = setTimeout(() => {
+      retry = undefined
+      if (queue.length > 0) tick()
+    }, retryDelayMs)
+    ;(retry as { unref?: () => void }).unref?.()
+  }
 
   /** 进程级 active 会话数;查不到 ⇒ "unknown"。 */
   async function busy(call: EngineRequest): Promise<number | "unknown"> {
@@ -201,6 +216,7 @@ export function createReloadScheduler(deps: {
         return
       }
       reportAll(members, "failed", directories, `reload failed (attempt ${failures}/${MAX_FAILURES}); retrying when the engine is idle`)
+      retryLater()
       return
     }
     failures = 0

@@ -11,6 +11,7 @@ import { renderPackageInstruction } from "@opencode/plugin/codepuppy-package-run
 import { pluginInstructionDefinition } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
 import { pluginText, renderPluginText } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 import { pluginDataDirectory, publicPluginOption } from "../../ui-mac/src/shared/installed-plugin-settings"
+import { PROJECT_HIDDEN_DIR } from "../../ui-mac/src/shared/project-hidden-dir"
 import { allInstalledPluginInstructions, installedPluginPackage } from "./plugin-package-skills"
 import { managedPackageEntryAllowedHere, managedSkillAllowedHere, managedMcpAllowedHere } from "./package-scope"
 import { readPackageAllowSet } from "./gen-skill-paths"
@@ -188,7 +189,7 @@ export async function registerPackageInvocations(
     if (!settings) throw new Error("dependency_missing: package DATA for " + scope.item.entry.sourceName)
     const root =
       mode === "project"
-        ? join(project, ".codepuppy", "agent-memory", scope.item.installed.key, scope.item.name)
+        ? join(project, PROJECT_HIDDEN_DIR, "agent-memory", scope.item.installed.key, scope.item.name)
         : join(
             pluginDataDirectory(settings.dataHome, settings.packageId),
             "agent-memory",

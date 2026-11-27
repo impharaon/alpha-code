@@ -24,6 +24,7 @@ import {
   parseUvResolvedValue,
   readUvLaunchEnvironment,
   normalizeUvLaunchDeclaration,
+  normalizeUvLaunchSnapshotFirst,
   checkUvPinnedPythonRequest,
   uvEditableInstallArguments,
 } from "@opencode/core/mcp/codepuppy-uv-launch"
@@ -1923,10 +1924,14 @@ test("uv remote requirements keep credential rotation offline and detect changed
         : current.spawner.spawn(command)) })
     })).pipe(Layer.provide(hostEnvironmentLayer))
     const launchers = { ...input.launchers, environment: { ...input.launchers.environment, XDG_CACHE_HOME: path.join(input.root, "owned-cache") } }
-    const invoke = (offline: boolean, token: string, version = "one") => {
+    const request = (offline: boolean, token: string, version = "one") => {
       const replace = (value: string) => value.replaceAll(capture.remoteOrigin.slice("http://".length), origin.slice("http://".length)).replaceAll(capture.remoteOrigin.split(":").at(-1)!, String(server.port)).replaceAll("owned-first", token).replaceAll("version=one", "version=" + version)
-      return Effect.runPromise(Effect.scoped(normalizeUvLaunchDeclaration({ ...input, launchers, python, cwd: input.root, environment: { ...input.environment, HTTPS_PROXY: "", HTTP_PROXY: "", NO_PROXY: "127.0.0.1", XDG_CACHE_HOME: path.join(input.root, "unbound-cache"), BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(input.root, "test-bun-cache") }, syntax: "uvx", arguments: [...(offline ? ["--offline"] : []), ...capture.remoteArguments.map(replace)], declaration: parseUvToolSettings(replace(offline ? capture.remoteOfflineSettings : capture.remoteSettings)) })).pipe(Effect.provide(layer)))
+      return { ...input, launchers, python, cwd: input.root, environment: { ...input.environment, HTTPS_PROXY: "", HTTP_PROXY: "", NO_PROXY: "127.0.0.1", XDG_CACHE_HOME: path.join(input.root, "unbound-cache"), BUN_RUNTIME_TRANSPILER_CACHE_PATH: path.join(input.root, "test-bun-cache") }, syntax: "uvx" as const, arguments: [...(offline ? ["--offline"] : []), ...capture.remoteArguments.map(replace)], declaration: parseUvToolSettings(replace(offline ? capture.remoteOfflineSettings : capture.remoteSettings)) }
     }
+    const invoke = (offline: boolean, token: string, version = "one", requirementSnapshots?: "prefer") =>
+      Effect.runPromise(Effect.scoped(normalizeUvLaunchDeclaration({ ...request(offline, token, version), ...(requirementSnapshots ? { requirementSnapshots } : {}) })).pipe(Effect.provide(layer)))
+    // The prepare decision: the snapshot key with a ready preparation never asks the source; a miss does.
+    const restart = (ready: boolean) => Effect.runPromise(Effect.scoped(normalizeUvLaunchSnapshotFirst(request(false, "owned-rotated"), () => Effect.succeed(ready))).pipe(Effect.provide(layer)))
     const key = (value: Awaited<ReturnType<typeof invoke>>) => connectorPreparationKey({ runner: "uv-tool", launchers, ...value })
     const first = await invoke(false, "owned-first")
     expect(requests).toBe(1)
@@ -1935,6 +1940,15 @@ test("uv remote requirements keep credential rotation offline and detect changed
     const persisted = (readdirSync(path.join(input.root, "owned-cache"), { recursive: true }) as string[]).map(name => path.join(input.root, "owned-cache", name)).filter(file => statSync(file).isFile()).map(file => readFileSync(file).toString("latin1"))
     expect(persisted.length).toBeGreaterThan(0)
     for (const secret of ["owned-first", "owned-fake-secret"]) expect(persisted.filter(text => text.includes(secret))).toEqual([])
+    // BR-11/AC-10: the unchanged declaration on a restart reads its source snapshot first; the source is not asked even when
+    // it would now refuse, so a prepared hit never waits on (or fails at) the network.
+    status = 403
+    const restarted = await invoke(false, "owned-rotated", "one", "prefer")
+    expect(key(restarted)).toBe(key(first))
+    expect(restarted.requirementSnapshot).toBe(true)
+    expect(first.requirementSnapshot).toBe(false)
+    expect(requests).toBe(1)
+    status = 200
     const cached = await invoke(true, "owned-rotated")
     expect(key(cached)).toBe(key(first))
     expect(requests).toBe(1)
@@ -1952,6 +1966,15 @@ test("uv remote requirements keep credential rotation offline and detect changed
     const facts = JSON.stringify({ requirements: cached.requirements, options: cached.options, configuration: cached.configuration })
     expect(facts).not.toContain("owned-first")
     expect(facts).not.toContain("owned-fake-secret")
+    status = 200
+    body = "packaging<25\n"
+    const before = requests
+    const hit = await restart(true)
+    expect(requests).toBe(before)
+    const refreshed = await restart(false)
+    expect(requests).toBe(before + 1)
+    expect(key(refreshed)).not.toBe(key(hit))
+    expect(refreshed.requirementSnapshot).toBe(false)
   } finally { server.stop(true) }
 })
 

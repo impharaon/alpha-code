@@ -17,7 +17,7 @@ import { commandHeadBase } from "@opencode/util/codepuppy-command-head"
 import { canonicalJsonDigest } from "@opencode/util/codepuppy-hash"
 import { Environment } from "../environment/index.js"
 import { connectorNpmDefaults, readNpmLaunchDeclaration, readNpmLaunchEnvironment, normalizeNpmLaunchDeclaration, installNpmConnector } from "./codepuppy-npm-launch.js"
-import { parseUvToolSettings, readUvLaunchEnvironment, uvEditableInstallArguments, readUvLaunchDeclaration, normalizeUvLaunchDeclaration, checkUvPinnedPythonRequest, installUvConnector, uvPythonRequest } from "./codepuppy-uv-launch.js"
+import { parseUvToolSettings, readUvLaunchEnvironment, uvEditableInstallArguments, readUvLaunchDeclaration, normalizeUvLaunchDeclaration, normalizeUvLaunchSnapshotFirst, checkUvPinnedPythonRequest, installUvConnector, uvPythonRequest } from "./codepuppy-uv-launch.js"
 import { connectorPreparationKey } from "./codepuppy-connector-key.js"
 import { ConnectorPreparationProgress, connectorStderrTargets, connectorUrlTargets } from "./codepuppy-connector-diagnostic.js"
 import { classifyStartFailure } from "./codepuppy-startup.js"
@@ -148,13 +148,16 @@ export function prepareConnectorLaunch(input: {
         ? { runner: "npm-exec" as const, syntax: name === "npx" ? "npx" as const : "npm-exec" as const, arguments: args }
         : { runner: "uv-tool" as const, syntax: name === "uvx" ? "uvx" as const : "uv" as const, arguments: args }
       const readInput = { launchers, python, temporary, cwd: input.cwd, environment: environment("0".repeat(64)) }
+      const keyOf = (value: { runner: "npm-exec"; value: Awaited<Effect.Success<ReturnType<typeof normalizeNpmLaunchDeclaration>>> } | { runner: "uv-tool"; value: Effect.Success<ReturnType<typeof normalizeUvLaunchDeclaration>> }) =>
+        connectorPreparationKey({ runner: input.runner, launchers, requirements: value.value.requirements, options: value.runner === "npm-exec" ? value.value.resolutionOptions : value.value.options, configuration: value.value.configuration })
       const normalized = source.runner === "npm-exec"
         ? { runner: "npm-exec" as const, value: yield* retry(normalizeNpmLaunchDeclaration({ ...readInput, ...source })) }
         : { runner: "uv-tool" as const, value: yield* retry(Effect.gen(function* () {
           const declaration = yield* readUvLaunchDeclaration({ ...readInput, ...source })
-          return yield* normalizeUvLaunchDeclaration({ ...readInput, ...source, declaration })
+          return yield* normalizeUvLaunchSnapshotFirst({ ...readInput, ...source, declaration }, (value) =>
+            readConnectorPreparation({ runtimeRoot: launchers.runtimeRoot, key: keyOf({ runner: "uv-tool", value }), runner: input.runner }).pipe(Effect.map(Boolean)))
         })) }
-      const key = connectorPreparationKey({ runner: input.runner, launchers, requirements: normalized.value.requirements, options: normalized.runner === "npm-exec" ? normalized.value.resolutionOptions : normalized.value.options, configuration: normalized.value.configuration })
+      const key = keyOf(normalized)
       const current = { ...readInput, environment: environment(key, python) }
       const declaration = normalized.runner === "npm-exec" ? { runner: "npm-exec" as const, syntax: name === "npx" ? "npx" as const : "npm-exec" as const, arguments: args, declaration: normalized.value } : { runner: "uv-tool" as const, syntax: name === "uvx" ? "uvx" as const : "uv" as const, arguments: args, declaration: normalized.value.declaration }
       if (normalized.runner === "uv-tool") {

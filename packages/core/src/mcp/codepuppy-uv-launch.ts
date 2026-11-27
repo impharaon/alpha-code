@@ -156,6 +156,8 @@ const UvContent = Schema.Struct({
   commandName: Schema.NullOr(Schema.String),
   runtimeRequest: Schema.NullOr(Schema.String),
   packageSource: Schema.String,
+  /** True when a remote requirement's content came from its sanitized snapshot instead of the source. */
+  requirementSnapshot: Schema.Boolean,
 })
 
 /** Parse package standards with the pinned Python's bundled packaging/pip, never a system module. */
@@ -163,6 +165,8 @@ export function normalizeUvLaunchDeclaration(input: Parameters<typeof readUvLaun
   declaration: ReturnType<typeof parseUvToolSettings>
   python: string
   temporary: string
+  /** "prefer": remote requirements read their snapshot first (a restart's ready check); absent: ask the source. */
+  requirementSnapshots?: "prefer"
 }) {
   return Effect.gen(function* () {
     const environment = yield* Environment.Service
@@ -175,6 +179,7 @@ export function normalizeUvLaunchDeclaration(input: Parameters<typeof readUvLaun
         arguments: input.arguments,
         windows: input.launchers.platform === "win32-x64",
         sourceCache: input.launchers.environment.XDG_CACHE_HOME,
+        preferSnapshot: input.requirementSnapshots === "prefer",
         settings: parseUvResolvedValue(input.declaration.fields.settings!),
         pythonPlatform: parseUvResolvedValue(input.declaration.fields.python_platform!),
         sources: Object.fromEntries(uvSourceOptions.map(option => [option.field, parseUvResolvedValue(input.declaration.fields[option.field]!)])),
@@ -196,6 +201,22 @@ export function normalizeUvLaunchDeclaration(input: Parameters<typeof readUvLaun
     }
     return { ...value, cwd: execution.cwd, installArguments: [...options, ...value.installFiles.flatMap(value => [value.argument, value.path]), "--", value.packageSource], declaration: { ...input.declaration, commandName: value.commandName } }
   }).pipe(Effect.mapError(uvLaunchFailure))
+}
+
+/**
+ * BR-11/AC-10: a restart keys remote requirements on their sanitized snapshots first; when that key already has a ready
+ * preparation the source is never asked. A miss normalizes again from the source, so changed contents still change the key.
+ */
+export function normalizeUvLaunchSnapshotFirst<E, R>(
+  input: Parameters<typeof normalizeUvLaunchDeclaration>[0],
+  ready: (value: Effect.Success<ReturnType<typeof normalizeUvLaunchDeclaration>>) => Effect.Effect<boolean, E, R>,
+) {
+  return Effect.gen(function* () {
+    const first = yield* normalizeUvLaunchDeclaration({ ...input, requirementSnapshots: "prefer" })
+    if (!first.requirementSnapshot || (yield* ready(first))) return first
+    const { requirementSnapshots: _, ...fresh } = input
+    return yield* normalizeUvLaunchDeclaration(fresh)
+  })
 }
 
 /** uv validates its own interpreter selector, without a package request or an online Python download. */
@@ -358,6 +379,7 @@ const { spawnSync } = require('node:child_process')
   const files = []
   const seen = new Map()
   const requirementFiles = Object.create(null)
+  let snapshotUsed = false
   const rawUrl = reference => {
     const withoutCredentials = source => { const value = new URL(source); value.username = ''; value.password = ''; return value.href }
     const candidates = [...input.arguments, ...Object.values(process.env)].flatMap(value => String(value).match(/https?:\/\/[^\s<>"']+/g) || [])
@@ -378,6 +400,11 @@ const { spawnSync } = require('node:child_process')
       if (error.code !== 'ENOENT') throw error
       throw Object.assign(Error('Requirement source unavailable offline ' + target.origin), { code: 'ENOTCACHED' })
     })
+    // A restart first keys on the snapshot; the caller asks again without it only when that key has no ready preparation.
+    if (input.preferSnapshot) {
+      const snapshot = await cached().catch(error => { if (error.code !== 'ENOENT') throw error })
+      if (snapshot !== undefined) { snapshotUsed = true; return snapshot }
+    }
     // No HTTP cache layer: npm's keys by the full signed URL. The sanitized snapshot above is the only persisted copy.
     return npmRequire('make-fetch-happen')(target.href, { headers: authorization ? { authorization } : {}, proxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY, noProxy: process.env.NO_PROXY, cache: 'no-store', retry: 0 }).then(async response => {
       if (!response.ok) throw Error('Requirement source HTTP ' + response.status + ' ' + target.origin)
@@ -439,7 +466,7 @@ const { spawnSync } = require('node:child_process')
   }
   if (files.length) configuration.push({ purpose: 'source', value: files })
   const commandName = input.declaration.from ? null : runtimeRequest ? 'python' : main.name ? /^[A-Za-z0-9_.-]+/.exec(input.declaration.command[0])?.[0] || main.name : null
-  process.stdout.write(JSON.stringify({ requirements, options, configuration, sourceBindings, requirementFiles, installFiles, commandName, runtimeRequest, packageSource }))
+  process.stdout.write(JSON.stringify({ requirements, options, configuration, sourceBindings, requirementFiles, installFiles, commandName, runtimeRequest, packageSource, requirementSnapshot: snapshotUsed }))
 })().catch(error => { if(typeof error.code==='string'&&/^[A-Z][A-Z_0-9]+$/.test(error.code))process.stderr.write('Connector source code '+error.code+'\n');process.stderr.write(String(error.message)); process.exitCode = 1 })
 `
 

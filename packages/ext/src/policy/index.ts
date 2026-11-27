@@ -266,10 +266,10 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   }
   /** AB3: offer the card for the folders `output` names; resolves "approved" once main reads every one as writable. */
   const approveRefusedWrites = async (call: RefusedWriteCall, output: string, signal?: AbortSignal): Promise<"approved" | "not-offered"> => {
-    // Nobody can click a card in an unattended run: its result and note stay as they are.
-    if (await profile(call.sessionID, call.agent) !== undefined) return "not-offered"
     const paths = refusedWritePaths(output)
     if (!paths.length || !readWriteScope) return "not-offered"
+    // Nobody can click a card in an unattended run: its result and note stay as they are.
+    if (await profile(call.sessionID, call.agent) !== undefined) return "not-offered"
     // The folder is the refused object's parent: creating, writing and renaming happen there.
     const targets = paths.map((absolute) => ({ absolute, directory: path.dirname(absolute) }))
     const classify = async (asked: typeof targets) => {
@@ -316,7 +316,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     const leave = () => {
       for (const card of waiting) {
         card.members.delete(key)
-        if (card.members.size === 0) void withdrawRefusedWriteCard(call.sessionID, card)
+        // The last waiting call stopped and the card is still open: nobody is left to receive its answer.
+        if (card.members.size === 0 && card.keys.some((entry) => refusedWriteCards.get(entry) === card)) void withdrawRefusedWriteCard(call.sessionID, card)
       }
     }
     try {

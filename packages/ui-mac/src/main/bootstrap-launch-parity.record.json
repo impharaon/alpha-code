@@ -551,6 +551,19 @@
             },
             "oauth": false,
             "codemode": false
+          },
+          "codepuppy-video": {
+            "codemode": false,
+            "command": [
+              "<repo>/packages/ui-mac/native/connector-launchers/build/mac-arm64/node/bin/node",
+              "<repo>/packages/ui-mac/resources/video-mcp/server.js",
+              "{workspace}",
+              "--cache-root",
+              "<root>/parity-userdata/connector-runtime/first-party-cache/video"
+            ],
+            "enabled": true,
+            "environment": {},
+            "type": "local"
           }
         }
       }

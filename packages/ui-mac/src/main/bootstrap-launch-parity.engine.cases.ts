@@ -306,6 +306,9 @@ function normalize(record: unknown): unknown {
 
 describe("#1698 段 0:代表性启动的决定记录", () => {
   test("真 fork → sidecar 这一步 → 注入 → 引擎 + 真 ext:记录与 bootstrap-launch-parity.record.json 逐项相同", async () => {
+    // #1760: a representative launch carries this build's connector launchers (packaged builds always do), so the record's
+    // injection includes the first-party video connector on the bundled Node. The dev tree must have run the launcher prebuild.
+    expect(fs.existsSync(path.join(REPO, "packages/ui-mac/native/connector-launchers/build/mac-arm64/runtime.json")), "run `bun ./scripts/build-connector-launchers.ts` in packages/ui-mac first").toBe(true)
     const launched = await launch()
     const inputs = sidecarStep(launched)
     // design §10 R31:共用模块的「快照 → 已发布文档 → 环境」里,环境这一支在生产启动里到不了 —— fork 给 sidecar 的 env 里没有这个键

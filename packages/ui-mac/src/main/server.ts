@@ -390,12 +390,15 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
   )
 }
 
-/** #1761 §4.8: a build without document resources still starts; the document tool then reports the missing projection. */
+/**
+ * #1761 §4.8: a build without document resources still starts; the document tool then reports the missing projection. Packaging
+ * already refuses a package without them (afterPack), so at run time this is a dev tree whose assets were not built: an info line.
+ */
 function forkDocumentBootstrap(userDataPath: string) {
   try {
     return documentBootstrap({ userData: realpathSync(userDataPath), resourcesRoot: realpathSync(resourcesRoot()), packaged: electronNs.app.isPackaged, platform: process.platform, manifest: readPinnedFiles() })
   } catch (error) {
-    getLogger()?.warn(`document resources unavailable for this generation: ${serializeError(error).message}`)
+    getLogger()?.log(`document resources unavailable for this generation: ${serializeError(error).message}`)
     return undefined
   }
 }

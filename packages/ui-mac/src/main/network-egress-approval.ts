@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { activitySession, sessionRefKey, networkActivityKey, type Destination, type EgressPass, type EgressApproval, type EgressChange, type EgressDecisionReceipt, type NetworkActivity, type NetworkEgressApi, type RememberedSite } from "../shared/network-egress-wire"
+import { activitySession, sessionRefKey, networkActivityKey, type Destination, type EgressPass, type EgressApproval, type EgressChange, type EgressDecisionReceipt, type NetworkActivity, type NetworkEgressApi, type RememberedSite, type SessionRef } from "../shared/network-egress-wire"
 import { admitUserEgressGrant, EGRESS_GRANT_PROMPT_TIMEOUT_MS, type EgressGrantOutcome, type EgressPassBasis } from "./network-egress-grants"
 import type { createEgressPassLog } from "./network-egress-passes"
 import { siteContains, siteForHost } from "./network-egress-sites"
@@ -12,6 +12,8 @@ type ApprovalGroup = {
   activities: Map<string, NetworkActivity>
   waiters: Map<string, { deadline: number; finish(outcome: EgressGrantOutcome): void }>
   receipt?: EgressDecisionReceipt
+  // Conversations shown while nobody ran tools (design §4.9). They see the card; notices still go to recipients only.
+  viewers: Map<string, SessionRef>
 }
 
 export function createNetworkEgressApproval(deps: {
@@ -124,7 +126,11 @@ export function createNetworkEgressApproval(deps: {
     async listApprovals(input) {
       if (!deps.available || !await deps.activity.contains(input.session)) return { ok: false, code: "unavailable" }
       return linearize(() => {
-        const visible = [...cards.values()].filter((group) => group.approval.recipients.some((session) => sessionRefKey(session) === sessionRefKey(input.session)))
+        const viewer = sessionRefKey(input.session)
+        // A trusted window listing this session is showing it. A waiting request that no running tool can
+        // receive goes to whoever is showing a conversation now (design §4.9).
+        cards.forEach((group) => { if (!group.receipt && group.waiters.size && !group.approval.recipients.length) group.viewers.set(viewer, input.session) })
+        const visible = [...cards.values()].filter((group) => group.viewers.has(viewer) || group.approval.recipients.some((session) => sessionRefKey(session) === viewer))
         const value = visible.map((group) => structuredClone(group.approval))
         // A settled result is delivered once, then its request identity and receipt can retire.
         visible.forEach((group) => { if (group.receipt) cards.delete(group.approval.requestID) })
@@ -210,7 +216,7 @@ export function createNetworkEgressApproval(deps: {
       const deadline = now() + (deps.timeoutMs ?? EGRESS_GRANT_PROMPT_TIMEOUT_MS)
       const group: ApprovalGroup = pending.get(destinationKey) ?? {
         approval: { requestID: randomUUID(), destination: target, site: siteForHost(target.host), attribution: { kind: "unknown" }, recipients: [], createdAt: new Date(now()).toISOString(), connectionDeadlineAt: new Date(deadline).toISOString(), state: "pending" },
-        generation: deps.activity.snapshot().generation, activities: new Map(), waiters: new Map(),
+        generation: deps.activity.snapshot().generation, activities: new Map(), waiters: new Map(), viewers: new Map(),
       }
       pending.set(destinationKey, group)
       cards.set(group.approval.requestID, group)
@@ -222,13 +228,18 @@ export function createNetworkEgressApproval(deps: {
           signal?.removeEventListener("abort", abort)
           if (!group.waiters.size) {
             if (pending.get(destinationKey) === group) pending.delete(destinationKey)
-            if (!group.receipt) { group.approval.state = "connection-expired"; changed("approvals") }
+            if (!group.receipt) {
+              group.approval.state = "connection-expired"
+              // Nobody ever saw it, and no later conversation can receive it (design §4.9).
+              if (!group.approval.recipients.length && !group.viewers.size) cards.delete(group.approval.requestID)
+              changed("approvals")
+            }
           } else group.approval.connectionDeadlineAt = new Date([...group.waiters.values()].reduce((latest, waiter) => Math.max(latest, waiter.deadline), 0)).toISOString()
           resolve(outcome)
         }
         const abort = () => { notice(group, group.waiters.size > 1 ? "waiting" : "unavailable"); finish("approval-unavailable") }
         const timer = setTimeout(() => {
-          const outcome = group.approval.recipients.length ? "approval-timeout" : "approval-unavailable"
+          const outcome = group.approval.recipients.length || group.viewers.size ? "approval-timeout" : "approval-unavailable"
           notice(group, group.waiters.size > 1 ? "waiting" : outcome === "approval-timeout" ? "timed-out" : "unavailable")
           finish(outcome)
         }, deps.timeoutMs ?? EGRESS_GRANT_PROMPT_TIMEOUT_MS)

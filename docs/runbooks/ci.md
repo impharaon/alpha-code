@@ -22,6 +22,8 @@ gate run
 
 **测试分层与选择(ADR-0014)**:唯一声明是根 [`.gate-tests`](../../.gate-tests):`*.scenario.test.ts(x)` = scenario,`*.fast.test.ts(x)` = fast,其余 `*.test.ts(x)` = integration。共享 `affected-tests` 校验每个文件恰好一层;`bin/check` 调 `affected-tests run`,只跑相对 origin/alpha 分叉点的改动经导入、字面路径或声明的 `reads` 可达的 fast / integration 文件;`bin/check --full` 调 `affected-tests run --full`,跑三层。锁文件、依赖清单、runner / 编译配置、全局准备或门自身改动才保守跑全部 PR 层,范围行由工具写入 `$GATE_SCOPE_FILE`。缺工具时先在 agent-config-sync 执行 `./sync.sh pull`。`affected-tests check` 给出七类真实文件探针;`affected-tests --list` 只列选择结果。ui-mac 保留并行组、真引擎串行组和 `--parallel=1` 浏览器组;ext 保持串行。每次调用的 JUnit 仍拆为 `$GATE_REPORT_DIR/<step>.<layer>.xml`。`[6/14]` 从报告核对本次选中的登记文件精确条数,未选中则写明不判;`--full` 核对全部登记,缺文件、漏跑或重复跑仍红。新测试放在最低能抓住缺陷的层、模块已有文件里,读取输入使用 import、字面路径或 `.gate-tests` 的 `reads`;被 PR 测试读取的 Markdown 必须用 `.gate-light` 的 `!` 行走 PR 门。慢而必要的场景放 scenario 层。
 
+**ext 进真引擎的两条选择与静态规则(`#1804`)**:真引擎从磁盘按路径装 ext(`packages/ext/src/plugin.ts`),cases 文件又由宿主按路径串起子进程,导入图里两段都看不见。所以 `.gate-tests` 的 `reads` 声明:ext 的生产 `.ts`(不含 `*.test.ts` / `*.cases.ts`)改了,选中装真 ext 的 PR 层宿主 —— `packages/ui-mac/src/main/engine-cases.test.ts`、`packages/ui-mac/src/engine-adapter/engine-cases.test.ts` 与 `packages/ui-mac/src/main/*.engine.test.ts`;代价是改 ext 生产代码的 PR 都会跑这几个慢宿主。静态的一半在 [`packages/ext/src/ext-imports.test.ts`](../../packages/ext/src/ext-imports.test.ts):ext 生产代码不得以运行期相对路径 import 会载入 `packages/schema/src/tool.ts` 的 schema 模块(直接,或经 schema 内的相对 import,如 `session-message.ts` 的 `./tool.js`)—— 引擎里会出现第二个 `Tool.Error`,只读拒绝丢原因、无人值守运行记成 ok(#1783、#1812、#1776)。改用 `import type` 或包名 `@opencode/schema/<模块>`;它也由 `reads` 在改 ext 或 schema 源码时选中。
+
 它跑的是 `codepuppy-ci` 的**全部 21 个代码步**,并在末尾打印一张逐步对照表
 (`MIRRORED` / `SUPERSET:<理由>` / `DEGRADED:<理由>`)。
 

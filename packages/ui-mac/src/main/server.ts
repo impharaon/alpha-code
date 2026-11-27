@@ -820,7 +820,7 @@ export async function spawnLocalServer(
     ...(launcher ? { launchers: launcher.environment } : {}),
   })
   // #1775 consumes FIRST-PARTY-CACHE-v2.2 and, for the attachment duration, the same launcher recipe entry; #1760 owns both producers.
-  publishVideoEnvironment(bootstrap, launcher && ((id) => launcher.prepareBundledEntry(pinnedFileAuthority(options.userDataPath), VIDEO_DECLARATION_ID, id, new AbortController().signal)))
+  publishVideoEnvironment(bootstrap, launcher && ((id, signal) => launcher.prepareBundledEntry(pinnedFileAuthority(options.userDataPath), VIDEO_DECLARATION_ID, id, signal)))
 
   const packageManagerEnvironment = { ...sidecarEnv, ...fence?.cacheEnv }
   for (const [key, value] of Object.entries(originalProxies)) {

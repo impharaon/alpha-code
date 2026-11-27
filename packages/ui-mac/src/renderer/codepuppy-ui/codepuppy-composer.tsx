@@ -951,17 +951,32 @@ export function CodePuppyComposerRuntime(props: CodePuppyComposerRuntimeProps) {
     if (directory) setAttachments((xs) => revalidateStagedDirectory(xs, directory))
   })
   // #1775 (design §4.1): a media attachment is attached and sendable at once; its duration fills in when main's probe
-  // answers. Only the same attachment in this instance receives it; one removed or carried to another draft does not.
+  // answers. Only the same attachment in this instance receives it. A request whose attachment was removed, or whose
+  // composer went away (a remounted draft asks again), is cancelled so main stops waiting for it.
   const durationRequested = new Set<string>()
+  const durationPending = new Set<string>()
   createEffect(() => {
+    const present = new Set<string>()
     for (const item of attachments()) {
+      present.add(item.id)
       if ((item.kind !== "video" && item.kind !== "audio") || item.durationMs !== null || durationRequested.has(item.id)) continue
       durationRequested.add(item.id)
-      void window.api.attachments.mediaDuration(item.path).then((durationMs) => {
+      durationPending.add(item.id)
+      void window.api.attachments.mediaDuration(item.id, item.path, item.bytes).then((durationMs) => {
+        durationPending.delete(item.id)
         if (disposed || durationMs === null) return
         setAttachments((xs) => xs.map((x) => (x.id === item.id && (x.kind === "video" || x.kind === "audio") && x.path === item.path ? { ...x, durationMs } : x)))
       })
     }
+    for (const id of durationPending)
+      if (!present.has(id)) {
+        durationPending.delete(id)
+        window.api.attachments.cancelMediaDuration(id)
+      }
+  })
+  onCleanup(() => {
+    for (const id of durationPending) window.api.attachments.cancelMediaDuration(id)
+    durationPending.clear()
   })
   const [dragOver, setDragOver] = createSignal(false)
   // REQ-126:有附件正在读盘(FileReader 未 settle)。这段窗口里内容既不在 attachments() 里、

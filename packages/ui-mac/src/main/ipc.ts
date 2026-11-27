@@ -29,7 +29,7 @@ import { engineInternalDirectories } from "./engine-internal-directories"
 import { resolveAppPath } from "./apps"
 import { editorCliName } from "./platform"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
-import { composerMediaDuration, registerComposerMedia } from "./composer-media-attachment"
+import { cancelComposerMediaDuration, composerMediaDuration, registerComposerMedia } from "./composer-media-attachment"
 import { videoFfprobe } from "./codepuppy-video-environment"
 import { getLogger } from "./logging"
 import { stageComposerAttachment } from "./composer-attachment-stage"
@@ -305,9 +305,16 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("composer-media-register", (event, filePath: unknown, name: unknown, bytes: unknown, mime: unknown) =>
     registerComposerMedia(event.sender.id, filePath, name, bytes, mime),
   )
-  ipcMain.handle("composer-media-duration", (event, filePath: unknown) =>
-    composerMediaDuration(event.sender.id, filePath, videoFfprobe(), (line) => getLogger()?.warn(line)),
-  )
+  ipcMain.handle("composer-media-duration", (event, request: unknown, filePath: unknown, bytes: unknown) => {
+    // A closed window is no longer a consumer: its waits end, a download another consumer still needs continues.
+    const sender = event.sender
+    const gone = () => cancelComposerMediaDuration(sender.id)
+    sender.once("destroyed", gone)
+    return composerMediaDuration(sender.id, request, filePath, bytes, videoFfprobe(), (line) => getLogger()?.warn(line)).finally(() => {
+      if (!sender.isDestroyed()) sender.removeListener("destroyed", gone)
+    })
+  })
+  ipcMain.on("composer-media-duration-cancel", (event, request: unknown) => cancelComposerMediaDuration(event.sender.id, request))
   ipcMain.handle("composer-attachment-stage", (_event, directory: unknown, name: unknown, reader: unknown, bytes: unknown) =>
     stageComposerAttachment(directory, name, reader, bytes),
   )

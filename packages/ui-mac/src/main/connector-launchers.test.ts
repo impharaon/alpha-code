@@ -259,7 +259,7 @@ test("system archive extraction does not write through a link outside its stagin
   expect(await readdir(outside)).toEqual([])
 })
 
-test("cancelling a managed download detaches one waiter while another prepares the entry", async () => {
+test.each(["managed service", "main's bundled entry"])("cancelling a %s download detaches one waiter while another prepares the entry", async (first) => {
   const f = await managedAsset()
   let release: () => void = () => {}
   const wait = new Promise<void>((resolve) => { release = resolve })
@@ -273,12 +273,14 @@ test("cancelling a managed download detaches one waiter while another prepares t
   let joined = 0
   const context = { ...f.context, files: { ensureFile: (...args: Parameters<typeof authority.ensureFile>) => { const result = authority.ensureFile(...args); if (++joined === 2) both(); return result } } }
   const cancelled = new AbortController()
-  const first = f.host.prepareFiles(context, { binding: f.binding, ids: [f.recipe.id] }, cancelled.signal, () => {})
+  const waiter = first === "managed service"
+    ? f.host.prepareFiles(context, { binding: f.binding, ids: [f.recipe.id] }, cancelled.signal, () => {})
+    : f.host.prepareBundledEntry(context.files, "own", f.recipe.id, cancelled.signal)
   const second = f.host.prepareFiles(context, { binding: f.binding, ids: [f.recipe.id] }, new AbortController().signal, () => {})
   await entered
   cancelled.abort()
   release()
-  expect(await first).toEqual({ ok: false, error: "cancelled" })
+  expect(await waiter).toEqual({ ok: false, error: "cancelled" })
   const result = await second
   expect(result.ok).toBe(true)
   if (result.ok) expect(await readFile(result.files[0]!.path)).toEqual(f.bytes)

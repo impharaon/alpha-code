@@ -952,13 +952,15 @@ runner 本身是一个不开窗口的 Electron main 进程：用 `packages/ui-ma
 
 不改产品代码，也不自己组装 DocumentHost。测量宿主与真实应用有两处不同，属于宿主的偏离，不是产品的偏离（调度方裁决：这些 AC 量的是默认模型经产品技能、引擎和文档宿主做出的成品，这两处不参与成品）：一是 `index.ts` 的启动只重放其中一部分，DB 预检、扩展台账、桌面 IPC 不跑；二是 key 不经 auth 模块，直接进入凭据文件通道（同一网关、同一账号、同一计费）。
 
-这个宿主同时是 AC-04、05、12 等其它付费真引擎验收的测量宿主：任务、素材和评分都由输入文件给出，换任务不改宿主。
+这个宿主同时是 AC-04、05、12 等其它付费真引擎验收的测量宿主：任务文本与素材由 `tasks.json` 给出，评分按成品格式选同目录的脚本，换任务不改宿主。
 
-#### 改动（按推荐做法）
+#### 改动
 
 | 文件 | 改什么 |
 | --- | --- |
-| `packages/ui-mac/scripts/document-quality-run.ts`（新增） | 上述无窗口宿主与驱动：余额前后读数（account summary，进程内读 key）、累计上限、单次运行、成品取回、调用评分；参数为任务（W/P/X）与运行编号 |
+| `packages/ui-mac/scripts/document-quality/host.ts`（新增） | 无窗口宿主（Electron main 入口）：按 index.ts 顺序调用产品启动函数并 `spawnLocalServer`；LibreOffice 预热；逐次运行（建会话、发任务文本、按「本次允许」答询问、等结束、导出记录）；余额前后读数、账本窗口核对、样本推算与 3000 分硬停；评分（产品 LO 渲染取页数与页图、产品 `OfficeExcel.recalculate` 重算副本、调用同目录评分脚本） |
+| `packages/ui-mac/scripts/document-quality/electron.vite.config.ts`（新增） | 用产品 main 的同一构建配置（插件、define、externals）打包宿主，只换入口与输出目录 `out/document-quality/`（与 `out/main/` 同深度，产品的开发态路径推导不变） |
+| `packages/ui-mac/scripts/document-quality-run.ts`（新增） | 启动器：在证据目录里 APFS 克隆 dev 的 Electron.app（`LSUIElement`、独立 bundle id），把 HOME/XDG/工作区放到证据目录下，写输入文件，起宿主，退出后把副本与其 helper 全部 `lsregister -u` 并核对 |
 | `packages/ui-mac/scripts/document-quality/`（新增） | pilot 的 `tasks.json`（sha256 前缀 `eaec636d31188410`）、`score_docx.py`（`3cab3058aefbcd7f`）、`score_pptx.py`（`66911f1d0bed30f0`）、`check_xlsx.py`（`440e2da69b84d1a2`）与任务素材 `content.json`（`0d8d4e1a02d7106a`）、`chart.png`（`92dc0a8d9c4ef656`）、`img_market.png`（`882990d996eaf4c6`）、`img_ui.png`（`8a1415cf0eb3fcb1`）、`sales.json`（`72e180cafd6b8139`）；出处写在目录的 `SOURCES.md`。入库时的改动：去掉写死的本机路径；`check_xlsx.py` 不再自己起 LO，改为评已由 `OfficeExcel.recalculate` 重算过的副本，并按任务的 12 项要求给出逐项结论（pilot 只输出事实，没有 12 项判定）；`score_pptx.py` 第 10 项「风格统一」由脚本判母版与字体一致，另附页图供人工复核 |
 | `docs/specs/document-output-quality/plan.md` | 本节与实测记录 |
 

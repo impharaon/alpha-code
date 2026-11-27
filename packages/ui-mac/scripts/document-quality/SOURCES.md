@@ -15,3 +15,9 @@ AC-01..03 实测（[plan 切片八「AC-01..03 实测」](../../../../docs/specs
 | `sales.json` | office-pilot `F-excel/shared/sales.json` | `72e180cafd6b81389953b2cd16dde9f28d5fc35430d79ffc317e6d3e72f6f5d5` |
 
 `tasks.json` 里 `assets` 写的是 pilot 的相对路径（`shared/content.json` 等），实测时按文件名取本目录的同名文件放进每次运行的工作目录。
+
+## 入库后的改动（只改评分脚本，任务文本与素材保持原字节）
+
+- `score_docx.py`：未改。
+- `score_pptx.py`：`content.json` 改为读本目录的同名文件；第 10 项「风格统一」由「待目测」改为脚本判定：全部幻灯片出自同一个母版，且整套使用的字体不超过 3 种即通过（实测时另存页图供人工复核，结论记在 plan）；输出补 `_score`。
+- `check_xlsx.py`：不再自己起 LibreOffice。参数改为「原样成品、经产品 `OfficeExcel.recalculate` 重算过的副本、重算回执、输出目录」，`sales.json` 读本目录的同名文件。汇总比对改为在汇总表的区域行、月份行里找任一数值单元格与独立结果相符，不再假定列序；新增按任务 12 项要求的逐项结论（`checklist`、`_score`）、重算后的公式错误数（`formula_errors`，取回执的 `errors`）与汇总一致性（`summary_match`）。第 7 项只判会被截断的中文单元格（右侧相邻单元格有值、未合并、未换行），列宽不足显示宽度的 0.9 即不通过。

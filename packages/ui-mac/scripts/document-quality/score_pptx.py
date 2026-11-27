@@ -1,8 +1,11 @@
-"""score_pptx.py <deck.pptx> : 11-element checklist by reopening with python-pptx (theme consistency judged visually and noted)."""
+"""score_pptx.py <deck.pptx> : 11-element checklist by reopening with python-pptx. Item 10 (consistent style) is scripted as one slide
+master for every slide and at most three font families across all runs; the measurement host also keeps the rendered pages for a
+human look, recorded next to the score."""
 import json, sys
+from pathlib import Path
 from pptx import Presentation
 from pptx.util import Emu
-C = json.load(open("/Users/pharaon/.cache/alpha-orch/2026-11-25/office-pilot/shared/content.json"))
+C = json.load(open(Path(__file__).with_name("content.json"), encoding="utf-8"))
 p = Presentation(sys.argv[1]); W = p.slide_width
 S = []
 def walk(shapes):
@@ -53,7 +56,9 @@ res("08 timeline slide", "pass" if tl else "fail", f"slides with >=4 milestones=
 last = S[-1]["text"] if S else ""
 res("09 closing slide", "pass" if any(x[:4] in last for x in C["P_CLOSING"][:2]) else "fail", last[:80])
 fonts = sorted(set(f for s in S for f in s["fonts"]))
-res("10 consistent theme", "judged-visually", f"fonts used across deck={fonts}; layouts per slide={[sl.slide_layout.name for sl in p.slides]}")
+masters = sorted({sl.slide_layout.slide_master.part.partname for sl in p.slides})
+res("10 consistent theme", "pass" if len(masters) == 1 and len(fonts) <= 3 else "fail", f"slide masters={masters}; fonts used across deck={fonts}; layouts per slide={[sl.slide_layout.name for sl in p.slides]}")
 res("11 exactly ten slides", "pass" if len(S) == 10 else "fail", f"slides={len(S)}")
+R["_score"] = sum(1 for k, v in R.items() if not k.startswith("_") and v["status"] == "pass")
 R["_slides"] = [{k: (v if k != "text" else v[:90]) for k, v in s.items()} for s in S]
 print(json.dumps(R, ensure_ascii=False, indent=1))

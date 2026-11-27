@@ -803,12 +803,14 @@ test("`#817` signed package children flip on through the production ext-set-inst
   // 安装后 skill / agent / mcp 三类可启停 child 均 disabled(catalog 首装缺省)—— #817 报的现场。
   expect(cfg().agent["generic-bundle-agent"].disable).toBe(true)
   expect(cfg().mcp["generic-bundle-remote"].enabled).toBe(false)
-  expect(allow()).toEqual({ v: 3, keys: [], scoped: [], mcp: [{ name: "generic-bundle-remote", enabled: false }] })
+  // The command child is always enabled (#840, shared/ext-install-policy.ts initialDesiredState), and since #1776 r6 the
+  // allow set projects command and agent records with the same root/effect/claim rule as skills, so its key is present.
+  expect(allow()).toEqual({ v: 3, keys: ["command--generic-bundle-command"], scoped: [], mcp: [{ name: "generic-bundle-remote", enabled: false }] })
 
   // skill:拨开 → 引擎允许集当场出现它。
   const skillOn = (await setState({ sender: { id: 1 } }, { type: "skill", name: "generic-bundle-skill", scope: "global", state: "enabled" })) as { ok: boolean; reason?: string }
   expect(skillOn.ok, skillOn.reason).toBe(true)
-  expect(allow()).toEqual({ v: 3, keys: ["skill--generic-bundle-skill"], scoped: [], mcp: [{ name: "generic-bundle-remote", enabled: false }] })
+  expect(allow()).toEqual({ v: 3, keys: ["command--generic-bundle-command", "skill--generic-bundle-skill"], scoped: [], mcp: [{ name: "generic-bundle-remote", enabled: false }] })
 
   // agent:拨开 → disable 投影解除。
   const agentOn = (await setState({ sender: { id: 1 } }, { type: "agent", name: "generic-bundle-agent", scope: "global", state: "enabled" })) as { ok: boolean; reason?: string }

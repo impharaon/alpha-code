@@ -74,6 +74,9 @@ export function PermissionDialog(props: {
   const external = directoryAccessMetadata(props.request.metadata)
   const directoryWrite = external?.access === "write" && props.directoryContext
   const [directoryDescription, setDirectoryDescription] = createSignal<DirectoryAccessDescription>()
+  // SPEC v8 BR-08 (design v7 NP6): once main has described a folder-write card, its resources row names what approving makes
+  // writable — for a new path directly in HOME that path, not HOME, which the engine's request lists.
+  const describedResources = () => (directoryWrite ? directoryDescription()?.targets.map((target) => target.realDirectory) : undefined)
   const [directoryFailure, setDirectoryFailure] = createSignal(false)
   const describeDirectory = async () => {
     if (!directoryWrite || !external) return
@@ -294,7 +297,7 @@ export function PermissionDialog(props: {
             {(resources) => (
               <Show when={resources().length > 0} fallback={<small>{t("codepuppy.permission.resourceCount", { count: 0 })}</small>}>
                 <span class="a-permission-resources">
-                  <For each={resources()}>{(resource) => <code>{resourceText(props.request.action, resource)}</code>}</For>
+                  <For each={describedResources() ?? resources()}>{(resource) => <code>{resourceText(props.request.action, resource)}</code>}</For>
                 </span>
               </Show>
             )}

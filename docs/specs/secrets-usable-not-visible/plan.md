@@ -907,7 +907,7 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 | --- | --- |
 | `packages/schema/src/codepuppy-protected-files.ts` | `probe` 现有的命令路径词扫描提成 `named({ text, roots })`，返回这些路径词经同一 `match` 命中的 ProtectedFile（按路径去重）；`probe` 改为取其 rule ID 去重，签名与结果不变。不新增路径规则或第二个分词器。 |
 | `packages/ext/src/secret-mask.ts` | 新增 `command({ command, cwd })`：把 Shell 的工作目录按 Location 目录解析（含开头的 `~`，与引擎解析 `workdir` 同义），作为相对路径的基准调用 `ProtectedFiles.named`，对每个命中文件调用既有 `files.track`。同步、不读文件；读取在随后 capture start 的 `files.refresh()`。 |
-| `packages/ext/src/policy/index.ts` | `seal` 在 capture 注册旁注册 `context.shell.hook("create.before", (event) => secrets.command(event))`。Core 先触发 create.before、再触发 capture start、之后才 spawn（`packages/core/src/shell.ts:303,343,357`），start 的 refresh 已采集登记文件，所以第一段输出起就按它遮盖。 |
+| `packages/ext/src/policy/index.ts` | `seal` 在 capture 注册旁注册 `context.shell.hook("create.before", (event) => secrets.command(event))`。Core 先触发 create.before、再触发 capture start、之后才 spawn（`packages/core/src/shell.ts:303,343,363`），start 的 refresh 已采集登记文件，所以第一段输出起就按它遮盖。 |
 | `packages/ext/src/policy/register-policy.test.ts` | 表例 `outside project protected files a command names are masked from its first output`：隔离 HOME 下另一项目的 `.env`（凭据名变量 + 端口），未经 read，第一次接触是 shell `cat`：(a) 相对项目目录写出的路径；(b) `workdir` 为 `~/work/<另一项目>` 后 `cat .env`。每段 chunk 发布后读运行中的输出文件（沿用 `registered shell capture masks live files and preserves program use` 的观察插件写法），实时与最终结果都没有值、有 `TOKEN=[REDACTED]` 与 `PORT=3000`。 |
 | `scripts/gate-files.tsv` | register-policy 精确条数 101→103。 |
 | 本 `plan.md` | 本节与收据。 |
@@ -942,4 +942,15 @@ Schema 的 `codepuppy-protected-files.test.ts` 不在任何 `.gate-tests` 根下
 
 ### 偏离记录
 
-暂无。
+2026-11-27 · 表例 `~` 工作目录行在测试宿主里需临时把 `OPENCODE_TEST_HOME` 设为 `os.homedir()`：policy 宿主（`packages/ext/src/policy/policy-host.cases.ts:21`）让引擎的 `~` 指向另一临时目录，而扩展的 roots 用 `os.homedir()`；生产两者同为 `os.homedir()`。只在该次调用内设置并用 `Effect.ensuring` 还原。另更正本节 spawn 行号引用（357→363）。文件与顺序不变。
+
+### ⑦ 实施收据
+
+- 已核：Claude Opus 5.5 作者自查；开始 2026-11-27 13:52 CST。提交：规格 `2e99186d59`、计划 `cd3dd75145`、红 `c425bed85b` → 实现 `18f8f451b6`、本收据。红例提交后未改其断言。
+- 红例（未修改实现）：register-policy `outside project protected files a command names are masked from its first output` 两行 0/2，均在 `live.some(... includes(value))` 处失败（值出现在实时输出）。日志 `/tmp/secrets-i54-red.log`。
+- 步骤结束完整文件：ext `bun test --max-concurrency 2` register-policy 103、secret-mask + secret-files + risk 共 53；Schema `src/codepuppy-protected-files.test.ts` 8。均 exit 0。
+- 移除臂（提交后在工作树临时改写、跑两行、`git restore`，生产文件与 HEAD 一致）：不注册 create.before → 0/2（实时输出出现值）；同臂去掉实时断言 → 0/2（结果出现值，在 `JSON.stringify(shell).includes(value)` 处失败）；登记挪到 capture end → 0/2（实时输出出现值），同臂去掉实时断言 → 2/2（终态已遮，证明只有实时断言能抓到晚登记）；工作目录不参与解析 → `~` 行 0/1、相对路径行 1/1；不展开 `~` → `~` 行 0/1、相对路径行 1/1。日志 `/tmp/secrets-i54-arm-*.log`。
+- 一次扩大相关集：ext plugin-host、codepuppy-ext-no-shell-layer、context-injection、authority-registry、secret-values/read/mutations/diff/stream/spool 共 143；ui-mac gate-file-registry、PermissionDialog、permission-risk 共 114，RiskTag 11。均 exit 0。Core 的 tool-shell/tool-registry/promise-tool 只引用未改的 `MASKING_FAILED_TEXT`，不在 `.gate-tests` 根下，未跑。
+- 场景（ui-mac，`gate slot -- bun test --max-concurrency 2 --timeout 90000 ./src/main/composer-tier-matrix.engine.cases.ts -t 'protected files (outside project read shell and card|ordinary env values stay visible|shell model records and card)'`）：3 pass / 47 filtered / 0 fail，exit 0（AC-11、AC-12 行与 AC-02 shell 行；真引擎每条 shell 现都经过新的 create.before 登记）。日志 `/tmp/secrets-i54-scenario.log`。
+- 静态：schema `bun typecheck` 145 files 无错；ext、ui-mac `bun typecheck` exit 0；4 个改动 TS 的 oxlint 0 warnings / 0 errors；`git diff --check` 通过；`core.hooksPath` 仍为 `.githooks`，未安装依赖。
+- `affected-tests --list` exit 0：`affected tests: 124 of 752 test files`；含 register-policy、secret-mask、risk、plugin-host、gate-file-registry、permission-risk。

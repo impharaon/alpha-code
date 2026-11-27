@@ -378,7 +378,8 @@ const { spawnSync } = require('node:child_process')
       if (error.code !== 'ENOENT') throw error
       throw Object.assign(Error('Requirement source unavailable offline ' + target.origin), { code: 'ENOTCACHED' })
     })
-    return npmRequire('make-fetch-happen')(target.href, { headers: authorization ? { authorization } : {}, proxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY, noProxy: process.env.NO_PROXY, cachePath: cache, cache: 'default', retry: 0 }).then(async response => {
+    // No HTTP cache layer: npm's keys by the full signed URL. The sanitized snapshot above is the only persisted copy.
+    return npmRequire('make-fetch-happen')(target.href, { headers: authorization ? { authorization } : {}, proxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY, noProxy: process.env.NO_PROXY, cache: 'no-store', retry: 0 }).then(async response => {
       if (!response.ok) throw Error('Requirement source HTTP ' + response.status + ' ' + target.origin)
       const text = await response.text()
       await snapshots.put(cache, key, text)

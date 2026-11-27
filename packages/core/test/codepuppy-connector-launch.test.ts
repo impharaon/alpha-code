@@ -10,6 +10,7 @@ import {
   copyFileSync,
   symlinkSync,
   cpSync,
+  statSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -1930,6 +1931,10 @@ test("uv remote requirements keep credential rotation offline and detect changed
     const first = await invoke(false, "owned-first")
     expect(requests).toBe(1)
     expect(authorizations).toEqual(["Basic " + Buffer.from("own:owned-fake-secret").toString("base64")])
+    // Nothing persisted under the owned cache names the signed URL or its credentials (npm's HTTP cache keys by full URL).
+    const persisted = (readdirSync(path.join(input.root, "owned-cache"), { recursive: true }) as string[]).map(name => path.join(input.root, "owned-cache", name)).filter(file => statSync(file).isFile()).map(file => readFileSync(file).toString("latin1"))
+    expect(persisted.length).toBeGreaterThan(0)
+    for (const secret of ["owned-first", "owned-fake-secret"]) expect(persisted.filter(text => text.includes(secret))).toEqual([])
     const cached = await invoke(true, "owned-rotated")
     expect(key(cached)).toBe(key(first))
     expect(requests).toBe(1)

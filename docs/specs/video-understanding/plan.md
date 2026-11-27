@@ -879,3 +879,66 @@ r13 执行：新 worktree 无随包 native/runtime 目录，原声明生成器�
 国内 relay pinned list 由编排器增加/发布 `ffmpeg/darwin-arm64/9.1-openh264-2.7.0-dav1d-1.5.3`、`ffmpeg/win32-x64/9.1-openh264-2.7.0-dav1d-1.5.3` 两个运行期 ID，origin/bytes/SHA256 以本仓 pinned-files.json 为准；对应源归档按 provenanceUrl 同时可取。原其它模型、OCR、语言与 Python 条目没有变化。
 
 首用全部固定文件量（既有 firstVideoPins）：darwin-arm64 **348493556 B**，win32-x64 **369869121 B**，仍小于 400000000 B。未发布资产、未部署 relay、未发收费调用、未启动窗口。Windows 实机解码与系统播放器播放仍交原发布验收，不以交叉编译代替。
+
+## #1760 集成
+
+- 依据：规格 v1 用户路径与 AC-01/02/15 的开发构建部分 @ impharaon/alpha-work `25afeda628`；视频设计 §4.1（附件 metadata「时长探测异步补回附件条，已准备时直接展示」「不等待 ffprobe 准备才允许发送」）、§4.2 L1、§10 @ impharaon/alpha-work `d8379759a8`；本仓 launcher 设计 v2 §4.2/§4.3（VIDEO-L1-v2）、v2.1、v2.2、v2.4 V24-R3 @ `aedea8af9f`；alpha-code#1775 正文「下一步 ②」。界面沿用 D1 附件条与 D4 工具卡，不另出稿。
+- 核对：<由实施提交按续派 Phase 行填写>
+
+### 读码确定的开发构建缺口（origin/alpha `aedea8af9f`）
+
+| 用户路径一步 | 现状与证据 | 本片处置 |
+| --- | --- | --- |
+| 附件条显示时长 | `src/main/composer-media-attachment.ts:18` 恒回 `durationMs:null`；main/preload/renderer 没有任何后续探测或回写入口（`rg durationMs` 仅命中投影/显示）。主进程拿不到 ffprobe：已准备入口只经 `connector-launchers.ts` `prepareFiles` 的受管 binding 取得（`:253-304`，需在途 snapshot 行） | 实施：main 消费同一 launcher authority 的配方准备（同一 `preparePinnedEntry` 与在途合并键，首个工具调用复用同一已准备根），复用 `video-mcp/source.ts` 的 `probeInfo` 取 durationMs；renderer 对已附上且时长为 null 的媒体异步请求并按附件 id 回写。冷机器上这一步会经同一固定文件 authority 取 ffmpeg（不是模型；附上与发送都不等它），失败只保持 null |
+| 首次工具调用准备组件并接着回答 | ensure 调用链在代码中完整：`core/src/tool/mcp.ts:94-103` 传 preparation（V24-R3）→ `core/src/mcp/codepuppy-pinned-files.ts` handler → `util` requester → `main/connector-launch-host.ts` entryFor → `connector-launchers.ts` 下载/展开 → `resources/video-mcp/assets.ts` 继续原调用；卡片投影 `tool-card-model.ts:1542-1549` 已有 | 实施期以一次真实运行证明（见证明表），不改契约；若实跑暴露缺陷，按 red-first 在同一调用链修正并记入偏离 |
+| 开发树里视频服务能否启动 | `{codepuppyResources}` 在未打包运行时是 `packages/ui-mac/resources`（`ext-fs-installer.ts:266`），其下 `video-mcp/` 只有 TS 源码；`server.js` 等由 `dist-video/` 与 `native/video-runtime/build/mac-arm64/` 两处构建产物仅在 electron-builder `extraResources` 合并（`electron-builder.config.ts:146-152`）。`predev` 不构建两者。另：本机按锁构建的 whisper addon 与已提交 `tools.json` 的 codeSha256 不同（64 项中 `runtime.json`、`index.node` 两项），声明核验不过即无首方 binding/handler | **未定的开发布局**，见下节；不在本片自行选择 |
+
+### 待编排器/设计确认的开发布局
+
+开发树要让同一模板启动视频服务并通过首方核验，必须让未打包资源根下出现与安装包同形的 `video-mcp/`，且清单摘要与本机构建一致。可选：
+
+1. 开发步骤把两处构建产物合并进 `resources/video-mcp/`（忽略生成物）并按本机字节重算视频条目摘要。代价：生成物与 TS 源同目录，其中 `node_modules/` 会让该目录源码的包解析改落到这份副本；每次开发运行改写已跟踪的 `tools.json`。
+2. 开发运行把首方清单与 `{codepuppyResources}` 指向一个忽略的暂存资源根（复制 `office-mcp/`、合并 `video-mcp/`、生成本机清单）。代价：Office 的开发命令/写策略按真实资源根解析，需同步改为该暂存根，影响面超出视频。
+3. 维持现状：开发树不启动视频服务，开发验证用暂存的安装包同形目录（下述实跑即如此），只有安装包/打包验收证明真实启动。
+
+推荐 3 为本片边界，1/2 交 #1760 launcher 或构建 owner 决定。附件时长不依赖此项：它只读随包清单的配方与已构建的 launcher，开发树已具备。
+
+### 改动
+
+| 文件（`packages/ui-mac/` 下） | 改什么 |
+| --- | --- |
+| `src/main/connector-launchers.ts` 及既有 `connector-launchers.test.ts` | 为 main 自身消费增加按随包声明 ID 准备配方入口的方法；与受管 `prepareFiles` 共用逐 id 下载→展开→核验与在途合并，不新增下载器、配方解析或第二种入口布局 |
+| `../core/src/mcp/codepuppy-first-party-mcp.ts` | 仅把已有 recipeSha256 公式提成导出函数供 main 复用（同一字面输入），声明器行为不变 |
+| `resources/video-mcp/assets.ts` | 导出 codec 配方 ID 与 ffprobe/ffmpeg 入口名的同一取法，服务与 main 共用 |
+| `src/main/codepuppy-video-environment.ts`、`src/main/server.ts` | 随本代 bootstrap 一并发布「准备 ffprobe」能力；无 launcher 的构建不发布 |
+| `src/main/composer-media-attachment.ts` 及既有测试、`src/main/ipc.ts` | 登记时记下本 sender 已选的真实路径与大小；新增时长探测入口只接受已登记来源，复核大小后准备 ffprobe、运行并以 `probeInfo` 得 durationMs，任何失败回 null |
+| `src/preload/index.ts`、`src/preload/types.ts` | `attachments.mediaDuration(path)` 调用上述入口 |
+| `src/renderer/codepuppy-ui/codepuppy-composer.tsx`、`test-component/codepuppy-composer-model.cases.ts` | 已附上且 durationMs 为 null 的媒体附件各请求一次时长，按 id 与 path 回写；发送不等待；已移除/换草稿的迟到结果不写入 |
+| `docs/specs/video-understanding/plan.md` | 本节、核对行与偏离 |
+
+工具卡进度投影已存在；若实跑与之不符才修改 `tool-card-model.ts` 与其既有测试。
+
+### 顺序
+
+1. 只提交本节。
+2. 时长：先在既有测试文件写红（main 登记/未登记/大小变化/真实 ffprobe 夹具、launcher 方法复用同一已准备根、composer 回写与不阻塞发送），再实现 launcher→environment→ipc→preload→composer。每步只跑在改的 case，步末跑该步行为文件一次。
+3. 一次真实运行（一次性证据，不入套件）：空的临时 userData/组件缓存，dev 构建的 launcher、`dist-video`、本机 video runtime 合并成安装包同形的临时资源根，生产 `McpConnection` + `connectorLocalLaunch` + sidecar host ↔ main 桥（`createPinnedFileMainBridge` + 真 launcher authority + 真固定文件下载）调用 `info`；记录 preparation 进度序列（真实字节）、原调用结果，及同一 metadata 经 `toolStepLineOf` 的卡片行；再以同一 userData 走 main 时长入口，确认复用已准备 ffmpeg、无第二次下载。`gate slot --` 运行。
+4. 返回前相关扩展集、两包 typecheck、`affected-tests --list`。
+
+### 风险
+
+- 真实下载依赖 GitHub release / 香港入口可达；断网续传与香港不可用切源由固定文件 authority 既有测试覆盖，本片不另造。不可达时如实记录，不改用本地文件冒充。
+- main 侧不经受管 binding 准备配方入口：只用于主进程自身的 ffprobe，配方来自随包清单（已由 launcher authority 读取），不接受 renderer 或服务提供的 ID/路径；不改变 L1 对第三方/服务请求的身份边界。
+- 时长请求不能变成第二个媒体权威：只回一个数字，不缓存 source、不写视频服务缓存。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-02 / 用户路径「附件条上出现时长」 | `composer-media-attachment.test.ts`：已登记真实 WAV 经实际 ffprobe 程序得到时长；未登记路径、大小变化、准备失败回 null。`codepuppy-composer-model.cases.ts`：未决时长时卡片与发送已可用，回写后显示时长，移除后的迟到结果不写入 | integration / component：受影响 PR 与夜间 | 去掉回写则卡片无时长；去掉登记检查则未登记路径得到时长；等待时长则发送断言失败 |
+| AC-01/15 首次准备与原调用继续（开发构建部分） | `connector-launchers.test.ts`：main 方法与受管 `prepareFiles` 得到同一已准备根且只下载一次；一次真实运行记录（命令与输出写入本节） | integration；真实运行为一次性 | 不共用合并键会二次下载/不同根；真实运行缺 preparation 进度或原调用不继续即可见 |
+| AC-15 断点续传/切源 | 既有固定文件 authority 用例（`pinned-files.test.ts`），本片不改 | 既有 | — |
+
+### 偏离记录
+
+暂无。

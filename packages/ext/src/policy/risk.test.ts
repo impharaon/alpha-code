@@ -460,8 +460,10 @@ describe("#1285 D. the ask path", () => {
 
 test("protected path risk consumes the location roots", () => {
   expect(classify({ permission: "read", patterns: ["secret.env"] }).facts.signals).toContain("credential-path")
-  for (const file of [".env.example", "node_modules/.env", "/outside/unlisted/.env", "/etc/passwd"])
+  for (const file of [".env.example", "node_modules/.env", "/outside/unlisted/notes.txt", "/etc/passwd"])
     expect(classify({ permission: "read", patterns: [file] }).facts.signals.includes("credential-path")).toBe(file === "/etc/passwd")
+  // Spec v5 BR-05: another project's env file follows the same project rule.
+  expect(classify({ permission: "read", patterns: ["/outside/other-project/.env"] }).facts.signals).toContain("credential-path")
   const roots: ProtectedFiles.ProtectedRoots = { platform: "win32", project: "C:\\Project", directory: "C:\\Project", home: "C:\\Users\\Me", appData: "C:\\Users\\Me\\AppData\\Roaming", localAppData: "C:\\Users\\Me\\AppData\\Local", pathVariables: { AWS_SHARED_CREDENTIALS_FILE: "D:\\Keys\\cloud.ini" } }
   expect(classify({ protectedRoots: roots, permission: "read", patterns: ["d:\\keys\\CLOUD.INI"] }).facts.signals).toContain("credential-path")
 })

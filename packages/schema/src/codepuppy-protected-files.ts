@@ -67,6 +67,7 @@ const SECRET_WORDS = new Set([
   "AUTH",
   "AUTHORIZATION",
   "PRIVATE",
+  "PWD",
 ])
 const GCP_FIELDS = [
   ["**", "refresh_token"],
@@ -80,7 +81,8 @@ const GCP_FIELDS = [
 
 // Selectors are release data, not parsers. * selects one object/array member; ** selects any depth, including zero.
 export const CredentialFields = {
-  env: { assignments: "all" },
+  // Spec v5 BR-06: env-style files take the same credential-name rule as structured credential documents.
+  env: { names: "credential" },
   "credential-document": { names: "credential" },
   "private-key": { raw: "private-key" },
   "encrypted-store": { raw: "bytes" },
@@ -271,7 +273,7 @@ export function sources(
 export function match(input: { path: string; roots: ProtectedRoots }): ProtectedFile | undefined {
   const file = normalize(input.path, input.roots)
   const api = input.roots.platform === "win32" ? path.win32 : path.posix
-  const item = locatedRules(input.roots).find((item) => {
+  const item = [...locatedRules(input.roots), ...outsideProjectRules(file, input.roots)].find((item) => {
     const relative = api.relative(item.root, file).replaceAll(api.sep, "/")
     if (!relative || relative === ".." || relative.startsWith("../") || api.isAbsolute(relative)) return false
     if (item.exclude?.some((pattern) => glob(relative, pattern, input.roots.platform))) return false
@@ -313,7 +315,8 @@ export function isCredentialName(name: string): boolean {
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
     .split(/[^a-zA-Z0-9]+/)
-    .some((word) => SECRET_WORDS.has(word.toUpperCase()))
+    // A token ending with a credential word counts too: PGPASSWORD, APIKEY, ACCESSTOKEN.
+    .some((word) => [...SECRET_WORDS].some((secret) => word.toUpperCase().endsWith(secret)))
 }
 
 export function isPublicValue(input: { name: string; value: string | number | boolean | null }): boolean {
@@ -380,6 +383,19 @@ function glob(value: string, pattern: string, platform: PathPlatform): boolean {
     })
     .join("")
   return new RegExp(`^${expression}$`, platform === "win32" ? "i" : "").test(value)
+}
+
+// Another project's files follow the same project rules (spec v5 BR-05). They are matched when a tool touches them and
+// never scanned, so `sources` does not include this scope.
+function outsideProjectRules(file: string, roots: ProtectedRoots): LocatedRule[] {
+  const api = roots.platform === "win32" ? path.win32 : path.posix
+  const relative = api.relative(normalize(roots.project, roots), file)
+  if (relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative)) return []
+  const root = api.parse(file).root
+  return [
+    ...PROJECT,
+    ...PROJECT_LOCATIONS.map((item) => ({ ...item, include: item.include.map((pattern) => `**/${pattern}`) })),
+  ].map((item) => ({ ...item, root, exclude: [...(item.exclude ?? []), ...DEPENDENCIES] }))
 }
 
 function locatedRules(roots: ProtectedRoots): LocatedRule[] {

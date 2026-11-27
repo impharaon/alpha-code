@@ -147,7 +147,7 @@ describe("I2:main-only 写者在 sidecar 闭包里没有调用方", () => {
     expect(importers).toContain("packages/ext/src/policy/identity.ts")
   })
 
-  test("闭包里对安装账本的读只有两处,都带 sideEffectFree: true(不写证据文件);闭包里没有文件拿到账本模块别的值", () => {
+  test("闭包里对安装账本的读只有三处,都带 sideEffectFree: true(不写证据文件);闭包里没有文件拿到账本模块别的值", () => {
     const reads = new Set(["readPackageLedgerStateV1", "readLedgerV2"])
     const calls: string[] = []
     const offenders: string[] = []
@@ -167,7 +167,8 @@ describe("I2:main-only 写者在 sidecar 闭包里没有调用方", () => {
       visit(source)
     }
     expect(offenders).toEqual([])
-    expect(calls.sort()).toEqual(["packages/ui-mac/src/main/engine-explicit-config.ts: readPackageLedgerStateV1", "packages/ui-mac/src/main/ext-disabled-injection.ts: readLedgerV2"])
+    // #1776 AC-13/14(cab63d0820):注入模块按账本把插件包的 MCP 定义中和成模板,直到 main 收敛时才绑定;同样只读、sideEffectFree。
+    expect(calls.sort()).toEqual(["packages/ui-mac/src/main/codepuppy-config-injection.ts: readPackageLedgerStateV1", "packages/ui-mac/src/main/engine-explicit-config.ts: readPackageLedgerStateV1", "packages/ui-mac/src/main/ext-disabled-injection.ts: readLedgerV2"])
   })
 })
 

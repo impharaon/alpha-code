@@ -1973,6 +1973,8 @@ test("connector preparation retries transient downloads and installers once and 
 
 test("connector preparation names egress only for the current attempt directory server host and port", async () => {
   expect(await preparationTransaction("egress")).toMatchObject({ installCount: 1, failure: { kind: "egress", host: "registry.invalid", port: 443 } })
+  // The configured registry is masked in the displayed stderr; attribution keeps the de-credentialed host and port.
+  expect(await preparationTransaction("egress-masked")).toMatchObject({ installCount: 1, failure: { kind: "egress", host: "registry.invalid", port: 443 } })
   for (const field of ["attempt", "directory", "server", "host", "port"]) expect(await preparationTransaction("egress-other-" + field)).toMatchObject({ installCount: 2, failure: { kind: "download" } })
 })
 

@@ -16,6 +16,22 @@ export const ConnectorPreparationProgress = Context.Reference<(
   progress: Extract<ConnectorLaunchState, { phase: "preparing" }>["progress"],
 ) => void>("@opencode/Mcp/ConnectorPreparationProgress", { defaultValue: () => () => {} })
 
+type UrlTarget = { host: string; port: number }
+const stderrTargets = new Map<string, UrlTarget[]>()
+
+/** Host and port of each URL in text; userinfo, path and query never leave this function. */
+export function connectorUrlTargets(text: string): UrlTarget[] {
+  return (text.match(/https?:\/\/[^\s<>"'`]+/g) ?? []).filter((value) => URL.canParse(value)).map((value) => {
+    const url = new URL(value)
+    return { host: url.hostname, port: Number(url.port || (url.protocol === "https:" ? 443 : 80)) }
+  })
+}
+
+/** De-credentialed URL targets this attempt's raw stderr named, read before masking for egress attribution only. */
+export function connectorStderrTargets(attempt: string): readonly UrlTarget[] {
+  return stderrTargets.get(attempt) ?? []
+}
+
 /** The connection owns one producer per attempt; root only transports its snapshots and queries. */
 export function createConnectorLaunchAttempt(
   input: Parameters<typeof observeConnectorLaunch>[0] & {
@@ -110,6 +126,14 @@ export function observeConnectorLaunch(input: {
     }
     let processNumber = 0
     let error: string | undefined
+    const targets: UrlTarget[] = []
+    stderrTargets.set(input.identity.attempt, targets)
+    // Bounded: attribution only reads a live attempt's own entry.
+    for (const attempt of stderrTargets.keys()) if (stderrTargets.size > 64) stderrTargets.delete(attempt)
+    const record = (line: string) => {
+      for (const target of connectorUrlTargets(line))
+        if (!targets.some((known) => known.host === target.host && known.port === target.port)) targets.push(target)
+    }
     const safeError = (failure: PlatformError.PlatformError) => {
       const reason = failure.reason
       const cause =
@@ -148,8 +172,17 @@ export function observeConnectorLaunch(input: {
           ),
           Effect.mapError(safeError),
         )
+        let rawLine = ""
         const stderr = handle.stderr.pipe(
           Stream.decodeText(),
+          Stream.tap((text) =>
+            Effect.sync(() => {
+              const lines = (rawLine + text).split("\n")
+              rawLine = lines.pop() ?? ""
+              lines.forEach(record)
+            }),
+          ),
+          Stream.ensuring(Effect.sync(() => record(rawLine))),
           Stream.map((text) => ({ text, final: false })),
           Stream.catch((failure) => Stream.succeed({ text: "", final: true, failure })),
           Stream.concat(Stream.succeed({ text: "", final: true })),

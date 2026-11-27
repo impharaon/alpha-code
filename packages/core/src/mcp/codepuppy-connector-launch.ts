@@ -19,7 +19,7 @@ import { Environment } from "../environment/index.js"
 import { connectorNpmDefaults, readNpmLaunchDeclaration, readNpmLaunchEnvironment, normalizeNpmLaunchDeclaration, installNpmConnector } from "./codepuppy-npm-launch.js"
 import { parseUvToolSettings, readUvLaunchEnvironment, uvEditableInstallArguments, readUvLaunchDeclaration, normalizeUvLaunchDeclaration, checkUvPinnedPythonRequest, installUvConnector, uvPythonRequest } from "./codepuppy-uv-launch.js"
 import { connectorPreparationKey } from "./codepuppy-connector-key.js"
-import { ConnectorPreparationProgress } from "./codepuppy-connector-diagnostic.js"
+import { ConnectorPreparationProgress, connectorStderrTargets, connectorUrlTargets } from "./codepuppy-connector-diagnostic.js"
 import { classifyStartFailure } from "./codepuppy-startup.js"
 import { KeyedMutex } from "../effect/keyed-mutex.js"
 
@@ -60,8 +60,9 @@ export function prepareConnectorLaunch(input: {
     })
     const failed = (detail: string) => Effect.gen(function* () {
       const evidence = yield* Effect.tryPromise({ try: () => host.egressEvidence(input.identity), catch: () => undefined }).pipe(Effect.catch(() => Effect.succeed([])))
-      const targets = (detail.match(/https?:\/\/[^\s<>"'`]+/g) ?? []).filter(value => URL.canParse(value)).map(value => new URL(value))
-      const refused = evidence.find(value => value.outcome === "refused" && value.identity.directory === input.identity.directory && value.identity.server === input.identity.server && value.identity.attempt === input.identity.attempt && targets.some(target => target.hostname === value.host && Number(target.port || (target.protocol === "https:" ? 443 : 80)) === value.port))
+      // The displayed detail is masked; the attempt's raw stderr keeps the de-credentialed host and port for attribution.
+      const targets = [...connectorUrlTargets(detail), ...connectorStderrTargets(input.identity.attempt)]
+      const refused = evidence.find(value => value.outcome === "refused" && value.identity.directory === input.identity.directory && value.identity.server === input.identity.server && value.identity.attempt === input.identity.attempt && targets.some(target => target.host === value.host && target.port === value.port))
       if (refused) return { kind: "egress", host: refused.host, port: refused.port } as const
       return classifyStartFailure(undefined, { type: "local" }, { preparation: { stderr: detail } }).failure!
     })

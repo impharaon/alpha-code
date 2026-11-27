@@ -7,7 +7,7 @@ import { Deferred, Effect, Fiber, Layer, PlatformError, References, Stream } fro
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { Environment } from "@opencode/core/environment/index"
 import { prepareConnectorLaunch } from "@opencode/core/mcp/codepuppy-connector-launch"
-import { ConnectorPreparationProgress } from "@opencode/core/mcp/codepuppy-connector-diagnostic"
+import { ConnectorPreparationProgress, observeConnectorLaunch } from "@opencode/core/mcp/codepuppy-connector-diagnostic"
 import { publishConnectorLaunchHost } from "@opencode/util/codepuppy-connector-launch"
 import type { ConnectorLaunchHost, LauncherEnvironment, PreparationProgress } from "@opencode/util/codepuppy-connector-launch"
 import { canonicalJsonDigest } from "@opencode/util/codepuppy-hash"
@@ -112,6 +112,11 @@ const prepare = (attempt: string) => prepareConnectorLaunch({ runner: "npm-exec"
   ;(progress[attempt] ??= []).push({ stage, value })
   if (attempt === "second" && stage === "packages" && value.unit === "activity" && value.detail === "Preparing connector packages") Effect.runSync(Deferred.succeed(joined, undefined))
 }))
+// As connection.ts runs it: inside the attempt's masking observer. The configured registry is itself a masked value.
+const observedPrepare = (attempt: string) => Effect.gen(function* () {
+  const observed = yield* observeConnectorLaunch({ identity: identity(attempt), requestedCommand: ["npx"], cwd: root, runtimeRoot: root, secrets: ["https://registry.invalid"] })
+  return yield* prepare(attempt).pipe(Effect.provideService(Environment.Service, observed.environment))
+})
 const readyFiles = () => existsSync(path.join(root, "prepared")) ? readdirSync(path.join(root, "prepared")).filter(name => name !== "c".repeat(64) && existsSync(path.join(root, "prepared", name, "ready.json"))) : []
 const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
   if (["resolve-cancel", "download-cancel"].includes(input.scenario)) {
@@ -160,14 +165,14 @@ const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
     assert.equal(installCount, 1)
     return { key: a.key, merged: true }
   }
-  const outcome = yield* Effect.scoped(prepare("first")).pipe(Effect.result)
-  if (["failed", "failure-restart", "deterministic", "egress", "egress-other-attempt", "egress-other-host", "egress-other-port", "egress-other-directory", "egress-other-server", "download-deterministic"].includes(input.scenario)) {
+  const outcome = yield* Effect.scoped(input.scenario === "egress-masked" ? observedPrepare("first") : prepare("first")).pipe(Effect.result)
+  if (["failed", "failure-restart", "deterministic", "egress", "egress-masked", "egress-other-attempt", "egress-other-host", "egress-other-port", "egress-other-directory", "egress-other-server", "download-deterministic"].includes(input.scenario)) {
     assert.equal(outcome._tag, "Failure")
     if (outcome._tag !== "Failure") throw Error("expected controlled failure")
     assert.equal(readyFiles().length, 0)
-    const kind = input.scenario === "egress" ? "egress" : ["deterministic", "download-deterministic"].includes(input.scenario) ? "unknown" : "download"
+    const kind = ["egress", "egress-masked"].includes(input.scenario) ? "egress" : ["deterministic", "download-deterministic"].includes(input.scenario) ? "unknown" : "download"
     assert.equal(outcome.failure.kind, kind)
-    assert.equal(installCount, input.scenario === "download-deterministic" ? 0 : ["egress", "deterministic"].includes(input.scenario) ? 1 : 2)
+    assert.equal(installCount, input.scenario === "download-deterministic" ? 0 : ["egress", "egress-masked", "deterministic"].includes(input.scenario) ? 1 : 2)
     if (input.scenario === "download-deterministic") assert.equal(downloads, 1)
     if (input.scenario === "failure-restart") {
       recovering = true

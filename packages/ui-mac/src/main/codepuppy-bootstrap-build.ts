@@ -7,6 +7,7 @@
 import os from "node:os"
 import path from "node:path"
 import { exportedFlag, isCredentialFreeUrl, parseCodePuppyBootstrap, type CodePuppyBootstrap, type DocumentBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import type { LauncherEnvironment } from "@opencode/util/codepuppy-connector-launch"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
 import { secretFileRef } from "./codepuppy-secret-files"
@@ -40,6 +41,8 @@ export type CodePuppyBootstrapInput = {
   sidecarGeneration: number
   /** #1761 §4.8 的文档资源投影;本构建没有可用的文档资源时缺席 */
   documents?: DocumentBootstrap
+  /** #1760 §4.3 的本代启动器描述;打包产物必有,未做启动器预构建的开发树缺席 */
+  launchers?: LauncherEnvironment
 }
 
 /** 喂给文档路径字段的用户导出变量:引擎全局配置目录、会话库的数据根、初始目录。 */
@@ -123,6 +126,7 @@ export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePup
     // Typed callers always pass it; harnesses outside the typecheck that omit it build a non-desktop document.
     ...(input.sidecarGeneration === undefined ? {} : { sidecarGeneration: input.sidecarGeneration }),
     ...(input.documents ? { documents: input.documents } : {}),
+    ...(input.launchers ? { launchers: input.launchers } : {}),
   })
 }
 

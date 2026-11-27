@@ -57,7 +57,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> => !!value &
  * 只放宽它们的 `timeout.startup`(目录 / 执行两段照旧);代价已接受:首次下载占着引擎的一个启动名额,真卡死的晚些报失败。
  */
 export const RUNNER_FIRST_FETCH_STARTUP_MS = 300_000
-const PACKAGE_RUNNERS = new Set(["uvx", "npx", "bunx", "pnpx"])
+// #1760 §4.4: uvx/npx now prepare before any start permit and outside the handshake clock, so they keep the default handshake;
+// the other runners keep this first-fetch allowance.
+const PACKAGE_RUNNERS = new Set(["bunx", "pnpx"])
 export function launchedByPackageRunner(config: { type?: unknown; command?: unknown }): boolean {
   return config.type === "local" && Array.isArray(config.command) && typeof config.command[0] === "string" && PACKAGE_RUNNERS.has(path.basename(config.command[0]))
 }

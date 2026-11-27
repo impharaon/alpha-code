@@ -93,6 +93,8 @@ import { receiveToolPolicyWrite } from "../../../ext/src/policy/store"
 import { createPinnedFileMainBridge, pinnedFileAuthority } from "./connector-launch-host"
 import { createConnectorLaunchState, installConnectorLaunchState } from "./connector-launch-state"
 import { hostLauncherPlatform } from "./connector-launchers"
+import { forkLauncherAuthority, openConnectorLaunchMain } from "./connector-launch-generation"
+import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { openDocumentGeneration } from "./document-generation"
 import { documentBootstrap } from "./document-resources"
 import { readPinnedFiles } from "./pinned-files"
@@ -170,6 +172,8 @@ type SpawnLocalServerOptions = {
    * `receive` 与 writeProbes 并列挂在 `child.on("message")` 上;ready 之后 `attach`,子进程退出时调它返回的断开函数。
    */
   codepuppySidecar?: CodePuppySidecarHost
+  /** #1760: the effective catalog the pre-spawn dependency read resolves installed declarations against (ext-ipc's resolver). */
+  connectorCatalog?: () => Promise<{ entries: readonly CatalogEntry[]; version: string }>
   /**
    * DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时(`credentials.unavailable`)或主进程读不出表时,请求既有的 `credential-change` 重启
    * (index.ts 接到 requestSidecarRespawn:既有队列与自愈阶梯,有界)。
@@ -744,13 +748,38 @@ export async function spawnLocalServer(
   const registryChannel = tryGetCodePuppyEnvironment()?.registryChannel
   if (!registryChannel)
     getLogger()?.warn("alpha environment not initialized at sidecar spawn — disabled-override injection will be skipped")
+  // #1760: the launcher descriptor consumes this fork's #1759 location binding, so the fence is planned before the document.
+  const engineConfigDirectory = engineGlobalConfigDirectory(exported.env, exported.home)
+
+  let fence: PlannedFence | undefined
+  try {
+    fence = await (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
+  } catch (error) {
+    getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
+    throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
+  }
+  if (fence && options.fenceRun && !fence.workspaces)
+    throw new Error("process fence plan carries no workspace list — this generation's W1 could not join the run's writable history, sidecar fork refused")
+  if (!fence && process.platform === "darwin")
+    throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
+  if (fence?.configFenceRoots) plannedConfigFenceRoots = fence.configFenceRoots
+  // #1760 §4.3: R1 locations as #1759 bound them for this fork (its R2 projection); win32 keeps whatever the fence code returns.
+  const launcher = forkLauncherAuthority({
+    userData: realpathSync(options.userDataPath),
+    resourcesRoot: realpathSync(resourcesRoot()),
+    packaged: electronNs.app.isPackaged,
+    pins: readPinnedFiles(),
+    packageManagerEnv: fence?.cacheEnv ?? {},
+    officeMcpManifest: join(realpathSync(resourcesRoot()), "office-mcp", "tools.json"),
+    log: (line) => getLogger()?.warn(line),
+  })
   const bootstrap = buildCodePuppyBootstrap({
     userDataPath: options.userDataPath,
     globalRoot: codepuppyGlobalRoot(),
     userConfig: codepuppyJsoncPath(),
     initialDirectory: codepuppyUserWorkspaceDir(exported.env, exported.home),
     databasePath,
-    engineConfigDirectory: engineGlobalConfigDirectory(exported.env, exported.home),
+    engineConfigDirectory,
     extPluginPath: ext.path,
     // #1565:引擎在四个文档工具连上之前,用这份随包清单给出它们的声明定义(packages/core/src/mcp/codepuppy-first-party-mcp.ts)。
     // 与写策略(ext-mcp-policy)一样按资源根的 realpath 解析,配置里那四条命令才能逐 token 对上。
@@ -763,21 +792,9 @@ export async function spawnLocalServer(
     log: (line) => getLogger()?.warn(line),
     sidecarGeneration: options.generation ?? 0,
     documents: forkDocumentBootstrap(options.userDataPath),
+    ...(launcher ? { launchers: launcher.environment } : {}),
   })
   publishVideoEnvironment(bootstrap) // #1775 consumes FIRST-PARTY-CACHE-v2.2; #1760 owns its producer.
-
-  let fence: PlannedFence | undefined
-  try {
-    fence = await (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
-  } catch (error) {
-    getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
-    throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
-  }
-  if (fence && options.fenceRun && !fence.workspaces)
-    throw new Error("process fence plan carries no workspace list — this generation's W1 could not join the run's writable history, sidecar fork refused")
-  if (!fence && process.platform === "darwin")
-    throw new Error("process fence plan returned nothing on darwin — sidecar fork refused (an unfenced engine must not start)")
-  if (fence?.configFenceRoots) plannedConfigFenceRoots = fence.configFenceRoots
 
   const packageManagerEnvironment = { ...sidecarEnv, ...fence?.cacheEnv }
   for (const [key, value] of Object.entries(originalProxies)) {
@@ -939,9 +956,7 @@ export async function spawnLocalServer(
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
-  const pinnedFiles = createPinnedFileMainBridge(spawned.files, String(options.generation ?? 0), (message) => child.postMessage(message))
-  // #1760: this generation's connector-launch projection (design §4.7). Core's changed/diagnostic bridge and the network/workspace
-  // actions bind with the #1759-dependent launcher host; until then they answer `unavailable`.
+  // #1760: this generation's connector-launch projection (design §4.7); network approval and folder choice join with group B.
   const launches = createConnectorLaunchState(String(options.generation ?? 0), {
     retry: async (identity) => {
       try {
@@ -951,12 +966,33 @@ export async function spawnLocalServer(
         return { ok: false, error: "unavailable", detail: serializeError(error).message }
       }
     },
-    diagnostic: async () => ({ ok: false, error: "unavailable" }),
+    diagnostic: (identity) => connectorMain?.diagnostic(identity) ?? Promise.resolve({ ok: false, error: "unavailable" }),
     openNetworkApproval: async () => ({ ok: false, error: "unavailable" }),
     chooseWorkspace: async () => ({ ok: false, error: "unavailable" }),
   })
   const uninstallLaunches = installConnectorLaunchState(launches)
-  // #1761 production composition on this lane; Node is the launcher authority's, bound together with it after #1759.
+  // The ID-only bridge reaches the one pinned authority through the launcher authority (Python mirror, managed entries).
+  const pinnedFiles = createPinnedFileMainBridge(
+    launcher
+      ? {
+          ensureFile: (id, signal, progress) => launcher.ensureFile(spawned.files, id, signal, progress),
+          ensureEntry: (id, binding, signal, progress) =>
+            launcher.ensureEntry({ sidecarGeneration: String(options.generation ?? 0), snapshots: launches.api, manifestPath: bootstrap.paths.officeMcpManifest, files: spawned.files }, binding, id, signal, progress),
+        }
+      : spawned.files,
+    String(options.generation ?? 0),
+    (message) => child.postMessage(message),
+  )
+  const connectorMain = launcher
+    ? openConnectorLaunchMain({
+        sidecarGeneration: String(options.generation ?? 0),
+        authority: launcher,
+        launches,
+        catalog: options.connectorCatalog ?? (async () => ({ entries: [], version: "" })),
+        post: (message) => child.postMessage(message),
+      })
+    : undefined
+  // #1761 production composition on this lane; Node is the launcher authority's resolved entry.
   const launcherPlatform = hostLauncherPlatform()
   const documents = bootstrap.documents && launcherPlatform
     ? openDocumentGeneration({
@@ -967,7 +1003,7 @@ export async function spawnLocalServer(
         platform: launcherPlatform,
         documents: bootstrap.documents,
         manifest: readPinnedFiles(),
-        node: () => Promise.reject(new Error("bundled Node is not bound to this generation yet")),
+        node: () => (launcher ? launcher.resolveAssets().then((assets) => assets.node) : Promise.reject(new Error("this build has no bundled connector launchers"))),
         ensureFile: (id, signal, progress) => spawned.files.ensureFile(id, signal, progress),
         writable: (directory) => generationWrites(directory),
         launches,
@@ -990,6 +1026,7 @@ export async function spawnLocalServer(
   const toolPolicyBaseDir = defaultPolicyBaseDir(dataDir)
   child.on("message", (message: unknown) => {
     if (pinnedFiles.receive(message)) return
+    if (connectorMain?.receive(message)) return
     if (documents?.receive(message, (reply) => child.postMessage(reply))) return
     if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
@@ -1020,6 +1057,7 @@ export async function spawnLocalServer(
   const pushThisGeneration = () => child.postMessage({ type: "credentials", credentials: credentialTable(options.userDataPath, credentialLog) } satisfies CredentialsMessage)
   child.once("exit", (code) => {
     void pinnedFiles.dispose()
+    connectorMain?.dispose()
     void documents?.dispose()
     uninstallLaunches()
     if (pushCredentialTable === pushThisGeneration) pushCredentialTable = undefined
@@ -1163,6 +1201,7 @@ export async function spawnLocalServer(
       readWriteScope,
       kill: () => {
         void pinnedFiles.dispose()
+        connectorMain?.dispose()
         if (!exited) child.kill()
       },
       projectConfigView: (directory: string) => projectConfigViews.request(directory),
@@ -1172,6 +1211,7 @@ export async function spawnLocalServer(
       generationWrites,
       stop: () => {
         void pinnedFiles.dispose()
+        connectorMain?.dispose()
         if (stopping) return stopping
         if (exited) return Promise.resolve()
         child.postMessage(SIDECAR_STOP_COMMAND)

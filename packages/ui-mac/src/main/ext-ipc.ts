@@ -1,6 +1,6 @@
 import { verifyVideoCall } from "./codepuppy-video-call"
 import { videoCacheRoot } from "./codepuppy-video-environment"
-import { checkConnectorRuntimeDependencies } from "./connector-runtime-dependencies"
+import { checkConnectorRuntimeDependencies, hostProgramEnvironment } from "./connector-runtime-dependencies"
 import { connectorPackageRunner } from "@opencode/util/codepuppy-command-head"
 import { engineClient } from "./engine-client"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
@@ -18,7 +18,6 @@ import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from "electro
 import * as fs from "node:fs"
 import { homedir } from "node:os"
 import * as path from "node:path"
-import { toolProbe } from "./platform"
 import { extensionsGranted, hasExtensionsDecision, listProjectExecutables } from "./codepuppy-ext-trust"
 import { readProjectPrefs, writeProjectPrefs } from "./codepuppy-workdir"
 import { projectTrustIdentity, readProjectTrustEntry } from "./project-trust-truth"
@@ -106,8 +105,7 @@ import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 // 同一个谓词 —— 两类运行器的 uv/Node 由随包启动器提供,git 不再以 /usr/bin 下的开发者工具 shim 存在为可用,且从不执行被判定的程序。
 function checkRuntime(tool: unknown, command: unknown): Promise<{ ok: boolean }> {
   if (typeof tool !== "string") return Promise.resolve({ ok: false })
-  const environment = Object.fromEntries(Object.entries({ ...process.env, PATH: toolProbe().probePath }).filter((entry): entry is [string, string] => entry[1] !== undefined))
-  return checkConnectorRuntimeDependencies({ runtimeDep: [tool], runner: Array.isArray(command) ? connectorPackageRunner(command) : undefined, environment }).then((facts) => ({ ok: facts.missing.length === 0 }))
+  return checkConnectorRuntimeDependencies({ runtimeDep: [tool], runner: Array.isArray(command) ? connectorPackageRunner(command) : undefined, environment: hostProgramEnvironment() }).then((facts) => ({ ok: facts.missing.length === 0 }))
 }
 
 const hiddenDirConflictsShown = new Set<string>()
@@ -1564,5 +1562,6 @@ export function registerExtIpcHandlers(
   // #390:同时交出恢复-gate 包装的 global 技能安装器,供 ecosystem gate 走事务安装(不绕恢复准入)。
   // REQ-234 `#1529`:codepuppySidecar 交给 composition root —— spawnLocalServer 在 `child.on("message")` 旁挂它的 receive,
   // ready 时 attach;onViewChanged 接 `ext-hub-view-changed` 推送。
-  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1 }
+  // #1760: the pre-spawn dependency read resolves installed declarations from this same effective catalog.
+  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1, resolveEffectiveCatalog }
 }

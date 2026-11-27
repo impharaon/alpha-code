@@ -5,6 +5,7 @@ import { connectorPackageRunner } from "@opencode/util/codepuppy-command-head"
 import type { LaunchIdentity, PackageRunner, RuntimeDependencyFacts } from "../../../util/src/codepuppy-connector-launch"
 import type { CatalogEntry } from "../renderer/extensions/catalog-types"
 import { findReceipt } from "./codepuppy-installs"
+import { toolProbe } from "./platform"
 
 /** What the two runner roles supply from the bundled launchers; the user's own copies never matter (BR-05). */
 const RUNNER_PROGRAMS = {
@@ -77,6 +78,11 @@ export async function installedConnectorDeclaration(input: {
   const entry = catalog.entries.find((value) => value.id === receipt.id && (value.version || catalog.version) === receipt.version)
   if (entry?.installSpec?.kind !== "mcp" || !entry.installSpec.command) return undefined
   return { runtimeDep: entry.installSpec.runtimeDep ?? [], command: entry.installSpec.command }
+}
+
+/** The host PATH the install precheck already uses (REQ-076 T2: posix adds the package-manager directories GUI launches lack). */
+export function hostProgramEnvironment(): Record<string, string> {
+  return Object.fromEntries(Object.entries({ ...process.env, PATH: toolProbe().probePath }).filter((entry): entry is [string, string] => entry[1] !== undefined))
 }
 
 /** `xcode-select -p` prints the active developer directory and never prompts; a missing directory counts as absent. */

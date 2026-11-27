@@ -130,6 +130,14 @@ export async function writeLauncherInventory(directory: string, platform: Launch
   return manifest
 }
 
+/** The descriptor only needs the shipped inventory's identity; resolveAssets still verifies every byte before use. */
+export function readLauncherBundle(directory: string, platform: LauncherPlatform): LauncherBundle {
+  const manifest: LauncherBundle = JSON.parse(readFileSync(join(directory, "runtime.json"), "utf8"))
+  if (manifest.schemaVersion !== 1 || manifest.platform !== platform || manifest.pinSet !== launcherPinSet || !["expanded", "archives"].includes(manifest.form) || !manifest.files || typeof manifest.files !== "object")
+    throw Error("invalid launcher bundle")
+  return manifest
+}
+
 export async function checkLauncherBundle(directory: string, platform: LauncherPlatform, expectedFiles?: Record<string, string>): Promise<LauncherBundle> {
   const manifest: LauncherBundle = JSON.parse(await readFile(join(directory, "runtime.json"), "utf8"))
   if (manifest.schemaVersion !== 1 || manifest.platform !== platform || manifest.pinSet !== launcherPinSet || !["expanded", "archives"].includes(manifest.form) || !manifest.files || typeof manifest.files !== "object" || Array.isArray(manifest.files)) throw Error("invalid launcher bundle")

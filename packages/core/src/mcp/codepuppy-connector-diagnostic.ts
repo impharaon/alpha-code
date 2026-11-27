@@ -1,4 +1,3 @@
-import path from "node:path"
 import { Context, Effect, Exit, PlatformError, References, Sink, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type {
@@ -8,6 +7,7 @@ import type {
   ConnectorLaunchState,
   LaunchIdentity,
 } from "@opencode/util/codepuppy-connector-launch"
+import { connectorDiagnosticTranscript } from "@opencode/util/codepuppy-connector-launch"
 import { KilledBySignal } from "@opencode/util/cross-spawn-spawner"
 import { Environment } from "../environment/index.js"
 
@@ -96,12 +96,7 @@ export function observeConnectorLaunch(input: {
     const environment = yield* Environment.Service
     const secrets = [...new Set(input.secrets.filter(Boolean))].sort((a, b) => b.length - a.length)
     const mask = (value: string) => maskDiagnostic(value, secrets)
-    const transcriptFile = path.join(
-      input.runtimeRoot,
-      "diagnostics",
-      encodeURIComponent(input.identity.attempt).replaceAll(".", "%2E"),
-      "transcript.json",
-    )
+    const transcriptFile = connectorDiagnosticTranscript(input.runtimeRoot, input.identity.attempt)
     const value: ConnectorLaunchDiagnostic = {
       identity: input.identity,
       requestedCommand: input.requestedCommand.map(mask),

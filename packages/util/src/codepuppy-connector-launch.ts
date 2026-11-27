@@ -1,5 +1,6 @@
 // #1760 frozen connector-launchers §4.6 / DOC-NODE-v2 data definitions.
 // Shared authority only; launcher acquisition, classification and host publication remain #1760 integration.
+import path from "node:path"
 import type { EnsurePinnedFileResult, PinnedFileId } from "./codepuppy-pinned-files.js"
 import type { Tool } from "../../schema/src/tool.js"
 
@@ -447,4 +448,81 @@ export function isLaunchSnapshot(value: unknown): value is LaunchSnapshot {
   const progress = state.progress
   if (progress.unit === "activity") return "detail" in progress && typeof progress.detail === "string"
   return ["bytes", "packages"].includes(String(progress.unit)) && "completed" in progress && Number.isSafeInteger(progress.completed) && Number(progress.completed) >= 0 && (!("total" in progress) || (Number.isSafeInteger(progress.total) && Number(progress.total) >= Number(progress.completed)))
+}
+
+/** The one derivation of an attempt's diagnostic file (§4.6): the sidecar writes it, main re-derives and checks it; no caller path. */
+export function connectorDiagnosticTranscript(runtimeRoot: string, attempt: string) {
+  return path.join(runtimeRoot, "diagnostics", encodeURIComponent(attempt).replaceAll(".", "%2E"), "transcript.json")
+}
+
+// §4.7 narrow messages besides the pinned-file bridge. Requests always end in one reply; notifications are fire-and-forget.
+export type ConnectorLaunchHostRequest =
+  | { operation: "resolve-assets" }
+  | { operation: "runtime-dependencies"; identity: LaunchIdentity }
+  | { operation: "begin-egress"; identity: LaunchIdentity }
+export type ConnectorLaunchSidecarMessage =
+  | { type: "codepuppy.connector-launch.changed"; snapshot: LaunchSnapshot }
+  | { type: "codepuppy.connector-launch.request"; id: number; sidecarGeneration: string; request: ConnectorLaunchHostRequest }
+  | { type: "codepuppy.connector-launch.end-egress"; sidecarGeneration: string; identity: LaunchIdentity }
+  | { type: "codepuppy.connector-launch.diagnostic.result"; id: number; sidecarGeneration: string; result: Awaited<ReturnType<ConnectorLaunchApi["diagnostic"]>> }
+export type ConnectorLaunchMainMessage =
+  | { type: "codepuppy.connector-launch.reply"; id: number; sidecarGeneration: string; ok: true; value: unknown }
+  | { type: "codepuppy.connector-launch.reply"; id: number; sidecarGeneration: string; ok: false; detail: string }
+  | { type: "codepuppy.connector-launch.egress-evidence"; sidecarGeneration: string; evidence: ConnectorEgressEvidence }
+  | { type: "codepuppy.connector-launch.diagnostic"; id: number; sidecarGeneration: string; identity: LaunchIdentity }
+
+const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
+const requestId = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) > 0
+const strings = (value: unknown) => Array.isArray(value) && value.every((item) => typeof item === "string")
+
+export function parseConnectorLaunchSidecarMessage(value: unknown): ConnectorLaunchSidecarMessage | undefined {
+  if (!record(value) || typeof value.type !== "string" || !value.type.startsWith("codepuppy.connector-launch.")) return undefined
+  if (value.type === "codepuppy.connector-launch.changed") return isLaunchSnapshot(value.snapshot) ? { type: value.type, snapshot: value.snapshot } : undefined
+  if (typeof value.sidecarGeneration !== "string") return undefined
+  if (value.type === "codepuppy.connector-launch.end-egress")
+    return isLaunchIdentity(value.identity) ? { type: value.type, sidecarGeneration: value.sidecarGeneration, identity: value.identity } : undefined
+  if (!requestId(value.id)) return undefined
+  if (value.type === "codepuppy.connector-launch.request") {
+    const request = value.request
+    if (!record(request)) return undefined
+    if (request.operation === "resolve-assets" && Object.keys(request).length === 1)
+      return { type: value.type, id: value.id, sidecarGeneration: value.sidecarGeneration, request: { operation: "resolve-assets" } }
+    if ((request.operation === "runtime-dependencies" || request.operation === "begin-egress") && Object.keys(request).length === 2 && isLaunchIdentity(request.identity))
+      return { type: value.type, id: value.id, sidecarGeneration: value.sidecarGeneration, request: { operation: request.operation, identity: request.identity } }
+    return undefined
+  }
+  if (value.type === "codepuppy.connector-launch.diagnostic.result" && record(value.result)) {
+    const result = value.result
+    if (result.ok === true && isConnectorLaunchDiagnostic(result.value))
+      return { type: value.type, id: value.id, sidecarGeneration: value.sidecarGeneration, result: { ok: true, value: result.value } }
+    if (result.ok === false && ["not-current", "unavailable", "cancelled"].includes(String(result.error)))
+      return { type: value.type, id: value.id, sidecarGeneration: value.sidecarGeneration, result: { ok: false, error: result.error as "not-current" | "unavailable" | "cancelled", ...(typeof result.detail === "string" ? { detail: result.detail } : {}) } }
+  }
+  return undefined
+}
+
+export function parseConnectorLaunchMainMessage(value: unknown): ConnectorLaunchMainMessage | undefined {
+  if (!record(value) || typeof value.type !== "string" || !value.type.startsWith("codepuppy.connector-launch.") || typeof value.sidecarGeneration !== "string") return undefined
+  if (value.type === "codepuppy.connector-launch.egress-evidence") {
+    const evidence = value.evidence
+    if (!record(evidence) || !isLaunchIdentity(evidence.identity) || typeof evidence.host !== "string" || !Number.isInteger(evidence.port) || !["refused", "granted", "not-asked"].includes(String(evidence.outcome))) return undefined
+    return { type: value.type, sidecarGeneration: value.sidecarGeneration, evidence: { identity: evidence.identity, host: evidence.host, port: Number(evidence.port), outcome: evidence.outcome as ConnectorEgressEvidence["outcome"] } }
+  }
+  if (!requestId(value.id)) return undefined
+  if (value.type === "codepuppy.connector-launch.diagnostic")
+    return isLaunchIdentity(value.identity) ? { type: value.type, id: value.id, sidecarGeneration: value.sidecarGeneration, identity: value.identity } : undefined
+  if (value.type !== "codepuppy.connector-launch.reply") return undefined
+  if (value.ok === true && "value" in value) return { type: value.type, id: value.id, sidecarGeneration: value.sidecarGeneration, ok: true, value: value.value }
+  if (value.ok === false && typeof value.detail === "string") return { type: value.type, id: value.id, sidecarGeneration: value.sidecarGeneration, ok: false, detail: value.detail }
+  return undefined
+}
+
+export function isConnectorLaunchDiagnostic(value: unknown): value is ConnectorLaunchDiagnostic {
+  return record(value) && isLaunchIdentity(value.identity) && strings(value.requestedCommand) && strings(value.effectiveCommand) && typeof value.cwd === "string" &&
+    (value.exitCode === null || Number.isInteger(value.exitCode)) && (value.signal === null || typeof value.signal === "string") && typeof value.stderr === "string" &&
+    ["launcher", "python", "packages", "handshake", "running"].includes(String(value.stage)) && typeof value.transcriptFile === "string" && path.isAbsolute(value.transcriptFile)
+}
+
+export function isRuntimeDependencyFacts(value: unknown): value is RuntimeDependencyFacts {
+  return record(value) && strings(value.runtimeDep) && strings(value.missing) && record(value.executables) && Object.values(value.executables).every((item) => typeof item === "string" && path.isAbsolute(item))
 }

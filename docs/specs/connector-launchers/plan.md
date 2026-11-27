@@ -879,7 +879,7 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 | AC-01 开发入口 | 一次性：真围栏驱动 + 本进程 main 桥，空 userData/空缓存，PATH 去掉 uv/node/Homebrew；五个官方条目的真实定义经生产注入 → index localLaunch → prepare → spawn，全部 connected，记录 resolved argv 为随包入口 | 一次性，记命令与输出（`gate slot --`） | 移除臂：去掉 index 的 packagePreparation 绑定，同一入口 uvx/npx 报 dependency_missing |
 | AC-01 Git | `connector-runtime-dependencies.test.ts`：xcode-select 失败/打印目录不存在 → missing=[git]，PATH 最前的 marker git 不执行；core 连接在 spawn 前得到 dependency，r3 投影显示「需要先安装 git」 | integration；受影响 PR + nightly | 只看 `/usr/bin/git` 存在或执行它取版本的实现会让 marker 执行或 missing 为空 |
 | AC-01 干净 Mac、无弹窗、正式包 | 发布层验收 | — | — |
-| AC-02 开发入口 | 一次性：真围栏驱动、空缓存，启用一条 uvx 连接器（离线本地 wheel）并完成 Python 安装，前后比对 HOME，userData 外零新增；记录三项 UV 根、npm cache、TMP/XDG、fence build ID | 一次性 | 设计 §4.7 对照臂：不设 UV_PYTHON_INSTALL_DIR、撤 R2 投影、XDG_DATA_HOME 取宿主值 → HOME 内默认 Python 位置 `Operation not permitted`；另一受限路径写入实际失败，证明不是无围栏 |
+| AC-02 开发入口 | 一次性：真围栏驱动、空缓存，启用一条 uvx 连接器（离线本地 wheel）并完成 Python 安装，前后比对 HOME，userData 与 bootstrap 导出的引擎数据根 `<XDG_DATA_HOME>/opencode`（V24-R2：属应用数据）之外零新增；记录三项 UV 根、npm cache、TMP/XDG、fence build ID | 一次性 | 设计 §4.7 对照臂：不设 UV_PYTHON_INSTALL_DIR、撤 R2 投影、XDG_DATA_HOME 取宿主值 → HOME 内默认 Python 位置 `Operation not permitted`；另一受限路径写入实际失败，证明不是无围栏 |
 | AC-02 正式包 utilityProcess、干净账户基线 | 发布层验收 | — | — |
 | AC-03 | 本片只把唯一 pinned authority 接入生产 Host：`pinned-files.test.ts`/`codepuppy-sidecar-wiring.test.ts` 的生产桥用例；北京与 owner 本机、入口不可达改道为发布层验收 | integration；受影响 PR + nightly | 生产桥绕过 authority 或接受 URL 时请求/磁盘断言失败 |
 | AC-04 开发入口 | 一次性：用户添加的 uvx 与 npx 连接器（各带本机模块的公开包）经生产链在真围栏下 connected | 一次性 | 同 AC-01 移除臂 |
@@ -962,12 +962,12 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 | --- | --- | --- |
 | AC-01 开发入口（五个官方） | `gate slot -- bun test /tmp/r10-probe/realentry.test.ts`（connect）exit 0：空 userData、空缓存下 fetch 37.9 s、filesystem 38.6 s、playwright 115.4 s、chrome-devtools 115.5 s、markitdown 119.2 s 全部 connected；引擎日志的进程为随包 `native/connector-launchers/build/mac-arm64/node/bin/node`；出网只有 registry.npmjs.org、pypi.org、files.pythonhosted.org（Python pin 由 main 的固定文件 authority 取） | Git「需要先安装 git」由 R5 谓词用例承担；干净 Mac/无弹窗/正式包仍属发布层 |
 | AC-05 | 同一次：PATH 最前的旧工具记录文件不存在（`old tools ran false`） | r10 本地用例已证去掉 localLaunch 会执行 marker |
-| AC-02 开发入口 | 同一次：以引擎首启完成后的 HOME 为基线，启用五个连接器后 HOME 只多出引擎自己的空目录 `~/.local/share/opencode/shell/<hash>`（引擎首次起子进程时建，非启动器写入）；Python 装在 `userData/package-managers/uv/python`，准备入口在 `userData/connector-runtime/prepared/<key>`（约 490 MB + 499 MB） | `gate slot -- bun /tmp/r10-probe/arm.ts <iso>` exit 0：同一生产 profile、同一随包 uv、同一已验镜像，撤掉 UV_PYTHON_INSTALL_DIR 并令 XDG_DATA_HOME 取 HOME 值 → `failed to create directory …/home/.local/share/uv/python: Operation not permitted (os error 1)`、HOME 内未出现；保留绑定位置 → `Installed Python 3.12.16`；同 profile 下另一 HOME 写入 → `Operation not permitted`，证明不是无围栏对照 |
+| AC-02 开发入口 | 同一次：以引擎首启完成后的 HOME 为基线，启用五个连接器后 HOME 只多出引擎自己的空目录 `~/.local/share/opencode/shell/<hash>`（引擎首次起子进程时建，非启动器写入）。按 V24-R2 这一目录在 bootstrap 导出的引擎数据根内、属应用数据，所以 **userData 与引擎数据根之外零新增，AC-02 开发入口通过**；Python 装在 `userData/package-managers/uv/python`，准备入口在 `userData/connector-runtime/prepared/<key>`（约 490 MB + 499 MB） | `gate slot -- bun /tmp/r10-probe/arm.ts <iso>` exit 0：同一生产 profile、同一随包 uv、同一已验镜像，撤掉 UV_PYTHON_INSTALL_DIR 并令 XDG_DATA_HOME 取 HOME 值 → `failed to create directory …/home/.local/share/uv/python: Operation not permitted (os error 1)`、HOME 内未出现；保留绑定位置 → `Installed Python 3.12.16`；同 profile 下另一 HOME 写入 → `Operation not permitted`，证明不是无围栏对照 |
 | AC-06 状态流 | `PROBE_PHASE=observe` exit 0：订阅当前代投影得到 `preparing:packages → launcher → python:activity → python:bytes 262144/25270084 … → packages → connecting → connected`（111 个状态，31.2 s）；200 KB/s 限速未测 | — |
 | AC-08 | connect 同一次：exit 23 的本地服务 → 行 `failed`，`connectorLaunchApi.diagnostic(identity)` 回原命令、`exitCode: 23`、stderr 原文 `probe crash: boom secret-xyz`（经 main→sidecar 窄桥读派生 transcript） | r10 用例：去掉诊断身份/路径核对即失败 |
 | AC-10 开发入口 | `PROBE_PHASE=offline` exit 0：同一 userData、新进程第 2 代、代理拒绝一切出网：filesystem 1.2 s、fetch 3.1 s、playwright 4.1 s、chrome-devtools 4.2 s、markitdown 5.0 s 全部 connected，代理记录为空（没有任何 CONNECT 尝试），HOME 无新增 | `PROBE_PHASE=offline-arm` exit 0：同一入口改用随包 node + npx 的默认设置（无准备入口）→ 5.1 s 后 `failed`（进程 exit 1），代理记录三次 `registry.npmjs.org deny` |
 
-未取得：AC-03 北京/香港、AC-04 用户添加的带本机模块的 npx 包（uvx 一侧的 fetch 依赖 pydantic-core 原生扩展，已连上；npm 原生模块与签名 Node 的库验证属正式包）、AC-06 200 KB/s 限速、AC-09 Windows、正式包/干净账户——均属发布层或下一轮。HOME 下引擎自建的空 `opencode/shell/<hash>` 是否计入 AC-02 由验收方判定（非启动器路径，位于引擎自己的数据根）。
+未取得：AC-03 北京/香港、AC-04 用户添加的带本机模块的 npx 包（uvx 一侧的 fetch 依赖 pydantic-core 原生扩展，已连上；npm 原生模块与签名 Node 的库验证属正式包）、AC-06 200 KB/s 限速、AC-09 Windows、正式包/干净账户——均属发布层或下一轮。HOME 下引擎自建的空 `opencode/shell/<hash>`：已由 V24-R2 裁定属应用数据，不计入 AC-02。
 
 **B 组真入口**（同一探针，`gate slot --`）：
 - BR-08 联网：`PROBE_PHASE=egress` exit 0：冷启动 filesystem，代理对 registry.npmjs.org 以用户拒绝作答 → 行 `failed {kind:"egress", host:"registry.npmjs.org", port:443}`（真 npm 经标记代理 URL 发 Proxy-Authorization，归属到本 attempt）；改为批准后 `connectorLaunchApi.openNetworkApproval(identity)` → `{ok:true}`，新 attempt `preparing → connecting → connected`。
@@ -1003,9 +1003,9 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 | 项 | 触发 | 负责 | 证据 |
 | --- | --- | --- | --- |
 | AC-01 干净 Mac、无弹窗 | macOS 候选包（正式签名 + 公证） | 编排器；干净账户或干净机器 | 打包产物在没有 uv/Node/Homebrew/开发者工具的账户上装五个官方连接器全部连上、全程无「安装开发者工具」对话框；Git 行显示「需要先安装 git」 |
-| AC-02 正式包 | 同上 | 编排器 | Electron utilityProcess 下真围栏 + 空缓存，前后比对 HOME（①的裁定结果决定 `opencode/shell` 的口径） |
+| AC-02 正式包 | 同上 | 编排器 | Electron utilityProcess 下真围栏 + 空缓存，前后比对 HOME，userData 与引擎数据根之外零新增（V24-R2） |
 | AC-03 | 候选包 + 香港入口已部署 | owner 本机与北京机房各一次；入口不可达臂由编排器 | 国内网络不开代理首次启动 Python 类连接器，下载经香港入口、哈希等于 pin；令入口不可达后同一构建改从原始来源下载 |
-| AC-04 正式包 | macOS 候选包；②裁定之后 | 编排器；干净机器 | 各选一个公开的 uvx 与 npx 本机模块包；签名后的随包 Node 加载本机模块（F-04 的库验证项） |
+| AC-04 正式包 | macOS 候选包（V24-R1 已落） | 编排器；干净机器 | 各选一个公开的 uvx 与 npx 本机模块包；签名后的随包 Node 加载本机模块（F-04 的库验证项） |
 | AC-06 限速 | 候选包 | 编排器 | 200 KB/s 限速下首次启动文档读取，行持续「正在准备」+ 进度、「未恢复的问题」里没有它，最终连上 |
 | AC-09 | Windows 候选包 | 编排器；没有开发工具的 Windows 机器 | AC-01、AC-02（`fenced=false` 按已批准的平台边界记录）、AC-04、AC-07、AC-10 全部通过 |
 | AC-10 正式包 | macOS 候选包 | 编排器 | 五个连过一次后断网重启应用，10 s 内全部连上；对照臂用启动器默认设置时 Node 类连不上或超时 |
@@ -1019,5 +1019,10 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 | 裁定 | 落实与证据 | 红例 |
 | --- | --- | --- |
 | V24-R1 AC-04 install 脚本 | 代码见偏离记录同日条。常驻命名例 core `codepuppy-connector-launch.test.ts` 「npm product installer runs dependency install scripts like official npx」：以真实准备 argv 与 npm-exec 运行器环境进入 CLI 分派，装载真 `@npmcli/config`，断言 argv 无 `--ignore-scripts`、生效配置 `ignore-scripts=false`、`prefer-offline=true`。本机模块本身用一次性真入口证明，不做常驻：常驻用例需要联网取 prebuild 或本机编译工具链。`PROBE_PHASE=native`（同 r11 探针、真围栏、`gate slot --` exit 0）：`better-sqlite3@12.11.1` 那条 → `connected`（49.9 s，暖 Python），install 脚本经 prebuild-install 把 `better_sqlite3.node` 下到 `userData/package-managers/npm/cache/_prebuilds`，再落进 `userData/connector-runtime/prepared/<key>/node_modules/better-sqlite3/build/Release/`；`@parcel/watcher` 那条同样 `connected`（42.4 s）；HOME 只多出引擎数据根下的 `shell/<id>`；旧工具未执行 | 改动前：常驻例 FAIL（argv 含 `--ignore-scripts=true`）；一次性探针同一入口 `better-sqlite3` → `failed`，stderr `Could not locate the bindings file`（上节 r12 ②） |
+| V24-R2 AC-02 | 不改代码。AC-02 证据行（本节计划证明表、r11 真入口表）改为「userData 与引擎数据根之外零新增」：r11 connect 与本轮两次 native 探针在 HOME 都只多出 `~/.local/share/opencode/shell/<id>`，即 bootstrap 导出的引擎数据根内 → AC-02 开发入口通过；正式包仍属发布层 | — |
+| V24-R3 V2-R5 载体 | 与偏离记录「北极星守卫」条一致（`callTool` 第三参数），无新增改动；守卫 exit 0 | — |
+| V24-R4 重开批准 | 与偏离记录「设计镜像 R6」条一致（打开批准卡片 = 重启 attempt），无新增改动；真入口证据见 r11 B 组 BR-08 | — |
+
+本轮提交：`35e0873dd5`（V24-R1）与本节（V24-R2 证据行、R3/R4 对照、收据）。相关检查：core `bun typecheck` exit 0（2075 files）；core `codepuppy-connector-launch.test.ts` + `codepuppy-local-launch.test.ts` 68 PASS；ui-mac `bun typecheck` exit 0，相关 5 文件 88 PASS、源码扫描 2 文件 15 PASS（r12 同轮，本轮 ui-mac 未改）；`bash scripts/north-star-guard.sh` exit 0；`affected-tests --list` 见返回。r12 发布层清单中 AC-02、AC-04 两行的「①/②裁定之后」前提已满足，其余不变。遗留去向：shell 中直接运行 npm 的三行警告 → #1759 拥有者观察项；项目 `codepuppy.jsonc` 手写 cwd 无改写端 → 观察项。OPTIONAL：无。
 
 遗留去向：①#1759 R1 env 里 pnpm 的 `npm_config_store_dir/cache_dir/state_dir` 让 npm 11 每次打印「Unknown env config」三行，并出现在下载失败的详情开头 → #1759 拥有者（或呈现层只取末行）；②网络中断时一次下载失败约需 338 s 才定论（npm 自身重试 × 准备事务一次恢复）→ 意图项（是否在 BR-06/07 下接受）；③AC-02 中引擎首次起子进程时在 HOME 的引擎数据根建空目录 `opencode/shell/<hash>` → 验收方判定是否计入；④开发树未做启动器预构建时不写描述（打包产物必有）→ 无需处理，已记偏离。OPTIONAL：无。

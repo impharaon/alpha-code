@@ -924,6 +924,12 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 
 2026-11-27 · 启动器包目录（本提交）：实读发现开发运行时 `resources/connector-launchers` 并不存在——prebuild 产物在 `native/connector-launchers/build/<mac-arm64|win-x64>`，打包器从那里复制到 `connector-launchers/`。`describeLauncherEnvironment`/`createLauncherAssetAuthority` 的输入因此从 resources 根改为显式 `bundleDirectory`，由新的 `launcherBundleDirectory` 按打包与否给出（用例对照 electron-builder 的同一 copy 源/目的）；`hostLauncherPlatform` 是两种发行目标的唯一判定。属于本片计划内的资产 authority 同链修正，未改锁或包内容。
 
+2026-11-27 · 设计镜像 R6（编排器评审前指令，供 designer 更新 DESIGN 镜像）：设计 F-13（`design.md:62`）与 §6 R6 行（`design.md:363`）的前提是批准面保留拒绝记忆，因而要新增 `reopenUserEgressGrant(host, port)` 去清除它。#1757 v3 合入后批准权威不再保留拒绝记忆：`requestUserEgressGrant`（`network-egress-grants.ts:94`）直接转给已配置的批准权威，每个新 CONNECT 都重新出卡。本票因此把「打开批准卡片」实现为经同一 `experimental.mcp.connect` 重启该 attempt（`server.ts` 的 `openNetworkApproval`），新 attempt 的出网再次走原批准面；没有新增 `reopenUserEgressGrant`，也没有新增任何用户步骤。DESIGN 镜像应把 R6 改为「重启 attempt，由批准面对新请求再次询问」，F-13 的「需要显式重开端口」随之作废。真入口证据见 r11 B 组 BR-08 行。
+
+2026-11-27 · npm 只收它定义的绑定键（`7f4a8b7870`）：实测 pnpm 10.32.1 只认 `npm_config_{store,cache,state}_dir`，`pnpm_config_*` 三项均为 `undefined`（`pnpm config get` 与 `pnpm store path` 两种读法），所以 #1759 R1 的环境表不能按名字拆开——拆掉会让 pnpm 的 store 回到 `~/Library/pnpm/store`。修在启动器 npm 程序的安装分派处：它本来就负责把绑定环境重新落到 npm 进程上，现在只删除绑定里以 `npm_config_` 开头、而 npm 自身 definitions 不认识的键，再交给 npm CLI；用户自己设的 npm 变量不动，pnpm 仍拿到这三项。红例在旧实现上得到三行 `Unknown env config "store-dir"/"cache-dir"/"state-dir"`；一次性用真随包 npm 11.20.0 与不可达 registry 核对：直接运行的对照臂 stderr 前三行就是这三条警告，经启动器安装时详情以 `npm error code ECONNREFUSED` 开头。剩余：会话里的 shell 与 pnpm 共用同一份环境，用户或助手在终端里直接运行 npm 仍会看到这三行（#1759 的既有行为，不在本调用链）→ 观察项交 #1759 拥有者。
+
+2026-11-27 · R8 显式 cwd（`55e4fe0163`）：新模块 `connector-workspace-binding.ts`。声明里明确配置了 cwd（不含 `{workspace}`）时，main 用既有写端（`persistMcpWithPolicy` → `persistMcp`，同一策略入口与停用投影）只把 cwd 换成所选文件夹，其余命令/环境/业务字段原样保留，再经 ext-ipc 已有的重载协调器请求一次 global 重载，由重载重读定义并重启连接器；`{workspace}` 或没有 cwd 的声明照旧在所选 Location 重新连接；写失败回 `unavailable` 并带原因，取消仍回 cancelled。来源：目录与包派生（`deriveMcpConfig`）从不产出 cwd，显式 cwd 只出现在用户自建的全局定义里，所以只接这一个写端；项目 `codepuppy.jsonc` 里手写的 cwd 没有既有的改写端（项目侧只有事务化安装与 `removeProjectMcpConfigInLock`），这种定义仍走「所选 Location 重连」，cwd 不变 → 观察项，不在本票另造项目写端。
+
 ### r10 独立部分实施收据（#1759 合入前）
 
 依据：本节计划 `9ebb66043c`（编排器 Claude Opus 5.5 通过，Q1–Q4 裁定见核对行）；已核：Claude Opus 5.5，结论 **PARTIAL**——不消费 #1759 代码的部分已完成，余项等合入后续接。提交：`0f47ece41b`（Q2/Q3 bootstrap）、`f169386a67`（R5 依赖谓词与安装预检）、`b8679f0f7c`（文档宿主 main+ext 组合、Q1 行、换代替换）、`fc07e036a6`（§4.7 其余窄消息两端）、`8207bf730c`（launchers 解析与类型化读取）、`1aa2c0de69`（index 的 localLaunch）、`00b1d8049e`（开发运行的启动器包目录）、`45c88ecf68`（未构建文档资源只记 info）。未改 #1759 所属文件，未接 R1/R2，未运行应用、窗口、gate run、bin/check 或全包/计时用例。
@@ -973,5 +979,35 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 相关检查一次：ui-mac 合入后 8 文件 113 PASS、接线后 7 文件 113 PASS、B 组 5 文件 99 PASS（server/sidecar-wiring/generation/sidecar/egress-proxy）、old-name-scan 等 4 文件 48 PASS；ext hub-bridge 19 PASS、identity/plugin-host 命名例 7 PASS、identity 全文件 23 PASS；core local-launch/collision/attach 24 PASS、mcp 命名例 4 PASS；util bootstrap+command-head 23 PASS；四包 `bun typecheck` exit 0；`bash scripts/north-star-guard.sh` exit 0；`affected-tests --list` exit 0：**affected tests: 433 of 763 test files**。移除臂（均 FAIL 后复原）：300 s 撤销（旧集合红）、R5 代理归属、secret 补充、hub-bridge 车道。
 
 未取得（仍待）：AC-03 北京/香港与入口不可达；AC-04 npm 一侧带本机模块的第三方包与签名 Node 库验证；AC-06 200 KB/s 限速；AC-09 Windows；正式包/干净账户/无弹窗；R8 显式 cwd 声明的改写端；文档行 unknown 失败的诊断（无进程 transcript）。
+
+### r12 评审前收口
+
+依据：编排器评审前指令（五项，各自红例、一因一提交）；SPEC v1、DESIGN v2.3、本节计划与核对行；已核：Claude Opus 5.5。提交：`7f4a8b7870`（npm 只收它定义的绑定键）、`55e4fe0163`（R8 显式 cwd）及本节。
+
+| 项 | 结果与证据 | 红例 / 移除臂 |
+| --- | --- | --- |
+| ④ npm「Unknown env config」 | 已修，见偏离记录同日条。core `codepuppy-connector-launch.test.ts -t "npm product installer"` 2 PASS（新例在 CLI 分派处装载真 `@npmcli/config` 与真 definitions，断言无 `Unknown env config` 且 `cache` 仍是绑定值） | 旧实现上新例 FAIL，收到三行警告 |
+| ③ R8 显式 cwd | 已实现，见偏离记录同日条。ui-mac `connector-workspace-binding.test.ts` 2 PASS：真写端 + 真严格读端、隔离全局根；显式 cwd 被替换、command/environment 保留、请求一次 global 重载；`{workspace}`、无 cwd、不存在的定义不写、不重载 | 模块直接回 location → 第一例 FAIL |
+| ⑤ 「打开批准卡片 = 重启 attempt」 | 已记偏离（设计镜像 R6 条），供 designer 更新 DESIGN 镜像 | — |
+| ② AC-04 npm 本机模块 | 分类后一半通过、一半是设计冲突。一次性真入口（`PROBE_PHASE=native`，同 r11 探针、真围栏、`gate slot --` exit 0）：两条用户添加的 `npx -y --package=file:<本地包> <bin>` 连接器，服务启动时加载本机模块。① 依赖 `@parcel/watcher@2.5.1`（N-API 预编译二进制经 optionalDependencies 下发）→ `connected`（冷启动约 233 s，含并行的 Python pin 下载）；② 依赖 `better-sqlite3@12.11.1`（二进制由 install 脚本 prebuild-install 取得）→ `failed`，诊断 stderr `native load failed: Could not locate the bindings file`。同一随包 npm 11.20.0 在围栏外对照：去掉 `--ignore-scripts` 安装同一包 → `better_sqlite3.node` 出现且加载成功。原因是 DESIGN §4.3 第 2 条冻结的 `npm install … --ignore-scripts`（`design.md:179`；代码 `codepuppy-npm-launch.ts:10` 的 `connectorNpmDefaults`）。这不是换机器能解决的，返回设计（见下） | — |
+| ① AC-02 引擎 `shell/<hash>` | 未改，返回设计（见下）。本轮 native 探针再次得到同一结果：HOME 只多出 `~/.local/share/opencode/shell` 与其下一个空的 `<project-id>` 目录 | — |
+
+**返回设计 ①（AC-02）**：这个目录由 `packages/core/src/shell.ts:155-158` 在 Location 的 Shell 服务建立时创建，`outputDir = path.join(global.data, "shell", location.project.id)`，没有单独的路径变量；`global.data` = `<XDG_DATA_HOME>/opencode`（`packages/util/src/global-roots.ts:5,13`）。这个根并不是「围栏/bootstrap 没给缺省」的根：bootstrap 把 `XDG_DATA_HOME` 作为会话库的数据根原样导出（`codepuppy-bootstrap-build.ts:49`），engine-config-fence 设计把它定为引擎自己的数据目录 W4，库、日志、工具输出、仓库缓存都在里面（`docs/specs/engine-config-fence/design.md:135,164`），owner 的 D13 把计划目录放在 `<XDG_DATA_HOME>/opencode/plan`（同文件 `:427`），CF-11 工具策略写者也在这里（`:155`），main 的 toolPolicyBaseDir、db-safety、data-clear 从同一根推导。把 XDG_DATA_HOME 指进应用数据会一起搬走会话库、计划、工具策略、快照与工作树（用户的历史会话在应用里消失，属破坏性的用户数据变更），并与上述冻结设计冲突；单独搬 shell 目录需要接管上游 `shell.ts`，北极星规则下要 owner 同意（D13 同款）。供裁定的选项：A. AC-02 的「应用数据目录」包含引擎数据根 W4（不改代码）；B. 接管 `shell.ts` 这一个路径值，把 shell 输出放到 userData（需 owner 同意新增上游接管，类同 D13）；C. 引擎数据根整体迁入 userData（架构变更 + owner 对会话数据位置的授权）。`BLOCKED: design — engine-config-fence W4/D13/CF-11 与本票 AC-02 — packages/core/src/shell.ts:155`。
+
+**返回设计 ②（AC-04 npm）**：`BLOCKED: design — DESIGN-connector-launchers §4.3 第 2 条（design.md:179）的 --ignore-scripts — packages/core/src/mcp/codepuppy-npm-launch.ts:10`。凡是本机二进制由 install 脚本取得的 npm 包（prebuild-install、node-gyp-build 回退、node-gyp 编译）在准备后都缺二进制，服务启动即退出；只有经 optionalDependencies 下发预编译二进制的包能连上。供裁定的选项：A. 准备时允许 install 脚本（去掉该默认项；脚本仍在写入围栏与出网批准之内运行，与用户直接用 npx 的行为一致；需要编译工具链的包在干净机器上仍会失败，但它的诊断原文会经 AC-08 带给助手）；B. 保留 `--ignore-scripts` 并在 spec 写明只支持预编译分发的包——这是新增限制，只能由 owner 定。按原则 1 的默认方向是 A，但它改冻结设计，本票不自行改。
+
+**发布层验收清单**（本票代码已就绪，以下只能在发布层取得；触发 = 打出候选包；负责 = 编排器按 `delivery-ship` 组织，标注 owner 的项需要 owner 本人的机器或网络）：
+
+| 项 | 触发 | 负责 | 证据 |
+| --- | --- | --- | --- |
+| AC-01 干净 Mac、无弹窗 | macOS 候选包（正式签名 + 公证） | 编排器；干净账户或干净机器 | 打包产物在没有 uv/Node/Homebrew/开发者工具的账户上装五个官方连接器全部连上、全程无「安装开发者工具」对话框；Git 行显示「需要先安装 git」 |
+| AC-02 正式包 | 同上 | 编排器 | Electron utilityProcess 下真围栏 + 空缓存，前后比对 HOME（①的裁定结果决定 `opencode/shell` 的口径） |
+| AC-03 | 候选包 + 香港入口已部署 | owner 本机与北京机房各一次；入口不可达臂由编排器 | 国内网络不开代理首次启动 Python 类连接器，下载经香港入口、哈希等于 pin；令入口不可达后同一构建改从原始来源下载 |
+| AC-04 正式包 | macOS 候选包；②裁定之后 | 编排器；干净机器 | 各选一个公开的 uvx 与 npx 本机模块包；签名后的随包 Node 加载本机模块（F-04 的库验证项） |
+| AC-06 限速 | 候选包 | 编排器 | 200 KB/s 限速下首次启动文档读取，行持续「正在准备」+ 进度、「未恢复的问题」里没有它，最终连上 |
+| AC-09 | Windows 候选包 | 编排器；没有开发工具的 Windows 机器 | AC-01、AC-02（`fenced=false` 按已批准的平台边界记录）、AC-04、AC-07、AC-10 全部通过 |
+| AC-10 正式包 | macOS 候选包 | 编排器 | 五个连过一次后断网重启应用，10 s 内全部连上；对照臂用启动器默认设置时 Node 类连不上或超时 |
+
+遗留去向：①②各自返回设计（上文）；shell 中直接运行 npm 的三行警告 → #1759 拥有者观察项；项目 `codepuppy.jsonc` 手写 cwd 无改写端 → 观察项；探针里两条连接器并行 `mcp.add` 时第一条出现一次 `connected → disabled → 重新准备 → connected`（推断为探针并行的第二次 `mcp.add` 触发了配置重载，未单独验证；最终两条都按各自结果收敛）→ 丢弃。OPTIONAL：无。
 
 遗留去向：①#1759 R1 env 里 pnpm 的 `npm_config_store_dir/cache_dir/state_dir` 让 npm 11 每次打印「Unknown env config」三行，并出现在下载失败的详情开头 → #1759 拥有者（或呈现层只取末行）；②网络中断时一次下载失败约需 338 s 才定论（npm 自身重试 × 准备事务一次恢复）→ 意图项（是否在 BR-06/07 下接受）；③AC-02 中引擎首次起子进程时在 HOME 的引擎数据根建空目录 `opencode/shell/<hash>` → 验收方判定是否计入；④开发树未做启动器预构建时不写描述（打包产物必有）→ 无需处理，已记偏离。OPTIONAL：无。

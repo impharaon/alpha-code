@@ -227,6 +227,27 @@ test("locations and root failures stay independent", async () => {
   ])
 })
 
+// Design §10 SPEC5-03: stopping the engine releases the Location before a waiting call is refused and finishes.
+test.each(["result", "error"] as const)("a Code Mode call finishing after release still masks its %s and keeps toolCalls", async (terminal) => {
+  const { mask, values: [value] } = await setup()
+  const toolCalls = [{ id: "child", name: "probe_echo", status: "error" }]
+  await mask.begin({ call, kind: "execute" })
+  mask.dispose()
+  const safe = terminal === "result"
+    ? await mask.result({ facts: undefined, call, tool: "execute", result: { content: `ran ${value}`, metadata: { toolCalls } } })
+    : await mask.error({ call, tool: "execute", error: new Tool.Error({ message: `failed ${value}`, metadata: { toolCalls } }) })
+  const text = JSON.stringify(safe)
+  expect(text.includes(value)).toBe(false)
+  expect(text.includes(ProtectedFiles.REDACTED)).toBe(true)
+  expect((safe.metadata?.toolCalls as typeof toolCalls | undefined)?.map((child) => child.status)).toEqual(["error"])
+  // Released once the last call finished: a call that begins afterwards is not taken in, so nothing can be masked.
+  const later = { ...call, id: "later" }
+  await mask.begin({ call: later, kind: "tool" })
+  expect((await mask.result({ facts: undefined, call: later, tool: "probe", result: { content: value } })).content).toEqual([
+    { type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT },
+  ])
+})
+
 test("masking failure drops previous and current dynamic key names", async () => {
   const { mask, roots } = await setup()
   const key = randomUUID()

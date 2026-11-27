@@ -1,15 +1,15 @@
 ---
 id: DESIGN-child-process-write-fence
 title: 子进程写入围栏技术设计
-summary: 保留既有围栏、Homebrew 与 Cargo 裁决；v4.2 将 Go 的 GOPATH/sumdb 缓存迁入应用数据，并固定原生 GOBIN，保持全局安装目标与校验语义；v4.4 让 Homebrew 节点只能由实际执行到的语法叶领取；v4.5 以 PID 加进程启动时间认定根 Shell，跨 exec 不变。
+summary: 保留既有围栏、Homebrew 与 Cargo 裁决；v4.2 将 Go 的 GOPATH/sumdb 缓存迁入应用数据，并固定原生 GOBIN，保持全局安装目标与校验语义；v4.4 让 Homebrew 节点只能由实际执行到的语法叶领取；v4.5 以 PID 加进程启动时间认定根 Shell，跨 exec 不变；v6 增量（SPEC v7，I-55）从命令报错里认出被拦的完整路径，经同一张 external_directory 卡与 R4 事后放行，R6 增 ineligible。
 kind: tech-design
 status: frozen
 spec: SPEC-child-process-write-fence
-spec_version: 6
+spec_version: 7
 review:
   rounds: 0
   reviewed_sha: ""
-  verdict: "frozen-per-r8; scoped review flagged for Go install-location capture and coupled projection"
+  verdict: "v6 increment (SPEC v7, I-55) drafted 2026-11-27, independent review not yet run; earlier increments frozen-per-r8, scoped review flagged for Go install-location capture and coupled projection"
 owners: [owner]
 last_reviewed: 2026-11-27
 ---
@@ -1240,3 +1240,213 @@ K1/K2 不变：档位/审批照旧，固定位置仍只在 R1，消费者不推�
 | F-b｜2026-11-27｜#1759 r8 | Bun 全局位置按 Bun 自身算法计算：`BUN_INSTALL` 已设取之，否则 `<XDG_CACHE_HOME>/.bun`，否则 `~/.bun`，取用户可信环境快照；只放行 `<root>/install/global` 与 `<root>/bin`，经 R7 绑定；`PackageManagerLocationInput` 从快照携带 `XDG_CACHE_HOME`/`BUN_INSTALL`（字段 `xdgCacheHome`/`bunInstall`）。应用自身为子进程设置会移动 Bun 根的变量时，用户未设 BUN_INSTALL 的围栏子进程得到 `BUN_INSTALL=<用户真实 Bun 根>`（同 GOBIN 模式；还原真实位置，不是重定向整个 Bun 安装）。 | 原 §4.2 只写 `~/.bun/...`，与用户设置 BUN_INSTALL 或 XDG_CACHE_HOME 的真实位置不符。同步 v4 §4.1 类型/bun 行/R2 句与 §4.2 bun 行；Windows 列未改。 |
 
 **传播核对**：`rg -n 'goInstallBin|GOBIN|\.bun/|BUN_INSTALL' docs/specs --glob design.md` 只命中本设计；#1760 无独立 Go/Bun 全局位置规则，共享位置权威仍为 R1。遗留：F-b 的字段名 `bunInstall`/`xdgCacheHome` 是本记录对「携带 XDG_CACHE_HOME/BUN_INSTALL」的具体化；用户已设 GOBIN 时的投影形态及 Bun 根还原的真实入口证据仍归 #1759 实施证明。
+
+
+# v6 增量｜命令运行中被拦下的写入事后批准（SPEC v7，INT-safety I-55）
+
+**状态：待审（draft）。** designer Claude Opus 5.5 受编排者委派起草；独立审查尚未进行，本节不声称 frozen。前文 v2–v5、v4.1–v4.5 的决定与收据不变。本增量只新增 AB1–AB4，并给 R6 回答增加一个结果值 `ineligible`（§4.2），其余接缝原样消费：没有新 IPC 通道、新消息类型、新原生能力或引擎改动。
+
+## 1. 基线
+
+- 已批准输入：SPEC-child-process-write-fence **v7**，[提交 `10bae65505` 的规格](https://github.com/impharaon/alpha%2Dcode/blob/10bae6550580c18ab767b344b08b8f42665a1608/docs/specs/child-process-write-fence/spec.md)（同目录 [当前规格](spec.md)）。覆盖 BR-11、AC-13，以及 BR-06 的 v7 句、限制段 v7 行、Windows 段 v7 句。
+- 依据：owner 2026-11-27 U-44 批准 impharaon/alpha-work INT-safety I-55，原话见规格「来源」v7 条。I-55 自己列的代价「需要先确认能从系统沙箱的拒绝记录可靠认出路径」由本增量 §2 回答。
+- 读码基线 `a56d861523`（本分支起点）。`origin/alpha@8c38a1c8a8` 移动了 `packages/ext/src/policy/index.ts` 的行号，本节引用的几段内容没有变（`git diff a56d861523 8c38a1c8a8` 对 `evaluateDirectoryWrite`、`readWriteScope`、`attachWriteDenied`、`needs-approval` 无改动行）；在 8c38a1c8a8 上的行号写在分号后。
+- 体验：沿用 BR-08 的批准卡（`PermissionDialog.tsx` 的目录写入分支）与既有工具结果说明；不新增页面、按钮或设计稿。
+
+## 2. 地面真相
+
+问题：应用能否可靠认出被围栏拦下的写入路径，并归到对应的那一次命令；若不能，最窄且如实的来源是什么。停止条件：系统拒绝记录被证实可靠，或被证据否决并找到一个能证伪的替代来源。探针用时约 30 分钟；探针目录 `/private/tmp/i55-probe.*` 与 `~/i55-probe-outside.*` 已删除，下面记命令与原样输出。
+
+| 编号 | 观察及证据 | 本增量依赖的结论 |
+| --- | --- | --- |
+| AB-P01（测，环境） | macOS 26.3.1（25D771280a）arm64，本机账户在 admin 组。profile 按 `renderProcessFenceProfile`（`process-fence-profile.ts:343-396`）同形手写：`(allow default)`、`(deny file-write*)`、W1/W3/W4/W5/W8/W11–W15 allow 块、X1、X2、N1–N4，外加一条受保护文件 literal 拒写。被拦目标是 HOME 下新建的空目录（`/private/tmp`、`/private/var/folders` 属 W11/W12，不能当被拦目标）。读取面与既有测试工具 `packages/ui-mac/test-component/sandbox-denial-stream.ts:35-101` 相同：`/usr/bin/log stream --style ndjson --predicate 'eventMessage CONTAINS "deny(1) file-write"' \| perl -MTime::HiRes=time -ne 'printf "%.0f\t%s", time*1000, $_'`；围栏内写标记目录确认已接上（第 1 个标记，24 ms）与已排空（第 1 个标记，29 ms）。案例在 `/usr/bin/sandbox-exec -f prod.sb /bin/bash -c '…'` 里逐个后台运行，记下各自 pid | 与生产同形的拒绝；读取方法与仓内现有测试相同 |
+| AB-P02（测，第一轮） | 20 个案例（14 种写法，另有同一路径 5 个进程、一个进程连写 200 个文件）全部 EPERM，HOME 下目标目录 0 落盘。报错原文：`/bin/sh: <O>/redir.txt: Operation not permitted`；`touch: <O>/touch.txt: …`；`mkdir: <O>/newdir: …`；`cp: <O>/cp.txt: …`；Python `PermissionError: [Errno 1] Operation not permitted: '<O>/py.txt'`；Python 捕获异常只打印 `failed`（stderr 空）；`tempfile.mkstemp(dir=<O>)` 只打印异常类名；Node `Error: EPERM: operation not permitted, open '<O>/node.txt'`；Bun `EPERM: operation not permitted, open '<O>/bun.txt'`；`error: could not lock config file <O>/gitcfg: Operation not permitted`；`fatal: cannot mkdir <O>/repo: Operation not permitted`；`cd <O 的父目录> && touch <O 名>/rel.txt` 报 `touch: i55-probe-outside.FkfAEm/rel.txt: …`（相对路径）；嵌套 `sh -c` 与受保护文件同 touch 形态。日志：12 种写法有对应行，**Node、Bun 两条没有任何行**；相对路径那条以绝对路径记在子进程 `touch(7126)` 名下，不是案例记下的 `sh(7125)`；`git config` 记的是 `<O>/gitcfg.lock`；`tempfile` 记的是随机名 `<O>/tmpl02f3vw0`；5 个同路径进程 5/5；连写 200/200。每个被围栏进程另有一行 `/dev/dtracehelper` 拒写。日志行在案例结束时间戳之前 4–74 ms 已到达（结束戳含 `wait` 与一次 perl 启动）。同一窗口另有 49 个进程名的 4 066 行（本机其它工作树的围栏测试与系统：`config-fence-ops` 2 104、`bash` 336、`sh` 241、`git` 224、`node` 161 …），`/dev/dtracehelper` 共 2 036 行；`Messages dropped` 0 行 | 延迟是毫秒级；但有静默缺失、噪声大、记在后代进程名下 |
+| AB-P03（测，第二轮） | 新开一个 stream：Node 写 ×3、Bun 写 ×3、Node `mkdirSync` ×3、touch ×3，12 次全部 EPERM。日志 8 行：缺 `node2-1`、`bun2-1`、`nodedir-1`、`node2-2`；touch 3/3；`Messages dropped` 0 行。两轮合计 Node/Bun 被拒 11 次、记录 5 次 | 安静的机器上也静默漏条，没有任何丢失提示 |
+| AB-P04（读，既有证据） | `9549fa622b`（2026-11-25）提交说明：夜间满载时 stream 已接上、已排空、无丢失行，引擎 pid 那条拒绝仍没出现（"the kernel lost that one sandbox report without trace"）；同一说明：同一进程重复的相同拒绝会被内核折叠（"so the kernel does not fold it into a duplicate report"）。`docs/architecture/2026-09-08-derived-process-spawn-paths.md` §7.2：同一命令换一个可执行文件就整段不报、随时间变化；`log show` 只留一部分 | 与 AB-P03 一致；不是本机一次性现象 |
+| AB-P05（读+测） | `strings /usr/bin/log` 含 `Must be admin to run '%s' command`；本账户是 admin，所以能 stream。非管理员账户未实测 | 推：标准账户拿不到这份记录 |
+| AB-P06（测，更多写法，zsh 下） | `zsh:1: operation not permitted: <O>/z.txt`；`tee: <O>/tee.txt: Operation not permitted`；`mv: rename /private/tmp/i55-err.rXZpLU to <O>/mv.txt: Operation not permitted`（两条绝对路径，前一条本来可写）；`ln: <O>/ln: …`；`install: sandbox detected, falling back to direct copy install: <O>/INS@GPWhDq: Operation not permitted`；Node `mkdirSync(<O>/n/m, {recursive:true})` 报 `EPERM: operation not permitted, mkdir '<O>/n/m'`（点名最终目录，实际被拒的是 `<O>/n`）；`sed -i '' … /etc/hosts` 报 `sed: /etc/hosts: Operation not permitted`；`rm` 不存在的文件与 zsh `>>` 到不存在的父目录都是 `No such file or directory`。两轮共 21 种写法：18 种写出绝对路径、1 种相对路径、2 种不写路径 | 命令自己的报错大多点名被拒对象，而且天然属于这次工具调用 |
+| AB-P07（读） | `attachWriteDenied`（`packages/ext/src/policy/display.ts:105-131`）对输出含 `operation not permitted` 的 shell 结果、以及写文件工具的 EPERM 错误，追加 `WRITE_REFUSED_NOTE`（`context-injection.ts:574-575`，登记 `:551`）；由 execute.after 调用（`policy/index.ts:340`；`:474`）。shell 输出含 stderr（v5 V5-P03 `handle.all`） | 命令中途被拦的「原来那句说明」就是这条：助手停下并告诉用户哪个写入被拒 |
+| AB-P08（读） | `evaluateDirectoryWrite`（`policy/index.ts:365-377`；`:499`）：external_directory 写请求先查 R6，`protected` → deny，`needs-approval` → 不论档位与已存规则一律 ask，全部 `fixed` → allow，其余按引擎原判定。它在 evaluate 钩子里排在无人值守分支之后（`:214-224`；`:299`），自动化会话在那里直接拒、不出卡 | BR-08 今天在「请求审批」「全部批准」两档都出卡；只读档不能运行命令 |
+| AB-P09（读） | 插件 `PermissionDomain.assert`（`packages/plugin/src/promise/permission.ts:24-31`）：需要批准时弹卡并等待；deny 规则或带反馈的拒绝抛 `Tool.Error`；普通拒绝抛出的错误结束本步，须原样抛出。ext 已在工具执行中使用它：安装工具 `hub-tools.ts:71` → `askInstall`（`policy/index.ts:284-289`）→ `confirm` → `gate.ts:189`。seal 阶段的 `context.tool.transform` 已包住每个工具的 execute（`policy/index.ts:324-327`；`:456-458`，`wrapForDisplay` `display.ts:38-63`）。core 先等 execute、再等 execute.after，才把结果交给模型（`packages/core/src/tool.ts:132-180`）。插件 Context 没有 FileAccess（`packages/plugin/src/promise/plugin.ts:27-58`） | ext 可以在命令结束、结果交给模型之前弹同一张卡；不需要引擎挂点 |
+| AB-P10（读） | R4 `approveDirectoryWrite` 只接受待决的 `external_directory` 请求且 metadata 带 `directoryAccess`、access 为 write（`directory-write-approval.ts:31-35`）；本代已可写的目录跳过（`:83`）；`protected` 拒（`:72`）；`checkWritableTarget`（`process-fence-plan.ts:226-236`）不合格拒（`:77-81`）。R6 `readWriteScope`（`ui-mac/src/main/server.ts:905-913`；`:914`）只按规则分类：`protected` = deny 规则覆盖；直接位于 HOME 的文件是 `needs-approval`，所以今天写前卡会出现，批准后才在卡上显示主目录那句（`PermissionDialog.tsx:105-111`）。R6 线上类型与 parser 在 `codepuppy-sidecar-messages.ts:776-798`（`:799-811`） | R4 与卡片可原样复用；R6 缺一个「不能批准」的结果值 |
+| AB-P11（读） | BR-08 写前请求的形状：`FileAccess.authorizeExternal`（`packages/core/src/file-access.ts:120-137`）发 `action: "external_directory"`、`resources: <dir>/*`、`save: <Project.root(dir) 或 dir>/*`、来源为该调用；R5 transform 加 `metadata.directoryAccess`（`packages/ui-mac/engine/file-access-transform.ts:16`）。`resolve` 对已存在目录取其本身，否则取 dirname（`:90-118`） | 事后请求按同一形状构造 |
+
+**结论 AB-V（探针结论）。** 系统拒绝记录不能作为认出路径的来源：会静默漏条（AB-P03 Node/Bun 11 报 5，AB-P04 满载时丢引擎 pid 那条，都没有丢失提示），要求管理员账户（AB-P05），同一窗口混有本机其它被围栏进程的大量拒绝（AB-P02 4 066 行），并且记在实际写盘的后代进程名下（AB-P02 相对路径那行）——要归到某次命令就得追进程树，而这些进程毫秒级就退出。延迟不是问题。命令自己的报错在 21 种写法里有 18 种写出了被拒对象的绝对路径，而且天然属于这一次工具调用，不需要归属。因此本增量走 I-55 允许的窄版本：只在报错写出了完整路径时提供批准，并由 main 的现有判定核对这个路径确实是围栏不放行、且能批准的位置。
+
+## 4. 接口契约
+
+### 4.1 AB1 输出里点名的被拒写入（ext 纯函数）
+
+```ts
+// packages/ext/src/policy/ 下；不读文件系统、不发消息
+function refusedWritePaths(output: string): readonly string[]
+// 返回绝对路径，已做词法规范化；按首次出现排序、去重；没有数量上限
+```
+
+- 只看含 `operation not permitted`（不分大小写）的行。`Permission denied`（EACCES）、`No such file or directory` 不算。
+- 形态是封闭集合，与下表都对不上的行不产出：
+
+| 形态 | 真实样本（AB-P02 / AB-P06） | 取出 |
+| --- | --- | --- |
+| `<前缀>: <P>: Operation not permitted` | `/bin/sh` 重定向、touch、mkdir、cp、tee、ln、sed、install | P |
+| `<前缀>: rename <A> to <B>: Operation not permitted` | mv | A、B |
+| `<前缀>: operation not permitted: <P>`（P 到行尾） | zsh 重定向 | P |
+| `… Operation not permitted: '<P>'` | Python `PermissionError` | P |
+| `EPERM: operation not permitted, <调用> '<P>'` | Node、Bun | P |
+| `could not lock config file <P>: Operation not permitted`、`cannot mkdir <P>: Operation not permitted` | git | P |
+
+- P 必须以 `/` 开头。只做词法规范化（`path.posix.normalize`，含 `..`），不跟随软链，真实目标由 R6/R4 解析。相对路径丢弃：命令里的 `cd` 让它的基准不可知（AB-P02 相对路径那行）。
+- 引号形态以引号定界；冒号形态取 `: ` 之后第一个 `/` 起、到 `: Operation not permitted` 之前，所以 P 里有空格也完整。`rename … to …` 中路径含空格时无法唯一定界，该行不产出。
+- 名字说的是概念「输出里点名的被拒写入」，输入只有输出文本；不按工具名分函数，不设条数。夹具用 AB-P02/AB-P06 的原样输出（CLAUDE.md 原则 7）。
+
+### 4.2 AB2 能否批准：R6 增 `ineligible`
+
+```ts
+// codepuppy-sidecar-messages.ts 的 R6 回答（既有权威；parser/build 与 HubBridge 同一类型，同一提交）
+type WriteScopeOutcome = "fixed" | "writable" | "needs-approval" | "ineligible" | "protected" | "no-fence"
+```
+
+- main `readWriteScope`（`server.ts:905-913`）的判定次序：`no-fence` → `protected`（deny 规则覆盖，原样）→ `fixed` → `writable` → **`ineligible`**：该目标的 `directory` 经 `plannedWritableTarget` 后，`checkWritableTarget` 用 R4 的同一份 eligibility 判为不合格（主目录及其祖先、`/`、应用状态根及其相关目录、不是目录）→ 其余 `needs-approval`。
+- 仍是只读投影：不登记、不签发、不改 revision 的含义。资格判定仍只有 `checkWritableTarget` 一份（K2）；main 在规划处与 R4 已持有同一 eligibility 输入（`server.ts:370`；`directory-write-approval.ts:13-18`）。
+- 消费者：`evaluateDirectoryWrite`（BR-08 写前）把 `ineligible` 与今天的 `needs-approval` 放在同一分支（ask），BR-08 写前行为不变（§10 留档第 1 行）。R4 不变：它只读 `protected`，资格仍由自己调用 `checkWritableTarget` 判。AB3 只对 `needs-approval` 提供批准。
+- parser 遇到不认识的结果值仍整条拒收（`codepuppy-sidecar-messages.ts:794`），所以新值的 main 与 ext 两端同一提交。
+
+### 4.3 AB3 事后批准：同一张卡、同一个授予（ext）
+
+位置：seal 阶段既有的 `context.tool.transform`（`policy/index.ts:324-327`；`:456-458`）里，再给 `shell` 工具的 execute 包一层。它在内层 execute 正常返回之后、结果交回 core（随后才是 execute.after）之前运行。不放在 execute.after：在 after 钩子里抛出拒绝的语义未核实，而在 execute 内 assert 是既有路径（AB-P09 安装卡）。
+
+```ts
+type RefusedWriteCall = { sessionID: string; agent?: string; messageID: string; id: string }
+// "approved"：本次调用的被拒目录全部获准，且 R6 复读为可写；"not-offered"：没有提供批准，原处理不变。
+// 用户拒绝或规则 deny：原样抛出 permission.assert 的错误，与工具自己的 assert 相同。
+function approveRefusedWrites(call: RefusedWriteCall, output: string): Promise<"approved" | "not-offered">
+```
+
+1. 不提供（返回 `not-offered`）：会话处于无人值守档位（`profile(sessionID, agent) !== undefined`，同 `policy/index.ts:215` 的判定）——没有人能点卡，保持今天的结果与说明；结果不是 completed、或 `output.output` 不是字符串；`refusedWritePaths` 为空。
+2. 分类：`targets = paths.map((p) => ({ absolute: p, directory: dirname(p) }))`，调 `readWriteScope({ access: "write", targets })`（`ext/src/hub-bridge.ts:80`、`:264`）。回答是 `{ error }` 或长度、顺序对不上 → `not-offered`。只留 `needs-approval`，按 `directory` 去重，每个目录留第一次出现的 absolute；为空 → `not-offered`。
+   - 文件夹取被拒对象的 dirname：创建、写、改名都发生在对象的父目录里，授予父目录即覆盖它。不复刻 `FileAccess.resolve` 对已存在目录取其本身的分支（插件拿不到它，AB-P09/AB-P11）；对象本身是已存在目录时授予的是它的父目录，卡上照实显示。
+3. 同会话合并：sidecar 内存 `Map<sessionID + "\0" + directory, Promise<void>>`。某目录在同一会话已有在途的事后批准卡 → 等那张卡（它被拒绝只算该目录未获准，别的调用的拒绝不抛给本调用）；其余目录合成**一张**卡：
+
+```ts
+await context.permission.assert({
+  sessionID, agent,
+  action: "external_directory",
+  resources: dirs.map((d) => `${d}/*`),
+  save: dirs.map((d) => `${d}/*`),
+  metadata: { directoryAccess: { access: "write", targets } }, // R5 的同一形状；targets 为这些目录各自的 { absolute, directory }
+  source: { type: "tool", messageID, id },
+})
+```
+
+   这个请求经过既有 evaluate 钩子：`evaluateDirectoryWrite` 再查一次 R6，`needs-approval` → ask（两档同，AB-P08），风险分类照常附上。renderer 按 `directoryAccess` 走 R4 的 describe/approve：显示真实路径、点击时核对 dev+ino、先授予后回复。R4 不改。`save` 取目录本身，不取它的项目根：插件没有 `Project.root`，本增量不另写一份；后果是在这张卡上点「始终允许」记住的是该目录，而 BR-08 写前卡记住的是它的项目根。
+4. 结果：assert 正常返回 → 对本调用的全部目录复读 R6，全部为 `writable`、`fixed` 或 `no-fence` → `approved`（以 main 的事实为准，不只看 assert 返回）；否则 `not-offered`。assert 抛出 → 原样抛出（普通拒绝结束本步；带反馈的拒绝或 deny 是 `Tool.Error`），同时清掉本调用的在途记录。
+5. 不加超时、有效期或次数上限。卡等用户决定期间工具调用保持「运行中」，与 BR-08 写前卡相同。
+
+### 4.4 AB4 告诉助手重试（既有注入通道）
+
+```ts
+// context-injection.ts，登记进 CONTEXT_INJECTIONS（与 WRITE_REFUSED_NOTE 同为 sink "tool-failure"、上限 CAP_DESCRIPTION）
+export const WRITE_APPROVED_RETRY_ID = "sandbox.write-approved-retry"
+export const WRITE_APPROVED_RETRY_NOTE =
+  "The user approved writing to the folder this command was refused in; it is writable now. Re-run only the part of the command that failed - the parts before it already ran once."
+```
+
+- AB3 把 `approved` 记在 ext 内存里按调用 id 的集合中（与既有 `displays`、`installAsks` 一样在 execute.after 里清除）。`attachWriteDenied`（`display.ts:105-131`）处理 shell 结果时：该调用为 `approved` → 追加 `WRITE_APPROVED_RETRY_NOTE`，不追加 `WRITE_REFUSED_NOTE`；其余行为不变。给模型哪一句只在这一处决定（K2）。
+- 措辞可以在实施中按登记簿上限微调；含义冻结：已获准、现在可写、只重跑失败的部分。
+- 应用不替助手重跑。重跑是一次普通的 shell 调用，走原 gate：「全部批准」直接运行，「请求审批」照常出命令卡（K1 不变）。
+
+### 4.5 seam map
+
+| 依赖能力 | 可合法调用的现有符号 / 本次 raise | 状态 |
+| --- | --- | --- |
+| 拿到完整输出，并在交给模型之前处理 | seal 阶段 `context.tool.transform` 包 execute（`policy/index.ts:324-327`；`:456-458`）；core 先等 execute 再等 execute.after（`core/src/tool.ts:132-180`） | 现有；AB3 新增一层包装 |
+| 认出路径 | AB1 `refusedWritePaths` | 新纯函数（ext） |
+| 是否围栏不放行、能否批准 | R6 `readWriteScope`（`hub-bridge.ts:80`、`:264` → `server.ts:905-913`）；资格 `checkWritableTarget`（`process-fence-plan.ts:226`） | 现有；AB2 增 `ineligible`，两端同一 raise |
+| 弹同一张卡 | `context.permission.assert`（`plugin/src/promise/permission.ts:24-31`；ext 现用 `policy/index.ts:171`）；`evaluateDirectoryWrite`（`:365-377`）；`PermissionDialog` 目录写入分支（`:74-111`） | 现有，不改 |
+| 批准即授予、先授予后回复 | R4 `describeDirectoryAccess` / `approveDirectoryWrite`（`directory-write-approval.ts:38-101`）→ `userOpened.register` → `tracker.grantWrite` → 原生 `issueFileExtensionToProcess` | 现有，不改 |
+| 无人值守判定 | ext `profile(sessionID, agent)`（`policy/index.ts:215`） | 现有 |
+| 给模型的说明 | `attachWriteDenied`（`display.ts:105`）、`CONTEXT_INJECTIONS`（`context-injection.ts:551`） | 现有；AB4 新增一条登记文本 |
+
+## 5. 数据与失败
+
+- 没有持久化。合并表与按调用记录只在 sidecar 内存，换代随进程消失；换代时还开着的卡由 R4 返回 `conflict`/`expired`，与 BR-08 相同。
+- R6 不可用或回答形状不对 → 不弹卡，原说明。
+- R4 授予失败（`grant-failed` 等）→ 卡上显示既有那句、不回复 allow；用户可再点（R4 对失败的决定可重试）或拒绝。
+- assert 返回后 R6 复读不是可写（例如这期间换代）→ `not-offered`，原说明；不让模型去重试一次注定失败的写入。
+- 报错是 EPERM 但原因不在围栏（隐私授权、系统完整性保护、不可变标志等），而路径在围栏看来又是 `needs-approval` → 出一次卡；批准后重跑仍失败，此时 R6 答 `writable` → 不再提供，原说明。不会循环。
+- 用户拒绝后，模型若再次运行同一写入 → 再出卡，与拒绝 BR-08 写前卡后模型再写相同。
+- 并发：同一调用里的多个路径 → 一张卡；同一会话并行的调用 → 合并到在途那张；不同会话 → 各一张，后批准的那张在 R4 里是对已可写目录的空操作（`directory-write-approval.ts:83`）。可达窗口：另一会话的卡在本调用分类之前已批准 → 本调用看到 `writable`，不出卡、给原说明而不是重试说明；后果是模型停下，用户可让它再试，没有数据影响。
+- 被拒对象之前的命令部分已执行一次（I-55 列出的代价）。AB4 提醒只重跑失败的部分；模型仍可能整条重跑，不加机制。
+
+## 6. 架构落点
+
+| 新增/改动的代码 | 落在哪个模块 | 依赖谁 | 复用的已有权威 |
+| --- | --- | --- | --- |
+| AB1 `refusedWritePaths` | `packages/ext/src/policy/`（与 `attachWriteDenied` 同处） | 无 | 无；新的纯解析，夹具取 AB-P02/AB-P06 原样输出 |
+| AB3 包装、同会话合并表、按调用记录 | `packages/ext/src/policy/index.ts` seal 阶段 | AB1、HubBridge、`context.permission` | `wrapForDisplay` 所在的同一 transform；`profile`；`displays` / `installAsks` 的按调用记录做法 |
+| AB4 说明 | `packages/ext/src/context-injection.ts`、`policy/display.ts` | 无 | `CONTEXT_INJECTIONS`、`attachWriteDenied` |
+| AB2 `ineligible` | `packages/ui-mac/src/main/server.ts` 的 `readWriteScope`；`codepuppy-sidecar-messages.ts` 的类型/parser/build；ext `evaluateDirectoryWrite` 的映射 | `process-fence-plan.ts` | `checkWritableTarget`、`plannedWritableTarget`、R6 既有消息 |
+
+- 新目录/新模块：无；`docs/architecture/modules.md` 不变。
+- 不新增 IPC 或消息：判定走 R6 既有 `codepuppy.write-scope.*`，询问走插件既有 `permission.assert`，授予走 R4 既有 preload IPC，说明走既有工具结果。main 不做观察点：main 拿不到工具输出，它能读到的系统拒绝记录不可靠（AB-V）。
+- 不改引擎：包装经插件 `tool.transform`；U-40 之后的引擎挂点数不变。
+- 架构约束：K1 档位判定仍只在 `evaluateDirectoryWrite`；K2 资格只在 `checkWritableTarget`，经 R6 投影给 ext，ext 不复制主目录、状态根判断；文件夹取 dirname 是本增量自己的概念，不复刻 `FileAccess.resolve`。无新偏离。
+- 工程标准 §6：AB1 名为「输出里点名的被拒写入」，输入是任意输出文本；AB3 名为「批准被拒写入」，参数是调用身份与输出；不按工具名、档位或路径种类分函数，不设上限。
+- 安全面：
+  - 威胁边界不变。被围栏的引擎进程树（模型产生的命令）控制输出文本，因此能让卡片点名任意路径；这与模型直接用写文件工具写该路径、触发 BR-08 写前卡等价。卡显示 R4 解析的真实路径，只有用户点击才登记与签发（BR-05 不变）。
+  - 不变量：AB-S1 本路径只提议、不授予，授予仍只经 R4（v4 §4.4 的「本人批准」来源）。AB-S2 `protected` 与 `ineligible` 不出卡；就算出现，R4 仍拒（`directory-write-approval.ts:72`、`:77-81`）。AB-S3 R6 仍只读，新值不带登记、签发语义；没有新的 sidecar → main 扩权消息。AB-S4 X1/X2、令牌绑定、运行内历史不变。
+- 被否决的替代：
+  - 读系统拒绝记录（`log stream` / OSLog）：漏条、要管理员、噪声、进程归属（AB-V）。
+  - 用 `sandbox_check` 一类内核查询发现路径：它只回答「某路径是否被拒」，仍得先知道路径；同一问题本增量由 R6 回答，不需要新原生能力（未实测）。
+  - Endpoint Security / dtrace 跟踪写操作：需 root 或专用 entitlement（同 v4.4、v4.5 的否决理由）。
+  - 批准后由应用自己重跑整条命令：前半段在没有判断的情况下再执行一次；「请求审批」档下等于用文件夹卡代替命令卡，改变 K1。
+  - 相对路径按调用起始目录解析：命令里的 `cd` 会让它指向错误的文件夹，卡上会照实显示一个用户没打算写的目录。
+  - 在 core `ShellTool` 结束处加引擎挂点：插件包装已足够；引擎改动按 U-40 需 owner 逐处允许。
+  - 在 execute.after 里 assert：after 钩子里抛出拒绝的语义未核实；execute 内 assert 是既有路径。
+- 实施必须拿出的证据（每条都要能失败；用例、文件与顺序归 plan.md）：
+  1. 真入口 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence → session.shell`，「全部批准」与「请求审批」两档：`echo a > <项目>/a.txt && touch <项目外>/b.txt` → 卡写明 `<项目外>` 的真实路径 → 批准 → R4 granted、引擎 pid 不变 → 结果带 AB4 说明、不带 `WRITE_REFUSED_NOTE` → 重跑后 `b.txt` 落盘（「请求审批」档重跑先出命令卡）。Node 报错写法再跑一次批准臂。
+  2. 拒绝 → `b.txt` 0 落盘，本步结束。
+  3. 不出卡各一臂：`cd` 后相对路径；测试 HOME 下直接写文件（R6 答 `ineligible`）；受保护位置（R6 答 `protected`）；无人值守会话。每臂都是原说明、0 落盘。
+  4. 已知的坏：去掉 AB3 包装 → 第 1 条的命令没有卡、0 落盘；去掉 AB2（主目录按 `needs-approval` 答）→ 第 3 条主目录臂出卡，必须红。
+  5. 并发：同一会话两条并行命令拒在同一目录 → 一张卡，批准后两条都得 AB4 说明；两个会话 → 两张卡，第二张批准是空操作。
+  6. AB1 以 AB-P02/AB-P06 的原样输出为夹具逐形态测；`Permission denied`、`No such file or directory`、不带路径的 EPERM 行产出为空；`rename` 两条路径都产出。
+  7. BR-08 写前不变：R6 对主目录文件答 `ineligible` 时，写文件工具仍出卡（现有 AC-10 用例照过）。
+
+## 8. 拆分决定
+
+不适用：都在 alpha-code 一个仓，同一负责方（#1759）。
+
+## 9. 回滚
+
+不适用：无数据迁移或不可逆数据变更。
+
+## 10. 裁决与审查结论（v6 增量）
+
+| 送审前裁决 | 依据与适用版本 |
+| --- | --- |
+| 1. 被拦路径只从命令自己的报错取得（AB1），不读系统拒绝记录 | AB-P02–AB-P05（测/读，macOS 26.3.1，`a56d861523`）；I-55「确定不了位置的保留原来那句说明」 |
+| 2. 观察点在 ext 的 shell execute 包装（AB3），判定与授予仍归 main（R6、R4）；没有新 IPC，没有引擎改动 | AB-P09、AB-P10 |
+| 3. R6 增 `ineligible`，事后路径只对 `needs-approval` 出卡；BR-08 写前的映射不变 | AB-P10；SPEC v7 BR-11「主目录本身…不弹卡」 |
+| 4. 同一张 external_directory 卡与 R4 授予，不改 R4 与卡片 | AB-P10、AB-P11；BR-11「与 BR-08 相同」 |
+| 5. 档位沿 `evaluateDirectoryWrite`：「请求审批」「全部批准」都出卡；无人值守会话不出卡 | AB-P08 |
+| 6. 重试由模型做，经 AB4 说明；应用不自己重跑；重跑命令走原档位 | I-55「助手重试这条命令」；K1 |
+| 7. 文件夹取被拒对象的 dirname；`save` 取目录本身 | AB-P09、AB-P11；后果见 §4.3 第 2、3 步 |
+| 8. 并发：调用内一张卡、同会话合并、跨会话各一张；是否给重试说明以 R6 复读为准 | AB-P10（R4 幂等）；§5 |
+| 9. 拒绝沿 `permission.assert` 的既有语义，原样抛出 | AB-P09 |
+
+审查：本增量含外部行为假设（工具报错形态、插件在 execute 包装内 assert 时普通拒绝结束本步）和一个共享契约改动（R6 结果值），按 delivery-review §2 应做一轮对抗审查，尚未进行。建议范围：§2 的 AB-V、§4.2–§4.4、§5、§6 安全面。
+
+**传播核对**：`rg -n -c '"needs-approval"' docs --glob '*.md'` 只命中本设计（1 行，v4 §4.4 的 R6 线上形状；新联合在本增量 §4.2 给出，不改历史段）。代码消费者 `rg -n -l '"needs-approval"' packages --glob '!**/node_modules/**'`：`packages/ext/src/policy/index.ts`、`packages/ui-mac/src/main/server.ts`、`packages/ui-mac/src/main/codepuppy-sidecar-messages.ts` 及其测试（`identity.test.ts`、`directory-write-approval.test.ts`、`server.test.ts`、`hub-view.test.ts`、`codepuppy-sidecar-messages.test.ts`），归实施的同一提交。
+
+**留档**
+
+| 提议 | 实际影响或未核实点 | 为什么现在不做 | 什么情况再看 |
+| --- | --- | --- | --- |
+| BR-08 写前：直接写主目录里的文件时仍出卡，批准后才在卡上显示主目录那句 | AB-P10；与 AC-08「主目录…各显示一句说明、没有按钮」不完全一致（推：AC-08 写的是工作区只读标记那条路径） | 不是本增量引入；改它会改变 BR-08 写前行为。AB2 之后它可以按 `ineligible` 一行修正 | 编排者按 delivery-review §5 路由 |
+| `mkdir ~/新文件夹` 中途被拦 → 文件夹是主目录 → 不出卡 | 在主目录下新建项目文件夹是常见写法；BR-08 写前对 `~/新文件夹/x` 会给 `~/新文件夹` 出卡 | 按 I-55「主目录本身不能批准」如实落地；把「要新建的文件夹本身」当批准目标是新的产品取舍 | owner 若要，经 intent 提出 |
+| Node/Bun 的拒绝在系统记录里静默缺失 | AB-P03；`sandbox-denial-stream.ts` 依赖同一记录，engine-config-fence A3 已改成「先看到才算」 | 不在本增量 | 有夜间用例以「没看到」判绿时 |
+| 应用内终端里用户自己运行的命令被拦 | SPEC v7 范围外 | I-55 说的是助手重试 | owner 提出时 |
+
+**仍属推断或未验证**：非管理员账户不能 `log stream`（只见二进制里的提示串）；在 execute 包装内 assert、普通拒绝时「结束本步」与工具自身 assert 一致（据插件 API 注释与安装卡先例）；普通拒绝后命令输出不再交给模型（本步以拒绝错误结束）；Python `os.makedirs` 等未逐一核对的报错形态；生产签名进程树下的报错与本机探针一致。没有 owner 待决项。
+
+**交接收据**：依据 SPEC v7 `10bae65505` 与 U-44/I-55。designer Claude Opus 5.5 跑完 §2 的两轮系统记录探针与报错形态探针（临时目录已删），核对 R4、R6、`evaluateDirectoryWrite`、`attachWriteDenied`、插件 `permission.assert` 与 core 工具执行顺序的现有符号；每项依赖能力都映射到现有符号或本节明确的 raise（§4.5）。下一步：编排者选定对抗审查；通过后冻结，再交 #1759 实施车道写 plan.md 切片。只改 spec.md 与 design.md，未实现、未推送。

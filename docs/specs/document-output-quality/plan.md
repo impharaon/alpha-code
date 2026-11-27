@@ -938,3 +938,56 @@ AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口�
 ### 偏离记录
 
 2026-11-27 · 计划外两处：没有为脚本新增套件测试（它需要真实 LibreOffice，按 test-layers 记为一次性证据）；`scripts/` 不在 ui-mac 的 tsconfig 里，新驱动另用临时配置单独做了类型检查（tsgo exit 0）。
+
+## r5 修正：围栏内 LibreOffice 单实例管道与不被系统登记的运行时
+
+- 依据：[design](design.md) @ `efd1af8808` §4.11（frozen）、§2 F-21..F-23、§5「围栏内管道」、§6 R14、§10 r5 各行；[网络围栏权威](../../architecture/2026-09-10-network-egress-on-process-fence.md)「落地」表强制层 N5 一行；[spec v1](spec.md) AC-03、04、06..10、13 的 LibreOffice 部分；Issue #1761。缺陷证据为测量回执 `~/.cache/alpha-orch/2026-11-27/impl-1761-ac01-03/diag/`（组合引擎内 verify 与 soffice 转换 exit 1）。Windows 不改（§4.11「Windows」）。
+- 核对：待首个实施提交按本轮 brief 的 `Phase:` 填写。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/src/main/process-fence-profile.ts` | 冻结契约 `FenceUnixListen` 与 `ProcessFenceProfileInput.unixListen`；按 §4.11 推算 LibreOffice 单实例管道名（导出给单元测试）；`renderProcessFenceProfile` 在 N4 之后、受保护集之前写 N5 放行行，紧跟每条 `userInstallations` 一行 `path-literal` 拒绝行；uid 不是非负安全整数或路径非绝对即拒渲染；省略或空列表不写 N5 |
+| `packages/ui-mac/src/main/process-fence-plan.ts` | `planProcessFence` 把 `unixListen`（`process.getuid()`，`deps.homeDir()` 下的 `Library/Application Support/LibreOffice/4`）交给 `trimUntilCompiles`；`renderCommandSourceProfile` 不动 |
+| `packages/ui-mac/src/main/document-runtime.ts` | mac 展开把 `<mount>/LibreOffice.app` 复制到 `<staging>/LibreOffice`；`executable()` 改为 `LibreOffice/Contents/MacOS/soffice` |
+| `packages/ui-mac/resources/document-runtime/verify_runtime.py` | mac 入口相对路径同上 |
+| `packages/ui-mac/test-fixtures/process-fence/network-driver.mjs`、`src/main/network-egress-fence.test.ts` | 网络轴的真 .node + 真 seatbelt + Electron node 用例加 unix socket 探针：按 LO 的写法 bind/listen `/tmp/OSL_PIPE_<uid>_SingleOfficeIPC_<hex>` 放行；用户默认 profile 管道名、`/private/tmp` 其它名、其它 uid 同族名的 bind 被拒；connect `$TMPDIR` 外部监听者、冒充用户默认管道的外部监听者、`/private/var/run/mDNSResponder` 被拒。对照：bare 臂全部能连/能 bind，去掉拒绝行的 profile 下默认名可 bind |
+| `src/main/process-fence-plan.test.ts` | 计划器把 N5 与本 HOME 默认 profile 的拒绝行渲染进计划 |
+| `src/main/process-fence-profile.test.ts` | 管道名推算对真实 LO 管道名的表；N5 的位置、逐字形状、省略不渲染、fail-closed |
+| `src/main/document-runtime.test.ts` | 夹具改为新布局、ready 入口没有 `.app` 段；`extractDocumentRuntime` 用 hdiutil 现做的小 dmg 判展开目录名（darwin） |
+| `src/main/document-generation.test.ts`、`src/main/document-host.test.ts` | 只改夹具里的展开布局（编码旧行为） |
+| `scripts/gate-files.tsv` | 改动的闸门文件条数（`CODEPUPPY_TEST_FILES` 限定的 `assert-gate-files.sh --update`）与说明 |
+| `docs/specs/document-output-quality/plan.md` | 本节与一次性证据 |
+
+### 顺序
+
+1. 本节单独提交。
+2. 证明 3 的真实管道名先采集（已做，见「证明」表下的采集记录），作为单元表的期望值。
+3. 红：`network-egress-fence` 的 unix 探针与 N5 用例、计划器 N5 用例、`document-runtime` 的两个布局用例单独提交，记下它们在未修代码上的失败输出。
+4. 修：四个产品文件、推算与渲染单元用例、两处旧夹具、gate-files 条数，一个提交；跑本步改动的测试文件（红→绿）与 ui-mac 类型检查。
+5. 一次性证据（不进套件）：用不开窗口的组合宿主（产品 `spawnLocalServer`：真 utilityProcess sidecar、生产计划器、生产原生模块围栏、出网代理；宿主源码与命令存证据目录，不入库）跑证明 1、2、4、5，移除臂用临时去掉计划器 `unixListen` 的构建（`git restore` 还原）；结果写入本节后提交。
+6. 结束前一次：mock/枚举本次改动导出的相关测试（grep 选出）、`affected-tests --list` 作用域行。
+
+### 风险
+
+- seatbelt 按解析后的路径匹配 unix socket：规则必须写 `/private/tmp`（F-21）。探针按 LO 自己的写法 bind `/tmp/OSL_PIPE_…`，规则写成 `/tmp` 即被判红。
+- 拒绝行必须在放行行之后（后写者胜）：真 seatbelt 下默认名 bind 被拒，并配「去掉拒绝行即可 bind」的对照臂；顺序写反或丢行即红。
+- 推算与 LO 不一致时拒绝行形同虚设：单元表的期望值来自真实 LO 26.8.3.1（含不补零的字节），证明 4 在真引擎下再逐字核对一次。
+- 真引擎证明依赖 dev 构建产物（已在 `gate slot --` 下构建）和约 300 MB 的固定文件下载；网络失败如实记录。宿主是 LSUIElement 的 Electron 副本，不开窗口，退出时注销。除证明 5 的对照臂外不执行任何 `.app` 副本，对照臂用完即注销并复查。
+- 证明 4 只用宿主的测试 HOME，不碰 owner 真实的 LibreOffice profile。
+
+### 证明
+
+| AC / 证明 | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| §4.11 证明 1（AC-03/04/06 的 LO 部分） | 组合宿主真引擎内经 `session.shell`（不调模型）跑 `verify_runtime.py`、`render_document.py`（docx/xlsx/pptx）与 `recalculate_document.py`，rc=0 且产物可读；移除臂：计划器不传 `unixListen`，同一组命令失败 | 一次性：命令与输出记于本节 | 没有 N5 时 LO 的 OSL_PIPE bind 得 EPERM，转换以 rc=1 结束（测量回执同形） |
+| 证明 1 的常驻部分 | `network-egress-fence.test.ts` 的 N5 用例（fenced 臂 bind/listen LO 管道族名成功）；`process-fence-plan.test.ts` 计划器用例 | integration：受影响 PR 与夜间（darwin） | 渲染器去掉 N5：fenced 臂 bind EPERM；计划器不传：计划的 profile 没有 N5 行 |
+| §4.11 证明 2 | 同一宿主的围栏 shell 内：connect `$TMPDIR` 外部监听者、冒充用户默认管道名的外部监听者、`/private/var/run/mDNSResponder` → EPERM；bind 用户默认管道名 → 被拒。常驻：`network-egress-fence.test.ts` 同组探针，bare 臂（全部连通/可 bind）与去掉拒绝行臂（默认名可 bind）作对照 | 一次性 + integration | 放行写宽（如 `network*` 或含 outbound）或丢拒绝行：对应探针变为连通/可 bind |
+| §4.11 证明 3 | `process-fence-profile.test.ts` 推算表：ASCII home、含中文/空格/`;` 的 home、hash 含不补零字节的 home，期望值是真实 LO 启动后 `/private/tmp` 下的管道名（采集记录 `~/.cache/alpha-orch/2026-11-27/impl-1761-lo-pipe/proof3-capture.txt`） | integration（按 `.gate-tests` 文件名归层）：受影响 PR 与夜间 | 编码集、UTF-16LE 或不补零任一处写错，结果与真实名不等 |
+| §4.11 证明 4 | 宿主运行期间，用宿主的测试 HOME 起无围栏默认 profile LO：实际管道名逐字等于渲染器的拒绝行；围栏内 bind 该名被拒；第二次启动 `--convert-to pdf` 被第一个实例接收并完成。拒绝行的对照臂由常驻测试的「去掉拒绝行可 bind」承担 | 一次性 | 没有拒绝行时围栏内进程能抢先 bind 该名（F-23 已证可截获请求） |
+| §4.11 证明 5 | 产品固定文件入口下载 + `extractDocumentRuntime` 展开到宿主 userData；记录 dmg、展开树与 `soffice` 的 xattr；首次执行（证明 1 的 verify 与 render）的 rc 与同时间窗的 syspolicyd 日志；`mdimport` 后 `mdfind -onlyin` 能查到包内文件，此时 `lsregister -dump` 与 `pluginkit -mAvvv` 在 document-runtime 下 0 条；对照：同一字节的 `.app` 副本执行后可见登记，随即注销并复查。常驻：`document-runtime.test.ts` 的 dmg 展开用例 | 一次性 + integration | 展开目录改回 `.app`：常驻用例红，对照臂可见登记 |
+
+### 偏离记录
+
+暂无。

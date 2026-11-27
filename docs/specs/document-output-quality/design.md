@@ -11,7 +11,7 @@ review:
   reviewed_sha: d07c5aa8a8
   verdict: "fix-then-freeze; R1 4 Major 4 Minor accepted and corrected"
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # DESIGN-document-output-quality｜助手文档与设计成品质量 技术设计
@@ -26,6 +26,7 @@ last_reviewed: 2026-11-26
 - 固定下载机制：直接消费协调仓 `docs/specs/domestic-cloud-connectivity/design.md`「切片四」§4.11、§10 冻结回执，读取版本同上；继承 R1 `6b0e4c0` 的处置，不另定清单、镜像、续传或回退规则。
 - 启动器输入：#1760 的 `docs/specs/connector-launchers/design.md`，固定合入提交 `173122a8e955f97d830fe53fccd3400d079d9488`（#1766），status=frozen，继承其 R1 处置。本文按要求执行 `git fetch -q origin && git show origin/alpha:docs/specs/connector-launchers/design.md`（exit 0），未合并 origin/alpha；消费其 §4.1..4.3、§4.5、§4.7。该版本 `:104` 的 platform 为 darwin-arm64 / win32-x64，与本设计范围一致；文档消费者的 bootstrap 读取面保留本次交接确认由启动器设计接受的 `DOC-NODE-v2`。冻结是决定的状态，不是实现完成证明。
 - AC-01..AC-03 的分数仍归规格及已授权的默认模型实测。本文不改变分数、不进行付费调用，也不以强模型试验成绩证明默认模型能力。
+- r5 增量（#1761 围栏内 LibreOffice）代码基线：`origin/alpha` `813ca7a98c`；只改 §2 F-21/F-22、§4.3/§4.9 各一句、新增 §4.11、§5 一条、§6 R14 及 §10；网络围栏权威 [`2026-09-10-network-egress-on-process-fence.md`](../../architecture/2026-09-10-network-egress-on-process-fence.md)「落地」表强制层一行同步。
 - 文档影响为 feature decision；唯一落点是本文与必要的生成索引行。ADR-014 第 5 条的后续修订属于实现批准后的同项决定传播，本文不修改受保护规则资产。
 
 ## 2. 地面真相
@@ -54,6 +55,8 @@ last_reviewed: 2026-11-26
 | F-18 | `factory-skills.ts:124-133` 直接收嵌套 SKILL.md；目录 `codepuppy-catalog.json:999-1013` 已有 canvas-design。`packages/core/src/filesystem/codepuppy-project-watch.ts:16-47,62-64` 是 ADR-047 的项目 watcher 忽略表拥有者，尚无 .document-output。 | 适配技能采用独立 frontmatter name；工作目录写本地 gitignore 并消费同一个 watcher 忽略权威。 |
 | F-19（r3） | 实施回执 `0db0c3ade34878c02e952393a5864d440e3a2f2b` 的 plan.md `:268` 指出固定验证任务缺口；`packages/plugin/src/promise/shell.ts:15-17` 只有 hook，不能执行。`ext/src/hub-bridge.ts:80-126,218-226` 已有 parentPort 通知/回执和早到消息交接；`ext/src/plugin.ts:109-130` 已有按 Location setup/cleanup；`sidecar.ts:175-179,270-281` 在加载插件前安装围栏，后代继承。`util/src/cross-spawn-spawner.ts:455-510,550-568` 已有进程树终止/强杀，公开 node 可经 `util/src/effect/layer-node.ts:244` 的 compile 消费。 | 用既有桥交付固定任务，所属 Location 的 ext 直接复用公共进程实现；不假称 ShellDomain 有执行口，不新增引擎或主进程执行 API。 |
 | F-20（r4） | 实施基线 `d3c2190fc83a88883249e53355c563fddd1c42b5`：`main/document-host.ts:29-38`、`ext/src/document-host-bridge.ts:33-37` 只返回 JS 对象，`util/src/codepuppy-document.ts:86-95` 是进程内发布槽；`office-mcp/server.py:49-74` 只接 format/workspace，不能向 Python 交付活状态。现成的 `plugin/src/promise/shell.ts:3-16` 允许 create.before 改 env，`plugin/src/promise/mcp.ts:6-19` 的 MCPEditor.update 可改本 Location 的派生配置，`ext/src/plugin.ts:135-137,345-382` 已消费两口。启动器 v2.2（`975715738049aaa5724c4a24dcde8a5b78e794a5`）`:789-822` 的缓存槽只交稳定目录，不携带 Location/注册/实时状态。 | 复用 DocumentHost 桥交付 main 写的投影入口，再由两个现有环境钩子交 Python；不扩启动器槽、不把目录当 ready，也不新增引擎 API。 |
+| F-21（r5） | **源码**（固定 tag `libreoffice-26.8.3.1`）：`desktop/source/app/app.cxx:531` 无条件 `RequestHandler::Enable(true)`，`officeipcthread.cxx:671-677` 只在编译期 MACOSX_SANDBOX/无桌面构建关管道；`sal/osl/unx/pipe.cxx:41-42,150-155` 管道目录先 `/tmp`、再 `/var/tmp`，两者都不可写才读 bootstrap `OSL_SOCKET_PATH`，`:166-172` 文件名 `OSL_PIPE_<uid>_<ident>`；`desktop/source/deployment/misc/dp_misc.cxx:288-324` 的 ident 为 `SingleOfficeIPC_` + UserInstallation URL 的 UTF-16 MD5 逐字节不补零十六进制；`pipe.cxx:229-241` 遇残留同名 socket 先 connect，失败即 unlink 再 bind。**探针**（本次临时目录，已删除）：bun 调 `renderProcessFenceProfile`（`813ca7a98c`）渲染生产形状 profile，`/usr/bin/sandbox-exec -f` 包 pilot LibreOffice 26.8.3.1，每次私有 UserInstallation。无围栏 docx→PDF rc=0；生产 profile 下 `--version` rc=0（版本输出早于管道），docx→PDF rc=1，`--terminate_after_init` rc=1 且未建 profile。追加下文 N5 后 docx→PDF rc=0（PDF 164,882 B），重算路径 `--terminate_after_init` rc=0、固定 RecalculateAndSave 宏 rc=0 且工作簿摘要改变；同一规则写成 `^/tmp/` 则 rc=1（规则须写解析后的 `/private/tmp`）。connect 矩阵：`(allow default)` 对照臂对 `$TMPDIR` 外部监听者、`/private/tmp/OSL_PIPE_501_SingleOfficeIPC_<伪 hash>` 外部监听者、`/private/var/run/mDNSResponder` 均 CONNECTED；生产臂与 N5 臂三者均 `EPERM`。bind 矩阵（N5 臂）：`$TMPDIR` 路径、`/private/tmp/` 其它名、`OSL_PIPE_501_other` 均 `EPERM`，`OSL_PIPE_501_SingleOfficeIPC_<hex>` 可 bind+listen；生产臂全 `EPERM`。真实用户实例臂：无围栏 headless soffice 持有 profile U 的管道，N5 臂用同一 profile U 转换 rc=0，`convert … ->` 行出现在围栏内进程输出、不在用户实例输出，即未转交；围栏内实例按 `pipe.cxx:240` unlink 了用户实例的管道文件（W11 本就允许）。MD5 公式对 profile U 计算值 `dcaf5b44…1d919d2e` 与实际管道名逐字一致。 | LibreOffice 的单实例管道既关不掉也挪不走；TMPDIR/HOME/OSL_SOCKET_PATH 在围栏下都不生效。产品 LO 只需 bind/listen/accept 自己 job 的管道名，不需 connect；最窄规则按本用户 uid + 该命名族 + 只监听方向。 |
+| F-22（r5） | 只读 `lsregister -dump`（检查开始时）：本机已有 pilot 副本及两个已从磁盘消失的实施副本 `/private/tmp/alpha-1761-r6/lo-candidate/LibreOffice.app`、`/private/tmp/lo-repro-1761/mnt/LibreOffice.app` 的应用记录及其 `QuickLookPreview.appex`/`QuickLookThumbnail.appex` 记录。本次把同一字节 clone 到临时 `…/userData/document-runtime/libreoffice/darwin-arm64/26.8.3/LibreOffice.app`：复制后 8 s 为 0 条；执行一次 `soffice --version` 后 1 条；一次转换后为应用加两个 QuickLook 扩展共 3 条，`pluginkit -mAvvv` 同时列出这两个扩展且 Parent Bundle 为该副本。同一字节放在不带扩展名的 `…/noext/LibreOffice`：无围栏与 N5 围栏下转换均 rc=0，`lsregister` 与 `pluginkit` 均 0 条，`codesign --verify --deep --strict` rc=0。本次自建的登记已用 `pluginkit -r` 与 `lsregister -u` 注销，复查 0 条后删除临时目录。 | 触发登记的是执行带 `.app` 扩展名的包，而不是复制；登记后其 QuickLook 扩展进入系统插件表。只在展开后注销没用（下一次启动又会登记）；包目录不带 `.app` 时同字节、同签名照常运行且不被登记。 |
 
 外部包元数据补核：PyPI `pypdfium2/5.0.0/json`（本次 urllib 读取，exit 0）列出本设计所需的 mac arm64、win_amd64 wheel；许可证为 BSD-3-Clause、Apache-2.0 及 dependency licenses。[Python API](https://pypdfium2.readthedocs.io/en/stable/python_api.html) 提供 PdfDocument、逐页 render。其实际随包加载尚未验证。所有本次探针只运行 Python/读元数据，没有启动桌面应用、Electron 或 LibreOffice。
 
@@ -132,9 +135,9 @@ F-07 的既有 urllib 读取回执提供上述两份 `provenanceUrl + ".mirrorli
 
 存储统一派生自 USER_DATA_LAYOUT：下载缓存沿 #1760 冻结契约为 `<userData>/pinned-files/<id>/<filename>`，同一宿主按 id 合并在途获取，不另改为按摘要合并；展开 runtime `<userData>/document-runtime/libreoffice/<target>/<version>/`；job profile、font cache、临时文件与检查记录在同一 document-runtime 下的独立子目录。安装资源只读。mac 下载约 300 MB，展开实测约 806 MB；Windows 下载约 376 MB、展开体积尚未测量，磁盘错误如实报告，不以约 800 MB 做人为容量闸。
 
-mac 用系统 hdiutil `attach -readonly -nobrowse -noautoopen -mountpoint <私有临时挂载点>`，复制原 LibreOffice.app 到临时展开根后卸载；不运行安装器、不写 /Applications、不改上游签名或去 quarantine。Windows 用随包 Python ctypes 调 `MsiOpenDatabaseW(MSIDBOPEN_READONLY)`、查询 Directory/Component/File/Media/_Streams、`MsiRecordReadStream` 取 CAB，再用 Cabinet API `FDICopy` 按 MSI 目录表还原到临时根；不执行安装序列、自定义 action、msiexec 或系统注册。Windows 的这个解包适配是明确新增端口，依据是 [Windows Installer 只读数据库](https://learn.microsoft.com/en-us/windows/win32/api/msiquery/nf-msiquery-msiopendatabasea)、[CAB 文件键](https://learn.microsoft.com/en-us/windows/win32/msi/cabinet-files)、[FDICopy](https://learn.microsoft.com/en-us/windows/win32/api/fdi/nf-fdi-fdicopy)；尚未在该 MSI 实物/Windows 上运行。二进制原字节保留，解包路径不越界；不得以需要管理员权限为解决办法。
+mac 用系统 hdiutil `attach -readonly -nobrowse -noautoopen -mountpoint <私有临时挂载点>`，把原 LibreOffice.app 的内容按原字节复制为临时展开根下不带 `.app` 扩展名的 `LibreOffice` 目录（§4.11 决定二）后卸载；不运行安装器、不写 /Applications、不改上游签名或去 quarantine。Windows 用随包 Python ctypes 调 `MsiOpenDatabaseW(MSIDBOPEN_READONLY)`、查询 Directory/Component/File/Media/_Streams、`MsiRecordReadStream` 取 CAB，再用 Cabinet API `FDICopy` 按 MSI 目录表还原到临时根；不执行安装序列、自定义 action、msiexec 或系统注册。Windows 的这个解包适配是明确新增端口，依据是 [Windows Installer 只读数据库](https://learn.microsoft.com/en-us/windows/win32/api/msiquery/nf-msiquery-msiopendatabasea)、[CAB 文件键](https://learn.microsoft.com/en-us/windows/win32/msi/cabinet-files)、[FDICopy](https://learn.microsoft.com/en-us/windows/win32/api/fdi/nf-fdi-fdicopy)；尚未在该 MSI 实物/Windows 上运行。二进制原字节保留，解包路径不越界；不得以需要管理员权限为解决办法。
 
-展开后入口为 mac `LibreOffice.app/Contents/MacOS/soffice`、Windows `program/soffice.com`。在独立 profile 中完成版本核对、字体配置和最小实际转换后原子发布 ready；仅有包或目录不算 ready。准备器按 §4.9 派发固定验证任务，只有匹配本次身份的实际成功回执才能提交 ready。独立 profile 禁 online update、扩展自动更新、宏自动执行和外部链接更新。渲染/重算进程走 Location 的现有执行/权限面并禁出网；下载只有宿主的固定文件入口可联网。应用不检查 LO 新版本，更新由以后应用版本的清单决定。
+展开后入口为 mac `LibreOffice/Contents/MacOS/soffice`、Windows `program/soffice.com`。在独立 profile 中完成版本核对、字体配置和最小实际转换后原子发布 ready；仅有包或目录不算 ready。准备器按 §4.9 派发固定验证任务，只有匹配本次身份的实际成功回执才能提交 ready。独立 profile 禁 online update、扩展自动更新、宏自动执行和外部链接更新。渲染/重算进程走 Location 的现有执行/权限面并禁出网；下载只有宿主的固定文件入口可联网。应用不检查 LO 新版本，更新由以后应用版本的清单决定。
 
 ```ts
 type DocumentRuntimeState =
@@ -412,7 +415,7 @@ type DocumentRuntimeVerifyReceipt = DocumentRuntimeVerifyRef & (
 
 注册身份取真实 ctx.location，main 只派给同代、仍存活且请求该 pin 的注册；注册建立前任务留在 preparing/verify，环境查询照常立即返回。共享准备选一个实际请求者执行，同 pin 不因多个等待者重复验证；该 Location 离开时取消原尝试，有其它等待者则给其活注册分配新 taskId，无活注册则保留准备状态，挂接后再派，不要求用户操作。此处只是现有准备过程的一次固定回调，不新建会话、持久执行队列或调度框架。
 
-**执行面**：handler 跑在所属 Location 的 ext，即已经安装现有进程围栏的 sidecar 内。当前本机执行直接消费公共 `CrossSpawnSpawner.node`（`LayerNode.compile`→`Effect.scoped`→ChildProcessSpawner.spawn），由 ctx.location 绑定注册、cwd 和作用域；不在插件外导入 core Environment.Service、不另建 Environment 权威。它与本机 Environment 使用同一公共进程实现，子 Python/soffice 继承同一 sidecar 围栏。mac 不可退回无围栏进程；Windows 沿原批准边界如实为无 seatbelt，不声称有等价围栏。这里不改既有文件/出网权限判定。
+**执行面**：handler 跑在所属 Location 的 ext，即已经安装现有进程围栏的 sidecar 内。当前本机执行直接消费公共 `CrossSpawnSpawner.node`（`LayerNode.compile`→`Effect.scoped`→ChildProcessSpawner.spawn），由 ctx.location 绑定注册、cwd 和作用域；不在插件外导入 core Environment.Service、不另建 Environment 权威。它与本机 Environment 使用同一公共进程实现，子 Python/soffice 继承同一 sidecar 围栏。mac 不可退回无围栏进程；Windows 沿原批准边界如实为无 seatbelt，不声称有等价围栏。除 §4.11 的 N5（LibreOffice 单实例管道只监听）外，这里不改既有文件/出网权限判定。
 
 argv 只能由该 handler 从已发布文档资源构造：随包 Office Python 加 `-I -B`、固定 `document-runtime/verify_runtime.py`，以及 task 的候选根/私有工作根；脚本、中文控制样本及字体取本应用锁定资源，控制样本来自随包中文模板。模型不提供程序、脚本、命令字符串、样本、URL 或环境覆盖，不走模型 shell，也不新增用户审批。main 与 ext 均核对 pin、候选根及工作根的真实路径/身份；脚本从候选根取得本平台 soffice，在私有 profile 内执行版本查询和实际 docx→PDF 转换，关闭更新/宏/外部链接，并用随包 PDFium 解码新 PDF。只有退出 0、版本匹配清单、输出位于本 job、PDF 非空可解码且页数为正，才回 completed；不能拿历史同名 PDF 或目录存在充数。
 
@@ -452,6 +455,38 @@ preparing 立即返回既有 pending/runtime，并为本次路径/源摘要分�
 
 **失效不复用旧 ready。** Location cleanup/正常 sidecar 停止先写 invalidated，再取消并排空同注册任务；旧文件名永不分给新注册。main 在换代/重启接收新调用前使旧代投影失效，异常退出期间没有收到清理回执仍按 §4.9 记为未确认，不承诺文件能替代进程存活证明。pin 变化时先在同一文件推进 sequence，发布新 pin 的 preparing，旧 pin 的 ready 和在途 job 随即失效；新 ready 仍必须经过固定转换验证。Python 监测到失效/身份变化就终止本 job 子进程并返回 runtime 失败，提交前再次比较当次身份/源摘要，不能把旧 pin 算出的缓存写回。相同注册后续调用可读新 pin，Location 重建则由钩子自动取得新文件；用户无重配/重试安装步骤。
 
+### 4.11 围栏内的 LibreOffice 单实例管道与不被系统登记的运行时（r5 增量，待审）
+
+这是对已批准能力（U-09「LibreOffice 来渲染」）的缺陷修正：生产围栏 N1 `(deny network*)`（`process-fence-profile.ts:381`）连带拒绝 LibreOffice 必建的单实例 unix socket，固定 verify、render、重算全部 rc=1。围栏作用于整个引擎及其子进程，嵌套 seatbelt 不能为单个子进程加宽（`remote-database-connector/design.md` P-02），所以规则对所有被围栏进程生效，必须足够窄。
+
+**决定一：围栏只增加一行“只监听、不连出”的 unix socket 规则 N5，范围限定为本用户 LibreOffice 单实例管道名。** 按 F-21，管道不能用参数关闭，目录写死为 `/tmp`，TMPDIR、HOME、`OSL_SOCKET_PATH` 都不能改变它；因此不能把规则限制在产品私有目录，只能按“本用户 uid + 该命名族 + 只监听方向”收窄。名字按领域概念命名为“围栏内允许监听的 unix socket 汇合点”，今天的唯一情形作为类型化参数：
+
+```ts
+/** N5：围栏内进程可以创建并接受连接的本机 unix socket 汇合点；绝不放行 connect（出站仍归 N1）。 */
+export type FenceUnixListen = { kind: "libreoffice-single-instance"; uid: number }
+// ProcessFenceProfileInput 增加，沿用 W20/W21 的可选列表约定
+unixListen?: readonly FenceUnixListen[]   // 省略或 [] 时不渲染任何 N5 行
+```
+
+```
+(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_<uid>_SingleOfficeIPC_[0-9a-f]+$"))) ; N5 LibreOffice 单实例管道：只 bind/accept，不 connect
+```
+
+- **渲染**：唯一渲染者仍是 `renderProcessFenceProfile`；N5 放在 N4 之后、受保护配置与凭据拒写块之前，与 N1–N4 同属网络行，N1–N4 逐字不变。uid 必须是非负安全整数，否则与端口一样拒绝渲染（fail-closed）。路径必须写解析后的 `/private/tmp`，写 `/tmp` 的同形规则经实测仍会失败（F-21）。
+- **生产者**：`process-fence-plan.ts:492-493` 的计划器在 darwin 上固定传入 `[{ kind: "libreoffice-single-instance", uid: process.getuid() }]`。不按 LO 是否已 ready 来决定是否加这一行：profile 在 sidecar 启动时只渲染一次，不能为此重启引擎。`renderCommandSourceProfile`（市场 command 源）不运行 LO，不加这一行。字节预算沿用 `trimUntilCompiles`，这一行约 150 B。
+- **可达面**：被围栏进程只新增一种能力，即在 `/private/tmp/OSL_PIPE_<本用户 uid>_SingleOfficeIPC_<十六进制>` 上 bind、listen 和 accept。**任何 unix socket 的出站 connect 仍由 N1 拒绝**，包括用户自己的 LibreOffice 管道（它的名字也在这个命名族里）、`$TMPDIR` 等处的外部监听者、`/private/var/run/mDNSResponder` 以及 docker.sock、ssh-agent 等系统或用户 socket。其它 uid、其它文件名、其它目录都不能 bind。
+- **产品启动不变**：`render_document.py:75`、`verify_runtime.py:33` 和 `recalculate.py:106` 已经为每个 job 使用私有 UserInstallation，管道名因此唯一，并由该私有 profile 派生；argv/env 不改，也不加 `--accept`（产品不用它，它是另一套 UNO 接收端，与单实例管道无关）。新路径不存在时 LO 只 bind/listen；遇到残留的同名 socket 时，LO 先 connect（被拒），再 unlink 并 bind，仍然成功（`pipe.cxx:229-241`）。
+
+**决定二：mac 展开根中的 LibreOffice 包目录不带 `.app` 扩展名。** `document-runtime.ts:207` 现在把 `<mount>/LibreOffice.app` 复制为 `<staging>/LibreOffice.app`，改为把同一份字节复制到 `<staging>/LibreOffice`。只有目录名不同，包内容、签名和 PlugIns 都不动。执行入口为 `<runtime>/LibreOffice/Contents/MacOS/soffice`；`document-runtime.ts:17` 的 `executable()` 与 `verify_runtime.py:20` 这两处现有派生同改为这个相对路径，ready.executable 仍只来自前者。不调用 lsregister 或 pluginkit，不改 Info.plist，也不删除 QuickLook 扩展。依据 F-22：执行 `.app` 副本会把它和其中的 QuickLook 扩展登记进 LaunchServices/pluginkit；无扩展名目录执行时登记数为 0。用户不需要任何新步骤，也看不到变化。
+
+**Windows**：围栏只在 darwin 上存在（网络围栏权威「非 darwin 没有围栏」），LO 在 Windows 使用命名管道，N5 没有对应物；MSI 只读解包不运行安装序列，不写文件关联，也没有 LaunchServices 的对应物。
+
+**实施须交付的、可失败的证明**（具体用例写在 plan.md）：
+1. 经生产围栏装载路径的真实引擎（不能用 `sandbox-exec` 代替）中，固定 verify、Word/Excel/PPT render 与 `excel_recalculate` 都成功。
+2. 移除臂：计划器不传 `unixListen`，其余条件相同，同一个 render/verify 必须失败。
+3. 负臂：从围栏内 connect 测试在 `$TMPDIR` 自建的外部监听者、`/private/var/run/mDNSResponder`，以及测试在 `/private/tmp/OSL_PIPE_<uid>_SingleOfficeIPC_<hex>` 自建的无围栏监听者（代表用户 LO 管道），全部返回 `EPERM`；在 `/private/tmp` 下 bind 非该命名族的路径或其它 uid 的同族名，也返回 `EPERM`。每条负臂都配一个必须能连通或绑定的无围栏对照臂。
+4. LaunchServices：准备完成并实际渲染一次后，`lsregister -dump` 与 `pluginkit -mAvvv` 在 userData/document-runtime 下都是 0 条；对照臂把同一份字节放成 `.app` 执行后能看到登记，用完必须注销。
+
 ## 5. 数据与失败
 
 - **文件发布**：生成器先写同目录临时文件后原子替换成品；渲染只读快照。runtime 和 render receipt 完整发布后才可引用；源摘要、renderer、页数及页摘要可关联，旧 PDF 不因同名成为新渲染结果。缓存键含源摘要、渲染器/字体版本、dpi/viewport，不设 TTL 或人工容量帽。
@@ -461,6 +496,7 @@ preparing 立即返回既有 pending/runtime，并为本次路径/源摘要分�
 - **视觉失败**：按实际已读页、已识图页报告覆盖范围；云识图额度/鉴权/拒绝归原服务，不在文档功能制造新批准或配额。原稿、渲染图和剩余问题都在本地；只有 F-10 这条不能看图时的识图路径上传图片。
 - **自检卡死**：§4.4 的 180 s 是执行与返回的统一期限，下载准备不计入；超时终结本 job，不发布不完整的 PNG/PDF 或 Excel 回存。工具保留已有成品回执供产物面板读取，报告尚未查的页；没有自动无限重试或等待用户确认的分支。
 - **准备验证窗口**：固定任务的身份、终结及 ready 提交只按 §4.9；取消/Location 释放/换代后旧成功结果无效，正常退出不产生失败问题，真实验证失败沿既有 unknown/诊断呈现。没有验证回执不能以下载成功代替 ready。
+- **围栏内管道**（r5）：每个 job 的私有 profile 产生各自的管道名，并发 job 不会冲突；同一 job 内多次 soffice 是串行的，前一次退出时会删除自己的 socket；进程崩溃留下的残留文件由 LO 自己 unlink 后重新 bind（§4.11）。计划器漏传 N5 时，转换以 rc=1 失败，沿 §4.9 的 unknown 诊断如实呈现，不会被当作成功。
 - **离线及不可信内容**：生成/转换无更新检查，无运行期 npm/pip/字体下载；Office 外部关系、HTML URL 与文档中的指令都是输入数据，不提升到 system 指令。LO 禁外部更新和文档宏，Chromium 禁外网；不会为了画出一个远端图片而替用户联网。
 
 ## 6. 架构落点
@@ -495,9 +531,10 @@ R 表示**已决定新增**的端口，范围及签名以 §4 为准；不是尚
 | Excel 新鲜算值与错误位置 / AC-03、07 | 上游 xlsx recalc 固定宏做法、pypdf/openpyxl 的只读解析；**R11**：§4.7 `OfficeExcel.recalculate`/excel_recalculate，LO 副本计算、原 ZIP 缓存合并、错误定位及图表/透视缓存同步。不可宣称这些已由 LO 自动保真。 |
 | 工具注册、产物面板与清单 / AC-05、11、14 | ext tool.transform（plugin `:160-163`）、`tools_for/call_tool`（office-mcp server `:127,290`）、`scanLocalArtifacts`（local-artifacts `:89`）、`projectWatchIgnore`（core filesystem 自有配置）、目录 `scripts/sync-catalog-snapshot.mjs`；**R12**：§4.8 移除 OFFICE_WRITE_TOOL/旧 writer 消费、接入 DocumentArtifactRecord、调整构建烟测依赖、工作根 gitignore/watcher 忽略、消费 §8 的目录源与 intake 更新；不维护影子工具表。 |
 
+| LO 在围栏内启动、运行时不被系统登记 / AC-03、04、06..10、13 | `renderProcessFenceProfile`（`process-fence-profile.ts:343`）、计划器 `trimUntilCompiles` 调用（`process-fence-plan.ts:492-493`）、`extractDocumentRuntime`（`document-runtime.ts:198-211`）、`executable()`（`:17`）；**R14**：§4.11 的 `FenceUnixListen`/N5 渲染与计划器传值、mac 展开目录名与入口相对路径。不新增围栏渲染者、执行面或用户步骤。 |
 | Python 宿主投影 / AC-03、07、09..11、15 | **R13**：§4.10 的 DocumentHost.pythonEnvironment、严格 JSON 与保留环境键；main 单一写者，ext 经既有 shell.hook/MCP transform 注入，Office 安全校验消费相同宿主预期值，Python 模块只读/按模板建 job。复用 R3 注册及现有 DocumentHostRequest/Reply，不改引擎、启动器槽或下载器；K2 保持单一状态/路径/字体权威。 |
 
-K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、Excel 保存和预览隔离各一个拥有者；新增消费不复制。`constraints.md:31` 已记 Office 命令展开的既有重复，Windows 入口本次必须走同一资源投影，不能再加第五份；其余既有偏离不在本票清理。依赖保持 Schema→Core/Protocol→Server，Client 不依赖 Core/Server。无必要架构例外。
+K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、Excel 保存和预览隔离各一个拥有者；新增消费不复制。`constraints.md:31` 已记 Office 命令展开的既有重复，Windows 入口本次必须走同一资源投影，不能再加第五份；其余既有偏离不在本票清理。依赖保持 Schema→Core/Protocol→Server，Client 不依赖 Core/Server。无必要架构例外。r5 的 N5 是网络围栏唯一渲染者内的加法，由该权威的「落地」表同步记载，不另立围栏或例外；N1 对 unix socket 出站一刀切的结论保持不变。
 
 **被否决的替代**：OfficeCLI（U-12 明确不带）；HTML→PPT（试验字体与图表数据失真）；让用户安装依赖（BR-07/15）；整套社区 46 工具（定义成本大且 BR-09 只需补缺）；社区 evaluator 作最终重算（有缓存时不重算）；LO 回存覆盖最终 xlsx（扩展对象保真无保证）；复用用户预览截图作为 Office 自检（渲染来源不满足 BR-04）；预装包/apt/下载 Poppler、pandoc 的上游假设（当前生成和逐页渲染已有更小闭包）；新云文档服务（BR-13）。
 
@@ -532,6 +569,9 @@ K1：权限档位权威不变。K2：下载、环境、技能发现、视觉、E
 | Excel 选中 12 个社区操作归三类工具，另加 LO 重算；原 ZIP 缓存合并，不让整本回存破坏对象 | F-11/12；BR-05/09；新增 R9..R11 是实现责任，不伪称现成功能 |
 | 原四 writer 从工具面移除，reader 保留，模板和源文件可直接继续编辑 | F-01、BR-01/10；无兼容分支、无新增用户限制 |
 | 所有能力都有合法符号或 R1..R12 的明确 raise；R1 修正及 owner 平台范围澄清后全部冻结 | §6、R1 指令与下文 owner 原话；无其它设计待决接缝，不把未实现断言写成已证明 |
+| r5：LO 单实例管道关不掉也挪不走；围栏新增 N5，只允许 bind/accept 本用户的 `OSL_PIPE_<uid>_SingleOfficeIPC_<hex>`，任何 unix socket 的 connect 仍被拒绝 | F-21；规格 v1 BR-04/07（U-09）。否决：按 `OSL_PIPE_` 放行全部网络操作（围栏内可以 connect 用户 LO 的管道，让它打开或转换围栏外的文件）；按 job 写 literal（profile 在 sidecar 启动时一次渲染，job 管道名事后才产生）；改 TMPDIR/HOME/`OSL_SOCKET_PATH` 或关闭管道（源码与实测均无效）；整体放行 unix socket（经 mDNSResponder 可绕过出网代理解析 DNS） |
+| r5：mac 运行时包目录去掉 `.app` 扩展名 | F-22。否决：展开后 `lsregister -u`（每次执行都会重新登记）；改 Info.plist 或删除 PlugIns（破坏封装签名） |
+| r5：Windows 不需要对应改动 | 围栏只在 darwin 上存在；MSI 只读解包不写文件关联 |
 
 | 轮 / 审查版本与范围 | 审计方 | finding 及处置 | 改了什么 / 验证证据 | 没改的及去向 |
 | --- | --- | --- | --- | --- |
@@ -591,13 +631,27 @@ F-20 与命令 `git show d3c2190fc8:docs/specs/document-output-quality/plan.md` 
 
 r4 核对回执（Codex / GPT-6）：隔离模式/状态替换探针 exit 0；旧名扫描 exit 0（10 pass / 0 fail）；本文链接检查 exit 0（2 links）、官方文档合同检查对本文 0 finding、`git diff --check` exit 0。`affected-tests --list` 已执行，因本 worktree 缺 `.gate-tests` exit 2，未生成 scope line，不声称选择器通过；本轮只有设计变更，不补仓级配置或运行全包。索引状态/摘要未变，仅提交本文。
 
+### r5：围栏内 LibreOffice 单实例管道与运行时登记（#1761）
+
+依据：#1761 测量回执（2026-11-27）。在组合产品引擎内，产品自己的 LO verify 以 exit 1 结束；在围栏内 session shell 中不经模型也能复现；sandbox-exec 二分把问题定位到 N1。另有协调者追加的 LaunchServices 观察。本轮只补 §4.11，以及 §2 的 F-21/F-22、§4.3 与 §4.9 各一句、§5 一条、§6 R14；网络围栏权威「落地」表的强制层一行同步记载 N5。旧的 slice 3/4 与 AC-08 证据都是在围栏外跑的，所以当时没有暴露这个缺陷；§4.11 的证明 1、2 补上这个证据缺口。
+
+探针回执（Claude Opus 5.5，本 worktree `813ca7a98c`，约 30 min）：结果见 F-21/F-22。生产 profile 由 bun 调 `renderProcessFenceProfile` 渲染（exit 0），每个臂都直接用 `/usr/bin/sandbox-exec -f` 执行，没有经过包装脚本。临时目录和下载的固定 tag 源码文件已删除，本次产生的 LaunchServices/pluginkit 登记已注销；`/private/tmp` 下没有 OSL_PIPE 残留，也没有 soffice 进程。没有启动桌面应用或 Electron，没有付费调用。sandbox-exec 与生产 addon 的 `sandbox_init` 在子进程继承上语义相同，这一点是推断，以 §4.11 证明 1 为准。
+
+**残余观察（不改）**：N5 允许围栏内进程在用户自己 LibreOffice 会使用的管道名上监听。若它先 unlink 现有管道文件（W11 已允许），之后用户新启动的 LibreOffice 会把要打开的文件路径交给这个监听者，然后自行退出。这属于入站方向，与 N2/N3 已允许的 loopback TCP 监听同类：不扩大可写集，也不打开任何出网通路；围栏本身不限制读取，这些文件对被围栏进程本来就可读。要排除用户默认 profile 的哈希，必须复现 LO 默认 profile URL 的展开形式（未验证），一旦写错就是无声失效，所以本轮不加。它没有独立价值，不登记 intent。
+
+**传播记录**（网络行约定从 N1–N4 增加 N5）：`grep -rn "N1–N4\|N1-N4" docs --include=*.md` 命中 `1662-opencode2/design.md:209,227`（「N1–N4 一字不改」）、`remote-database-connector/design.md:63,284`（「N1–N4 不变」，I1「有无此连接器逐字节相同」）、`engine-config-fence/design.md:53` 与 `stored-credentials-fence/design.md:51`（规则先后：网络行之后才是拒写块）、`child-process-write-fence/design.md:1262`（历史手写 profile 测量）、`tool-network-egress/plan.md:29,37`（使用它自己的 N 编号，属于另一个命名空间）。这些命中在 N5 加入后都仍然成立，无需修改：N1–N4 逐字未变，N5 与连接器无关，且位于拒写块之前。唯一需要同步的是架构权威 `2026-09-10-network-egress-on-process-fence.md:319` 这一行，已修改。
+
+**增量状态 draft（待审）**：这次改动触及跨功能的围栏安全面，是否送独立审查由编排器按 delivery-review §2 决定，作者不自行登记 not-required。历史 R1 review 字段与其它节的 frozen 状态不变。无 owner-only 待决项：修正不增加任何用户可见的限制或步骤。
+
+r5 核对回执（Claude Opus 5.5）：`bin/check-light` exit 0，包括 NUL 闸、两份改动文档的 8 个相对链接，以及 docs-anchored 的 5 个测试文件（68 pass / 0 fail，含 old-name-scan 与 network-egress-disclosure）；`git diff --check` exit 0；链接检查器对一个自建坏链返回 rc=1，证明它能报红。索引状态与摘要未变，只提交本文与网络围栏权威的那一行。
+
 引用传播已在本文做一次接缝扫查：旧草稿启动器 SHA、按 sha256 派生的固定文件缓存、固定版本 ready 类型、脚本稳定等待、server 适配与 Location 路由决定均移除；对应当前形状在 §1/§4/§6/§8 一致。OFFICE_WRITE_TOOL 与旧 writer 只保留在“删除义务/事实证据”中，不再是有效消费端口。目录源新增的生产者依赖已落在 §8，未另创平行契约。
 
 传播取证范围只有本消费设计：Python 字面搜索旧启动器 SHA、原 server resume 函数名、原 Location 路由类名、固定版本 ready 类型及旧摘要缓存路径，五项各为 0；旧不可用错误名仅 1 处且在 R1-3 历史删除处置中。review 字段、R1-1..R1-10 覆盖及无新旧名词元断言均 exit 0；未修改其它生产者设计，必要输入已按 §8 交接。
 
 **R1 修正文档验证回执**：Codex / GPT-6 核对 review 字段、十项处置和冻结范围；`git fetch -q origin && git show origin/alpha:docs/specs/connector-launchers/design.md` exit 0，读取到 #1766 的冻结输入，未 merge/rebase。ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail），两份改动文档的 `check-doc-links.py` exit 0（426 links），`git diff --check` exit 0。官方 `check_repo(..., changed_since="origin/alpha")` 对本设计 0 finding，仓级仍为既有 71 errors / 250 warnings（索引/跨仓引用等），未顺带修整。仅更新生成器产出的本设计索引行状态为 frozen，不收其它索引漂移。未启动应用/窗口程序，未跑可选重算替代或付费实测。
 
-**待 owner 定**：无。平台范围已按上述 owner 原话明确，DOC-NODE-v2 是已接受契约的实现依赖。ADR-014 第 5 条的准确修订仍按原保护资产流程交实施/调度方，本文未越权修改。
+**待 owner 定**：无（r5 同样没有：N5 与运行时目录名都是用户不可见的缺陷修正）。平台范围已按上述 owner 原话明确，DOC-NODE-v2 是已接受契约的实现依赖。ADR-014 第 5 条的准确修订仍按原保护资产流程交实施/调度方，本文未越权修改。
 
 **仍为推断或未验证的断言**
 
@@ -608,6 +662,12 @@ r4 核对回执（Codex / GPT-6）：隔离模式/状态替换探针 exit 0；�
 | 平台默认模型完成质量、自检实际发现问题与中文字体单段一致 | 原强模型 pilot 与配置可行性不等于默认模型和正式包；字体实值锁/四份产物尚待构建 | 已授权的小额模型测量决定 AC-01..03 是否修订；本票按原 AC 实施验证，不在设计任务执行 |
 | 固定文件的自有 release/HK 上线、真实国内续传 | 本次只读官方元数据，没有发布或实网下载 LO | §8 既有生产者；消费契约已冻结，不重开机制 |
 | ADR-014 决策 5 与新规格冲突 | `.claude/rules/adrs/ADR-014-extension-hub.md:22` 仍写旧的禁止再分发和重量理由 | 精确修订受保护条款须随批准输入交实施；无相邻规则清理 |
+| r5：sandbox-exec 下的结论等同于生产 addon 围栏；真实引擎中 verify/render/recalc 都能成功 | F-21 只用了 sandbox-exec 加 pilot 副本，两者是同一份 SBPL；生产环境由 addon `sandbox_init` 装在 sidecar 上，子进程继承（F-19），两者等价属于推断 | §4.11 证明 1–3，由实施交付 |
+| r5：不带 `.app` 的运行时在正式下载（可能带 quarantine）与 Gatekeeper 下能照常执行；放在 Spotlight 索引的位置也不会被登记 | 探针副本来自 pilot，没有下载 quarantine；位置在 `/private/var/folders`，不是 Spotlight 索引的 `~/Library/Application Support`。后者按构造推断：那里不存在可供登记的 `.app` 包 | §4.11 证明 4 在正式包的 userData 下执行；若失败按 §5 平台缺口处理，不让用户关闭保护 |
+| r5：已登记的 `.app` 副本会出现在「打开方式」里，并接管 QuickLook 预览 | 实测观察到 LaunchServices 应用记录和 pluginkit 中的 QuickLook 扩展登记；对 UI 的具体影响未直接观测，属推断 | 决定二直接消除前提，不另行验证 |
+| r5：本机已有的 LO 登记（pilot 副本，以及两条已从磁盘消失的实施副本记录） | 不是本次登记的，未注销 | 已告知调度方，按需由所属 lane 注销；这不属于产品行为 |
 | 文档索引与既有引用不是全绿 | 修改索引前官方 `check_repo(..., changed_since="origin/alpha")` 为 69 errors/252 warnings；新设计无 finding。`docs/README.md:105` 所在生成块原已 stale；只加入生成器产生的本设计一行后为 71/250，其中 `:391`、`:448` 等两类既有跨仓意图引用因索引成为 changed file 从 warning 升为 error，仍非本设计新增引用 | 告知调度方的基线观察，不调查或修复其它文档；本次范围只含本文及必要索引行 |
 
 交接收据：依据为规格 v1、设计 `d07c5aa8a8` 的独立 R1、§1 的冻结输入更新、owner 平台澄清与 r3/r4 实施接缝回执；Codex / GPT-6 已核既有决定、§4.9 固定验证与 §4.10 Python 宿主投影契约，平台仅为 darwin-arm64/win32-x64，结论为**全部冻结，无待决接缝**。已定勿重开：技能主路、LO 渲染、不带 OfficeCLI、共享下载/启动器/视觉权威及 R1 十项修正。下一步由实施者消费本增量恢复 Python OfficeExcel 重算接线，并按 DOC-NODE-v2 集成文档读取面；遗留只有明确的实现/发布证据与默认模型测量，无产品范围扩张。
+
+r5 交接收据：依据为规格 v1（U-09）、#1761 测量回执、协调者的 LaunchServices 观察，以及代码 `813ca7a98c`。Claude Opus 5.5 已在生产形状 profile 下完成 sandbox-exec 探针和只读 LaunchServices 检查（F-21/F-22）。结论：§4.11 的 N5（只监听本用户 LO 单实例管道名）与无 `.app` 扩展名的运行时目录，是使 verify/render/recalc 在围栏内可用、且运行时不被系统登记的最小修正。增量状态为 **draft（待审）**。已定勿重开：LO 渲染路线、每 job 私有 profile、出站 unix socket 全拒。下一步：编排器决定是否送审；之后实施按 §4.11 的四项证明执行。遗留去向：上表 r5 各行，以及本节的残余观察。

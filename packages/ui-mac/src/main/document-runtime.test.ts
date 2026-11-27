@@ -1,5 +1,6 @@
 import { createConnectorLaunchState } from "./connector-launch-state"
 import { afterEach, describe, expect, test, spyOn } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, existsSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -7,7 +8,7 @@ import { join } from "node:path"
 import type { Location } from "../../../schema/src/location"
 import type { DocumentRuntimeState, DocumentRuntimeVerifyTask, DocumentRuntimeVerifyReceipt } from "../../../util/src/codepuppy-document"
 import type { PinnedFiles } from "../../../util/src/codepuppy-pinned-files"
-import { createDocumentRuntime } from "./document-runtime"
+import { createDocumentRuntime, extractDocumentRuntime } from "./document-runtime"
 
 const roots: string[] = []
 const runtimes: ReturnType<typeof createDocumentRuntime>[] = []
@@ -26,7 +27,7 @@ function fixture() {
     manifest: { schemaVersion: 1, files: [pin] } satisfies PinnedFiles, platform: "darwin-arm64" as const, userData: root, assets, resources: root, python: process.execPath, sidecarGeneration: 3,
     ensureFile: async (_id: string, _signal: AbortSignal, progress: (received: number, total: number) => void) => { counts.acquire++; progress(1, 1); return { result: { ok: true as const, path: join(root, "fixture.dmg"), via: "cache" as const } } },
     classifyFailure: () => ({ kind: "unknown" as const, detail: "preserved delivery facts" }),
-    extract: async ({ destination }: { destination: string }) => { counts.extract++; const file = join(destination, "LibreOffice.app/Contents/MacOS/soffice"); mkdirSync(join(file, ".."), { recursive: true }); writeFileSync(file, "extracted candidate") },
+    extract: async ({ destination }: { destination: string }) => { counts.extract++; const file = join(destination, "LibreOffice/Contents/MacOS/soffice"); mkdirSync(join(file, ".."), { recursive: true }); writeFileSync(file, "extracted candidate") },
   }
   const completed = async (task: DocumentRuntimeVerifyTask): Promise<DocumentRuntimeVerifyReceipt> => {
     counts.verify++
@@ -50,10 +51,11 @@ describe("document runtime", () => {
     runtime.query(f.location)
     await verifying
     expect(f.counts).toEqual({ acquire: 1, extract: 1, verify: 0 })
-    const ready = until(runtime, (s) => s.phase === "ready")
+    const ready = until(runtime, (s) => s.phase === "ready" || s.phase === "failed")
     runtime.subscribeRuntimeVerify(f.location, f.completed)
     const state = await ready
-    expect(state.phase).toBe("ready")
+    // The published entry sits in a directory without the .app extension (design §4.11 decision two: never a LaunchServices bundle)
+    expect(state).toEqual({ phase: "ready", version: pin.version, executable: join(f.location.directory, "document-runtime/libreoffice/darwin-arm64", pin.version, "LibreOffice/Contents/MacOS/soffice") })
     if (state.phase !== "ready") throw Error("not ready")
     expect(readFileSync(state.executable, "utf8")).toBe("extracted candidate")
     expect(f.counts.verify).toBe(1)
@@ -240,6 +242,21 @@ test("publishing the Python environment for an enabled connector does not begin 
     expect(query.mock.calls).toHaveLength(0)
     expect(f.counts.acquire).toBe(0)
   } finally { query.mockRestore(); await runtime.dispose() }
+})
+
+// Integration layer (darwin): the shipped mac extraction against a real disk image made with hdiutil. The bundle lands in a
+// LibreOffice directory without the .app extension, so running it registers nothing with LaunchServices/pluginkit (design §4.11).
+// UDRW: the product attach verifies checksums, which a compressed image would make take seconds.
+test.skipIf(process.platform !== "darwin")("mac extraction copies the mounted bundle into a LibreOffice directory without the .app extension", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "document-runtime-dmg-"))); roots.push(root)
+  const bundle = join(root, "volume", "LibreOffice.app", "Contents", "MacOS")
+  mkdirSync(bundle, { recursive: true }); writeFileSync(join(bundle, "soffice"), "fixture executable")
+  const archive = join(root, "fixture.dmg")
+  expect(spawnSync("/usr/bin/hdiutil", ["create", "-quiet", "-srcfolder", join(root, "volume"), "-volname", "LibreOffice", "-format", "UDRW", archive]).status).toBe(0)
+  const destination = join(root, "candidate"); mkdirSync(destination)
+  await extractDocumentRuntime({ archive, destination, platform: "darwin-arm64", python: process.execPath, resources: root, signal: new AbortController().signal })
+  expect(readFileSync(join(destination, "LibreOffice/Contents/MacOS/soffice"), "utf8")).toBe("fixture executable")
+  expect(readdirSync(destination).filter((name) => name.endsWith(".app"))).toEqual([])
 })
 
 // Integration layer: the shipped connector action calls the actual runtime, not a retry counter adapter.

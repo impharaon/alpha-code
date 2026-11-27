@@ -942,7 +942,7 @@ AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口�
 ## r5 修正：围栏内 LibreOffice 单实例管道与不被系统登记的运行时
 
 - 依据：[design](design.md) @ `efd1af8808` §4.11（frozen）、§2 F-21..F-23、§5「围栏内管道」、§6 R14、§10 r5 各行；[网络围栏权威](../../architecture/2026-09-10-network-egress-on-process-fence.md)「落地」表强制层 N5 一行；[spec v1](spec.md) AC-03、04、06..10、13 的 LibreOffice 部分；Issue #1761。缺陷证据为测量回执 `~/.cache/alpha-orch/2026-11-27/impl-1761-ac01-03/diag/`（组合引擎内 verify 与 soffice 转换 exit 1）。Windows 不改（§4.11「Windows」）。
-- 核对：待首个实施提交按本轮 brief 的 `Phase:` 填写。
+- 核对：`e29803bffd` · 本轮 brief（2026-11-27）的 Phase 为「PLAN, then IMPLEMENT in the same round」：本节单独提交后同轮实施；调度方未另行审查本节，Claude Opus 5.5 按冻结的 §4.11 自核调用链，未见设计待决。
 
 ### 改动
 

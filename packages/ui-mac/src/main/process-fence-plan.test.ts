@@ -468,6 +468,21 @@ describeDarwin("planProcessFence", () => {
     expect(h.made.some((d) => d.endsWith("/.opencode") || d.endsWith("/.zsh_sessions") || d.includes("bun"))).toBe(false)
   })
 
+  test("`#1761` N5:计划的 profile 在 N4 之后、受保护集之前放行本用户 LibreOffice 单实例管道族的 bind/accept,紧跟拒绝这个 HOME 的默认 profile($HOME/Library/Application Support/LibreOffice/4)的确切管道名", () => {
+    // HOME 取一个真实采样:LibreOffice 26.8.3.1 以这个 HOME 的默认 profile 启动时建的管道名就是下面的 hash(plan.md r5 证明 3 的采集记录)
+    const home = "/private/tmp/lo1761-cap/home-ascii"
+    const h = harness({ homeDir: () => home })
+    h.input.sidecarEnv = { HOME: home }
+    const uid = process.getuid!()
+    const lines = planProcessFence(h.input, h.deps).profile.split("\n").map((line) => line.replace(/\s*;.*$/, "").trim())
+    const n4 = lines.findIndex((line) => line.startsWith("(allow network-outbound"))
+    expect(lines.slice(n4 + 1, n4 + 3)).toEqual([
+      `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_[0-9a-f]+$")))`,
+      `(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb")))`,
+    ])
+    expect(lines[n4 + 3]).toBe("(deny file-write*")
+  })
+
   test("用户导出 XDG_STATE_HOME ⇒ 多建 <state>/opencode,profile 多一行 W3;XDG_DATA_HOME 跟着 env", () => {
     const h = harness()
     h.input.sidecarEnv = { HOME, XDG_STATE_HOME: "/Volumes/s", XDG_DATA_HOME: "/Volumes/d" }

@@ -2,7 +2,7 @@
 // 装上生产渲染的 profile(经生产 .node 模块),然后逐条试「唯一放行的那扇门」与逃逸语料。
 // 判据不在这里 —— 这里只做动作并把自报打成 JSON(每条带 errno / 状态码 / 耗时);判在 network-egress-fence.test.ts。
 //
-//   argv: <addonPath> <mode: bare|fenced> <profileFile> <targetName> <targetPort> <proxyPort> <closedV6Port>
+//   argv: <addonPath> <mode: bare|fenced> <profileFile> <targetName> <targetPort> <proxyPort> <closedV6Port> <unixProbes JSON>
 //   env : 由测试进程按生产 sidecarEgressProxyEnv(port) 注入(HTTP(S)_PROXY / NO_PROXY …),本文件不自设。
 //
 // 步骤(每步各自 try/catch,一步失败不影响下一步;`started` 由本进程 pid 自证 —— 空输出 ≠ 拦住):
@@ -16,6 +16,15 @@
 //   udp           dgram.send 到 1.1.1.1:53 ⇒ EPERM。
 //   v6OtherPort   net.connect([::1]:<closedV6Port>):loopback 上**非代理端口** ⇒ EPERM(bare 臂 ECONNREFUSED)。
 //   dns           dns.lookup("example.com") ⇒ 围栏下解析失败(mDNSResponder 的 unix socket 被 (deny network*) 拦,`#1334` Q2)。
+//
+// `#1761`(DESIGN-document-output-quality §4.11 N5)unix socket 探针,路径由测试进程给(unixProbes JSON):
+//   loPipeBind     按 LibreOffice 自己的写法 listen `/tmp/OSL_PIPE_<uid>_SingleOfficeIPC_<hex>`(产品 job 的单实例管道)⇒ 围栏下放行。
+//   userPipeBind   listen 用户默认 profile 的确切管道名(取自 profile 的拒绝行)⇒ 拒。
+//   otherUidBind   其它 uid 的同族名 ⇒ 拒。
+//   otherTmpBind   /tmp 下非该命名族的名字 ⇒ 拒。
+//   tmpdirConnect  connect 测试进程(围栏外)在 $TMPDIR 的监听者 ⇒ EPERM。
+//   userPipeConnect connect 测试进程冒充用户默认管道名的监听者 ⇒ EPERM。
+//   mdnsConnect    connect /var/run/mDNSResponder ⇒ EPERM。
 import { createRequire } from "node:module"
 import dgram from "node:dgram"
 import dns from "node:dns"
@@ -23,7 +32,8 @@ import fs from "node:fs"
 import http from "node:http"
 import net from "node:net"
 
-const [addonPath, mode, profileFile, targetName, targetPortRaw, proxyPortRaw, closedV6PortRaw] = process.argv.slice(2)
+const [addonPath, mode, profileFile, targetName, targetPortRaw, proxyPortRaw, closedV6PortRaw, unixProbesRaw] = process.argv.slice(2)
+const unixProbes = JSON.parse(unixProbesRaw)
 const targetPort = Number(targetPortRaw)
 const proxyPort = Number(proxyPortRaw)
 const closedV6Port = Number(closedV6PortRaw)
@@ -153,6 +163,41 @@ out.steps.dns = await timed(
       "dns",
     ),
 )
+
+/** unix socket listen:bind + listen 成功即关(关闭时 libuv 删掉 socket 文件)⇒ {bound:true};错 ⇒ 抛(带 errno)。 */
+const unixListen = (path) =>
+  withTimeout(
+    new Promise((resolve, reject) => {
+      if (!path) return reject(Object.assign(new Error("no probe path"), { code: "NO_PATH" }))
+      const srv = net.createServer()
+      srv.once("error", reject)
+      srv.listen(path, () => srv.close(() => resolve({ bound: true })))
+    }),
+    4000,
+    `listen ${path}`,
+  )
+/** unix socket connect:连上 ⇒ {connected:true};错 ⇒ 抛(带 errno)。 */
+const unixConnect = (path) =>
+  withTimeout(
+    new Promise((resolve, reject) => {
+      if (!path) return reject(Object.assign(new Error("no probe path"), { code: "NO_PATH" }))
+      const s = net.connect({ path })
+      s.once("connect", () => {
+        s.destroy()
+        resolve({ connected: true })
+      })
+      s.once("error", (e) => reject(e))
+    }),
+    4000,
+    `connect ${path}`,
+  )
+out.steps.loPipeBind = await timed(() => unixListen(unixProbes.loPipe))
+out.steps.userPipeBind = await timed(() => unixListen(unixProbes.userPipe))
+out.steps.otherUidBind = await timed(() => unixListen(unixProbes.otherUidPipe))
+out.steps.otherTmpBind = await timed(() => unixListen(unixProbes.otherTmp))
+out.steps.tmpdirConnect = await timed(() => unixConnect(unixProbes.tmpdirListener))
+out.steps.userPipeConnect = await timed(() => unixConnect(unixProbes.userPipeListener))
+out.steps.mdnsConnect = await timed(() => unixConnect(unixProbes.mdns))
 
 emit()
 process.exit(0)

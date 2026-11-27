@@ -202,6 +202,12 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         await files.refresh()
         if (input.phase === "start") {
           const raw = await createSecretSpool(input.file, input.id)
+          // Capture material is cleared at release and never re-established, also when release came during this start
+          // (design §10 SPEC5-03); later phases find no capture and are withheld.
+          if (closing) {
+            await raw.dispose()
+            throw new Error("Location released")
+          }
           const state: Capture = { raw, publish: input.publish, stream: createSecretStream(input.file, input.id, files.values, (bytes) => state.publish(bytes)) }
           captures.set(input.id, state)
           return

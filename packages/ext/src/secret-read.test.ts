@@ -37,6 +37,16 @@ test("env read view keeps ordinary values visible", async () => {
   expect(JSON.stringify(result.content)).toContain("1: DB_HOST=db")
 })
 
+test("env read view masks only embedded URL passwords", async () => {
+  const source = "DATABASE_URL=postgres://app:fixture-db-pass@db:5432/x\nDB_HOST=db\n"
+  expect(project(source, await read(source)).output).toMatchObject({ content: "DATABASE_URL=postgres://app:[REDACTED]@db:5432/x\nDB_HOST=db\n" })
+  // A line truncated inside the password shows none of it.
+  const long = `DATABASE_URL=postgres://app:${"p".repeat(4000)}@db/x\n`
+  const truncated = project(long, await read(long))
+  expect(JSON.stringify(truncated).includes("p".repeat(8))).toBe(false)
+  expect(JSON.stringify(truncated.content)).toContain("1: DATABASE_URL=postgres://app:[REDACTED]")
+})
+
 test("long-line secret prefixes and raw file references are removed", async () => {
   const source = `TOKEN=${"s".repeat(4000)}\nPORT=3000\n`
   const result = project(source, await read(source))

@@ -1845,6 +1845,20 @@ describe("safe file tools", () => {
     expect((shell as { value: { output: unknown } }).value.output).toMatchObject({ output: "DB_HOST=db\nAPI_KEY=[REDACTED]\nmongodb\n" })
   }))
 
+  it.live("env URL values mask only the embedded password", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const password = randomUUID()
+    fs.writeFileSync(path.join(location.directory, ".env"), `DATABASE_URL=postgres://app:${password}@db:5432/x\n`)
+    const { session } = yield* setup({ internal: [ReadTool.Plugin, ShellTool.Plugin], records: NEUTRAL })
+    const read = yield* callRaw(session.id, "read", { path: ".env" })
+    expect(Exit.isSuccess(read)).toBe(true)
+    expect(JSON.stringify(read).includes(password)).toBe(false)
+    expect(JSON.stringify(read)).toContain("DATABASE_URL=postgres://app:[REDACTED]@db:5432/x")
+    const shell = yield* callRaw(session.id, "shell", { command: "cat .env" })
+    expect(Exit.isSuccess(shell)).toBe(true)
+    expect((shell as { value: { output: unknown } }).value.output).toMatchObject({ output: "DATABASE_URL=postgres://app:[REDACTED]@db:5432/x\n" })
+  }))
+
   it.live("foreign read tools retain their original path", () => Effect.gen(function* () {
     let rawReads = 0
     const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {

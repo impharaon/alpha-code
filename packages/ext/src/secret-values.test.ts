@@ -78,6 +78,15 @@ test("env files collect only credential-named values", () => {
   expect(strings(credentialValues(env, Buffer.from(source)))).toEqual(["fixture-api-key", "1234", "fixture-auth"])
 })
 
+test("embedded URL passwords are credential fields in every format", () => {
+  // Node dotenv assignment grammar and static YAML mapping syntax; fixture values only.
+  const env: ProtectedFiles.ProtectedFile = { rule: "env", path: "/fixture/.env", profile: "env", format: "env", view: "variables" }
+  const source = "DATABASE_URL=postgres://app:fixture-db-pass@db:5432/x\nREDIS_URL='redis://:fixture-redis-pass@cache:6379/0'\nSITE_URL=https://example.com/path\nDB_HOST=db\n"
+  expect(strings(credentialValues(env, Buffer.from(source)))).toEqual(["fixture-db-pass", "fixture-redis-pass"])
+  const document = "database:\n  url: postgres://svc:fixture-yaml-pass@db/app\n  host: db\n"
+  expect(strings(credentialValues(file("credential-document", "assignments"), Buffer.from(document)))).toEqual(["fixture-yaml-pass"])
+})
+
 test("structured parse failures never become opaque values", async () => {
   const text = await fixture("gcp.json").text()
   expect(() => credentialValues(file("gcp-adc", "json"), Buffer.from(text.slice(0, -3)))).toThrow()

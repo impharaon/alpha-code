@@ -86,6 +86,26 @@ for (const operation of ["write", "edit", "patch"] as const) test(`multiline rea
   expect(actual.includes(ProtectedFiles.REDACTED)).toBe(false)
 })
 
+for (const operation of ["write", "edit", "patch"] as const) test(`embedded URL password view restores through ${operation}`, async () => {
+  const { projectEnvRows } = await import("./secret-read")
+  const { roots } = await setup()
+  const source = "DATABASE_URL=postgres://app:fixture-db-pass@db:5432/x\nPORT=3000\n"
+  await writeFile(path.join(roots.directory, ".env"), source)
+  const rows = source.trimEnd().split("\n").map((text, index) => ({ number: index + 1, text }))
+  const view = projectEnvRows([source], rows, (text) => text).join("\n")
+  expect(view).toBe("DATABASE_URL=postgres://app:[REDACTED]@db:5432/x\nPORT=3000")
+  const input = operation === "write" ? { operation, path: ".env", content: view.replace("3000", "3001") + "\n" }
+    : operation === "edit" ? { operation, path: ".env", oldString: view, newString: view.replace("3000", "3001") }
+    : { operation, patchText: ["*** Begin Patch", "*** Update File: .env", "@@", ` ${view.split("\n")[0]}`, "-PORT=3000", "+PORT=3001", "*** End Patch"].join("\n") }
+  const { mutation } = await restoreEnvMutation(input, roots)
+  const actual = mutation.operation === "write" ? mutation.content : mutation.operation === "edit" ? source.replace(mutation.oldString, mutation.newString) : (() => {
+    const parsed = Patch.parse(mutation.patchText)
+    if (Result.isFailure(parsed) || parsed.success[0].type !== "update") throw new Error("invalid restored patch")
+    return Patch.derive(".env", parsed.success[0].chunks, source).content
+  })()
+  expect(actual === source.replace("3000", "3001")).toBe(true)
+})
+
 test("compact edits still replace every multiline assignment occurrence", async () => {
   const { roots } = await setup()
   const source = 'KEY="first\nline"\nFLAG=0\nKEY=second\nFLAG=0\n'

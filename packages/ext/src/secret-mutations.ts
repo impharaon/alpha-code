@@ -2,7 +2,8 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { Result } from "effect"
-import { Tool } from "../../schema/src/tool"
+import { Error as ToolError } from "@opencode/plugin/promise/tool"
+import type { Tool } from "../../schema/src/tool"
 import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
 import { Patch } from "../../util/src/patch"
 import { Bom } from "../../util/src/bom"
@@ -22,7 +23,7 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
     try { return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(await readFile(name)) }
     catch (cause) {
       if ((cause as NodeJS.ErrnoException).code === "ENOENT") return undefined
-      if (required) throw new Tool.Error({ message: `Unable to read env file: ${name}` })
+      if (required) throw new ToolError({ message: `Unable to read env file: ${name}` })
     }
   }
   const target = (name: string) => path.resolve(roots.directory, name)
@@ -58,11 +59,11 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
         snapshots.push({ path: target(input.path), file, before })
         return { mutation: { ...input, oldString, newString }, snapshots }
       }
-      if (names.size || envAssignments(input.newString).some((item) => item.value === ProtectedFiles.REDACTED)) throw new Tool.Error({ message: `Could not find oldString in ${input.path}. It must identify the env assignments.` })
+      if (names.size || envAssignments(input.newString).some((item) => item.value === ProtectedFiles.REDACTED)) throw new ToolError({ message: `Could not find oldString in ${input.path}. It must identify the env assignments.` })
       snapshots.push({ path: target(input.path), file, before })
       return { mutation: input, snapshots }
     }
-    if (matches.length > 1 && input.replaceAll !== true) throw new Tool.Error({ message: `Found ${matches.length} matches for oldString, but expected exactly one. Add more surrounding context to make oldString unique, or set replaceAll to true to replace every occurrence.` })
+    if (matches.length > 1 && input.replaceAll !== true) throw new ToolError({ message: `Found ${matches.length} matches for oldString, but expected exactly one. Add more surrounding context to make oldString unique, or set replaceAll to true to replace every occurrence.` })
     const replacements = matches.map((match) => ({ ...match, text: restoreFields(input.newString, records, counts(envAssignments(source).filter((item) => item.valueEnd <= match.start))) }))
     const after = replacements.toReversed().reduce((text, item) => text.slice(0, item.start) + item.text.replaceAll("\r\n", "\n") + text.slice(item.end), source)
     snapshots.push({ path: target(input.path), file, before, after: Bom.join(after, Bom.has(Buffer.from(before))) })
@@ -119,7 +120,7 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
       hunks.push(restored); snapshots.push({ path: target(destination), file, before, after: Patch.joinBom(after.content, after.bom) })
       if (hunk.movePath) snapshots.push({ path: target(hunk.path), file, before, after: "" })
     } catch {
-      throw new Tool.Error({ message: `Unable to restore env patch: ${hunk.path}` })
+      throw new ToolError({ message: `Unable to restore env patch: ${hunk.path}` })
     }
   }
   return { mutation: snapshots.length ? { ...input, patchText: serialize(hunks) } : input, snapshots }

@@ -185,9 +185,9 @@ const UPSTREAMS = [
     // path and aggregate SHA, and reads every source byte from that exact Git object. Unlike the
     // older optional staged fixtures above, an unavailable checkout or missing commit is a hard
     // failure:provenance cannot be proved by a self-consistent replacement lock.
-    // #1776: d3c9725 republishes checkpoint b3eff85a6b (host aggregate 9eaf5230…).
+    // #1776: 9f7b66d (alpha-web #322) republishes checkpoint e0c6e11f86 (host aggregate 254dee98…).
     repo: "jinjunnn/alpha-web",
-    commit: "d3c97254a11fe50c3f76ea95e1184e04e576e1cc",
+    commit: "9f7b66de081da2dc2a3776fe2703b5a582ce8786",
     lock: "alpha-web-extension-package.lock.json",
     vendor: "vendor/alpha-web-extension-package",
     sourceEnv: "CODEPUPPY_WEB_EXTENSION_PACKAGE_SOURCE",
@@ -195,7 +195,7 @@ const UPSTREAMS = [
     sourceFallback: "../../../alpha-web",
     sourcePrefix: "contracts/extension-package/artifact",
     artifactPath: "contracts/extension-package/artifact",
-    artifactSha256: "2e378ff5b88e7a70f8f0f0ba0c6454a77db0e350eea3f27ffae256d35d1df7a4",
+    artifactSha256: "631dea62f20c3bb401eb82f21b57333daf599deefc71bd5a4a24bd2935bbb74d",
     commitBound: true,
     // #759 / alpha-web#109:producer 追平宿主合同 v2。语料从 22 个文件长到 36 个 —— 新增的是
     // flat Bundle 正/负向、OAuth 与 Code Puppy Connection 的正向语料(旧的 `input.remote-oauth.invalid.json`

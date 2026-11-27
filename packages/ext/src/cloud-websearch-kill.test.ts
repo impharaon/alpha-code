@@ -508,6 +508,8 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
           // #1699 的规则回退会读 agent.get 的真实返回形状;保留该宿主原先的空规则输入。
           if (name === "agent" && method === "get") return async () => ({ data: { permissions: [] } })
           if (name === "plugin" && method === "list") return async () => ({ data: [] })
+          // session.list 是分页接口(protocol groups/session.ts 的 SessionsResponse:`{ data, cursor }`)。
+          if (name === "session" && method === "list") return async () => ({ data: [], cursor: {} })
           if (name === "mcp" && method === "transform") return async (callback: never) => (mcpTransforms.push(callback), { dispose: async () => {} })
           if (name === "event" && method === "subscribe") return () => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) })
           return noop

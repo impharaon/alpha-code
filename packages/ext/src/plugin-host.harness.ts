@@ -94,7 +94,8 @@ export function recordingContext(directory: string) {
             if (method === "transform") (transforms[name] ??= []).push(args[0] as never)
             if (method === "hook") (hooks[`${name}.${String(args[0])}`] ??= []).push(args[1] as never)
             // 读类调用回真宿主的空形状(工具表是数组,客户端 API 回 `{ data }`):L4 的 registerPolicy 在 setup / seal 里读它们。
-            if (method === "list") return name === "tool" ? [] : { data: [] }
+            // session.list 是分页接口(protocol groups/session.ts 的 SessionsResponse:`{ data, cursor }`,cursor 必有)。
+            if (method === "list") return name === "tool" ? [] : name === "session" ? { data: [], cursor: {} } : { data: [] }
             return { dispose: async () => {} }
           }
         },

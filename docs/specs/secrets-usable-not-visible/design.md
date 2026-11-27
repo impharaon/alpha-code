@@ -1,7 +1,7 @@
 ---
 id: DESIGN-secrets-usable-not-visible
 title: 密钥文件程序可用、助手不可见 技术设计
-summary: v3.4 冻结：消费规格 v5——项目外按项目规则命中的名单文件经 match 认定、读过后计入采集；env 只取凭据名变量与值里内嵌的连接地址密码；写回恢复只遮密码段的值。SC-01/SC-02 与两处引擎授权不变。
+summary: v3.4 冻结：消费规格 v5——项目外按项目规则命中的名单文件经 match 认定、读过后计入采集；env 只取凭据名变量与值里内嵌的连接地址密码；值里凭据名键的 key=value 段同样只遮其值；写回按位置换回每个遮盖符。SC-01/SC-02 与两处引擎授权不变。
 kind: tech-design
 status: frozen
 design_version: "3.4"
@@ -21,8 +21,8 @@ last_reviewed: 2026-11-27
 
 ## 1. 基线
 
-- Spec：[SPEC-secrets-usable-not-visible v5](spec.md)，固定输入提交 `d14b2e3c647204beab1136a1980b6f55e818e200`（v5 首版 `5d56d0cae1`，该提交补 BR-06 的内嵌密码句与 AC-12 扩写，批准行不变）。v4 固定提交 `0099c0c248` 的 U-42 说明文件限制在 v5 中不变；v1..v4 的有效证据继承。
-- v3.4 输入：本工作树 `d14b2e3c64`（分支 feat/1758-i50-i51，未 push）；plan.md「⑥ 规格 v5」的改动表、偏离记录（plan.md:861-865）、实施收据（:867-877）与「⑥ 核对修正：值里内嵌的密码」（:879-886）。只消费已实施的 BR-05/BR-06 v5 行为，不重开 v3.3 及更早决定；I-52 不在本增量。
+- Spec：[SPEC-secrets-usable-not-visible v5](spec.md)，固定输入提交 `3776643a6e84e1a7afd620a05b9b7f981da88e68`（v5 首版 `5d56d0cae1`；`d14b2e3c64` 补 BR-06 的内嵌密码句与 AC-12 扩写，`3776643a6e` 按代码审查 R1 第 6 项补「值里以 `Password=`、`?password=` 这类键写出的密码同样只遮这一段」，两次均注明批准行不变）。v4 固定提交 `0099c0c248` 的 U-42 说明文件限制在 v5 中不变；v1..v4 的有效证据继承。
+- v3.4 输入：本工作树 `d14b2e3c64`（分支 feat/1758-i50-i51，未 push）；plan.md「⑥ 规格 v5」的改动表、偏离记录（plan.md:861-865）、实施收据（:867-877）与「⑥ 核对修正：值里内嵌的密码」（:879-886）；v3.4 修订再消费 `3776643a6e` 的「⑥ 审查 R1 修正（FIX-THEN-MERGE）」（plan.md:888-897），实现为红例 `099c3ec893`、修正 `fc825e9e6d`。只消费已实施的 BR-05/BR-06 v5 行为，不重开 v3.3 及更早决定；I-52 不在本增量。
 - 覆盖：BR-01..BR-07、AC-01..AC-12（AC-11、AC-12 为 v5 新增，由 §4.1/§4.3/§4.4 的 v5 句保持）。AC-09 由实时 flush 保持，AC-10 由逐 profile 凭据字段提取保持；成功结果 hook 沿用 §2 证据，本文探针不代替验收。
 - 输入收据：owner 2026-11-26 的 U-38「好的。」已批准 SC-01、前后可读值边界及失败整次隐藏；U-39「这两个你的建议是什么，按你的建议吧。」批准实时逐段遮盖、先打印后写入的窄残留，以及非 env 格式只提取凭据字段，已落入规格 v3。继承 Windows 发布时真机验收和「复用工具卡文本区、无需 frames」约定。自动化仍消费 [SPEC-unattended-run-permissions v2](../unattended-run-permissions/spec.md) BR-03。
 - 背景：规格[来源](spec.md#来源)所指的协调仓安全意图 I-45、讨论 P-06/P-08；不重开「程序可用」「全部批准读项目外文件不问」和原样匹配边界。
@@ -148,14 +148,14 @@ expect(JSON.stringify(yield* snapshot.execute(call("disabled")))).toContain(valu
 
 ### v3.4：规格 v5 的已实施事实
 
-只回答：v3.3 §4.1/§4.3/§4.3.1/§4.4 中哪些句子与已实施的规格 v5 矛盾；停止条件是每条 v5 行为都对到一个现有 callable。均为 `d14b2e3c64` 的**观察**，正反证据见 plan.md:867-886 的红例与移除臂。
+只回答：v3.3 §4.1/§4.3/§4.3.1/§4.4 中哪些句子与已实施的规格 v5 矛盾；停止条件是每条 v5 行为都对到一个现有 callable。均为 `3776643a6e` 的**观察**，正反证据见 plan.md:867-897 的红例与移除臂。
 
 | 已观察的事实 | 证据与结论 |
 | --- | --- |
-| 项目外文件经 match 按项目规则判定，sources 不含 | `packages/schema/src/codepuppy-protected-files.ts:272-275` 在定位规则后追加 `outsideProjectRules`；`:386-397` 只对项目外路径生效，以该路径的文件系统根为根，复用 PROJECT 规则（固定位置加 `**/` 前缀）、示例排除与 DEPENDENCIES 剪枝，规则 ID 不变；`sources`（`:256-270`）只遍历 `locatedRules`。`probe`（`:291-310`）经 match 同时认它。 |
+| 项目外文件经 match 按项目规则判定，sources 不含 | `packages/schema/src/codepuppy-protected-files.ts:273-276` 在定位规则后追加 `outsideProjectRules`；`:388-399` 只对项目外路径生效，以该路径的文件系统根为根，复用 PROJECT 规则（固定位置加 `**/` 前缀）、示例排除与 DEPENDENCIES 剪枝，规则 ID 不变；`sources`（`:257-271`）只遍历 `locatedRules`。`probe`（`:292-311`）经 match 同时认它。 |
 | 读过的项目外名单文件计入采集，不列目录 | `packages/ext/src/secret-mask.ts:229-232` 的 read 先 `files.track(input.file)`；`packages/ext/src/secret-files.ts:120-125` 在每次 refresh 对已 track 文件独立 stat/采集，`:146-148` 登记，`:162-166` dispose 清空；没有对其目录 readdir。 |
-| env 只取凭据名与内嵌密码，同一函数供三处 | `packages/schema/src/codepuppy-protected-files.ts:84` `CredentialFields.env = { names: "credential" }`；`packages/ext/src/secret-values.ts:34-39` `urlPasswords`、`:73-81` `envView`、`:83-85` `envSecret`；采集 `:102-103`、结构化叶子 `:149-160`、assignments `:142` 都追加内嵌密码；read 视图 `packages/ext/src/secret-read.ts:76`、错误恢复判定 `secret-mask.ts:295` 消费同一函数。 |
-| 写回恢复只遮密码段的值 | `packages/ext/src/secret-mutations.ts:131-149` 的 `shown`/`restoreFields`：赋值值不是整个遮盖符、但等于当前同键同序号值的 envView 时恢复当前 RHS；`:153-156` 的模板按同一视图匹配。项目外 env 经 `resolveProtectedFile`（`secret-files.ts:11-19`）随 match 覆盖。 |
+| env 只取凭据名与内嵌凭据字段，同一函数供三处 | `packages/schema/src/codepuppy-protected-files.ts:85` `CredentialFields.env = { names: "credential" }`；秘密词表 `:58-71` 含 `PWD`，`isCredentialName`（`:313-320`）对以秘密词结尾的名字片段也成立。`packages/ext/src/secret-values.ts:39-67` `embeddedFields` 不用 `URL.parse`，从原文逐处取 `scheme://` 授权段（止于 `/ ? #` 或空白）中最后一个 `@` 前、第一个 `:` 后的密码，空密码记 `whole`，并取凭据名键的 key=value 段的值；`:70-83` 解码失败只保留书写形；`:86-90` `embedded`、`:109-121` `envView`、`:123-125` `envSecret`。采集 env `:142-147`、assignments `:186`、结构化叶子 `:193-205` 都追加内嵌字段；read 视图 `packages/ext/src/secret-read.ts:76`、错误恢复判定 `secret-mask.ts:295` 消费同一函数。 |
+| 写回按位置恢复只遮内嵌字段的值 | `packages/ext/src/secret-mutations.ts:136-158` 的 `restoreFields`：赋值值不是整个遮盖符、且当前同键同序号值的 envView 为 embedded 时，按出现顺序把每个遮盖符换回当前字段原文，其余文本保留助手所写；`:159-182` 的模板按同一视图匹配，后续位置按实际替换长度计偏移。项目外 env 经 `resolveProtectedFile`（`secret-files.ts:11-19`）随 match 覆盖。 |
 
 ## 4. 接口契约
 
@@ -221,7 +221,12 @@ roots 全部必填，由宿主实际目录事实提供，不从工具输出或�
 
 凭据值提取也由这份发布数据持有：**（v3.4，规格 v5 BR-06）env 与 credential-document 同一判定 `CredentialFields.env = { names: "credential" }`**——只有名字含秘密词（下述同一 `isCredentialName`）的变量的值是秘密，其它变量的值原样，不再每个值默认秘密；非 env 只提取该文件 profile 的凭据字段，不把每个标量、非空行、整个 JSON 文本或整库字节作为匹配单位。
 
-**内嵌连接地址密码（v3.4，规格 v5 BR-06）**：值（去首尾空白）形如 `scheme://用户:密码@主机…`（scheme 为 `[a-z][a-z0-9+.-]*`，用户与密码段不含空白和 `/?#@`）且 WHATWG `URL` 解析出非空 password 时，该密码是凭据字段，不论变量或字段名；匹配单位为书写形与解码形（含非法 `%` 时只用书写形），以字段名 `password` 交同一 `secretScalar`，因此不享受公开豁免。它在 env 的每次赋值、credential-document/JSON profile 的每个叶子、assignments profile 的每行值上一并采集；sqlite、netrc、credential-url 与原始单位 profile 不变。env 的直接读视图、diff 投影与错误恢复共用同一个 env 视图判定（`envView`，§2 v3.4）：凭据名 → 整值遮盖；否则含内嵌密码 → 只把密码段在 RHS 原文中的每次出现换成遮盖符，主机、用户名等其余原样；该密码在 RHS 原文中找不到逐字出现时整值遮盖，不猜测；都不是 → 原样。不新增配置、不对其它 URL 部件或任意值做识别。未列中的字段不贡献值；结构化解析失败进入遮盖失败处理，不能退回「整段 opaque 文本」来制造短匹配项。
+**值里内嵌的凭据字段（v3.4，规格 v5 BR-06；审查 R1 修订）**：以下两类值内片段是凭据字段，不论变量或字段名，从原文直接取跨度，不用 `URL.parse`：
+
+1. **连接地址密码**：值中每一处 `scheme://`（scheme 为 `[a-z][a-z0-9+.-]*`，大小写不敏感）之后的授权段止于 `/`、`?`、`#` 或空白；用户信息取到授权段内**最后一个** `@`，其中第一个 `:` 之后到该 `@` 之前为密码。因此多主机地址、一个值里的多个地址、未编码的 `@` 都按整段密码各自取出；没有 `@` 或用户信息里没有 `:` 的不是凭据形状。形状成立但密码为空（`user:@host`）时**整值为秘密**。
+2. **凭据名键的 key=value 段**：值中位于开头或 `;`、`&`、`?`、空白之后的 `键=值` 段，键通过下述同一 `isCredentialName` 时（例如 ADO/ODBC 的 `Password=…;`、`Pwd={…}`，查询参数 `?password=`、`&pwd=`），只取该段的值；值可为双引号、单引号、花括号包裹（取包裹内）或止于 `;`、`&`、空白、`#`。
+
+匹配单位为每个字段的书写形与 `decodeURIComponent` 解码形；解码失败（如 `%9A`）只保留书写形，不使本次采集失败。字段以字段名 `password` 交同一 `secretScalar`，因此不享受公开豁免。它在 env 的每次赋值、credential-document/JSON profile 的每个叶子、assignments profile 的每行值上一并采集；sqlite、netrc、credential-url 与原始单位 profile 不变。env 的直接读视图、diff 投影与错误恢复共用同一个 env 视图判定（`envView`，§2 v3.4）：凭据名 → 整值遮盖；否则有空密码形状 → 整值遮盖；有内嵌字段 → 只把这些字段在 RHS 原文中的跨度换成遮盖符，主机、用户名等其余原样；RHS 去掉外层引号后取出的字段与解析值的字段不一致（引号/转义改变了字段）时整值遮盖，不猜测；都不是 → 原样。不新增配置、不对其它 URL 部件或任意值做识别。未列中的字段不贡献值；结构化解析失败进入遮盖失败处理，不能退回「整段 opaque 文本」来制造短匹配项。
 
 | profile | 只提取的字段 / 单元格 |
 | --- | --- |
@@ -241,7 +246,7 @@ roots 全部必填，由宿主实际目录事实提供，不从工具输出或�
 
 SQLite 始终以主库路径 `new DatabaseSync(path,{readOnly:true,allowExtension:false})` 打开，用固定发布表/列与 `prepare(...).iterate()` 流式读取，完成后关闭。只允许 SELECT/只读 schema 检查，不执行库中提供的 SQL、写 PRAGMA、迁移或扩展加载；不设 immutable 绕开 WAL。伴随 `-wal/-shm` 仍是受保护位置，但采集通过主库正常 SQLite 快照读取，不把日志页拆成秘密；缓存身份包含主库及伴随文件。schema 列名来自发布数据，值绝不拼进 SQL。[Chromium 密码列](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/password_manager/core/browser/password_store/login_database.cc)、[cookie 列](https://chromium.googlesource.com/chromium/src/+/643cdf61903e99f27c3d80daee67e217e9d280e0/net/extras/sqlite/sqlite_persistent_cookie_store.cc)及 [Firefox cookie 源码](https://raw.githubusercontent.com/mozilla-firefox/firefox/main/netwerk/cookie/CookiePersistentStorage.cpp)支持浏览器列的落点；gcloud 的固定版本与实测见 §2。
 
-BR-06 在**所有格式**应用。先按 camelCase/非字母数字拆出键名词；秘密词为 KEY/TOKEN/SECRET/PASS/PASSWORD/PASSWD/CREDENTIAL/CREDENTIALS/AUTH/AUTHORIZATION/PRIVATE（大小写不敏感）。键名有秘密词时不授予下述公开豁免，例如 `PASSWORD=1234` 仍是秘密。没有秘密词时：
+BR-06 在**所有格式**应用。先按 camelCase/非字母数字拆出键名词；秘密词为 KEY/TOKEN/SECRET/PASS/PASSWORD/PASSWD/PWD/CREDENTIAL/CREDENTIALS/AUTH/AUTHORIZATION/PRIVATE（大小写不敏感；`PWD` 为 v3.4 审查 R1 修订所加）。名字片段等于秘密词，或（v3.4 审查 R1 修订）以秘密词**结尾**（如 `PGPASSWORD`、`APIKEY`、`SECRETKEY`、`ACCESSTOKEN`、`oauth`），都算有秘密词；env 与结构化文件共用这一判定。键名有秘密词时不授予下述公开豁免，例如 `PASSWORD=1234` 仍是秘密。没有秘密词时：
 
 | 明显非密钥的发布规则 | 公开值 |
 | --- | --- |
@@ -310,7 +315,7 @@ env（包括 `.envrc`）静态解析用 `node:util.parseEnv` 读取可识别的�
 仅包装身份权威确认的内置 write/edit/patch。执行器包装位于 `tool.transform`，在 before/pin 之后调用原 execute 时传**局部恢复副本**，不改已冻结 event.input。prepareMutation 无子调用事务状态，只用目标文件当前可读文本，不从 Location 的跨文件匹配集合猜值，不另写文件、不绕过原审批/锁/formatter。
 
 - write：对 env-format 受保护目标，完整赋值行的值恰为 `[REDACTED]`（含语法引号）时，以该文件**同一键第 n 次出现的当前 RHS（n 为该键在对应文件中的出现序号）**替换；新给出的真实值、非 env 文件和不相干行不变。
-- （v3.4）只遮密码段的值：赋值的值含 `[REDACTED]` 但不是整个遮盖符时，仅当它与对应文件同键第 n 次出现的当前值经 §4.1 env 视图判定（只遮内嵌密码）后的显示逐字相等，才整段换回该次出现的当前 RHS；不相等（助手改了主机、用户名等其余部分）时不恢复，继续原工具语义（write 照写所给文本；edit/patch 定位不到时沿用 `secret-mutations.ts:61` 的具名定位错误）。write/edit/patch 三者共用此规则；edit/patch 定位 oldString 与上下文行时，模板同样按该视图生成，使「其余原样、只遮密码」的片段能匹配源文。不在 URL 内部拼接密码、不跨键或跨文件猜值。
+- （v3.4，审查 R1 修订）只遮内嵌字段的值：赋值的值含 `[REDACTED]` 但不是整个遮盖符，且对应文件同键第 n 次出现的当前值按 §4.1 env 视图是「只遮内嵌字段」时，**按位置恢复**：所写值里的遮盖符按出现顺序依次换成当前值中对应内嵌字段（密码或凭据名键段的值）的原文，助手对主机、用户名、其余参数等的改动原样保留；遮盖符多于当前字段数时，多出的保持原文。当前值不是这种视图（整值秘密或公开）时不按此规则恢复，继续原工具语义（write 照写所给文本；edit/patch 定位不到时沿用 `secret-mutations.ts:61` 的具名定位错误）。write/edit/patch 三者共用此规则；edit/patch 定位 oldString 与上下文行时，模板同样按该视图生成，长于一个遮盖符的视图之后的位置按实际替换长度计偏移。不跨键或跨文件猜值。
 - edit：按原 edit 的定位语义，把 oldString 的行映射到目标全文的键出现序号，再恢复 oldString/newString 的对应占位符；replaceAll 的每个匹配分别映射，不能把片段里第一个键误当全文第一次。前者才能匹配真实源文本，后者才能保住未修改秘密。
 - patch：先用既有 Patch.parse 区分 add/update/delete、源/移动目标和 oldLines/newLines；上下文/删除行用源文件对应键出现序号的当前值，新增/保留行按 hunk 与完整目标文本定位对应出现序号；移动到尚不存在的目标时沿用源文件相应出现序号。由包装内唯一的序列化逻辑按已有 Patch.Hunk 语法重建原 patch，路径、删除/移动操作、普通行、行尾和 BOM 保持原语义，不手写第二个 patch parser。
 
@@ -325,7 +330,7 @@ env（包括 `.envrc`）静态解析用 `node:util.parseEnv` 读取可识别的�
 1. **non-env 保护文件**：保留原设计的执行前说明分流，不调用原 read/authorizeRead，不读出附件或私钥正文，不发 read/external_directory 卡片。说明结果由原注册 tool.output codec 解码固定说明 DTO 后交原输出编码，不手写 TextPage 类/schema；已有实施 codec 探针证明这一路合法，不需要构造器接管。不存在/不可读来源保留具名读失败，不假装文件存在。
 2. **env 保护文件**：改为调用原 execute，offset/limit 不改；原 reader 负责行/字节/单行裁剪、EOF/越界、TextPage 或 utf8 FileContent、行号/页眉/续页提示。env profile 的路径在项目内，或（v3.4）是 §4.1 项目外范围按项目规则命中的 env 文件，后者以其自身路径执行；若只是项目外别名的 realpath 命中项目 env，则原 execute 的局部副本使用同一已核实项目目标路径，前后展示仍为原请求路径。词法项目 env 指向外部的链接仍按其词法保护路径执行。此为同文件路径归一化，不换 agent、不生成 grant、不松开只读档的普通外读 deny；非 env 的外部保护文件始终走上一分流。
 3. **安全页投影**：在最终 execute.after、通用投影之前，SecretMask.read 同时改写 output 与 content，说明置于正文页外。`type/mime/offset/truncated/next` 作为分页结构消费，安全正文不重新触发原物化 URI/附件。消费原 output 的类型、offset/truncated/next 和原 content 的公开行号格式（read 的 description 明示 `<line>: <content>`），保留引擎生成的页眉、行号及 continuation；不重新数行、限页、裁字节或从完整文件补回未选中的内容。通用结果收口最后仍执行，不重新用 read 输出 codec 拒绝已经安全的结果。
-4. **按源位置生成变量视图**：用同一 envAssignments 的键出现序号/RHS 词法跨度和调用前后可核实的源快照，对原页中可见区间逐行投影。已识别赋值保留可见变量名，按 §4.1 env 视图判定：凭据名变量的 RHS 为遮盖符，含内嵌连接地址密码的 RHS 只把密码段换成遮盖符（v3.4），其它值原样；跨页的引号/多行 RHS、仅剩前缀的长行同样按源跨度遮盖，不能只 exact-match 页面里的完整值。注释/未解析内容不透传；保留原页的行槽和前缀，不重排重复键或把下一页内容塞进本页。页与源快照无法对应时整次隐藏，不猜测为公开值。
+4. **按源位置生成变量视图**：用同一 envAssignments 的键出现序号/RHS 词法跨度和调用前后可核实的源快照，对原页中可见区间逐行投影。已识别赋值保留可见变量名，按 §4.1 env 视图判定：凭据名变量的 RHS 为遮盖符，含内嵌凭据字段的 RHS 只把这些字段换成遮盖符（v3.4），其它值原样；跨页的引号/多行 RHS、仅剩前缀的长行同样按源跨度遮盖，不能只 exact-match 页面里的完整值。注释/未解析内容不透传；保留原页的行槽和前缀，不重排重复键或把下一页内容塞进本页。页与源快照无法对应时整次隐藏，不猜测为公开值。
 5. **错误、附件及其它读取**：原 read 的正常 IO/二进制/越界错误没有文件正文，仍经已有 error 收口去 cause；投影/解析失败只返回固定隐藏说明。若声明为 env 的文件实际返回 media/base64/list 等非文本结果，删除整份原 output/content/附件，换说明，不能交给后续 normalizeImages。未命中保护的 read 保留原实现与通用结果遮盖。原 read 仍会先发布邻近指令；§4.9 按规格 v4 明确这条说明文件链路不遮盖，不将其视为遮盖步骤故障。工具结果的 output/content、错误和附件继续按本节及通用收口处理。
 
 保留删除交互 `.env` ask/deny 注入的既有决定；引擎原 build 底座的 `.env` ask 在已核实受保护 env 调用（项目内，或 v3.4 起 §4.1 项目外范围命中的 env）的 permission.evaluate 中按同一读关联改为 allow，询问/只读档删冲突条目后按原 read allow。三档的 non-env 保护读不触发授权；自动化原 `.env` deny 不变。不得把项目外普通 read 的 BR-05 例外扩大到其它档位/写操作，也不翻转用户已有的其它显式 deny。
@@ -438,7 +443,7 @@ SC-01 的接管仍仅是 Core Shell 捕获生命周期和 Effect/Promise ShellHo
 | 判定路径 / 凭据字段 / 非密钥 | **新增** ProtectedFiles.sources/match/probe/isPublicValue 及 §4.1 profile 发布数据 | Schema 一份权威；相同依赖树边界、KUBECONFIG 拆分和列/字段选择由所有消费者共用 |
 | 采集与变化检测 | **新增** §4.3 的 SecretMask 方法；Node `fs/promises.readdir/realpath/readFile/stat({bigint:true})`、`node:util.parseEnv` | 文件/目录 stat 五元组缓存；变目录逐层 readdir 发现新来源，已知文件独立 stat；已读项目外名单文件经 `createSecretFiles().track`（`packages/ext/src/secret-files.ts:146-148`）只 stat 不 readdir；SQLite 含 WAL/SHM；不收集任意 scalar |
 | SQLite 明文单元格 | 已有 Node 内建 `DatabaseSync` 的 readOnly、prepare/iterate/close；仓内使用点 `packages/core/node_modules/@effect/sql-sqlite-node/src/SqliteClient.ts:36`；**新增**发布 profile 查询投影 | 扩展直接用 Node 内建，只读打开来源库；官方 gcloud schema 与只读/反例探针见 §2 |
-| env 写回恢复 | 已有 ToolEditor.update/execute 包装；write Input `packages/core/src/tool/plugin/write.ts:19-24`、edit Input `:24-33`、Patch.parse/Hunk `packages/util/src/patch.ts:27-49`；**新增** SecretMask.prepareMutation | 传局部恢复副本给原执行器，不改 pin 后事件；old/new/context 按对应文件的键出现序号恢复；只遮密码段的值按 §4.3.1 v3.4 句经 `envView` 比对恢复（`packages/ext/src/secret-mutations.ts:131-156`）。重建 patch 的私有序列化能力明确在扩展写回边界新增，不声称 Patch 已有 format API |
+| env 写回恢复 | 已有 ToolEditor.update/execute 包装；write Input `packages/core/src/tool/plugin/write.ts:19-24`、edit Input `:24-33`、Patch.parse/Hunk `packages/util/src/patch.ts:27-49`；**新增** SecretMask.prepareMutation | 传局部恢复副本给原执行器，不改 pin 后事件；old/new/context 按对应文件的键出现序号恢复；只遮内嵌字段的值按 §4.3.1 v3.4 句经 `envView` 按位置恢复（`packages/ext/src/secret-mutations.ts:136-182`）。重建 patch 的私有序列化能力明确在扩展写回边界新增，不声称 Patch 已有 format API |
 | 实时 shell / 最终文件 / 后台通知 | **raise SC-01（U-38）**：§4.5 ShellHooks.capture 的 start/chunk/end + 回调内 publish/replace；原 pump/writer/outputDone 为 `packages/core/src/shell.ts:333-355` | 同一捕获生命周期提供多段 Promise 发布、逐段背压/计数及安全文件替换；outputDone 前成功重遮盖或故障仅说明，说明文件 IO 失败的终态也由同一 Core withheld 状态直接生成说明，不回读旧文件；不依赖 synthetic hook |
 | ANSI 归一化与实时尾部 | 已有 `stripAnsi`，`packages/session-ui/src/tools/ansi.ts:6`；**新增**扩展的增量边界适配和真前缀尾部 matcher | 窄引用纯函数，不依赖 UI barrel、不复制 CSI/OSC 语义；直播/终态均先归一化再匹配，普通末行立即发布 |
 | 加密 spill / 流式终态重写 | **新增** §4.5 私有 spool；Node `crypto.randomBytes/createCipheriv/createDecipheriv`、认证 tag，`fs.createReadStream/createWriteStream` 与 `fs/promises.rename/unlink` | event.file 提供合法捕获目录；key 只留进程，原文仅当前帧/匹配尾部，不加输出上限 |
@@ -558,10 +563,11 @@ const hiddenResult: Tool.Result = {
 | 裁决 | 依据 / 后果 |
 | --- | --- |
 | SPEC5-01：项目外名单文件经 match、读过后计入；env 只取凭据字段，值里内嵌的连接地址密码也是凭据字段、只遮该段 | 产品依据为规格 v5 BR-05、BR-06：I-50、I-51 由 owner 2026-11-27 在协调仓安全意图 U-43 批准，原话「intent 全部按照你的建议。」；内嵌密码句来自编排器（Claude Opus 5.5）2026-11-27 对 I-51 的核对修正（plan.md:818、:881），写入规格 v5 `d14b2e3c64`，该提交注明批准行不变，本文不把这一句记作 owner 对它的单独批准。设计后果：§4.1 项目外范围与内嵌密码规则、§4.3 已读项目外文件来源、§4.3.1 只遮密码段的写回恢复、§4.4 env 视图与权限关联；`ProtectedFiles`、`SecretMask`、`EnvMutation` 签名，SC-01/SC-02 及 U-38/U-40 授权都不变，不新增用户步骤、选项或限制。v3.3 及更早裁决不重开；I-52 已延后，不在本增量。 |
+| SPEC5-02（审查 R1 修订）：内嵌字段逐处从原文取、空密码形状整值秘密、解码失败只留书写形、凭据名键的 key=value 段只遮其值、秘密词以结尾计并加 `PWD`、写回按位置换回遮盖符 | 来源：#1758 代码审查 R1（Claude Opus 5.5，独立只读，FIX-THEN-MERGE，7 项），编排器全部接受（plan.md:888-897）；实现红例 `099c3ec893`、修正 `fc825e9e6d`；key=value 段一句由编排器写入规格 v5 BR-06（`3776643a6e`，注明批准行不变），本文不把它记作 owner 单独批准。理由：`URL.parse` 门在多主机/多地址/未编码 `@` 上漏取或抛错，精确词匹配漏 `PGPASSWORD` 等拼接名，「仅逐字相等才恢复」使助手只改主机时把遮盖符写进密码。后果只在 §4.1 字段提取/秘密词与 §4.3.1 恢复规则；签名、SC-01/SC-02 与授权不变，不新增用户步骤、选项或限制。审查第 7 项（Code Mode 子调用读另一项目 `.env`）为核实、非缺陷，不改设计。 |
 
 | 本增量收据 | 检查方 / 结论 | 遗留去向 |
 | --- | --- | --- |
-| v3.4 / 工作树 `d14b2e3c64`，规格 v5 + plan.md ⑥ 实施与核对修正 | Claude Opus 5.5 设计方定向同步：逐句对照 §4.1/§4.3/§4.3.1/§4.4/§4.7 与 §2「v3.4」所列实现 `file:line`，只改矛盾句与直接后果；行为证据继承 plan.md:867-886 的红例、绿例与移除臂，本轮未重跑测试或探针。没有新增独立审查轮次，review 元数据保留 R2 真实收据 | **v3.4 frozen**；无 owner-only 决定。规格 v5 批准记录所列边界（命令打印读文件工具尚未读过的项目外名单文件时不遮）由编排器回流意图，不在本设计处理。 |
+| v3.4 / 工作树 `d14b2e3c64`，规格 v5 + plan.md ⑥ 实施与核对修正（提交 `25eaac5a2b`）；v3.4 审查 R1 修订 / 工作树 `3776643a6e`，`099c3ec893`..`fc825e9e6d` 与 plan.md ⑥ 审查 R1 收据 | Claude Opus 5.5 设计方定向同步：逐句对照 §4.1/§4.3/§4.3.1/§4.4/§4.7 与 §2「v3.4」所列实现 `file:line`（R1 修订后行号已重核），只改矛盾句与直接后果；行为证据继承 plan.md:867-897 的红例、绿例与移除臂，本轮未重跑测试或探针。design_version 保持 3.4。没有新增独立审查轮次，review 元数据保留 R2 真实收据 | **v3.4 frozen**；无 owner-only 决定。规格 v5 批准记录所列边界（命令打印读文件工具尚未读过的项目外名单文件时不遮）由编排器回流意图，不在本设计处理。 |
 
 本轮检查：`python3 scripts/check-doc-links.py docs/specs/secrets-usable-not-visible/design.md` 与 `git diff --check` 见提交收据；只提交 design.md，不改 spec/plan/索引/生产代码，不 push。
 

@@ -1,6 +1,9 @@
+import { pluginEntryRuntimeAvailable } from "../shared/plugin-package-runtime"
+import { preparePluginSettings } from "./plugin-package-config"
 import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { convertCreatedPlugin } from "./created-plugin"
-import { renderInstalledSkill } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
+import { renderPluginText } from "../shared/host-extension-package-contract/plugin-package"
+import { renderInstalledSkill, pluginInstructionDefinition } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import type { Capture, Entry, Text } from "../shared/host-extension-package-contract/plugin-conversion"
 import {
   diagnosticNotRunning,
@@ -32,6 +35,7 @@ import {
   buildDepartingChildConfigItemsV1,
   buildMcpTxItems,
   buildSkillTxItems,
+  buildPackageInstructionTxItems,
   type PackageTxBuildV1,
 } from "./ext-package-tx-builders"
 import { projectScopeIdentity, readPackageLedgerStateV1, type UpsertInput } from "./ext-receipt-v2"
@@ -46,8 +50,9 @@ import { allPluginSourcesSucceeded, installedPackageIdentity, packageDeclaration
 type Dependencies = Pick<
   PlannerDeps,
   "globalRoot" | "casBaseRoot" | "environment" | "advisoryGate" | "resolvePackage"
-> & {
+> & Partial<Pick<PlannerDeps, "resolveEntry">> & {
   userDataPath: string
+  dataHome?: () => string
   sources: Pick<ReturnType<typeof createPluginSources>, "convertCandidate" | "catalogComparisons" | "searchedSources" | "release">
   catalogInstall(catalogId: string, request: InstallRequestV1): Promise<InstallOutcomeV1>
   activateMcp(packageId: string): Promise<unknown>
@@ -58,7 +63,13 @@ type Dependencies = Pick<
 /** Main owns one instance; the registered write channel supplies the shared recovery gate and ledger barrier. */
 export function createSourceInstaller(deps: Dependencies) {
   const requests = new Map<string, { input: string; result: Promise<InstallOutcomeV1> }>()
-  return async function installFromSource(request: InstallRequestV1): Promise<InstallOutcomeV1> {
+  const activations = new Map<string, ReturnType<typeof setImmediate>>()
+  const cancelActivation = (packageId: string) => {
+    const pending = activations.get(packageId)
+    if (pending) clearImmediate(pending)
+    activations.delete(packageId)
+  }
+  const installFromSource = async function installFromSource(request: InstallRequestV1): Promise<InstallOutcomeV1> {
     if (!request || !isHubRequestId(request.requestId) || (request.via !== "chat" && request.via !== "hub"))
       return { ok: false, code: "unknown-id", detail: "Invalid installation request" }
     const encoded = canonicalJson(request)
@@ -89,7 +100,7 @@ export function createSourceInstaller(deps: Dependencies) {
       if (!projectMatches())
         return { ok: false, code: "transaction-failed", detail: "Project identity changed during source capture" }
       const captured = { capture: converted.capture }
-      const wholePackage = captured.capture.source.kind === "marketplace" && (captured.capture.source.ecosystem === "claude" || captured.capture.source.ecosystem === "codex")
+      const wholePackage = ["folder", "git", "listing", "marketplace"].includes(captured.capture.source.kind) && converted.package.provider !== "opencode"
       const before = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
       if (!before.ok)
         return { ok: false, code: "transaction-failed", detail: "Package installation state is unreadable" }
@@ -151,12 +162,12 @@ export function createSourceInstaller(deps: Dependencies) {
       const mapped = converted.package.entries
         .toSorted((left, right) => (left.kind + left.sourcePath).localeCompare(right.kind + right.sourcePath))
         .flatMap((entry) => {
-          if (entry.kind !== "mcp" && entry.kind !== "skill") {
-            notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" })
+          if (entry.kind !== "mcp" && entry.kind !== "skill" && !(wholePackage && (entry.kind === "command" || entry.kind === "agent"))) {
+            if (!wholePackage || !pluginEntryRuntimeAvailable(entry)) notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "kind-not-supported-yet" })
             return []
           }
           if (
-            (!wholePackage || entry.kind === "mcp") && needsPluginFiles(
+            !wholePackage && (entry.kind === "skill" || entry.kind === "mcp") && needsPluginFiles(
               entry,
               converted.package.tree.map((node) => node.path),
             )
@@ -164,23 +175,24 @@ export function createSourceInstaller(deps: Dependencies) {
             notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "needs-plugin-files" })
             return []
           }
-          const hostName = pluginHostName(entry, packageId, names, name => entry.kind !== "skill" || !!sameSource || uncuratedSkillFreshGate(deps.globalRoot(), name).ok)
+          const hostName = sameSource?.declarations?.find(item => item.kind === entry.kind && item.sourceName === entry.sourceName)?.hostName ?? pluginHostName(entry, packageId, names, name => entry.kind !== "skill" || !!sameSource || uncuratedSkillFreshGate(deps.globalRoot(), name).ok)
           return [{ entry, hostName }]
         })
-      if (!mapped.length)
+      if (!mapped.length && !wholePackage)
         return { ok: false, code: "nothing-runnable", detail: "No runnable components in this source", notRunning }
       const builds: PackageTxBuildV1[] = []
       const skillReceipts: UpsertInput[] = []
       const rootName = "plugin-" + sha256Hex(packageId).slice(0, 24)
       const rootKey = "bundle--" + rootName
+      const pluginSettings = wholePackage ? preparePluginSettings({ root: deps.globalRoot(), storeKey: rootKey, packageId, server: rootName, description: converted.package, userDataPath: deps.userDataPath, dataHome: deps.dataHome, privateCredentials: converted.privateCredentials }) : undefined
       const installedNames = new Map(mapped.map(item => [item.entry.id, item.hostName]))
       const declarations: PackageDeclarationV1[] = []
       const nodes: PackageGraphNodeV1[] = []
       const version = converted.package.version ?? "content." + converted.package.treeDigest.slice(7, 23)
       for (const item of mapped) {
-        const componentId = wholePackage ? pluginComponentId(packageId, item.entry) : "user:" + item.hostName.toLowerCase()
+        const componentId = pluginComponentId(packageId, item.entry, item.hostName)
         const receipt: UpsertInput = {
-          id: "user:" + item.hostName.toLowerCase(),
+          id: pluginComponentId(packageId, item.entry, item.hostName),
           kind: item.entry.kind,
           name: item.hostName,
           scope: { kind: "global" },
@@ -205,6 +217,7 @@ export function createSourceInstaller(deps: Dependencies) {
           sourceName: item.entry.sourceName,
           secretNeeds: [],
         }
+        if (item.entry.kind === "command" || item.entry.kind === "agent") builds.push(buildPackageInstructionTxItems({ ...common, kind: item.entry.kind, description: pluginInstructionDefinition(item.entry.instruction).description }))
         if (item.entry.kind === "skill" && wholePackage) skillReceipts.push(receipt)
         if (item.entry.kind === "skill" && !wholePackage) {
           const prefix = item.entry.directory ? item.entry.directory + "/" : ""
@@ -247,7 +260,7 @@ export function createSourceInstaller(deps: Dependencies) {
           const leaf = pluginMcpConfig(entry)
           declaration.mcp = leaf
           declaration.secretNeeds = converted.package.secrets
-            .filter((need) => need.componentId === entry.id)
+            .filter((need) => need.componentId === entry.id && JSON.stringify(entry).includes('"secret":"' + need.id + '"'))
             .map((need) => ({ needId: need.id, label: need.label }))
           if (entry.transport !== "stdio" && entry.oauth !== false && !declaration.secretNeeds.length)
             declaration.login = { serverUrl: renderText(entry.url) }
@@ -259,6 +272,7 @@ export function createSourceInstaller(deps: Dependencies) {
           }
           const build = buildMcpTxItems({
             ...common,
+            source: wholePackage ? "plugin" : "connector",
             userDataPath: deps.userDataPath,
             newSecretVersionId: newMcpSecretVersionId,
             leaf,
@@ -287,6 +301,7 @@ export function createSourceInstaller(deps: Dependencies) {
       }) : undefined
       if (rootBuild && !rootBuild.ok) return { ok: false, code: "transaction-failed", detail: rootBuild.reason }
       if (rootBuild?.ok) builds.unshift(rootBuild.build)
+      if (pluginSettings && rootBuild?.ok) rootBuild.build.items.push(pluginSettings.item)
       const graph: PackageGraphV1 = {
         packageId,
         envelopeDigest: converted.package.treeDigest,
@@ -333,7 +348,7 @@ export function createSourceInstaller(deps: Dependencies) {
         claimMutations: planPackageClaimTransferV1(diff.diff),
         childRemovals: departing.map((node) => ({ kind: node.kind, name: node.name })),
       }
-      const prepared = builds.flatMap((build) => (build.prepared ? [build.prepared] : []))
+      const prepared = [...builds.flatMap((build) => (build.prepared ? [build.prepared] : [])), ...(pluginSettings?.prepared ? [pluginSettings.prepared] : [])]
       const result = await runExtensionTransaction(
         deps.globalRoot(),
         { items, ...(prepared.length ? { prepared: prepared.map((resource) => resource.descriptor) } : {}) },
@@ -341,6 +356,7 @@ export function createSourceInstaller(deps: Dependencies) {
           populate: (item, directory) => {
             const build = builds.find((build) => build.items.some((candidate) => candidate.key === item.key))
             build?.populate(item, directory)
+            pluginSettings?.populateData()
           },
           probe: builds[0]!.probe,
           precondition: () => {
@@ -377,8 +393,10 @@ export function createSourceInstaller(deps: Dependencies) {
           commitReceipt: (records) => commitTransactionLedger(deps.globalRoot(), records),
         },
       )
-      if (!result.ok)
+      if (!result.ok) {
+        pluginSettings?.discardData()
         return { ok: false, code: "transaction-failed", detail: "Package transaction failed at " + result.stage }
+      }
       for (const build of builds.filter((build) => build.receipt.kind === "mcp")) {
         const leaf = build.items[0]!.config!.edits[0]!.value as Record<string, unknown>
         if (leaf.type === "remote") {
@@ -389,9 +407,6 @@ export function createSourceInstaller(deps: Dependencies) {
         }
       }
       if (departing.length) await deps.removeDeparting(departing.filter(child => !sameSource?.pluginTree || child.kind !== "skill"))
-      const enabled = await setPackageStateV1({ packageId, state: "enabled" }, deps)
-      if (enabled.ok) await deps.activateMcp(packageId).catch(() => undefined)
-      if (mapped.some((item) => item.entry.kind === "skill")) deps.reloadSkills(packageId)
       return outcomeOf(graph)
     })().catch(
       (): InstallOutcomeV1 => ({
@@ -401,25 +416,40 @@ export function createSourceInstaller(deps: Dependencies) {
       }),
     )
     requests.set(request.requestId, { input: encoded, result: pending })
+    void pending.then(result => {
+      if (!result.ok) return
+      // Publish the enabled image only after the entire promise/IPC return chain has completed.
+      cancelActivation(result.packageId)
+      activations.set(result.packageId, setImmediate(() => {
+        activations.delete(result.packageId)
+        void (async () => {
+          const state = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
+          const graph = state.ok && state.packageGraphs.find(graph => graph.packageId === result.packageId)
+          if (!state.ok || !graph) return
+          const nodes = [graph.root, ...graph.children]
+          const enabled = result.alreadyInstalled
+            ? { ok: true as const }
+            : await setPackageStateV1({ packageId: result.packageId, state: "enabled" }, deps)
+          if (!enabled.ok) console.warn("[plugin-install] Package activation failed", { packageId: result.packageId })
+          await deps.activateMcp(result.packageId)
+          // AC-14 keeps each path's existing reload rule: catalog content reloads for any non-MCP node (its cloud startup
+          // refresh, d28545a02e); a source tree only when it carries skills, so an MCP-only package activates without a reload.
+          const reload = result.source.kind === "catalog" ? nodes.some(node => node.kind !== "mcp") : nodes.some(node => node.kind === "skill")
+          if (reload) deps.reloadSkills(result.packageId)
+        })().catch(() => console.warn("[plugin-install] Package runtime could not be applied", { packageId: result.packageId }))
+      }))
+    })
     const source = request.source
     if (source.kind === "candidate") void pending.then(() => deps.sources.release(source.candidateId))
     return pending
   }
+  return Object.assign(installFromSource, { cancelActivation })
 }
 
 function renderText(text: Text): string {
-  return text
-    .map((part) =>
-      typeof part === "string"
-        ? part
-        : "secret" in part
-          ? "{secret:" + part.secret + "}"
-          : part.binding === "projectDir"
-            ? "."
-            : "",
-    )
-    .join("")
+  return renderPluginText(text, { pluginRoot: "${CLAUDE_PLUGIN_ROOT}", projectDir: "." })
 }
+
 function sourceOf(capture: Capture, publisher?: import("./plugin-sources").CandidateV1["publisher"]): PackageSourceV1 {
   const source = capture.source
   if (source.kind === "created") return { kind: "created" }
@@ -497,10 +527,7 @@ export async function installCatalogFromSource(
   if (!state.ok) return { ok: false, code: "transaction-failed", detail: "Installed catalog entry could not be read" }
   const graph = state.packageGraphs.find((graph) => graph.packageId === catalogId)
   if (!graph) return { ok: false, code: "nothing-runnable", detail: "No catalog content could be installed", notRunning: [] }
-  if (legacy) await setPackageStateV1({ packageId: catalogId, state: "enabled" }, planner)
   if (before) await deps.removeDeparting([before.root, ...before.children].filter((node) => !state.records.some((record) => record.kind === node.kind && record.name === node.name)))
-  await deps.activateMcp(catalogId)
   const nodes = [graph.root, ...graph.children]
-  if (nodes.some((node) => node.kind !== "mcp" && node.kind !== "cloud")) deps.reloadSkills(catalogId)
   return { ok: true, packageId: catalogId, displayName: graph.displayName ?? legacy?.entry.displayName ?? catalogId, source: { kind: "catalog" }, installed: nodes.flatMap((node) => node.kind === "skill" || node.kind === "mcp" ? [{ kind: node.kind, hostName: node.name, sourceName: node.name }] : []), notRunning: graph.notRunning ?? [] }
 }

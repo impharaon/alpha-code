@@ -1,3 +1,4 @@
+import { parsePackageSessionMessage, type PackageSessionMessage } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 import { parseVideoBridgeReply, type VideoBridgeRequest, type VideoBridgeReply } from "../../ui-mac/src/shared/video-understanding"
 import { createNetworkEgress } from "./network-egress"
 import { parseNetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
@@ -43,6 +44,7 @@ import {
   buildHubRequestQuery,
   buildHubViewRequest,
   buildReloadReport,
+  buildPackageLocationReady,
   isCodePuppySidecarMessage,
   parseHubRequestReply,
   parseHubViewReply,
@@ -77,6 +79,7 @@ export type HubBridge = {
   video(input: VideoAction): Promise<VideoBridgeReply | BridgeFailure>
   readonly network: ReturnType<typeof createNetworkEgress>
   readonly unattended: ReturnType<typeof createUnattendedState>
+  onPackageSession(handler: (message: PackageSessionMessage) => Promise<boolean>): () => void
   readWriteScope(request: Pick<WriteScopeRequest, "access" | "targets">): Promise<WriteScopeReply["result"]>
   readonly available: boolean
   view(input: { directory: string; sessionID?: string; agent?: string; query?: string }): Promise<{ ok: true; view: HubView } | BridgeFailure>
@@ -86,6 +89,7 @@ export type HubBridge = {
   packageAuthorization(packageId: string): Promise<PackageAuthorizationResultV1 | BridgeFailure>
   /** 本进程里 main 搜索答过的候选(目录条目与 main 铸的编号)的名称与来源;没答过 ⇒ undefined。 */
   installSubject(id: string): HubInstallSubject | undefined
+  locationReady(directory: string): void
   report(input: { generation: number; scope: ReloadScope; outcome: ReloadOutcome; directories: string[]; error?: string }): void
   /** main → ext 的重载请求交给谁。只能挂一个(调度器);挂上之前到达的请求按序缓存,挂上时补交。 */
   onReloadRequest(handler: (message: ReloadRequestMessage) => void): void
@@ -113,6 +117,7 @@ export function createHubBridge(
   const log = options.log ?? ((line: string) => console.error(line))
   const pending = new Map<number, { settle: (message: unknown) => void; timer: ReturnType<typeof setTimeout> }>()
   const early: ReloadRequestMessage[] = []
+  const packageSessions = new Set<(message: PackageSessionMessage) => Promise<boolean>>()
   const documentHandlers = new Set<(message: DocumentRuntimeMessage) => boolean>()
   const earlyDocument: DocumentRuntimeMessage[] = []
   const readyHandlers = new Set<(check: DeferredDocumentCheck, sidecarGeneration: number) => boolean>()
@@ -136,6 +141,18 @@ export function createHubBridge(
     const message = event?.data
     if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
+    if (type === "codepuppy.plugin.session") {
+      const parsed = parsePackageSessionMessage(message)
+      if (!parsed) return log("runtime-failed: malformed package session message")
+      void (async () => {
+        for (const receive of packageSessions) if (await receive(parsed)) return
+        throw Error("runtime-failed: package session has no active Location")
+      })().then(() => port?.postMessage({ id: parsed.id, ok: true }), error => {
+        log("runtime-failed: package session delivery: " + String(error))
+        port?.postMessage({ id: parsed.id, ok: false, error: "runtime-failed: package session delivery failed" })
+      })
+      return
+    }
     if (type === "codepuppy.document.check-ready") {
       const ready = message as { check?: unknown; sidecarGeneration?: unknown }
       if (!isDeferredDocumentCheck(ready.check) || !Number.isSafeInteger(ready.sidecarGeneration) || Number(ready.sidecarGeneration) < 0) return log("[@codepuppy/ext] dropped malformed document ready notification")
@@ -261,6 +278,10 @@ export function createHubBridge(
     video: (input) => ask((id)=>({type:"codepuppy.video.understand",id,...input}),parseVideoBridgeReply),
     network,
     unattended,
+    onPackageSession: handler => {
+      packageSessions.add(handler)
+      return () => { packageSessions.delete(handler) }
+    },
     readWriteScope: async (request) => {
       const result = await ask((id) => buildWriteScopeRequest(id, request), (message) => parseWriteScopeReply(message)?.result)
       return "ok" in result ? { error: "unavailable" } : result
@@ -316,6 +337,10 @@ export function createHubBridge(
       ),
     packageAuthorization: (packageId) => ask((id) => buildPackageAuthorizationQuery(id, packageId), (message) => parsePackageAuthorizationReply(message)?.result),
     installSubject: (id) => subjects.get(id),
+    locationReady(directory) {
+      try { port?.postMessage(buildPackageLocationReady(directory)) }
+      catch { log("[@codepuppy/ext] hub bridge: Location readiness could not be posted") }
+    },
     report(input) {
       if (!port) return
       try {

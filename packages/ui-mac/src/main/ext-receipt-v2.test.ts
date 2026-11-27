@@ -780,18 +780,18 @@ describe("#336 skills projection final-publish lag — 判别式如实上报", (
     expect(derivationKeys()).not.toContain("skill--shrink")
   })
 
-  test("派生无变化(非 skill / MCP 写)不触发 publish:seam 失败不误报 projectionLag", () => {
-    // I-11 起 v3 也投影 global MCP 的开启状态,所以「派生不变的写」取 agent 记录。
-    const w = upsertRecordV2(root, upsertInput({ id: "agent:plain", name: "plain", kind: "agent", configKey: "agent.plain" }), failingPublish)
+  test("派生无变化(非调用组件写)不触发 publish:seam 失败不误报 projectionLag", () => {
+    // command/agent 现在也是投影成员；用不贡献该投影的 cloud 记录验无变化分支。
+    const w = upsertRecordV2(root, upsertInput({ id: "cloud:plain", name: "plain", kind: "cloud", configKey: undefined }), failingPublish)
     expect(w.ok).toBe(true)
     if (!w.ok) throw new Error("unreachable")
     // 首写时派生缺席→absent 也会做首建发布;先真建一次再验"无变化跳过"
-    const again = upsertRecordV2(root, upsertInput({ id: "agent:plain2", name: "plain2", kind: "agent", configKey: "agent.plain2" }))
+    const again = upsertRecordV2(root, upsertInput({ id: "cloud:plain2", name: "plain2", kind: "cloud", configKey: undefined }))
     expect(again.ok).toBe(true)
-    const third = upsertRecordV2(root, upsertInput({ id: "agent:plain3", name: "plain3", kind: "agent", configKey: "agent.plain3" }), failingPublish)
+    const third = upsertRecordV2(root, upsertInput({ id: "cloud:plain3", name: "plain3", kind: "cloud", configKey: undefined }), failingPublish)
     expect(third.ok).toBe(true)
     if (!third.ok) throw new Error("unreachable")
-    expect(third.projectionLag).toBeUndefined() // 投影无变化(全 agent)→ alreadyFinal 跳过 publish
+    expect(third.projectionLag).toBeUndefined() // 投影无变化(全 bundle)→ alreadyFinal 跳过 publish
   })
 })
 
@@ -856,6 +856,26 @@ describe("I-11 global MCP states in the v3 projection", () => {
 })
 
 describe("E2 package allow-set v3", () => {
+  test("command and agent projection follows the package root and project effect", () => {
+    const inputs = ["bundle", "command", "agent"].map(kind => upsertInput({ kind: kind as UpsertInput["kind"], id: kind + ":entry", name: kind + "-entry", configKey: undefined }))
+    const nodes = inputs.map(input => ({ componentId: input.id, kind: input.kind, name: input.name, required: true, manifestDigest: DIGEST_A }))
+    const graph: PackageGraphV1 = { packageId: "local:invocation", envelopeDigest: DIGEST_A, installedGraphDigest: "", root: nodes[0]!, children: nodes.slice(1), pluginTree: { treeDigest: DIGEST_A, storeKey: "bundle--bundle-entry" } }
+    graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+    expect(applyPackageMutation(root, { operation: "install", transactionId: "invocation-seed", graphBeforeDigest: null, graphAfter: graph, claimMutations: nodes.map(node => ({ op: "acquire", kind: node.kind, name: node.name, owner: bundleOwner(graph.packageId, graph.root.manifestDigest) })), childRecordMutations: inputs.map(input => ({ op: "upsert", input })) }).ok).toBe(true)
+    const projection = () => JSON.parse(fs.readFileSync(skillsEnabledPath(root), "utf8"))
+    expect(projection().keys).toEqual(["agent--agent-entry", "bundle--bundle-entry", "command--command-entry"])
+    expect(setDesiredStateV2(root, "bundle", "bundle-entry", "disabled").ok).toBe(true)
+    expect(projection().keys).toEqual([])
+    const directory = path.join(root, "project")
+    fs.mkdirSync(directory)
+    const scope = projectScopeIdentity(directory)
+    if (!scope.ok) throw new Error(scope.reason)
+    const scoped = { ...graph, effect: scope.scope }
+    scoped.installedGraphDigest = computeInstalledGraphDigest(scoped)
+    expect(applyPackageMutation(root, { operation: "update", transactionId: "invocation-scope", graphBeforeDigest: graph.installedGraphDigest, graphAfter: scoped, claimMutations: [], childRecordMutations: [] }).ok).toBe(true)
+    expect(setDesiredStateV2(root, "bundle", "bundle-entry", "enabled").ok).toBe(true)
+    expect(projection()).toEqual({ v: 3, keys: [], scoped: [{ kind: "agent", name: "agent-entry", projectPath: scope.scope.projectPath }, { kind: "bundle", name: "bundle-entry", projectPath: scope.scope.projectPath }, { kind: "command", name: "command-entry", projectPath: scope.scope.projectPath }], mcp: [] })
+  })
   // These are our own ledger/graph inputs, not fabricated provider definitions.
   const scopeFor = (name: string) => {
     const directory = path.join(root, name)
@@ -1046,4 +1066,25 @@ describe("#773 —— 坏账本:三条 V3 只读路径给出一致的、可观�
     expect(owners).toEqual({ ok: true, owners: [] })
     expect(readPackageLedgerStateV1(root).ok).toBe(true)
   })
+})
+
+test("a bundle-only package projects enabled disabled and project-enabled root membership", () => {
+  const input = upsertInput({ kind: "bundle", id: "bundle:hooks", name: "hooks", configKey: undefined })
+  const node = { componentId: input.id, kind: input.kind, name: input.name, required: true, manifestDigest: DIGEST_A }
+  const graph: PackageGraphV1 = { packageId: "local:hooks", envelopeDigest: DIGEST_A, installedGraphDigest: "", root: node, children: [], pluginTree: { treeDigest: DIGEST_A, storeKey: "bundle--hooks" } }
+  graph.installedGraphDigest = computeInstalledGraphDigest(graph)
+  expect(applyPackageMutation(root, { operation: "install", transactionId: "hooks-seed", graphBeforeDigest: null, graphAfter: graph, claimMutations: [{ op: "acquire", kind: "bundle", name: "hooks", owner: bundleOwner(graph.packageId, DIGEST_A) }], childRecordMutations: [{ op: "upsert", input }] }).ok).toBe(true)
+  const projection = () => JSON.parse(fs.readFileSync(skillsEnabledPath(root), "utf8"))
+  expect(projection()).toEqual({ v: 3, keys: ["bundle--hooks"], scoped: [], mcp: [] })
+  expect(setDesiredStateV2(root, "bundle", "hooks", "disabled").ok).toBe(true)
+  expect(projection()).toEqual({ v: 3, keys: [], scoped: [], mcp: [] })
+  const directory = path.join(root, "hooks-project")
+  fs.mkdirSync(directory)
+  const scope = projectScopeIdentity(directory)
+  if (!scope.ok) throw Error(scope.reason)
+  const scoped = { ...graph, effect: scope.scope }
+  scoped.installedGraphDigest = computeInstalledGraphDigest(scoped)
+  expect(applyPackageMutation(root, { operation: "update", transactionId: "hooks-project", graphBeforeDigest: graph.installedGraphDigest, graphAfter: scoped, claimMutations: [], childRecordMutations: [] }).ok).toBe(true)
+  expect(setDesiredStateV2(root, "bundle", "hooks", "enabled").ok).toBe(true)
+  expect(projection()).toEqual({ v: 3, keys: [], scoped: [{ kind: "bundle", name: "hooks", projectPath: scope.scope.projectPath }], mcp: [] })
 })

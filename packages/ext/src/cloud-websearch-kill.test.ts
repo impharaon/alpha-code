@@ -497,7 +497,7 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
    * 工具表里有被问的那个工具(策略按它认身份);裁决按宿主的链:execute.before 依注册顺序逐个跑。
    */
   const location = async (directory: string) => {
-    const befores: Array<(event: Record<string, unknown>) => unknown> = []
+    const befores: Array<(event: Record<string, unknown>, call: { signal: AbortSignal }) => unknown> = []
     const mcpTransforms: Array<(editor: unknown) => void> = []
     const noop = async () => ({ dispose: async () => {} })
     const domain = (name: string) =>
@@ -508,6 +508,8 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
           // #1699 的规则回退会读 agent.get 的真实返回形状;保留该宿主原先的空规则输入。
           if (name === "agent" && method === "get") return async () => ({ data: { permissions: [] } })
           if (name === "plugin" && method === "list") return async () => ({ data: [] })
+          // session.list 是分页接口(protocol groups/session.ts 的 SessionsResponse:`{ data, cursor }`)。
+          if (name === "session" && method === "list") return async () => ({ data: [], cursor: {} })
           if (name === "mcp" && method === "transform") return async (callback: never) => (mcpTransforms.push(callback), { dispose: async () => {} })
           if (name === "event" && method === "subscribe") return () => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) })
           return noop
@@ -525,7 +527,8 @@ describe("跨 Location 隔离:治理归属按 setup 闭包,不串扰(#223 R7 Blo
       },
       verdict: async (tool: string) => {
         try {
-          for (const before of befores) await before({ tool, input: {}, sessionID: "ses_xtalk", agent: "build", messageID: "msg_xtalk", id: "call_xtalk" })
+          // promise 适配器给每个钩子回调第二个参数 `{ signal }`(plugin/src/promise/adapter.ts 的 tool.hook)。
+          for (const before of befores) await before({ tool, input: {}, sessionID: "ses_xtalk", agent: "build", messageID: "msg_xtalk", id: "call_xtalk" }, { signal: new AbortController().signal })
           return null
         } catch (error) {
           // 治理云工具的拒绝理由只有那一句;第三方 / 有歧义的那一句点名「按名字认出的工具」

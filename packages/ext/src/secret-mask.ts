@@ -22,7 +22,7 @@ import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
 import { stripAnsi } from "../../session-ui/src/tools/ansi"
 import { toolCallKey } from "./policy/identity"
 import { DISPLAY_KEY } from "./policy/display"
-import { createSecretFiles, resolveProtectedFile } from "./secret-files"
+import { createSecretFiles, resolveProtectedFile, type CredentialStorePaths } from "./secret-files"
 
 type MaskCall = { sessionID: string; messageID: string; id: string }
 type CallState = {
@@ -37,8 +37,8 @@ type CallState = {
 }
 const WRAPPED = Symbol("secret-progress")
 
-export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
-  const files = createSecretFiles(roots)
+export function createSecretMask(roots: ProtectedFiles.ProtectedRoots, credentialStores: CredentialStorePaths = []) {
+  const files = createSecretFiles(roots, credentialStores)
   const calls = new Map<string, CallState>()
   // Design §10 SPEC5-03: Location release takes no new calls; the calls already running finish masking, then values clear.
   let closing = false
@@ -247,6 +247,16 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         input.disposition = "withhold"
         await release()
       } finally { if (staging) await unlink(staging).catch(() => {}) }
+    },
+    // Spec v6 BR-05: protected files a shell command names literally join collection before it spawns, so the capture
+    // start's refresh reads them and every chunk is masked; so does the list file a named link literally points to. The
+    // working directory resolves like the engine's `workdir`.
+    command: async (input: { command: string; cwd: string }) => {
+      const api = roots.platform === "win32" ? path.win32 : path.posix
+      const directory = api.resolve(roots.directory, /^~(?:[/\\]|$)/.test(input.cwd) ? api.join(roots.home, input.cwd.slice(1)) : input.cwd)
+      const named = { text: input.command, roots: { ...roots, directory } }
+      for (const file of ProtectedFiles.named(named)) files.track(file)
+      for (const candidate of ProtectedFiles.literalPaths(named)) await files.trackLink(candidate)
     },
     prepareMutation: async (input: EnvMutation): Promise<EnvMutation> => (await prepareMutation(input)).mutation,
     read: async (input: { call: MaskCall; file: ProtectedFiles.ProtectedFile; result: Tool.Result }): Promise<Tool.Result> => {

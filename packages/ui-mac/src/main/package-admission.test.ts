@@ -1,3 +1,4 @@
+import { pluginDataDirectory } from "../shared/installed-plugin-settings"
 import corpus from "../shared/host-extension-package-contract/testvectors/decoder-corpus.v1.json"
 import { captureWholeFixture } from "../../test-fixtures/plugin-helper/fixture"
 import { canonicalArtifactJsonBytesV1 } from "../shared/host-extension-package-contract/generate-artifact"
@@ -44,6 +45,7 @@ function desktopDeps() {
     root: () => root,
     globalRoot: () => root,
     userDataPath: userData,
+    dataHome: () => join(userData, "data"),
     casBaseRoot: () => userData,
     environment: () => "dev" as const,
     installability: { fetchPayload: sample.fetchBytes },
@@ -74,14 +76,17 @@ test("whole plugin profile installs its signed tree and registered skills throug
   if (!state.ok) throw Error(state.reason)
   expect(state.packageGraphs[0]?.children.map(node => node.kind)).toEqual(["skill"])
   expect(state.records.map(record => record.kind)).toEqual(["bundle", "skill"])
+  expect(existsSync(pluginDataDirectory(deps.dataHome(), sample.envelope.prelude.packageId))).toBe(true)
   const live = resolveLiveGenerationDir(root, state.packageGraphs[0]!.pluginTree!.storeKey)!
   expect(readFileSync(join(live, "tree/skills/using-superpowers/SKILL.md"), "utf8")).toContain("superpowers")
-  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).toContain("skill--using-superpowers")
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers-63fb5846cb")
+  expect(await setPackageStateV1({ packageId: sample.envelope.prelude.packageId, state: "enabled" }, deps)).toMatchObject({ ok: true })
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).toContain("skill--using-superpowers-63fb5846cb")
   expect(await setPackageStateV1({ packageId: sample.envelope.prelude.packageId, state: "disabled" }, deps)).toMatchObject({ ok: true })
-  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers")
+  expect(JSON.parse(readFileSync(skillsEnabledPath(root), "utf8")).keys).not.toContain("skill--using-superpowers-63fb5846cb")
 })
 
-test("whole plugin profile reports package-dependent MCP entries without installing a broken command", async () => {
+test("whole plugin profile retains package MCP paths for runtime binding", async () => {
   const { installDesktopPackageV1 } = await import("./package-admission")
   const { convertPluginTree } = await import("../shared/host-extension-package-contract/plugin-conversion.mjs")
   const { derivePayloadCapabilitiesV1 } = await import("../shared/host-extension-package-contract/decoder")
@@ -117,13 +122,26 @@ test("whole plugin profile reports package-dependent MCP entries without install
   const state = readPackageLedgerStateV1(root)
   if (!state.ok) throw Error(state.reason)
   const graph = state.packageGraphs[0]!
-  expect(graph.notRunning).toContainEqual({ kind: "mcp", sourceName: "database", reason: "needs-plugin-files" })
-  expect(state.records.some(record => record.kind === "mcp")).toBe(false)
+  expect(graph.notRunning?.some(entry => entry.kind === "mcp")).toBe(false)
+  expect(state.records.some(record => record.kind === "mcp")).toBe(true)
   expect(graph.children.filter(node => node.kind === "skill")).toHaveLength(7)
-  expect(graph.children.some(node => node.kind === "mcp")).toBe(false)
-  expect(existsSync(join(root, "codepuppy.jsonc")) ? parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp?.database : undefined).toBeUndefined()
+  expect(graph.children.filter(node => node.kind === "command")).toHaveLength(1)
+  expect(graph.children.filter(node => node.kind === "agent")).toHaveLength(3)
+  expect(state.records.filter(record => record.kind === "command")).toHaveLength(1)
+  expect(state.records.filter(record => record.kind === "agent")).toHaveLength(3)
+  expect(graph.children.some(node => node.kind === "mcp")).toBe(true)
+  const mcp = state.records.find(record => record.kind === "mcp")!
+  expect(parse(readFileSync(join(root, "codepuppy.jsonc"), "utf8")).mcp[mcp.name].command).toContain("${CLAUDE_PLUGIN_ROOT}/servers/db-server.js")
   const live = resolveLiveGenerationDir(root, graph.pluginTree!.storeKey)!
   expect(readFileSync(join(live, "tree/.mcp.json"), "utf8")).toContain("${CLAUDE_PLUGIN_ROOT}/servers/db-server.js")
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  const instructions = graph.children.filter(node => node.kind === "command" || node.kind === "agent")
+  expect(await setPackageStateV1({ packageId: envelope.prelude.packageId, state: "enabled" }, deps)).toMatchObject({ ok: true })
+  const enabled = JSON.parse(readFileSync(skillsEnabledPath(root), "utf8"))
+  expect(instructions.every(node => enabled.keys.includes(node.kind + "--" + node.name))).toBe(true)
+  expect(await setPackageStateV1({ packageId: envelope.prelude.packageId, state: "disabled" }, deps)).toMatchObject({ ok: true })
+  const disabled = JSON.parse(readFileSync(skillsEnabledPath(root), "utf8"))
+  expect(instructions.some(node => disabled.keys.includes(node.kind + "--" + node.name))).toBe(false)
 })
 
 test("project-only catalog admission commits effect with the graph and keeps persistent MCP disabled", async () => {
@@ -136,6 +154,8 @@ test("project-only catalog admission commits effect with the graph and keeps per
   const identity = projectScopeIdentity(project)
   if (!identity.ok) throw Error(identity.reason)
   expect(await installDesktopPackageV1("package:supabase", { ...deps, effect: identity.scope })).toMatchObject({ ok: true })
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  expect(await setPackageStateV1({ packageId: "package:supabase", state: "enabled" }, deps)).toMatchObject({ ok: true })
   const state = readPackageLedgerStateV1(root)
   expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
   expect(state.ok && state.records.every((record) => record.scope.kind === "global" && record.desiredState === "enabled")).toBe(true)
@@ -177,6 +197,10 @@ test("desktop plus commits content before automatic package enable without login
   })
   expect(result.ok).toBe(true)
   expect(commits).toEqual([["disabled", "disabled", "disabled"]])
+  const content = readPackageLedgerStateV1(root)
+  expect(content.ok && content.records.map(record => record.desiredState)).toEqual(["disabled", "disabled", "disabled"])
+  const { setPackageStateV1 } = await import("./ext-install-planner")
+  expect(await setPackageStateV1({ packageId: "package:supabase", state: "enabled" }, deps)).toMatchObject({ ok: true })
   const state = readPackageLedgerStateV1(root)
   expect(state.ok).toBe(true)
   if (!state.ok) return
@@ -289,6 +313,8 @@ test("package activation and switch work when main-owned remote definitions requ
   try {
     expect((await installDesktopPackageV1("package:supabase", deps)).ok).toBe(true)
     expect(readMcpServerRecords(() => {}).map((record) => record.name)).toContain("supabase")
+    const { setPackageStateV1 } = await import("./ext-install-planner")
+    expect(await setPackageStateV1({ packageId: "package:supabase", state: "enabled" }, deps)).toMatchObject({ ok: true })
     const installed = readPackageLedgerStateV1(root)
     expect(installed.ok && installed.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled", "enabled"])
     const config = readFileSync(join(root, "codepuppy.jsonc"), "utf8")

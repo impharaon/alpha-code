@@ -169,6 +169,7 @@ function world(
       directory === projectDir ? { ok: true, projectDir, root: join(projectDir, PROJECT_HIDDEN_DIR) } : { ok: false, reason: "not a project" },
     defaultDirectory: () => workspace,
     projectMcpState: extra.projectMcpState ?? (async () => "unverifiable"),
+    mcpDependencyError: () => undefined,
     awaitServer: async () => ({ url: "http://127.0.0.1:39117", username: "opencode", password: "pw" }),
     pendingFor: (directory, itemID) => coordinator.pendingFor(directory, itemID),
     fetch: engineFetch(engine, seen),
@@ -444,6 +445,7 @@ describe("hub-view 三档状态(§2.5)", () => {
       projectEntry: () => ({ ok: false, reason: "no" }),
       defaultDirectory: () => w.workspace,
       projectMcpState: async () => "unverifiable",
+      mcpDependencyError: () => undefined,
       awaitServer: async () => ({ url: "http://127.0.0.1:39117", username: "opencode", password: "pw" }),
       pendingFor: () => undefined,
       fetch: (async () => new Response("boom", { status: 500 })) as unknown as typeof fetch,
@@ -615,6 +617,129 @@ test("A3 main accepts before a slow install finishes and owns the submitted/comm
   await Bun.sleep(0)
   expect(requests.get("request_a3")).toMatchObject({ stage: "committed", packageId: "claude:playwright", outcome: { ok: true } })
   expect(changes).toHaveLength(2)
+})
+
+test("plugin SessionEnd requester awaits the real receiver reply and rejects a dead generation", async () => {
+  const { createPluginSessionRequester } = await import("./plugin-session-lifecycle")
+  const sent: unknown[] = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  let done = false
+  const leave = requester.request({ sessionId: "ses_leave", action: "leave", reason: "resume" }).then(() => { done = true })
+  await Promise.resolve()
+  expect(done).toBe(false)
+  expect(sent).toEqual([{ type: "codepuppy.plugin.session", id: expect.any(Number), sessionId: "ses_leave", action: "leave", reason: "resume" }])
+  const id = (sent[0] as { id: number }).id
+  expect(requester.receive({ type: "unrelated", id, ok: true })).toBe(false)
+  expect(requester.receive({ id, ok: true })).toBe(true)
+  await leave
+  expect(done).toBe(true)
+  const pending = requester.request({ sessionId: "ses_other", action: "leave", reason: "other" })
+  requester.close()
+  await expect(pending).rejects.toThrow("runtime-failed")
+})
+
+test("main settles every actually viewed Session before stopping without inventing a Session", async () => {
+  const { createPluginSessionRequester, notePluginSessionViewed, endViewedPluginSessions } = await import("./plugin-session-lifecycle")
+  const sent: Array<{ id: number; sessionId: string }> = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  notePluginSessionViewed(1776, "ses_left")
+  notePluginSessionViewed(1777, "ses_right")
+  notePluginSessionViewed(1778, "ses_left")
+  const end = endViewedPluginSessions("logout")
+  expect(sent.map(message => message.sessionId).toSorted()).toEqual(["ses_left", "ses_right"])
+  for (const message of sent) requester.receive({ id: message.id, ok: true })
+  await end
+  notePluginSessionViewed(1776, undefined)
+  notePluginSessionViewed(1777, undefined)
+  notePluginSessionViewed(1778, undefined)
+  requester.close()
+})
+
+test("unified plugin notifications retain the original occurrence identity across duplicate producers", async () => {
+  const { createPluginSessionRequester } = await import("./plugin-session-lifecycle")
+  const sent: Array<{ id: number }> = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  const action = { sessionId: "ses_notification", action: "notification" as const, notification: { message: "Native permission", notificationType: "permission_prompt", occurrenceId: "evt_original_notification" } }
+  const first = requester.request(action)
+  const duplicate = requester.request(action)
+  expect(sent).toHaveLength(1)
+  requester.receive({ id: sent[0]!.id, ok: true })
+  await Promise.all([first, duplicate])
+  requester.close()
+})
+
+test("plugin quit does not intercept when no viewed Sessions need settlement", async () => {
+  const { createPluginSessionRequester, createPluginSessionQuitHandler, notePluginSessionViewed } = await import("./plugin-session-lifecycle")
+  const requester = createPluginSessionRequester(() => {})
+  let prevented = 0
+  let stopped = 0
+  let quit = 0
+  const beforeQuit = createPluginSessionQuitHandler(async () => { stopped++ }, () => { quit++ })
+  try {
+    beforeQuit({ preventDefault: () => { prevented++ } })
+    expect(prevented).toBe(0)
+    expect(stopped).toBe(0)
+    expect(quit).toBe(0)
+    requester.close()
+    notePluginSessionViewed(2128, "ses_no_live_generation")
+    beforeQuit({ preventDefault: () => { prevented++ } })
+    expect(prevented).toBe(0)
+    expect(stopped).toBe(0)
+  } finally { requester.close(); notePluginSessionViewed(2128, undefined) }
+})
+
+test("plugin quit waits for actual viewed Session receipts and then quits once", async () => {
+  const { createPluginSessionRequester, createPluginSessionQuitHandler, notePluginSessionViewed, endViewedPluginSessions } = await import("./plugin-session-lifecycle")
+  const sent: Array<{ id: number }> = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  let prevented = 0
+  let quit = 0
+  const beforeQuit = createPluginSessionQuitHandler(async () => { await endViewedPluginSessions("other") }, () => { quit++ })
+  notePluginSessionViewed(2128, "ses_real_quit")
+  try {
+    beforeQuit({ preventDefault: () => { prevented++ } })
+    expect(prevented).toBe(1)
+    expect(sent).toHaveLength(1)
+    expect(quit).toBe(0)
+    requester.receive({ id: sent[0]!.id, ok: true })
+    await Bun.sleep(0)
+    expect(quit).toBe(1)
+    beforeQuit({ preventDefault: () => { prevented++ } })
+    expect(prevented).toBe(1)
+    expect(quit).toBe(1)
+  } finally { requester.close(); notePluginSessionViewed(2128, undefined) }
+})
+
+test("plugin notification dedup ends with its Session receipt and engine generation", async () => {
+  const { createPluginSessionRequester } = await import("./plugin-session-lifecycle")
+  const sent: Array<{ id: number }> = []
+  const requester = createPluginSessionRequester(message => { sent.push(message) })
+  const notification = (sessionId: string) => ({ sessionId, action: "notification" as const, notification: { message: "Native occurrence", notificationType: "idle_prompt", occurrenceId: "evt_same_occurrence" } })
+  const settle = async (result: Promise<void>) => { requester.receive({ id: sent.at(-1)!.id, ok: true }); await result }
+  try {
+    await settle(requester.request(notification("ses_first")))
+    await settle(requester.request(notification("ses_second")))
+    await requester.request(notification("ses_first"))
+    expect(sent).toHaveLength(2)
+    const leaving = requester.request({ sessionId: "ses_first", action: "leave", reason: "clear" })
+    await requester.request(notification("ses_first"))
+    expect(sent).toHaveLength(3)
+    await settle(leaving)
+    const resumed = requester.request(notification("ses_first"))
+    expect(sent).toHaveLength(4)
+    await settle(resumed)
+    await requester.request(notification("ses_second"))
+    expect(sent).toHaveLength(4)
+    requester.close()
+    const nextSent: Array<{ id: number }> = []
+    const next = createPluginSessionRequester(message => { nextSent.push(message) })
+    try {
+      const result = next.request(notification("ses_first"))
+      expect(nextSent).toHaveLength(1)
+      next.receive({ id: nextSent[0]!.id, ok: true })
+      await result
+    } finally { next.close() }
+  } finally { requester.close() }
 })
 
 

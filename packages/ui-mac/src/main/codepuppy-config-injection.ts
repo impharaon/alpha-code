@@ -37,7 +37,8 @@ import {
 } from "./cloud-web-search"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { injectDisabledOverrides } from "./ext-disabled-injection"
-import { injectMcpDefaultDeny } from "./mcp-default-deny"
+import { injectMcpDefaultDeny, NEUTRALIZED_MCP_SERVER } from "./mcp-default-deny"
+import { readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import { readMcpServerRecords } from "./mcp-server-records"
 import { remoteMcpLeaf } from "./mcp-server-truth"
 import { projectServerConfig } from "../../../ext/src/engine-transforms"
@@ -609,6 +610,12 @@ export function injectCodePuppyConfig(
       console.error(
         "[req104-397] registry channel missing from start command — skipping disabled-override injection (boot reconcile holds the fail-closed gate)",
       )
+
+    // Plugin definitions on disk are templates. Only main's post-ready convergence may bind and connect them.
+    const packages = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
+    if (packages.ok) for (const graph of packages.packageGraphs.filter(graph => graph.pluginTree))
+      for (const node of [graph.root, ...graph.children].filter(node => node.kind === "mcp"))
+        config.mcp = { ...config.mcp, servers: { ...config.mcp?.servers, [node.name]: { ...NEUTRALIZED_MCP_SERVER } } }
 
     // #535 / REQ-109 T6(基线 §② G1、§③):账本禁用覆盖落定后,枚举真实用户全局
     // XDG config 的三个文件。非治理 MCP 以末序 enabled:false 压住;治理 MCP 不复制、不改写。

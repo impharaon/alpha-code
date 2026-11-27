@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative, sep } from "node:path"
-import { captureFixture, digest, fixtureRoot } from "../../../test-fixtures/plugin-helper/fixture"
+import { captureStandardFixture, captureFixture, digest, fixtureRoot } from "../../../test-fixtures/plugin-helper/fixture"
 import provenance from "../../../test-fixtures/plugin-helper/provenance.json"
 import codex from "../../../test-fixtures/plugin-helper/codex/provenance.json"
 import registry from "../../../test-fixtures/plugin-helper/registry/provenance.json"
@@ -13,6 +13,55 @@ import type { Json, Source } from "./plugin-conversion"
 const converter = () => import("./plugin-conversion")
 const registryServer = async (file: string) => (await Bun.file(join(fixtureRoot, "registry", file)).json()).server as { [key: string]: Json }
 const registrySource: Source = { kind: "mcp-registry", locator: "https://registry.modelcontextprotocol.io", serverName: "io.github.github/github-mcp-server", version: "2.1.0" }
+
+test("source tool rules retain quoted nested patterns and recover the next rule", async () => {
+  const original = await captureStandardFixture("claude:plugin-dev")
+  const source = new TextDecoder().decode(await original.readFile("commands/create-plugin.md"))
+  // Pinned plugin-dev declaration, with a controlled rule-list variant exercising its source grammar.
+  const variant = source.replace(/allowed-tools:[\s\S]*?\n---/, 'allowed-tools: \'Bash(clay *), Bash(echo "a,b" $(date)), Write, Broken(, AskUserQuestion\'\n---')
+  const result = (await (await converter()).convertPluginTree(await captureStandardFixture("claude:plugin-dev", { "commands/create-plugin.md": variant }))).package
+  const command = result.entries.find(entry => entry.kind === "command")!
+  expect(command).toMatchObject({ invocation: { allowedTools: [
+    { tool: "Bash", pattern: "clay *" }, { tool: "Bash", pattern: 'echo "a,b" $(date)' }, { tool: "Write" }, { tool: "AskUserQuestion" },
+  ] } })
+  expect(result.diagnostics).toContainEqual(expect.objectContaining({ path: "commands/create-plugin.md", field: "allowed-tools", code: "invalid-definition" }))
+})
+
+test("skill sidecars preserve manual policy and resolve declared MCP dependencies", async () => {
+  const convert = (await converter()).convertPluginTree
+  const temporal = await captureStandardFixture("codex:temporal")
+  const source = new TextDecoder().decode(await temporal.readFile("skills/temporal-cloud-setup/SKILL.md"))
+  // Remove the redundant frontmatter false so the real YAML must supply the manual policy.
+  const manual = (await convert(await captureStandardFixture("codex:temporal", { "skills/temporal-cloud-setup/SKILL.md": source.replace(/^allow_implicit_invocation: false\r?\n/m, "") }))).package
+  expect(manual.entries.find(entry => entry.sourceName === "temporal-cloud-setup")).toMatchObject({ invocation: { implicitInvocation: false, userInvocable: true, argumentSyntax: "literal", arguments: [], paths: [], preloadSkills: [] }, display: { displayName: "Temporal Cloud Setup", shortDescription: "Set up Temporal Cloud and run a sample Workflow" } })
+  const apps = (await convert(await captureStandardFixture("codex:openai-developers"))).package
+  expect(apps.entries.find(entry => entry.sourceName === "build-chatgpt-app")).toMatchObject({ dependencies: [{ type: "mcp", value: "openaiDeveloperDocs", transport: "http", url: ["https://developers.openai.com/mcp"] }], display: { displayName: "Build ChatGPT App", defaultPrompt: expect.stringContaining("$build-chatgpt-app") } })
+  expect(apps.entries.filter(entry => entry.kind === "agent")).toHaveLength(0)
+  expect(apps.entries).toContainEqual(expect.objectContaining({ kind: "mcp", sourceName: "openaiDeveloperDocs", transport: "http" }))
+})
+
+test("invocation fields preserve source controls and provider argument syntax", async () => {
+  const original = await captureStandardFixture("claude:feature-dev")
+  const source = new TextDecoder().decode(await original.readFile("agents/code-reviewer.md"))
+  const variant = source.replace("---\n", '---\narguments: [target, mode]\neffort: high\npaths: ["src/**"]\nskills: [review]\nmemory: project\nmaxTurns: 7\nbackground: false\n')
+  const converted = (await (await converter()).convertPluginTree(await captureStandardFixture("claude:feature-dev", { "agents/code-reviewer.md": variant }))).package
+  expect(converted.entries.find(entry => entry.id === "agent:agents/code-reviewer.md")).toMatchObject({ invocation: { arguments: ["target", "mode"], argumentSyntax: "literal", effort: "high", paths: ["src/**"], preloadSkills: ["review"], memory: "project", maxTurns: 7, background: false, model: { alias: "sonnet" }, availableTools: expect.arrayContaining([{ tool: "Read" }]) } })
+  const vercel = (await (await converter()).convertPluginTree(await captureStandardFixture("codex:vercel"))).package
+  expect(vercel.entries.filter(entry => entry.kind === "command")).toHaveLength(6)
+  expect(vercel.entries.find(entry => entry.kind === "command")).toMatchObject({ invocation: { argumentSyntax: "codex" } })
+})
+
+test("YAML false independently disables automatic skill invocation", async () => {
+  const original = await captureStandardFixture("codex:temporal")
+  const source = new TextDecoder().decode(await original.readFile("skills/temporal-cloud-setup/SKILL.md"))
+  // The pinned source actually uses the Claude spelling; remove that redundant declaration.
+  expect(source).toContain("disable-model-invocation: true")
+  const converted = await (await converter()).convertPluginTree(await captureStandardFixture("codex:temporal", {
+    "skills/temporal-cloud-setup/SKILL.md": source.replace(/^disable-model-invocation: true\r?\n/m, ""),
+  }))
+  const entry = converted.package.entries.find(entry => entry.sourceName === "temporal-cloud-setup")
+  expect(entry && "invocation" in entry ? entry.invocation.implicitInvocation : undefined).toBe(false)
+})
 
 test("real third-party sample trees are archive-only and unpacked into temporary storage", async () => {
   const storedRoot = join(import.meta.dir, "../../../test-fixtures/plugin-helper")
@@ -250,7 +299,7 @@ test("real GitHub credential placeholder becomes a need and every public byte is
   const converted = await (await converter()).convertPluginTree(captured)
   expect(converted.package.secrets).toMatchObject([{ componentId: converted.package.entries[0]!.id, label: "GITHUB_PERSONAL_ACCESS_TOKEN", targets: [{ file: ".mcp.json", pointer: "/github/headers/Authorization" }] }])
   const need = converted.package.secrets[0]!
-  expect(converted.package.entries).toMatchObject([{ headers: { Authorization: ["Bearer ", { secret: need.id }] } }])
+  expect(converted.package.entries).toMatchObject([{ headers: { Authorization: ["Bearer ", { environment: { name: "GITHUB_PERSONAL_ACCESS_TOKEN", default: [{ secret: need.id }] } }] } }])
   expect(converted.privateCredentials.size).toBe(0)
   expect(new TextDecoder().decode(converted.replacements.get(".mcp.json"))).toContain(`{secret:${need.id}}`)
   // Controlled value substitution uses a non-credential marker. The source itself is unchanged.
@@ -356,4 +405,119 @@ test("standalone converter check detects drift in both committed runtime and dec
       await writeFile(join(root, file), original)
     }
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test("chosen provider and portable MCP retain the real standard definitions", async () => {
+  const convert = (await converter()).convertPluginTree
+  const supabase = await convert(await captureStandardFixture("claude:supabase"))
+  expect(supabase.package.provider).toBe("claude-code")
+  expect(supabase.package.entries.filter(entry => entry.kind === "mcp")).toContainEqual(expect.objectContaining({ sourceName: "supabase", sourcePath: "agents/claude/.mcp.json" }))
+  for (const [name, count] of [["claude:cloudinary", 5], ["claude:catalyst-by-zoho", 1]] as const) {
+    const result = await convert(await captureStandardFixture(name))
+    expect(result.package.entries.filter(entry => entry.kind === "mcp" && entry.transport === "http")).toHaveLength(count)
+  }
+})
+
+test("typed options and environment defaults preserve real source meaning", async () => {
+  const convert = (await converter()).convertPluginTree
+  const grafana = await convert(await captureStandardFixture("claude:grafana-mcp"))
+  expect(grafana.package).toMatchObject({ options: { grafana_url: { type: "string", required: true, sensitive: false }, grafana_service_account_token: { type: "string", required: true, sensitive: true } } })
+  expect(grafana.privateCredentials.size).toBe(0)
+  expect(grafana.package.entries.find(entry => entry.kind === "mcp")).toMatchObject({ environment: { GRAFANA_URL: [{ option: "grafana_url" }], GRAFANA_SERVICE_ACCOUNT_TOKEN: [{ option: "grafana_service_account_token" }] } })
+  const langfuse = await convert(await captureStandardFixture("claude:langfuse-observability"))
+  expect(langfuse.package).toMatchObject({ options: { CC_LANGFUSE_DEBUG: { default: false }, CC_LANGFUSE_MAX_CHARS: { default: 20000 }, LANGFUSE_BASE_URL: { default: "https://cloud.langfuse.com" } } })
+  const logfire = await convert(await captureStandardFixture("claude:logfire"))
+  expect(logfire.package.entries.find(entry => entry.kind === "mcp")).toMatchObject({ url: [{ environment: { name: "LOGFIRE_MCP_URL", default: ["https://logfire-us.pydantic.dev/mcp"] } }] })
+  expect(logfire.package.secrets).toEqual([])
+})
+
+test("ambiguous exported option names preserve each source key and report the environment name", async () => {
+  const convert = (await converter()).convertPluginTree
+  const original = await captureStandardFixture("claude:langfuse-observability")
+  const manifest = JSON.parse(new TextDecoder().decode(await original.readFile(".claude-plugin/plugin.json")))
+  manifest.userConfig.cc_langfuse_debug = manifest.userConfig.CC_LANGFUSE_DEBUG
+  const converted = await convert(await captureStandardFixture("claude:langfuse-observability", { ".claude-plugin/plugin.json": JSON.stringify(manifest) }))
+  expect(converted.package.options?.CC_LANGFUSE_DEBUG?.default).toBe(false)
+  expect(converted.package.options?.cc_langfuse_debug?.default).toBe(false)
+  expect(converted.package.diagnostics).toContainEqual(expect.objectContaining({ field: "/userConfig", message: "Plugin option environment name is ambiguous: CLAUDE_PLUGIN_OPTION_CC_LANGFUSE_DEBUG" }))
+})
+
+test("standard hook sources retain command prompt scopes events and monitor triggers", async () => {
+  const convert = (await converter()).convertPluginTree
+  const learning = (await convert(await captureStandardFixture("claude:learning-output-style"))).package
+  expect(learning.entries.filter(entry => entry.kind === "hook")).toMatchObject([{ hook: { type: "command", event: "SessionStart", scope: { kind: "package" } } }])
+  const langfuse = (await convert(await captureStandardFixture("claude:langfuse-observability"))).package
+  expect(langfuse.entries.filter(entry => entry.kind === "hook").length).toBeGreaterThan(0)
+  const dash = (await convert(await captureStandardFixture("claude:dash0"))).package
+  expect(dash.entries.filter(entry => entry.kind === "hook")).toHaveLength(24)
+  expect(dash.diagnostics.filter(item => item.code === "unavailable-trigger").map(item => item.sourceName).sort()).toEqual(["CwdChanged", "PermissionDenied", "TaskCompleted", "TaskCreated", "TeammateIdle"])
+  const stripe = (await convert(await captureStandardFixture("claude:stripe"))).package
+  expect(stripe.entries.find(entry => entry.kind === "hook" && entry.hook.event === "PostToolBatch")).toMatchObject({ hook: { type: "command", command: ["node"], args: [expect.any(Array)] } })
+  const paypal = (await convert(await captureStandardFixture("claude:paypal"))).package
+  expect(paypal.entries.find(entry => entry.kind === "hook")).toMatchObject({ hook: { type: "prompt", event: "PreToolUse", matcher: "Write|Edit", continueOnBlock: false } })
+  const security = (await convert(await captureStandardFixture("claude:claude-security"))).package
+  expect(security.entries.find(entry => entry.kind === "hook" && entry.hook.scope.kind === "skill")).toMatchObject({ sourcePath: "skills/threat-model/SKILL.md", hook: { type: "command", scope: { kind: "skill", entryId: "skill:skills/threat-model/SKILL.md" } } })
+  expect(new Set(security.entries.filter(entry => entry.kind === "hook").map(entry => entry.hook.order)).size).toBe(security.entries.filter(entry => entry.kind === "hook").length)
+  const convex = (await convert(await captureStandardFixture("claude:convex"))).package
+  expect(convex.entries.filter(entry => entry.kind === "monitor")).toHaveLength(5)
+  expect(convex.entries.filter(entry => entry.kind === "monitor" && entry.when.kind === "skill" && entry.when.sourceName === "design")).toHaveLength(2)
+  expect(convex.entries.filter(entry => entry.kind === "monitor" && entry.when.kind === "skill" && entry.when.sourceName === "quickstart")).toHaveLength(3)
+})
+
+test("monitor declarations merge portable and provider manifests by source name", async () => {
+  const source = await captureStandardFixture("claude:convex")
+  const manifest = JSON.parse(new TextDecoder().decode(await source.readFile(".claude-plugin/plugin.json")))
+  const monitors = JSON.parse(new TextDecoder().decode(await source.readFile("monitors/monitors.json")))
+  const { pluginText } = await import("./plugin-package")
+  // Controlled variants of the pinned Convex declarations: one conflicting name and one additional entry.
+  const portable = { ...manifest, experimental: { monitors: [{ ...monitors[0], command: "printf portable" }, { ...monitors[0], name: "portable-monitor" }] } }
+  const capture = await captureStandardFixture("claude:convex", { "plugin.json": JSON.stringify(portable) })
+  for (const ecosystem of ["claude", "codex"] as const) {
+    const converted = (await (await converter()).convertPluginTree({ ...capture, source: { ...capture.source, ecosystem } })).package
+    const entries = converted.entries.filter(entry => entry.kind === "monitor")
+    expect(entries).toHaveLength(6)
+    expect(entries.find(entry => entry.sourceName === "convex-runtime-errors")).toMatchObject({ command: ecosystem === "claude" ? pluginText(monitors[0].command) : ["printf portable"] })
+    expect(entries.find(entry => entry.sourceName === "portable-monitor")).toMatchObject({ sourcePath: "plugin.json" })
+  }
+})
+
+
+test("real skill bodies retain shell environment expressions byte for byte except package bindings", async () => {
+  const { renderPluginText } = await import("./plugin-package")
+  const capture = await captureStandardFixture("codex:build-ios-apps")
+  const converted = await (await converter()).convertPluginTree(capture)
+  for (const path of ["skills/ios-ettrace-performance/SKILL.md", "skills/ios-memgraph-leaks/SKILL.md"]) {
+    const source = new TextDecoder().decode(await capture.readFile(path))
+    const entry = converted.package.entries.find(entry => entry.kind === "skill" && entry.sourcePath === path)!
+    if (entry.kind !== "skill") throw Error("real skill missing")
+    const bindings = { pluginRoot: "/package root", skillDir: "/skill dir", projectDir: "/project dir", pluginData: "/package data", resolveEnvironment: () => "MUST_REMAIN_SOURCE" }
+    const expected = source.replaceAll("${CLAUDE_PLUGIN_ROOT}", bindings.pluginRoot).replaceAll("${PLUGIN_ROOT}", bindings.pluginRoot).replaceAll("${CLAUDE_SKILL_DIR}", bindings.skillDir).replaceAll("${CLAUDE_PROJECT_DIR}", bindings.projectDir).replaceAll("${CLAUDE_PLUGIN_DATA}", bindings.pluginData).replaceAll("${PLUGIN_DATA}", bindings.pluginData)
+    expect(renderPluginText(entry.instruction, bindings)).toBe(expected)
+  }
+})
+
+test("sensitive structured credentials preserve each path binding and hide nested default literals", async () => {
+  const original = await captureFixture("external_plugins/github")
+  const source = new TextDecoder().decode(await original.readFile(".mcp.json"))
+  // Controlled credential-field variants of the recorded GitHub declaration; no real credential.
+  for (const value of ["${CLAUDE_PLUGIN_DATA}/token.json", "${CLAUDE_PLUGIN_ROOT}/token.json", "${OUTER_TOKEN:-${INNER_TOKEN:-fixture-nested-private-default}}"] ) {
+    const capture = await captureFixture("external_plugins/github", { ".mcp.json": source.replace("Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}", value) })
+    const converted = await (await converter()).convertPluginTree(capture)
+    const replacement = converted.replacements.get(".mcp.json")
+    const text = new TextDecoder().decode(replacement ?? await capture.readFile(".mcp.json"))
+    if (value.endsWith("/token.json")) expect(JSON.parse(text).github.headers.Authorization).toBe(value)
+    else {
+      expect(JSON.stringify(converted.package)).not.toContain("fixture-nested-private-default")
+      expect(text).not.toContain("fixture-nested-private-default")
+      expect([...converted.privateCredentials.values()].map(bytes => new TextDecoder().decode(bytes))).toContain("fixture-nested-private-default")
+      const { renderPluginText } = await import("./plugin-package")
+      const entry = converted.package.entries.find(entry => entry.kind === "mcp")!
+      if (entry.kind !== "mcp" || entry.transport === "stdio") throw Error("GitHub fixture must be remote")
+      const render = (environment: Record<string, string>) => renderPluginText(entry.headers.Authorization!, { pluginRoot: "/plugin", projectDir: "/project", resolveEnvironment: name => environment[name], resolveSecret: id => { const bytes = converted.privateCredentials.get(id); return bytes && new TextDecoder().decode(bytes) } })
+      expect(render({ OUTER_TOKEN: "outer" })).toBe("outer")
+      expect(render({ INNER_TOKEN: "inner" })).toBe("inner")
+      expect(render({})).toBe("fixture-nested-private-default")
+    }
+  }
 })

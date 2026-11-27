@@ -31,6 +31,17 @@ import { displaySnapshot } from "./display"
 
 /** Source name a ruleset-axis deny folds into the cap under (shown in Settings reasons). */
 export const RULESET_HARD_DENY_SOURCE = "permission-ruleset"
+export const PACKAGE_INVOCATION_ALLOW = "package-invocation-allow"
+export const PACKAGE_HOOK_DECISION = "package-hook-decision"
+
+export function packageCallAllows(canonical: string, ruleset: readonly PermissionRule[]) {
+  const hook = ruleset.findLast(rule => rule.action === PACKAGE_HOOK_DECISION && match(canonical, rule.resource))
+  return hook ? hook.effect === "allow" : evaluate(PACKAGE_INVOCATION_ALLOW, canonical, ruleset.filter(rule => rule.action === PACKAGE_INVOCATION_ALLOW)).effect === "allow"
+}
+
+function packageCallAsks(canonical: string, ruleset: readonly PermissionRule[]) {
+  return ruleset.some(rule => rule.action === PACKAGE_HOOK_DECISION && match(canonical, rule.resource) && rule.effect === "ask") || !packageCallAllows(canonical, ruleset) && rulesetIdentityEffect(canonical, ruleset) === "ask"
+}
 
 /**
  * OpenCode 2 `Permission.evaluate` (packages/core/src/permission.ts), restated: that module imports the engine's bus,
@@ -107,7 +118,7 @@ export interface GateDeps {
   /** Identity facts for the effective tool name, from the current registry; undefined = unknown identity. */
   readonly facts: (tool: string) => Promise<ToolFacts | undefined>
   /** Configured rules for this call: the agent's rules before Code Puppy's own, then the session's. */
-  readonly ruleset: (sessionID: string, agent: string, profile?: UnattendedProfile) => Promise<readonly PermissionRule[]>
+  readonly ruleset: (sessionID: string, agent: string, profile?: UnattendedProfile, call?: Pick<GateCall, "tool" | "input"> & Partial<Pick<GateCall, "messageID" | "id">>) => Promise<readonly PermissionRule[]>
   readonly directory: () => string
   readonly assert: (input: {
     sessionID: string
@@ -128,14 +139,14 @@ export interface GateDecision {
 }
 
 /** Head of the chain: re-read the document and the current binding on every call; deny before anything else runs. */
-export async function decide(deps: GateDeps, call: Pick<GateCall, "tool" | "sessionID" | "agent"> & { id?: string }): Promise<GateDecision> {
+export async function decide(deps: GateDeps, call: Pick<GateCall, "tool" | "sessionID" | "agent"> & { id?: string; messageID?: string; input?: unknown }): Promise<GateDecision> {
   const facts = await deps.facts(call.tool)
   if (!facts) throw namedDeny(call.tool, undefined, "unknown-tool-identity")
   const profile = await deps.profile(call.sessionID, call.agent)
-  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(call.sessionID, call.agent, profile)])
+  const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(call.sessionID, call.agent, profile, { tool: call.tool, input: call.input, messageID: call.messageID, id: call.id })])
   const effective = effectiveFor(facts, snapshot, ruleset)
   if (profile !== undefined) {
-    const verdict = unattendedGateVerdict(profile, { effective, rulesetAsks: effective.action !== "deny" && rulesetIdentityEffect(canonicalToolIdentity(facts.identity), ruleset) === "ask", tool: facts.identity.name })
+    const verdict = unattendedGateVerdict(profile, { effective, rulesetAsks: effective.action !== "deny" && packageCallAsks(canonicalToolIdentity(facts.identity), ruleset), tool: facts.identity.name })
     if (verdict.kind === "deny") {
       deps.denied(call.id, verdict.denial)
       throw unattendedToolError(facts, verdict.denial)
@@ -163,7 +174,8 @@ export function isInstallAsk(metadata: Record<string, unknown> | undefined): boo
 export async function confirm(deps: GateDeps, decision: GateDecision, call: GateCall, install?: { readonly subject?: { readonly name: string; readonly source: string } }): Promise<void> {
   const { facts } = decision
   const canonical = canonicalToolIdentity(facts.identity)
-  const rulesetAsks = install !== undefined || rulesetIdentityEffect(canonical, decision.ruleset) === "ask"
+  const invocationAllows = packageCallAllows(canonical, decision.ruleset)
+  const rulesetAsks = install !== undefined || packageCallAsks(canonical, decision.ruleset)
   const profile = await deps.profile(call.sessionID, call.agent)
   if (profile !== undefined) {
     const verdict = unattendedGateVerdict(profile, { effective: decision.effective, rulesetAsks, tool: facts.identity.name })
@@ -173,6 +185,7 @@ export async function confirm(deps: GateDeps, decision: GateDecision, call: Gate
     }
     if (verdict.kind === "allow") return
   }
+  if (install === undefined && invocationAllows) return
   const bindingDigest = subjectBindingDigest({ identity: facts.identity, authority: facts.authority, bindingDigest: facts.bindingDigest })
   const askedBy = install ? INSTALL_ASKED_BY : rulesetAsks ? "ruleset" : "policy"
   const patterns = askedBy === "policy" ? [`${bindingDigest ?? "binding:unknown"}@${decision.revision}`] : [`call:${call.id}`]
@@ -226,7 +239,7 @@ export async function gateWithoutToolCall(
   const [snapshot, ruleset] = await Promise.all([deps.store.snapshot(), deps.ruleset(event.sessionID, event.agent ?? agent, profile)])
   const effective = effectiveFor(facts, snapshot, ruleset)
   if (profile !== undefined) {
-    const verdict = unattendedGateVerdict(profile, { effective, rulesetAsks: effective.action !== "deny" && rulesetIdentityEffect(canonicalToolIdentity(facts.identity), ruleset) === "ask", tool: facts.identity.name })
+    const verdict = unattendedGateVerdict(profile, { effective, rulesetAsks: effective.action !== "deny" && packageCallAsks(canonicalToolIdentity(facts.identity), ruleset), tool: facts.identity.name })
     if (verdict.kind === "deny") {
       event.effect = "deny"
       event.message = verdict.denial.message

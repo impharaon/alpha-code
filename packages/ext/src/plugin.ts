@@ -1,3 +1,6 @@
+import { registerPackageHooks } from "./plugin-package-hooks"
+import { registerPackageInvocations } from "./plugin-package-invocation"
+import { aliasPluginMcpTools } from "./plugin-package-tools"
 import { DOCUMENT_PYTHON_HOST, documentHost, documentPythonEnvironmentFor } from "../../util/src/codepuppy-document"
 import { declaredFirstPartyTools } from "../../core/src/mcp/codepuppy-first-party-mcp"
 import { checkCodePuppyOfficeMcpSafety } from "../../ui-mac/src/shared/office-advisories"
@@ -46,7 +49,7 @@ import { agentSampling, applyAgents, applyProjectMcp, commandDefinitions, remove
 import { postActivationTail } from "./post-activation-tail"
 import type { AgentEditor } from "@opencode/plugin/promise/agent"
 import type { SkillEditor } from "@opencode/plugin/promise/skill"
-import { allInstalledPluginSkills, installedPluginSkill } from "./plugin-package-skills"
+import { allInstalledPluginSkills, allInstalledPluginPackages, installedPluginSkill } from "./plugin-package-skills"
 import { renderPluginText } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
 import { Skill } from "../../schema/src/skill"
 import { AbsolutePath } from "../../schema/src/schema"
@@ -196,6 +199,11 @@ export const CodePuppyExt: Plugin.Plugin = {
 
       // `#1419`(REQ-228):看不了图的模型 —— 图片送云端识图,模型可按编号 / 路径追问。登记簿按本 Location 建
       // (#223 R7 的纪律);能力真源是引擎目录里的模型(modelFacts);转写正文跨重启缓存在插件存储里。
+      const packageHooks = await registerPackageHooks(context, { root: bootstrap.paths.globalRoot, projectRoot: () => projectRootFor(directory)?.directory, log: error, policy, unattended: hubBridge.unattended })
+      const releasePackageSessions = hubBridge.onPackageSession(message => packageHooks.receiveSession(message))
+      cleanups.push(async () => { releasePackageSessions(); await packageHooks.dispose() })
+      const packageInvocations = await registerPackageInvocations(context, { root: bootstrap.paths.globalRoot, projectRoot: () => projectRootFor(directory)?.directory, policy, log: error, hooks: packageHooks })
+      cleanups.push(() => packageInvocations.dispose())
       const vision = createCloudVisionHooks({
         directory,
         documentPageView: (sessionID, view) => recordDocumentPageView(context.location, sessionID, view),
@@ -350,6 +358,13 @@ export const CodePuppyExt: Plugin.Plugin = {
         if (bootstrap.network.egressProxy) processState().hubBridge.network.context(context.location.directory, event)
       })
       for (const name of ["context", "compaction", "generate", "title"] as const) await context.session.hook(name, assembleRequest)
+      await context.session.hook("context", async event => {
+        const servers = allInstalledPluginPackages(bootstrap.paths.globalRoot).flatMap(installed => installed.description.entries.flatMap(entry => {
+          const hostName = installed.hostNames[entry.id]
+          return entry.kind === "mcp" && hostName && installed.settings ? [{ hostName, sourceName: entry.sourceName, packageId: installed.settings.packageId }] : []
+        }))
+        policy.registerModelToolAliases(aliasPluginMcpTools(event.tools, await context.tool.list(), servers))
+      })
       // REQ-236 `#1562`:平台代理节点的凭据每次请求现读,续期热应用不必重启引擎;读不到就抛,请求不发出。
       // 写在 http.request:2.x 的路由层在 model.request 之后才按 apiKey 写 Authorization(packages/ai/src/route/auth.ts),
       // 那里加的头会被注入的占位 apiKey 盖掉;http.request 拿到的是鉴权之后、即将发出的请求(#1662 parity B4)。
@@ -416,11 +431,15 @@ export const CodePuppyExt: Plugin.Plugin = {
           // I-11(design v9 §4.4「收口」):受管全局 MCP 开不开只看允许集,排在所有配置文档之后。读不到 ⇒ 非云、非项目 MCP 全停。
           const allowSet = readPackageAllowSet(bootstrap.paths.globalRoot)
           const managed = new Set(allowSet?.mcp.map((entry) => entry.name))
+          const pluginMcp = new Set(allInstalledPluginPackages(bootstrap.paths.globalRoot).flatMap(installed =>
+            installed.description.entries.flatMap(entry => entry.kind === "mcp" ? [installed.hostNames[entry.id]!] : []),
+          ))
           for (const [name] of editor.list()) {
             if (name === bootstrap.cloudMcp?.name || projectMcp.has(name) || (allowSet && !managed.has(name))) continue
             const disabled = !managedMcpAllowedHere(name, allowSet, projectRootFor(directory)?.directory)
             editor.update(name, (config) => {
-              config.disabled = disabled
+              // Keep startup templates disabled; an enabled runtime override is already bound by main.
+              config.disabled = disabled || (pluginMcp.has(name) && config.disabled === true)
             })
           }
           for (const [name, config] of editor.list()) {
@@ -555,9 +574,9 @@ export const CodePuppyExt: Plugin.Plugin = {
       cleanups.push(() => providerTail.abort())
       const activePlugins = async () => (((await context.plugin.list()) as { data?: Array<{ id?: string }> }).data ?? []).map((plugin) => String(plugin.id))
       // #1700(Codex R1/1 M1):项目停用的助手同样等这一批激活结束才移除 —— 早了会被 post 段的配置层按默认(全放行)重建。
-      const agentTail = postActivationTail<Pick<AgentEditor, "remove">>({
+      const agentTail = postActivationTail<AgentEditor>({
         transform: (callback) => context.agent.transform(callback),
-        apply: (editor) => removeAgents(editor, disabledAgents),
+        apply: (editor) => { removeAgents(editor, disabledAgents); packageInvocations.transformAgents(editor) },
         activePlugins,
         log,
         unplaced: "project agents with disable: true stay registered",
@@ -575,9 +594,9 @@ export const CodePuppyExt: Plugin.Plugin = {
             // Native directory ids may also occupy the managed key; keep their registrations intact.
             const id = editor.get(skill.key) ? skill.key + "/" + skill.entry.id : skill.key
             editor.add({ id: Skill.ID.make(id), name: Skill.Name.make(skill.name), path: AbsolutePath.make(skill.path),
-              ...(typeof skill.entry.display.description === "string" ? { description: skill.entry.display.description } : {}),
-              autoinvoke: skill.entry.invocation.implicitInvocation,
-              content: renderPluginText(skill.entry.instruction, { pluginRoot: skill.pluginRoot, skillDir: skill.directory, projectDir: directory }),
+              ...(typeof skill.entry.display.shortDescription === "string" ? { description: skill.entry.display.shortDescription } : {}),
+              autoinvoke: skill.entry.invocation.implicitInvocation && skill.entry.invocation.paths.length === 0,
+              content: renderPluginText(skill.entry.instruction, { pluginRoot: skill.pluginRoot, skillDir: skill.directory, projectDir: directory, pluginData: skill.pluginData, resolveOption: skill.resolveOption }),
             })
           }
         },
@@ -606,6 +625,7 @@ export const CodePuppyExt: Plugin.Plugin = {
     }
 
     await policy.seal()
+    hubBridge.locationReady(directory)
     return cleanup
   },
 }

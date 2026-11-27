@@ -1,3 +1,5 @@
+import { LocationServiceMap } from "../../core/src/location-service-map"
+import { SdkPlugins } from "../../core/src/plugin/sdk"
 import { publishDocumentPythonEnvironment } from "../../util/src/codepuppy-document"
 // `#1665`:ext 在 OpenCode 2 真插件宿主里(plugin-host.harness.ts)—— 每条用例装的是生产的默认导出 `CodePuppyExt`,
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
@@ -6,7 +8,7 @@ import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap, type TestBo
 import { allInstalledPluginSkills } from "./plugin-package-skills"
 import { skillGenerationLiveDirs } from "./gen-skill-paths"
 import { convertPluginTree } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
-import { fixtureRoot, captureWholeFixture } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
+import { fixtureRoot, captureWholeFixture, captureStandardFixture } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
 import { afterEach, beforeAll, expect } from "bun:test"
 import { createHash } from "node:crypto"
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
@@ -18,6 +20,7 @@ import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import { Agent } from "../../core/src/agent.ts"
 import { Location } from "../../core/src/location.ts"
 import { FileMutation } from "../../core/src/file-mutation.ts"
+import { InstructionDiscovery } from "../../core/src/instruction-discovery.ts"
 import { FileWrite } from "../../core/src/file-write.ts"
 import { Formatter } from "../../core/src/formatter.ts"
 import { Plugin as Plugins } from "../../core/src/plugin.ts"
@@ -39,7 +42,7 @@ import { codepuppyOfficeInstallCommand } from "../../ui-mac/src/shared/office-ad
 import CodePuppyExt, { PROCESS_STATE_KEY } from "./plugin"
 import { codePuppyWebSearchFailureOf } from "./exa-websearch"
 import { buildHubInstallReply, buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
-import { activate, it, recordingMcp } from "./plugin-host.harness"
+import { activate, it, packageIt, recordingMcp } from "./plugin-host.harness"
 import { testEffect } from "../../core/test/lib/effect.ts"
 import { makePluginTestLayer } from "../../core/test/plugin/fixture.ts"
 import { CODEPUPPY_EXPLORE_PROMPT } from "./codepuppy-prompts"
@@ -63,6 +66,13 @@ import { ConfigAgentPlugin } from "../../core/src/config/plugin/agent.ts"
 import { PluginPromise } from "../../core/src/plugin/promise.ts"
 import { Document as ConfigDocument, Info as ConfigInfo } from "../../schema/src/config.ts"
 import { Schema } from "effect"
+import { ConfigCommandPlugin } from "../../core/src/config/plugin/command"
+import { SubagentTool } from "../../core/src/tool/plugin/subagent"
+import { SkillTool } from "../../core/src/tool/plugin/skill"
+import { ReadTool } from "../../core/src/tool/plugin/read"
+import { ShellTool } from "../../core/src/tool/plugin/shell"
+import { TestLLM } from "../../ai/src/testing"
+import { dirname } from "node:path"
 
 let scratch = ""
 beforeAll(() => {
@@ -1203,6 +1213,11 @@ it.live("权威 · 项目 agent 的 disable(#1700 AC-04):已同意的项目里 e
  * ext 排在 post 段之后的 transform(post-activation-tail.ts)这时才登记。`finish(done)` 翻过来之后等到 `done` 成立。
  */
 const activateExtUntilFinished = Effect.gen(function* () {
+  const current = (yield* (yield* Plugins.Service).list()).find(plugin => plugin.id === CodePuppyExt.id)
+  if (current) return { finish: (done: Effect.Effect<boolean>) => Effect.gen(function* () {
+    for (let waited = 0; waited < 3000 && !(yield* done); waited += 20) yield* Effect.sleep("20 millis")
+    expect(yield* done).toBe(true)
+  }) }
   let finished = false
   const plugins = yield* Plugins.Service
   const policy = { id: "opencode.config.policy", source: { type: "builtin" }, features: { server: true }, state: { status: "active" } }
@@ -1214,6 +1229,7 @@ const activateExtUntilFinished = Effect.gen(function* () {
       Effect.gen(function* () {
         finished = true
         for (let waited = 0; waited < 3000 && !(yield* done); waited += 20) yield* Effect.sleep("20 millis")
+    expect(yield* done).toBe(true)
       }),
   }
 })
@@ -1619,6 +1635,2065 @@ itWithPermission.live("D3/I-10 installing the user's own plugin asks once in eve
   expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_create")
 }))
 
+it.live("long plugin MCP names are aliased by the awaited context hook without copying definitions", () => Effect.gen(function* () {
+  const account = "acct:" + createHash("sha256").update("long-alias").digest("hex")
+  env({}, { policyAccount: account })
+  const { captureStandardFixture } = yield* Effect.promise(() => import("../../ui-mac/test-fixtures/plugin-helper/fixture"))
+  const { mcpToolMark } = yield* Effect.promise(() => import("../../core/src/tool/codepuppy-mcp-tool-mint"))
+  const converted = yield* Effect.promise(() => captureStandardFixture("claude:cloudinary").then(convertPluginTree))
+  const root = join(scratch, "codepuppy-state/env/dev")
+  const key = "bundle--long-mcp-alias"
+  const live = join(root, "ext-store", key, "generations/gen-000001-abcdef")
+  mkdirSync(live, { recursive: true })
+  const hostNames = Object.fromEntries(converted.package.entries.map((entry, index) => [entry.id, "service-" + index]))
+  const source = converted.package.entries.find(entry => entry.kind === "mcp")!
+  const server = hostNames[source.id]!
+  writeFileSync(join(live, "plugin-package.json"), JSON.stringify({ description: converted.package, hostNames }))
+  writeFileSync(join(root, "ext-store", key, "current.json"), JSON.stringify({ generation: "gen-000001-abcdef" }))
+  writeFileSync(join(root, "ext-store", key, "package-settings.json"), JSON.stringify({ packageId: "claude:cloudinary", dataHome: join(scratch, "data"), values: {}, secretRefs: {}, versions: {}, mcpVersions: {} }))
+  const name = "get_asset_" + "details_".repeat(8)
+  const effective = server + "_" + name
+  yield* activate({ id: "mcp-alias-registered-tool" as never, async setup(context) {
+    await context.tool.transform(editor => editor.add({ name, options: { namespace: server, codemode: false }, ...mcpToolMark(server, name), description: "asset details", input: { type: "object" }, execute: async () => ({ content: "original tool" }) }))
+  } })
+  const definition = { description: "asset details", input: { type: "object" } }
+  writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [{ name: server, enabled: true }] }))
+  yield* activate(CodePuppyExt, { mcp: recordingMcp({ [server]: { type: "remote", url: "https://example.test/mcp" } }) })
+  const hooks = yield* PluginHooks.Service
+  const shaped = yield* hooks.trigger("session", "context", { ...contextEvent([]), tools: { [effective]: definition } })
+  expect(Object.keys(shaped.tools)).toHaveLength(1)
+  expect(Object.keys(shaped.tools)[0]!.length).toBe(64)
+  expect(shaped.tools[effective]).toBeUndefined()
+  expect(Object.values(shaped.tools)[0]).toBe(definition)
+  const location = yield* Location.Service
+  const store = createToolPolicyStore({ baseDir: defaultPolicyBaseDir(join(process.env.XDG_DATA_HOME!, "opencode")), account: () => account, workspace: () => policyWorkspace(location as never) })
+  const canonical = canonicalToolIdentity({ source: "mcp", origin: server, name })
+  yield* Effect.promise(() => store.setRecord({ selector: { level: "tool", canonical }, state: "disabled" }))
+  const refused = yield* hooks.trigger("tool", "execute.before", { tool: Object.keys(shaped.tools)[0]!, ...ids, id: "call_long_alias" as never, input: {} }).pipe(Effect.exit)
+  expect(Exit.isFailure(refused)).toBe(true)
+  expect(JSON.stringify(refused)).toContain("Code Puppy tool policy denied " + canonical)
+}))
+
+it.effect("long plugin MCP aliases execute the original registered tool after model request shaping", () => Effect.gen(function* () {
+  const { mcpToolMark } = yield* Effect.promise(() => import("../../core/src/tool/codepuppy-mcp-tool-mint"))
+  const { aliasPluginMcpTools } = yield* Effect.promise(() => import("./plugin-package-tools"))
+  const { SessionModelRequest } = yield* Effect.promise(() => import("../../core/src/session/model-request"))
+  const { SessionModelTransport } = yield* Effect.promise(() => import("../../core/src/session/model-transport"))
+  const { SessionRunnerModel } = yield* Effect.promise(() => import("../../core/src/session/runner/model"))
+  const { OpenAIChat } = yield* Effect.promise(() => import("../../ai/src/protocols"))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "MCP alias executor" })
+  const model = SessionRunnerModel.resolved(OpenAIChat.route.model({ id: "gpt-5.5", provider: "test" }), { capabilities: { tools: true, input: ["text"], output: ["text"] }, cost: [], limit: { context: 200000, output: 32000 } })
+  const transport = SessionModelTransport.Service.of({ bind: () => ({ execute: () => Effect.die("unused WebSocket execution") }), close: () => Effect.void, closeAll: Effect.void })
+  const registry = yield* Tool.Service
+  const hooks = yield* PluginHooks.Service
+  const server = { hostName: "cloudinary-a123456789", sourceName: "Cloudinary", packageId: "claude:cloudinary" }
+  const name = "get_asset_" + "details_".repeat(8)
+  let executions = 0
+  yield* registry.transform(editor => editor.add({ name, description: "asset details", input: { type: "object", properties: {} }, options: { namespace: server.hostName, codemode: false }, ...mcpToolMark(server.hostName, name), execute: () => Effect.sync(() => { executions++; return { content: "original MCP executor" } }) }))
+  const registered = yield* registry.list()
+  yield* hooks.register("session", "context", event => Effect.sync(() => { aliasPluginMcpTools(event.tools, registered, [server]) }))
+  const requests = yield* SessionModelRequest.Service.pipe(Effect.provide(SessionModelRequest.layer), Effect.provideService(SessionModelTransport.Service, transport))
+  const prepared = yield* requests.primary({ session, agent: "build" as never, model, system: [], messages: [], tools: yield* registry.snapshot() })
+  const alias = prepared.request.tools.find(tool => tool.name.startsWith(server.hostName + "_"))!.name
+  expect(alias.length).toBe(64)
+  const result = yield* prepared.executeTool({ sessionID: session.id, agent: "build" as never, messageID: "msg_alias" as never, call: { type: "tool-call", id: "call_alias", name: alias, input: {} } })
+  expect(result.content).toEqual([{ type: "text", text: "original MCP executor" }])
+  expect(executions).toBe(1)
+}))
+
+const invocationSample = (name: string, changes: Record<string, string | null> = {}) => Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture(name, changes))
+  const converted = yield* Effect.promise(() => convertPluginTree(capture))
+  const root = join(scratch, "codepuppy-state", "env", "dev")
+  const key = "bundle--invocation-" + name.replace(/[^a-z0-9-]/gi, "-")
+  const live = join(root, "ext-store", key, "generations", "gen-000001-abcdef")
+  for (const node of capture.nodes) if (node.kind === "file") {
+    const target = join(live, "tree", node.path)
+    mkdirSync(dirname(target), { recursive: true })
+    writeFileSync(target, converted.replacements.get(node.path) ?? (yield* Effect.promise(() => capture.readFile(node.path))), { mode: node.mode })
+  }
+  const hostNames = Object.fromEntries(converted.package.entries.map(entry => [entry.id, entry.kind + "-" + entry.sourceName.replace(/[^a-z0-9-]/gi, "-")]))
+  writeFileSync(join(live, "plugin-package.json"), JSON.stringify({ description: converted.package, hostNames }))
+  writeFileSync(join(root, "ext-store", key, "current.json"), JSON.stringify({ v: 1, generation: "gen-000001-abcdef", txId: "invocation-fixture", switchedAt: "2026-11-27T00:00:00Z" }))
+  writeFileSync(join(root, "ext-store", key, "package-settings.json"), JSON.stringify({ packageId: "local:" + name, dataHome: join(scratch, "data"), values: {}, secretRefs: {}, versions: {}, mcpVersions: {} }))
+  writeFileSync(join(root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: converted.package.entries.filter(entry => ["skill", "command", "agent"].includes(entry.kind)).map(entry => entry.kind + "--" + hostNames[entry.id]), scoped: [], mcp: converted.package.entries.filter(entry => entry.kind === "mcp").map(entry => ({ name: hostNames[entry.id], enabled: true })) }))
+  return { root, key, live, description: converted.package, hostNames }
+})
+const packageJourney = <A, E, R>(program: Effect.Effect<A, E, R>, before?: Plugin.Plugin) => Effect.gen(function* () {
+  env({})
+  const sdk = yield* SdkPlugins.Service
+  yield* sdk.register(PluginPromise.fromPromise(providerPlugin("test", "https://test.invalid", "picked", "source-sonnet")))
+  yield* sdk.register(PluginPromise.fromPromise({ id: "package-test-variants", setup: async context => {
+    await context.model.transform(editor => {
+      editor.default.set("test", "picked")
+      editor.update("test", "picked", model => {
+      model.variants = ["low", "high"].map(id => ({ id: id as never, name: id, settings: { test: { reasoningEffort: id } } }))
+      })
+    })
+  } }))
+  if (before) yield* sdk.register(PluginPromise.fromPromise(before))
+  yield* sdk.register(PluginPromise.fromPromise(CodePuppyExt))
+  const location = yield* Location.Service
+  const locations = yield* LocationServiceMap.Service
+  return yield* program.pipe(Effect.provide(locations.get({ directory: location.directory })))
+})
+const invocationNativeServices = Effect.gen(function* () {
+  yield* (yield* Plugins.Service).awaitActivation
+  yield* (yield* Agent.Service).reload()
+  yield* (yield* Skill.Service).reload()
+  yield* (yield* Command.Service).reload()
+  yield* (yield* Tool.Service).reload()
+})
+
+packageIt.live("package agent delegates with its instructions and tool set", () => packageJourney(Effect.gen(function* () {
+  env({})
+  const sample = yield* invocationSample("claude:feature-dev")
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const agents = yield* Agent.Service
+  const target = sample.hostNames["agent:agents/code-reviewer.md"]!
+  yield* ext.finish(agents.get(target as never).pipe(Effect.map(agent => !!agent)))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const registry = yield* Tool.Service
+  const snapshot = yield* registry.snapshot()
+  const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_package_agent" as never, call: { type: "tool-call", name: "subagent", id: "call_package_agent", input: { agent: target, description: "Review package", prompt: "review source", background: false } } })
+  expect(JSON.stringify(result)).toContain("Package child result")
+  const children = (yield* sessions.list({ parentID: parent.id })).data
+  expect(children).toHaveLength(1)
+  expect(children[0]?.model).toMatchObject({ providerID: "test", id: "picked" })
+  const requests = yield* (yield* TestLLM.Test).requests()
+  const request = requests.find(request => JSON.stringify(request).includes("expert code reviewer"))
+  expect(request).toBeDefined()
+  expect(JSON.stringify(request)).toContain("high precision")
+  expect(JSON.stringify(request?.tools)).not.toContain('"name":"shell"')
+  expect(JSON.stringify(request?.tools)).toContain('"name":"read"')
+  const suggested = yield* sessions.create({ location: { directory: location.directory }, title: "Source model suggestion", agent: "build" } as never)
+  yield* snapshot.execute({ sessionID: suggested.id, agent: "build" as never, messageID: "msg_suggested" as never, call: { type: "tool-call", name: "subagent", id: "call_suggested", input: { agent: target, description: "Suggested model", prompt: "review", background: false } } })
+  expect((yield* sessions.list({ parentID: suggested.id })).data[0]?.model).toMatchObject({ providerID: "test", id: "source-sonnet" })
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  const denied = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_package_agent_off" as never, call: { type: "tool-call", name: "subagent", id: "call_package_agent_off", input: { agent: target, description: "Stopped review", prompt: "review", background: false } } }).pipe(Effect.exit)
+  expect(Exit.isFailure(denied)).toBe(true)
+  expect((yield* sessions.list({ parentID: parent.id })).data).toHaveLength(1)
+})))
+
+packageIt.live("package commands invoke the source renderer only after an explicit call", () => packageJourney(Effect.gen(function* () {
+  env({})
+  const original = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => original.readFile("commands/feature-dev.md")))
+  const sample = yield* invocationSample("claude:feature-dev", { "commands/feature-dev.md": source + "\nRUNTIME_ARG=$0\n!`printf SOURCE_EXECUTED`\n" })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(commands => commands.some(entry => entry.name === command))))
+  const llm = yield* TestLLM.Test
+  expect(yield* llm.requests()).toHaveLength(0)
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* llm.push(TestLLM.toolCall("call_source_agent", "subagent", { agent: "code-reviewer", description: "Source alias review", prompt: "review", background: false }), TestLLM.text("Child review", "source-child"), TestLLM.text("Parent result", "source-parent"))
+  yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: '"!`printf VALUE_EXECUTED`"' }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  const messages = yield* sessions.context(parent.id)
+  const text = messages.filter(message => message.type === "user").map(message => message.text).join("\n")
+  expect(text).toContain("RUNTIME_ARG=!`printf VALUE_EXECUTED`")
+  expect(text).toContain("SOURCE_EXECUTED")
+  expect(text).not.toContain("!`printf SOURCE_EXECUTED`")
+  const children = (yield* sessions.list({ parentID: parent.id })).data
+  expect(children).toHaveLength(1)
+  expect(children[0]?.agent).toBe(sample.hostNames["agent:agents/code-reviewer.md"])
+  expect(JSON.stringify(yield* llm.requests())).toContain("expert code reviewer")
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  expect(Exit.isFailure(yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "after disable" }, delivery: "queue" } }).pipe(Effect.exit))).toBe(true)
+})))
+
+packageIt.live("package invocation applies preload memory effort and native turn limits", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:plugin-dev"))
+  const path = "agents/skill-reviewer.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("claude:plugin-dev", { [path]: source.replace("\n---\n", "\nskills: [plugin-structure]\nmemory: project\nmaxTurns: 2\nbackground: false\neffort: max\n---\n") })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const agents = yield* Agent.Service
+  const target = sample.hostNames["agent:" + path]!
+  yield* ext.finish(agents.get(target as never).pipe(Effect.map(agent => agent?.steps === 2)))
+  const location = yield* Location.Service
+  const memory = join(location.directory, ".codepuppy", "agent-memory", sample.key, target, "MEMORY.md")
+  mkdirSync(dirname(memory), { recursive: true })
+  writeFileSync(memory, "REVIEW_MEMORY_FROM_EXISTING_FILE")
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_read_turn", "read", { path: memory }), TestLLM.text("Bounded review", "bounded"))
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_controls" as never, call: { type: "tool-call", name: "subagent", id: "call_controls", input: { agent: target, description: "Review", prompt: "review" } } })
+  const requests = yield* llm.requests()
+  expect(JSON.stringify(requests[0]?.system)).toContain("REVIEW_MEMORY_FROM_EXISTING_FILE")
+  expect(JSON.stringify(requests)).toContain("Plugin Structure for Claude Code")
+  expect(JSON.stringify(requests)).toContain("MAXIMUM STEPS REACHED")
+  expect(JSON.stringify(result)).toContain('"partial":true')
+  expect(JSON.stringify(requests[0]?.providerOptions)).toContain("high")
+  expect((yield* sessions.list({ parentID: parent.id })).data).toHaveLength(1)
+  const explicit = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_explicit_effort" as never, call: { type: "tool-call", name: "subagent", id: "call_explicit_effort", input: { agent: target, description: "Explicit low", prompt: "review", model: "test/picked#low" } } })
+  expect(JSON.stringify(explicit)).not.toContain('"partial":true')
+  const latest = (yield* llm.requests()).at(-1)!
+  expect(JSON.stringify(latest.providerOptions ?? {})).not.toContain("high")
+  expect((yield* sessions.list({ parentID: parent.id })).data.some(child => child.model?.variant === "low")).toBe(true)
+})))
+
+packageIt.live("package paths activate on real file access while Temporal manual skills stay explicit", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("codex:temporal"))
+  const path = "skills/temporal-developer/SKILL.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("codex:temporal", { [path]: source.replace("\n---\n", '\npaths: ["src/**"]\n---\n') })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const manual = sample.hostNames["skill:skills/temporal-cloud-setup/SKILL.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === manual))))
+  const skills = (yield* (yield* Skill.Service).list())
+  expect(skills.find(skill => skill.name === manual)?.autoinvoke).toBe(false)
+  const manualSkill = skills.find(skill => skill.name === manual)!
+
+  const location = yield* Location.Service
+  const file = join(location.directory, "src", "workflow.ts")
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, "export const workflow = 1")
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_path_read", "read", { path: file }), TestLLM.text("Read workflow", "path"))
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Package invocation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const implicit = yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_implicit" as never, call: { type: "tool-call", name: "skill", id: "call_implicit_manual", input: { id: manualSkill.id } } })), Effect.exit)
+  expect(Exit.isFailure(implicit)).toBe(true)
+  yield* sessions.prompt({ sessionID: parent.id, text: "read the source", resume: true })
+  yield* sessions.wait(parent.id)
+  const requests = yield* llm.requests()
+  const body = source.split("\n---\n")[1]!.trim().slice(0, 100)
+  expect(JSON.stringify(requests[0])).not.toContain(body)
+  expect(JSON.stringify(requests[1])).toContain(body.replace(/\n/g, "\\n"))
+  yield* commands.execute({ name: manual, invocation: { sessionID: parent.id, prompt: { text: "configure" }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("Temporal Cloud")
+})))
+
+packageIt.live("package Claude background agents stop when their package is disabled", () => packageJourney(Effect.gen(function* () {
+  const sample = yield* invocationSample("claude:feature-dev")
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const agents = yield* Agent.Service
+  const target = sample.hostNames["agent:agents/code-reviewer.md"]!
+  yield* ext.finish(agents.get(target as never).pipe(Effect.map(Boolean)))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Background review", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const gate = yield* (yield* TestLLM.Test).gate()
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_background" as never, call: { type: "tool-call", name: "subagent", id: "call_background", input: { agent: target, description: "Review", prompt: "review" } } })
+  expect(JSON.stringify(result)).toContain('"status":"running"')
+  yield* gate.started
+  const child = (yield* sessions.list({ parentID: parent.id })).data[0]!
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  yield* sessions.wait(child.id).pipe(Effect.timeout("3 seconds"))
+  expect(JSON.stringify(yield* sessions.context(child.id))).not.toContain("Package child result")
+  yield* gate.release
+})))
+
+packageIt.live("package YAML dependencies resolve to a real connected MCP tool", () => Effect.gen(function* () {
+  const { echoMcpHandler } = yield* Effect.promise(() => import("../../core/test/fixture/mcp-echo"))
+  const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+  const handler = echoMcpHandler()
+  let calls = 0
+  const server = yield* Effect.acquireRelease(Effect.sync(() => Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: async request => {
+    if (request.method === "POST") {
+      const body = await request.clone().json()
+      if (body.method === "tools/call") calls++
+    }
+    return handler.fetch(request)
+  } })), server => Effect.sync(() => { server.stop(true) }))
+  const path = "skills/build-chatgpt-app/agents/openai.yaml"
+  const capture = yield* Effect.promise(() => captureStandardFixture("codex:openai-developers"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("codex:openai-developers", { [path]: source.replace("https://developers.openai.com/mcp", server.url.href) })
+  const dependency = sample.description.entries.find(entry => entry.kind === "mcp" && entry.sourceName === "openaiDeveloperDocs")!
+  const host = sample.hostNames[dependency.id]!
+  return yield* packageJourney(Effect.gen(function* () {
+  yield* invocationNativeServices
+  const mcp = yield* Mcp.Service
+  yield* mcp.awaitStartup()
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["skill:skills/build-chatgpt-app/SKILL.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === command))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Dependency call", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_dependency", host + "_echo", {}), TestLLM.text("Used dependency", "dependency"))
+  yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "use docs" }, delivery: "queue" } })
+  const permission = yield* Permission.Service
+  yield* ext.finish(permission.list().pipe(Effect.map(list => list.length > 0)))
+  const request = (yield* permission.list())[0]
+  expect(request).toBeDefined()
+  yield* permission.reply({ requestID: request!.id, reply: "once" })
+  yield* sessions.wait(parent.id)
+  expect(calls).toBe(1)
+  expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("called echo")
+  yield* mcp.remove(host)
+  const missing = yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "missing docs" }, delivery: "queue" } }).pipe(Effect.exit)
+  expect(Exit.isFailure(missing)).toBe(true)
+  expect(JSON.stringify(missing)).toContain("dependency_missing: MCP openaiDeveloperDocs")
+  }), { id: "package-test-dependency", setup: async context => {
+    await context.mcp.transform(editor => editor.set(host, { type: "remote", url: server.url.href, oauth: false, codemode: false }))
+    await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "mcp:" + host + ":echo", resource: "*", effect: "ask" })))
+  } })
+}))
+
+packageIt.live("package skill arguments and denies expire at the next user prompt", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:plugin-dev"))
+  const path = "skills/plugin-structure/SKILL.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("claude:plugin-dev", { [path]: source.replace("\n---\n", "\ndisallowed-tools: [Write]\n---\n") + "\nSKILL_ARGUMENT=$0\n" })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const command = sample.hostNames["skill:" + path]!
+  const skills = yield* Skill.Service
+  yield* ext.finish(skills.list().pipe(Effect.map(list => list.some(item => item.name === command))))
+  const skill = (yield* skills.list()).find(item => item.name === command)!
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Skill scope", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const execute = (name: string, input: unknown, id: string) => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_skill_scope" as never, call: { type: "tool-call", name, id, input } })
+  const result = yield* execute("skill", { id: skill!.id, arguments: '"two words"' }, "call_skill_args")
+  expect(JSON.stringify(result)).toContain("SKILL_ARGUMENT=two words")
+  const file = join(location.directory, "scope-output.txt")
+  expect(Exit.isFailure(yield* execute("write", { path: file, content: "not yet" }, "call_skill_denied").pipe(Effect.exit))).toBe(true)
+  expect(yield* Effect.promise(() => Bun.file(file).exists())).toBe(false)
+  yield* (yield* PluginHooks.Service).trigger("session", "experimental.idle", { sessionID: parent.id, background: [] })
+  yield* execute("write", { path: file, content: "after idle" }, "call_skill_idle")
+  expect(yield* Effect.promise(() => Bun.file(file).text())).toBe("after idle")
+  yield* execute("skill", { id: skill!.id, arguments: "again" }, "call_skill_again")
+  expect(Exit.isFailure(yield* execute("write", { path: file, content: "still scoped" }, "call_skill_again_denied").pipe(Effect.exit))).toBe(true)
+  yield* sessions.prompt({ sessionID: parent.id, text: "new user turn" })
+  yield* sessions.wait(parent.id)
+  yield* execute("write", { path: file, content: "after user turn" }, "call_skill_cleared")
+  expect(yield* Effect.promise(() => Bun.file(file).text())).toBe("after user turn")
+})))
+
+packageIt.live("package agent Edit remains available when source Write is denied", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const path = "agents/code-reviewer.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("claude:feature-dev", { [path]: source.replace(/^tools:.*$/m, "tools: [Read, Edit, Write]").replace("\n---\n", "\ndisallowed-tools: [Write]\n---\n") })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const target = sample.hostNames["agent:" + path]!
+  yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Edit only", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_edit" as never, call: { type: "tool-call", name: "subagent", id: "call_edit", input: { agent: target, description: "Edit", prompt: "edit", background: false } } })))
+  const requests = yield* (yield* TestLLM.Test).requests()
+  const request = requests.find(request => JSON.stringify(request).includes("expert code reviewer"))!
+  expect(request.tools.map(tool => tool.name)).toContain("edit")
+  expect(request.tools.map(tool => tool.name)).not.toContain("write")
+})))
+
+for (const mode of ["user", "local"] as const) packageIt.live("package agent reads its " + mode + " memory through the file tool", () => packageJourney(Effect.gen(function* () {
+  const { pluginDataDirectory } = yield* Effect.promise(() => import("../../ui-mac/src/shared/installed-plugin-settings"))
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:plugin-dev"))
+  const path = "agents/skill-reviewer.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const sample = yield* invocationSample("claude:plugin-dev", { [path]: source.replace("\n---\n", "\nmemory: " + mode + "\nbackground: false\n---\n") })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const target = sample.hostNames["agent:" + path]!
+  yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+  const location = yield* Location.Service
+  const data = pluginDataDirectory(join(scratch, "data"), "local:claude:plugin-dev")
+  const root = join(data, "agent-memory", target, mode, ...(mode === "local" ? [createHash("sha256").update(realpathSync(location.directory)).digest("hex")] : []))
+  mkdirSync(root, { recursive: true })
+  writeFileSync(join(root, "MEMORY.md"), "EXISTING_" + mode + "_MEMORY")
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Memory " + mode, agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_memory_" + mode as never, call: { type: "tool-call", name: "subagent", id: "call_memory_" + mode, input: { agent: target, description: "Memory " + mode, prompt: "review" } } })))
+  const request = (yield* (yield* TestLLM.Test).requests())[0]!
+  expect(JSON.stringify(request.system)).toContain(root)
+  expect(JSON.stringify(request.system)).toContain("EXISTING_" + mode + "_MEMORY")
+  const refused = yield* sessions.create({ location: { directory: location.directory }, title: "Denied memory " + mode, agent: "build", model: { providerID: "test", id: "picked" }, permissions: [{ action: "read", resource: "*", effect: "deny" }] } as never)
+  const denied = yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: refused.id, agent: "build" as never, messageID: "msg_memory_denied" as never, call: { type: "tool-call", name: "subagent", id: "call_memory_denied", input: { agent: target, description: "Denied memory", prompt: "review" } } })), Effect.exit)
+  expect(Exit.isFailure(denied)).toBe(true)
+  expect(yield* (yield* TestLLM.Test).requests()).toHaveLength(1)
+})))
+
+packageIt.live("package SessionStart hooks run before the first model request and follow bundle activity", () => packageJourney(Effect.gen(function* () {
+  const sample = yield* invocationSample("claude:learning-output-style")
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [sample.key], scoped: [], mcp: [] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const llm = yield* TestLLM.Test
+  const location = yield* Location.Service
+  const first = yield* sessions.create({ location: { directory: location.directory }, title: "Package hook", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* llm.push(TestLLM.text("First answer", "learning-first"))
+  yield* sessions.prompt({ sessionID: first.id, text: "Learn the project" })
+  yield* sessions.wait(first.id)
+  expect(JSON.stringify((yield* llm.requests())[0])).toContain("You are in 'learning' output style mode")
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+  const second = yield* sessions.create({ location: { directory: location.directory }, title: "Disabled package hook", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* llm.push(TestLLM.text("Second answer", "learning-second"))
+  yield* sessions.prompt({ sessionID: second.id, text: "Package is disabled" })
+  yield* sessions.wait(second.id)
+  expect(JSON.stringify((yield* llm.requests())[1])).not.toContain("You are in 'learning' output style mode")
+})))
+
+packageIt.live("unmatched package model hints use the existing default for commands and delegation", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const changes: Record<string, string> = {}
+  for (const path of ["commands/feature-dev.md", "agents/code-reviewer.md"]) {
+    const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+    changes[path] = /^model:.*$/m.test(source) ? source.replace(/^model:.*$/m, "model: missing-model-hint") : source.replace("\n---\n", "\nmodel: missing-model-hint\n---\n")
+  }
+  const sample = yield* invocationSample("claude:feature-dev", changes)
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === command))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Default command model", "command-default"), TestLLM.text("Default child model", "child-default"))
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Default command", agent: "build" } as never)
+  const invoked = yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "review" }, delivery: "queue" } }).pipe(Effect.exit)
+  expect(Exit.isSuccess(invoked)).toBe(true)
+  yield* sessions.wait(parent.id)
+  const delegate = yield* sessions.create({ location: { directory: location.directory }, title: "Default delegation", agent: "build" } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const result = yield* snapshot.execute({ sessionID: delegate.id, agent: "build" as never, messageID: "msg_default_model" as never, call: { type: "tool-call", name: "subagent", id: "call_default_model", input: { agent: sample.hostNames["agent:agents/code-reviewer.md"]!, description: "Review", prompt: "review", background: false } } })
+  expect(JSON.stringify(result)).toContain("Default child model")
+  expect((yield* llm.requests())).toHaveLength(2)
+})))
+
+packageIt.live("hookify writing-rules keeps literal dollar replacement patterns in loaded skill content", () => packageJourney(Effect.gen(function* () {
+  const captured = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => captured.readFile("skills/writing-rules/SKILL.md")))
+  const sample = yield* invocationSample("claude:hookify")
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const skills = yield* Skill.Service
+  const name = sample.hostNames["skill:skills/writing-rules/SKILL.md"]!
+  yield* ext.finish(skills.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+  const skill = (yield* skills.list()).find(item => item.name === name)!
+  const location = yield* Location.Service
+  const parent = yield* (yield* Sessions.Service).create({ location: { directory: location.directory }, title: "Writing rules", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const loaded = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_writing_rules" as never, call: { type: "tool-call", name: "skill", id: "call_writing_rules", input: { id: skill.id } } })
+  const expected = source.slice(source.indexOf("\n---\n") + 5).trim().replaceAll("${CLAUDE_PLUGIN_ROOT}", join(sample.live, "tree"))
+  expect(loaded.content.filter(part => part.type === "text").map(part => part.text).join("\n")).toContain(expected)
+})))
+
+packageIt.live("package delegation asserts sourceless permission only for command entry", () => {
+  const checks: Array<{ source: unknown }> = []
+  return packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+    const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("commands/feature-dev.md")))
+    const sample = yield* invocationSample("claude:feature-dev", { "commands/feature-dev.md": source.replace("\n---\n", "\ncontext: fork\nagent: code-reviewer\nbackground: false\n---\n") })
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const command = sample.hostNames["command:commands/feature-dev.md"]!
+    const commands = yield* Command.Service
+    yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === command))))
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const parent = yield* sessions.create({ location: { directory: location.directory }, title: "One delegation check", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const llm = yield* TestLLM.Test
+    yield* llm.push(TestLLM.text("Tool child", "tool-child"), TestLLM.text("Command child", "command-child"))
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    const result = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_permission_once" as never, call: { type: "tool-call", name: "subagent", id: "call_permission_once", input: { agent: sample.hostNames["agent:agents/code-reviewer.md"]!, description: "Review", prompt: "review", background: false } } })
+    expect(JSON.stringify(result)).toContain("Tool child")
+    expect(checks.filter(check => check.source === undefined)).toHaveLength(0)
+    expect(checks.some(check => check.source !== undefined)).toBe(true)
+    yield* commands.execute({ name: command, invocation: { sessionID: parent.id, prompt: { text: "review" }, delivery: "queue" } })
+    expect(checks.filter(check => check.source === undefined)).toHaveLength(1)
+    expect((yield* sessions.list({ parentID: parent.id })).data).toHaveLength(2)
+  }), { id: "package-test-permission-observer", setup: async context => {
+    await context.permission.hook("evaluate", event => {
+      if (event.action === "subagent") checks.push({ source: event.source })
+    })
+  } })
+})
+
+packageIt.live("package agent bodies keep dollar amounts and shell examples literal during delegation", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const path = "agents/code-reviewer.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const literal = "AGENT_PRICE=$1,250.00\nAGENT_SNIPPET=!`printf AGENT_SHOULD_REMAIN_SOURCE`"
+  const sample = yield* invocationSample("claude:feature-dev", { [path]: source + "\n" + literal + "\n" })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const agents = yield* Agent.Service
+  const name = sample.hostNames["agent:" + path]!
+  yield* ext.finish(agents.get(name as never).pipe(Effect.map(Boolean)))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Literal agent", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Reviewed source", "literal-agent"))
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_agent_literal" as never, call: { type: "tool-call", name: "subagent", id: "call_agent_literal", input: { agent: name, description: "Review", prompt: "first second", background: false } } })
+  const requests = yield* llm.requests()
+  expect(JSON.stringify(requests)).toContain(JSON.stringify(literal).slice(1, -1))
+})))
+
+packageIt.live("a path-activated package skill renders once until the next user prompt", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("codex:temporal"))
+  const path = "skills/temporal-developer/SKILL.md"
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile(path)))
+  const location = yield* Location.Service
+  // Controlled Claude-syntax variant of the pinned skill so its setup has an observable temp-only side effect.
+  const claude = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const command = new TextDecoder().decode(yield* Effect.promise(() => claude.readFile("commands/feature-dev.md")))
+  const sample = yield* invocationSample("claude:feature-dev", { "skills/temporal-developer/SKILL.md": source.replace("\n---\n", '\npaths: ["src/**"]\n---\n') + '\n!`printf x >> ${CLAUDE_PROJECT_DIR}/path-render-count`\n', "commands/feature-dev.md": command })
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const skills = yield* Skill.Service
+  yield* ext.finish(skills.list().pipe(Effect.map(list => list.some(item => item.name === sample.hostNames["skill:skills/temporal-developer/SKILL.md"]))))
+  const file = join(location.directory, "src", "workflow.ts")
+  mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, "export const workflow = 1")
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Path once", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_path_first", "read", { path: file }), TestLLM.toolCall("call_path_second", "read", { path: file }), TestLLM.text("Read twice", "path-twice"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Read twice" })
+  yield* sessions.wait(parent.id)
+  expect(readFileSync(join(location.directory, "path-render-count"), "utf8")).toBe("x")
+  yield* llm.push(TestLLM.toolCall("call_path_next_prompt", "read", { path: file }), TestLLM.text("Read again", "path-again"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "New prompt" })
+  yield* sessions.wait(parent.id)
+  expect(readFileSync(join(location.directory, "path-render-count"), "utf8")).toBe("xx")
+})))
+
+packageIt.live("the real ralph-loop Stop hook continues the same task and stops at its completion promise", () => packageJourney(Effect.gen(function* () {
+  // setup-ralph-loop.sh writes `session_id: ${CLAUDE_CODE_SESSION_ID:-}` into its state file and the Stop hook only blocks
+  // for that session. Shells inherit this process's environment, so a value from the shell running the tests (a Claude
+  // Code session) would make the hook ignore the session under test; the case runs without it and restores it after.
+  const inheritedSessionID = process.env.CLAUDE_CODE_SESSION_ID
+  delete process.env.CLAUDE_CODE_SESSION_ID
+  yield* Effect.addFinalizer(() => Effect.sync(() => {
+    if (inheritedSessionID === undefined) delete process.env.CLAUDE_CODE_SESSION_ID
+    else process.env.CLAUDE_CODE_SESSION_ID = inheritedSessionID
+  }))
+  const sample = yield* invocationSample("claude:ralph-loop")
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const name = sample.hostNames["command:commands/ralph-loop.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Ralph same task", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Work remains", "ralph-working"), TestLLM.text("<promise>DONE</promise>", "ralph-complete"))
+  yield* commands.execute({ name, invocation: { sessionID: parent.id, prompt: { text: 'Keep working --completion-promise DONE --max-iterations 3' }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  expect(yield* llm.requests()).toHaveLength(2)
+  expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("Keep working")
+  expect((yield* sessions.list({ parentID: parent.id })).data).toHaveLength(0)
+  const { existsSync } = yield* Effect.promise(() => import("node:fs"))
+  expect(existsSync(join(location.directory, ".claude/ralph-loop.local.md"))).toBe(false)
+  yield* llm.push(TestLLM.text("Ordinary task finished", "ralph-ordinary"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "An ordinary task" })
+  yield* sessions.wait(parent.id)
+  expect(yield* llm.requests()).toHaveLength(3)
+})))
+
+packageIt.live("real hookify PreToolUse blocks the matching native write using source tool fields", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+  const rule = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("examples/sensitive-files-warning.local.md")))
+  const sample = yield* invocationSample("claude:hookify")
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  mkdirSync(join(location.directory, ".claude"), { recursive: true })
+  writeFileSync(join(location.directory, ".claude/hookify.sensitive.local.md"), rule.replace("action: warn", "action: block"))
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Hook source fields", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_hook_safe" as never, call: { type: "tool-call", name: "write", id: "call_hook_safe", input: { path: "ordinary.txt", content: "safe fixture" } } })
+  expect(readFileSync(join(location.directory, "ordinary.txt"), "utf8")).toBe("safe fixture")
+  const blocked = yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_hook_blocked" as never, call: { type: "tool-call", name: "write", id: "call_hook_blocked", input: { path: "credentials.txt", content: "harmless test fixture" } } }).pipe(Effect.exit)
+  expect(Exit.isFailure(blocked)).toBe(true)
+  expect(JSON.stringify(blocked)).toContain("Sensitive file detected")
+  const { existsSync } = yield* Effect.promise(() => import("node:fs"))
+  expect(existsSync(join(location.directory, "credentials.txt"))).toBe(false)
+})))
+
+packageIt.live("hookify match-all group still blocks a matching native write", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  for (const group of hooks.hooks.PreToolUse) group.matcher = "*"
+  const sample = yield* invocationSample("claude:hookify", { "hooks/hooks.json": JSON.stringify({ hooks: { PreToolUse: hooks.hooks.PreToolUse } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  mkdirSync(join(location.directory, ".claude"), { recursive: true })
+  const rule = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("examples/sensitive-files-warning.local.md")))
+  writeFileSync(join(location.directory, ".claude/hookify.sensitive.local.md"), rule.replace("action: warn", "action: block"))
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Wildcard source matcher", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const blocked = yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_wildcard_block" as never, call: { type: "tool-call", name: "write", id: "wildcard_block", input: { path: "credentials.txt", content: "fixture data" } } }).pipe(Effect.exit)
+  expect(Exit.isFailure(blocked)).toBe(true)
+  expect(JSON.stringify(blocked)).toContain("Sensitive file detected")
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "credentials.txt")).exists())).toBe(false)
+})))
+
+packageIt.live("the real Convex hook allow is scoped to one call and never overrides a native deny", () => packageJourney(Effect.gen(function* () {
+  const sample = yield* invocationSample("claude:convex")
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Hook allow once", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const permission = yield* Permission.Service
+  const write = (id: string, sessionID = parent.id) => Effect.gen(function* () {
+    const call = yield* snapshot.execute({ sessionID, agent: "build" as never, messageID: ("msg_" + id) as never, call: { type: "tool-call", name: "write", id: id as never, input: { path: "convex/" + id + ".ts", content: "export const example = query({ handler: async () => [] });" } } }).pipe(Effect.exit, Effect.forkChild)
+    let asks = 0
+    for (let waited = 0; waited < 3000 && !call.pollUnsafe(); waited += 10) {
+      for (const request of yield* permission.forSession(sessionID)) { asks++; yield* permission.reply({ requestID: request.id, reply: "once" }) }
+      yield* Effect.sleep("10 millis")
+    }
+    return { asks, exit: yield* Fiber.join(call) }
+  })
+  const allowed = yield* write("allowed")
+  expect(Exit.isSuccess(allowed.exit)).toBe(true)
+  expect(allowed.asks).toBe(0)
+  const deniedSession = yield* sessions.create({ location: { directory: location.directory }, title: "Native deny", agent: "build", model: { providerID: "test", id: "picked" }, permissions: [{ action: "edit", resource: "*", effect: "deny" }] } as never)
+  expect(Exit.isFailure((yield* write("denied", deniedSession.id)).exit)).toBe(true)
+  // Toggle the bundle only: the native write also activated Convex's path-scoped skill.
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify(membership))
+  const ordinary = yield* write("ordinary")
+  expect(Exit.isSuccess(ordinary.exit)).toBe(true)
+  expect(ordinary.asks).toBeGreaterThan(0)
+}), { id: "package-test-hook-ask", setup: async context => {
+  await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "edit", resource: "*", effect: "ask" })))
+} }))
+
+
+for (const reject of [false, true]) {
+  packageIt.live(`the real PayPal prompt hook ${reject ? "rejects a controlled prompt variant" : "approves without skipping native approval"} and ignores Read`, () => packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+    if (reject) hooks.hooks.PreToolUse[0].hooks[0].prompt = "Reject this modification with reason 'fixture payment rejection'. " + hooks.hooks.PreToolUse[0].hooks[0].prompt
+    const sample = yield* invocationSample("claude:paypal", reject ? { "hooks/hooks.json": JSON.stringify(hooks) } : {})
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    yield* activateExtUntilFinished
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Payment hook", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    writeFileSync(join(location.directory, "paypal.ts"), "export const payment = 'paypal';")
+    yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_paypal_read" as never, call: { type: "tool-call", name: "read", id: "call_paypal_read", input: { path: "paypal.ts" } } })
+    const llm = yield* TestLLM.Test
+    expect(yield* llm.requests()).toHaveLength(0)
+    yield* llm.push(TestLLM.text(JSON.stringify(reject ? { ok: false, reason: "fixture payment rejection" } : { ok: true }), "paypal-judgment"))
+    const running = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_paypal_write" as never, call: { type: "tool-call", name: "write", id: "call_paypal_write", input: { path: "paypal.ts", content: "export const payment = 'paypal.Buttons';" } } }).pipe(Effect.exit, Effect.forkChild)
+    const permission = yield* Permission.Service
+    let asks = 0
+    for (let waited = 0; waited < 3000 && !running.pollUnsafe(); waited += 10) {
+      for (const request of yield* permission.forSession(parent.id)) { asks++; yield* permission.reply({ requestID: request.id, reply: "once" }) }
+      yield* Effect.sleep("10 millis")
+    }
+    const exit = yield* Fiber.join(running)
+    expect(Exit.isFailure(exit)).toBe(reject)
+    expect(asks).toBe(reject ? 0 : 1)
+    expect(readFileSync(join(location.directory, "paypal.ts"), "utf8")).toBe(reject ? "export const payment = 'paypal';" : "export const payment = 'paypal.Buttons';")
+    const requests = yield* llm.requests()
+    expect(requests).toHaveLength(1)
+    expect(requests[0]!.tools).toHaveLength(0)
+    expect(requests[0]!.model.id).toBe("picked")
+    expect(JSON.stringify(requests[0])).toContain("PayPal SDK")
+    expect(JSON.stringify(requests[0])).toContain("paypal.ts")
+    expect(JSON.stringify(requests[0])).toContain("file_path")
+  }), { id: "paypal-native-ask", setup: async context => {
+    await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "edit", resource: "*", effect: "ask" })))
+  } }))
+}
+
+
+for (const continueOnBlock of [false, true]) {
+  packageIt.live(`a rejecting PayPal prompt hook ${continueOnBlock ? "feeds its error back to" : "ends"} the current native task`, () => packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+    hooks.hooks.PreToolUse[0].hooks[0].continueOnBlock = continueOnBlock
+    hooks.hooks.PreToolUse[0].hooks[0].prompt = "Reject this modification with reason 'fixture payment rejection'. " + hooks.hooks.PreToolUse[0].hooks[0].prompt
+    const sample = yield* invocationSample("claude:paypal", { "hooks/hooks.json": JSON.stringify(hooks) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    yield* activateExtUntilFinished
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Payment task judgment", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const llm = yield* TestLLM.Test
+    yield* llm.push(TestLLM.toolCall("call_payment", "write", { path: "payment.ts", content: "paypal.Buttons()" }), TestLLM.text('{"ok":false,"reason":"fixture payment rejection"}', "payment-reject"), TestLLM.text("I received the rejection", "payment-feedback"))
+    yield* sessions.prompt({ sessionID: parent.id, text: "Write the payment file" })
+    yield* sessions.wait(parent.id)
+    expect(yield* llm.requests()).toHaveLength(continueOnBlock ? 3 : 2)
+    expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("fixture payment rejection")
+    expect(yield* Effect.promise(() => Bun.file(join(location.directory, "payment.ts")).exists())).toBe(false)
+  })))
+}
+
+
+packageIt.live("the real hookify PostToolUse rule adds context after the native write", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  // Isolate the original post handler so a pre-handler cannot satisfy the assertion.
+  delete hooks.hooks.PreToolUse
+  const rule = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("examples/sensitive-files-warning.local.md")))
+  const sample = yield* invocationSample("claude:hookify", { "hooks/hooks.json": JSON.stringify(hooks) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  mkdirSync(join(location.directory, ".claude"), { recursive: true })
+  writeFileSync(join(location.directory, ".claude/hookify.sensitive.local.md"), rule)
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Post hook context", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_post_write", "write", { path: "credentials.txt", content: "not a real secret" }), TestLLM.text("Received the warning", "post-warning"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Write the fixture" })
+  yield* sessions.wait(parent.id)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(2)
+  expect(JSON.stringify(requests[0])).not.toContain("Sensitive file detected")
+  expect(JSON.stringify(requests[1])).toContain("Sensitive file detected")
+  expect(readFileSync(join(location.directory, "credentials.txt"), "utf8")).toBe("not a real secret")
+})))
+
+
+packageIt.live("the real security PermissionRequest hook denies before a native approval card", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:claude-security"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.py")))
+  const question = source.match(/START_CONFIRMATION = \(([\s\S]*?)\n\)/)![1]!.trim().split("\n").map(line => JSON.parse(line.trim())).join("")
+  // Keep the real handler and protocol; omit only its one-minute delay from this wiring regression.
+  const sample = yield* invocationSample("claude:claude-security", { "hooks/hooks.py": source.replace("UNANSWERED_AFTER_S = 60", "UNANSWERED_AFTER_S = 0") })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Security permission hook", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const running = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_security_ask" as never, call: { type: "tool-call", name: "question", id: "call_security_ask", input: { questions: [{ question, header: "Start", options: [{ label: "Yes", description: "Start the fixture scan" }] }] } } }).pipe(Effect.exit, Effect.forkChild)
+  const permission = yield* Permission.Service
+  let cards = 0
+  for (let waited = 0; waited < 3000 && !running.pollUnsafe(); waited += 10) {
+    for (const request of yield* permission.forSession(parent.id)) { cards++; yield* permission.reply({ requestID: request.id, reply: "reject" }) }
+    yield* Effect.sleep("10 millis")
+  }
+  const exit = yield* Fiber.join(running)
+  expect(Exit.isFailure(exit)).toBe(true)
+  expect(cards).toBe(0)
+  expect(JSON.stringify(exit)).toContain("No answer after 0 seconds")
+}), { id: "security-native-ask", setup: async context => {
+  await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "question", resource: "*", effect: "ask" })))
+} }))
+
+
+packageIt.live("the real security expansion activates its skill hook only for that native task", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:claude-security"))
+  const decoder = new TextDecoder()
+  const hooks = JSON.parse(decoder.decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  for (const group of hooks.hooks.UserPromptExpansion) for (const handler of group.hooks)
+    if (handler.command.includes(" turn")) handler.command = 'CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" ' + handler.command
+  const skill = decoder.decode(yield* Effect.promise(() => capture.readFile("skills/threat-model/SKILL.md")))
+  // Route source-owned Claude config state into the test package DATA; scripts remain original.
+  const sample = yield* invocationSample("claude:claude-security", { "hooks/hooks.json": JSON.stringify(hooks), "skills/threat-model/SKILL.md": skill.replace('command: sh ', 'command: printf s >>"${CLAUDE_PLUGIN_DATA}/scope-calls"; CLAUDE_CONFIG_DIR="${CLAUDE_PLUGIN_DATA}" sh ') })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const name = sample.hostNames["skill:skills/threat-model/SKILL.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Security scoped turn", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_security_outside", "write", { path: "unrelated.ts", content: "must not write" }), TestLLM.toolCall("call_security_inside", "write", { path: ".claude-security/threat-model.md", content: "fixture threat model" }), TestLLM.text("Threat model done", "security-scope-done"))
+  yield* commands.execute({ name, invocation: { sessionID: parent.id, prompt: { text: "Only inspect the fixture" }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "unrelated.ts")).exists())).toBe(false)
+  expect(readFileSync(join(location.directory, ".claude-security/threat-model.md"), "utf8")).toBe("fixture threat model")
+  const { pluginDataDirectory } = yield* Effect.promise(() => import("../../ui-mac/src/shared/installed-plugin-settings"))
+  const settings = JSON.parse(readFileSync(join(sample.root, "ext-store", sample.key, "package-settings.json"), "utf8"))
+  const calls = join(pluginDataDirectory(settings.dataHome, settings.packageId), "scope-calls")
+  expect(readFileSync(calls, "utf8")).toBe("ss")
+  expect(JSON.stringify(yield* sessions.context(parent.id))).toContain("Claude Security")
+  yield* llm.push(TestLLM.toolCall("call_security_after", "write", { path: "unrelated.ts", content: "ordinary next turn" }), TestLLM.text("Ordinary done", "security-ordinary"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Write an ordinary file" })
+  yield* sessions.wait(parent.id)
+  expect(readFileSync(join(location.directory, "unrelated.ts"), "utf8")).toBe("ordinary next turn")
+  expect(readFileSync(calls, "utf8")).toBe("ss")
+})))
+
+
+packageIt.live("a real Ralph Stop continuation retains invocation permissions until the task ends", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:ralph-loop"))
+  const source = new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("commands/ralph-loop.md")))
+  const sample = yield* invocationSample("claude:ralph-loop", { "commands/ralph-loop.md": source.replace("\n---\n", "\ndisallowed-tools: [Write]\n---\n") })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const name = sample.hostNames["command:commands/ralph-loop.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Ralph scope lifetime", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Work remains", "ralph-scope-working"), TestLLM.toolCall("call_ralph_scope_write", "write", { path: "ralph-scope.txt", content: "must remain denied" }), TestLLM.text("<promise>DONE</promise>", "ralph-scope-complete"))
+  yield* commands.execute({ name, invocation: { sessionID: parent.id, prompt: { text: 'Keep working --completion-promise DONE --max-iterations 3' }, delivery: "queue" } })
+  yield* sessions.wait(parent.id)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "ralph-scope.txt")).exists())).toBe(false)
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_ralph_after" as never, call: { type: "tool-call", name: "write", id: "call_ralph_after", input: { path: "ralph-scope.txt", content: "after task" } } })
+  expect(readFileSync(join(location.directory, "ralph-scope.txt"), "utf8")).toBe("after task")
+})))
+
+
+packageIt.live("dash0 failure hooks receive actual tool and execution failures without a Stop recovery", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const groups of Object.values(hooks.hooks) as { hooks: { command: string; args?: string[] }[] }[][]) for (const group of groups) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('failure-hook-events.jsonl',JSON.stringify(input)+'\\n')"]
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify(hooks) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Tool failure", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_failed_write", "write", { path: "failed.ts" }), TestLLM.text("Tool failure received", "failure-feedback"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Attempt an invalid write" })
+  yield* sessions.wait(parent.id)
+  const events = () => readFileSync(join(location.directory, "failure-hook-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  const tools = events().filter(event => event.hook_event_name === "PostToolUseFailure")
+  expect(tools).toHaveLength(1)
+  expect(tools[0]).toMatchObject({ tool_name: "Write", tool_use_id: "call_failed_write", is_interrupt: false })
+  expect(tools[0].error).toContain("content")
+  const broken = yield* sessions.create({ location: { directory: location.directory }, title: "Provider failure", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const { AIError, InvalidRequestError } = yield* Effect.promise(() => import("../../ai/src/schema/errors"))
+  yield* llm.push(TestLLM.failAfter(new AIError({ reason: new InvalidRequestError({ message: "fixture provider rejection" }) })))
+  yield* sessions.prompt({ sessionID: broken.id, text: "Produce a provider rejection" })
+  yield* sessions.wait(broken.id).pipe(Effect.exit)
+  for (let waited = 0; waited < 3000 && !events().some(event => event.hook_event_name === "StopFailure"); waited += 10) yield* Effect.sleep("10 millis")
+  const failed = events().filter(event => event.hook_event_name === "StopFailure")
+  expect(failed).toHaveLength(1)
+  expect(failed[0]).toMatchObject({ session_id: broken.id, error_details: "fixture provider rejection" })
+  expect(typeof failed[0].error).toBe("string")
+  expect(events().filter(event => event.session_id === broken.id && event.hook_event_name === "Stop")).toHaveLength(0)
+  expect(yield* llm.requests()).toHaveLength(3)
+})))
+
+packageIt.live("ConfigChange uses active package handlers once per revision and releases their rejection on disable", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const groups of Object.values(hooks.hooks) as { hooks: { command: string; args?: string[] }[] }[][]) for (const group of groups) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();if(input.hook_event_name==='ConfigChange'){fs.appendFileSync('config-hook-events.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({decision:'block',reason:'fixture keeps the previous configuration'}))}"]
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify(hooks) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Config observer", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* TestLLM.Test).push(TestLLM.text("Ready", "config-ready"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Observe configuration changes" })
+  yield* sessions.wait(session.id)
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const port = runtime.packageRuntime(location)!
+  expect(port).toBeDefined()
+  const change = { occurrenceId: "revision-a", source: "skills" as const, filePath: join(location.directory, ".opencode/skills/SKILL.md") }
+  const first = yield* Effect.promise(() => port.beforeConfigChange(change))
+  expect(first).toMatchObject({ apply: false, reason: "fixture keeps the previous configuration" })
+  expect(yield* Effect.promise(() => port.beforeConfigChange(change))).toEqual(first)
+  const events = () => readFileSync(join(location.directory, "config-hook-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(events()).toHaveLength(1)
+  expect(events()[0]).toMatchObject({ hook_event_name: "ConfigChange", session_id: session.id, source: "skills", file_path: change.filePath })
+  expect(yield* Effect.promise(() => port.beforeConfigChange({ ...change, occurrenceId: "revision-policy", source: "policy_settings" }))).toMatchObject({ apply: true })
+  expect(events()).toHaveLength(2)
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify(membership))
+  expect(yield* Effect.promise(() => port.beforeConfigChange(change))).toMatchObject({ apply: true })
+  expect(events()).toHaveLength(2)
+})))
+
+packageIt.live("PostToolBatch groups native terminal calls before the next request and never replays old batches", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:stripe"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  for (const groups of Object.values(hooks.hooks) as { hooks: { command: string; args?: string[] }[] }[][]) for (const group of groups) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();if(input.hook_event_name==='PostToolBatch'){fs.appendFileSync('batch-hook-events.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PostToolBatch',additionalContext:'BATCH_CONTEXT_BEFORE_REQUEST'}}))}"]
+  }
+  const sample = yield* invocationSample("claude:stripe", { "hooks/hooks.json": JSON.stringify(hooks) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  writeFileSync(join(location.directory, "batch-input.txt"), "batch fixture")
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Terminal batch", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const { LLMEvent } = yield* Effect.promise(() => import("../../ai/src/schema/events"))
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCalls(LLMEvent.toolCall({ id: "batch_read", name: "read", input: { path: "batch-input.txt" } }), LLMEvent.toolCall({ id: "batch_invalid_write", name: "write", input: { path: "invalid-batch.ts" } })), TestLLM.text("Batch done", "batch-done"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Read and attempt invalid write" })
+  yield* sessions.wait(session.id)
+  const events = () => readFileSync(join(location.directory, "batch-hook-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(events()).toHaveLength(1)
+  const calls = events()[0].tool_calls
+  expect(calls.map((call: { tool_use_id: string }) => call.tool_use_id)).toEqual(["batch_read", "batch_invalid_write"])
+  expect(calls[0]).toMatchObject({ tool_name: "Read", tool_input: { file_path: join(location.directory, "batch-input.txt") }, is_error: false })
+  expect(calls[1]).toMatchObject({ tool_name: "Write", is_error: true, is_interrupt: false })
+  expect(calls[1].error).toContain("content")
+  const history = yield* sessions.context(session.id)
+  const assistant = history.find(message => message.type === "assistant" && message.content.some(part => part.type === "tool" && part.id === "batch_read"))!
+  expect(events()[0].assistant_message_id).toBe(assistant.id)
+  const requests = yield* llm.requests()
+  expect(JSON.stringify(requests[0])).not.toContain("BATCH_CONTEXT_BEFORE_REQUEST")
+  expect(JSON.stringify(requests[1])).toContain("BATCH_CONTEXT_BEFORE_REQUEST")
+  yield* llm.push(TestLLM.text("Next turn", "batch-next"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Finish without tools" })
+  yield* sessions.wait(session.id)
+  expect(events()).toHaveLength(1)
+})))
+
+packageIt.live("package compact hooks block before a summary and observe the actual committed summary", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const event of ["PreCompact", "PostCompact"]) for (const group of hooks.hooks[event]) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('compact-hook-events.jsonl',JSON.stringify(input)+'\\n');if(input.hook_event_name==='PreCompact'&&!fs.existsSync('permit-compaction'))console.log(JSON.stringify({decision:'block',reason:'fixture preserves full context'}));if(input.hook_event_name==='PostCompact')console.log(JSON.stringify({continue:false,stopReason:'notification cannot undo compaction'}))"]
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { PreCompact: hooks.hooks.PreCompact, PostCompact: hooks.hooks.PostCompact } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Real compaction hooks", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("An ordinary answer", "before-compaction"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Preserve our current work" })
+  yield* sessions.wait(session.id)
+  yield* sessions.compact({ sessionID: session.id })
+  yield* sessions.wait(session.id)
+  const events = () => readFileSync(join(location.directory, "compact-hook-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(events()).toHaveLength(1)
+  expect(events()[0]).toMatchObject({ hook_event_name: "PreCompact", trigger: "manual", custom_instructions: null })
+  expect(yield* llm.requests()).toHaveLength(1)
+  expect(JSON.stringify(yield* sessions.context(session.id))).toContain("fixture preserves full context")
+  writeFileSync(join(location.directory, "permit-compaction"), "yes")
+  yield* llm.push(TestLLM.text("## Objective\nPreserved actual work", "actual-compaction-summary"))
+  yield* sessions.compact({ sessionID: session.id })
+  yield* sessions.wait(session.id)
+  expect(events().map(event => event.hook_event_name)).toEqual(["PreCompact", "PreCompact", "PostCompact"])
+  expect(events()[2]).toMatchObject({ trigger: "manual", compact_summary: expect.stringContaining("Preserved actual work") })
+  expect((yield* sessions.context(session.id)).some(message => message.type === "compaction" && message.status === "completed")).toBe(true)
+})))
+
+packageIt.live("Convex skill monitors start once per session and stop without late delivery when the bundle closes", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:convex"))
+  const monitors = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("monitors/monitors.json")))) as { name: string; command: string; when: string }[]
+  for (const monitor of monitors) monitor.command = 'node "${CLAUDE_PLUGIN_ROOT}/monitors/runtime-observe.mjs" ' + monitor.name
+  const observer = `import fs from 'node:fs';const name=process.argv[2];fs.appendFileSync('monitors-started.jsonl',JSON.stringify({name,pid:process.pid})+'\\n');process.stdout.write('MONITOR_STDOUT '+name+'\\r\\n');if(name.includes('insights')){process.on('SIGTERM',()=>{console.log('LATE_SOURCE_LINE');process.exit(0)});setInterval(()=>fs.writeFileSync('monitor-heartbeat',name),10)}else{process.stdout.write('MONITOR_FINAL '+name);process.stderr.write('MONITOR_STDERR_DIAGNOSTIC\\n')}`
+  const sample = yield* invocationSample("claude:convex", { "monitors/monitors.json": JSON.stringify(monitors), "monitors/runtime-observe.mjs": observer, "hooks/hooks.json": null })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const design = sample.description.entries.find(entry => entry.kind === "skill" && entry.sourceName === "design")!
+  const command = sample.hostNames[design.id]!
+  yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Scoped Convex monitors", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.always(TestLLM.text("A monitored task", "monitor-response"))
+  yield* sessions.prompt({ sessionID: session.id, text: "An ordinary turn without a Convex skill" })
+  yield* sessions.wait(session.id)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "monitors-started.jsonl")).exists())).toBe(false)
+  yield* commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Design this fixture" }, delivery: "queue" } })
+  yield* sessions.wait(session.id)
+  for (let waited = 0; waited < 2000 && !(yield* Effect.promise(() => Bun.file(join(location.directory, "monitor-heartbeat")).exists())); waited += 10) yield* Effect.sleep("10 millis")
+  const started = () => readFileSync(join(location.directory, "monitors-started.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(started().map(row => row.name).sort()).toEqual(["convex-occ-insights", "convex-runtime-errors"])
+  for (let waited = 0; waited < 2000 && !JSON.stringify(yield* sessions.context(session.id)).includes("MONITOR_FINAL"); waited += 10) yield* Effect.sleep("10 millis")
+  const history = JSON.stringify(yield* sessions.context(session.id))
+  expect(history).toContain("MONITOR_STDOUT convex-runtime-errors")
+  expect(history).toContain("MONITOR_FINAL convex-runtime-errors")
+  expect(history).toContain("MONITOR_STDOUT convex-occ-insights")
+  expect(history).not.toContain("MONITOR_STDERR_DIAGNOSTIC")
+  const alive = (pid: number) => { try { process.kill(pid, 0); return true } catch { return false } }
+  const live = started().find(row => row.name === "convex-occ-insights")!
+  expect(alive(live.pid)).toBe(true)
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify(membership))
+  for (let waited = 0; waited < 2000 && alive(live.pid); waited += 10) yield* Effect.sleep("10 millis")
+  expect(alive(live.pid)).toBe(false)
+  yield* commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Invoke while bundle is off" }, delivery: "queue" } })
+  yield* sessions.wait(session.id)
+  expect(started()).toHaveLength(2)
+  expect(JSON.stringify(yield* sessions.context(session.id))).not.toContain("LATE_SOURCE_LINE")
+})))
+
+packageIt.live("a first-input Convex skill invocation arms only its matching monitors", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:convex"))
+  const monitors = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("monitors/monitors.json")))) as { name: string; command: string }[]
+  for (const monitor of monitors) monitor.command = 'printf "%s\\n" ' + monitor.name + ' >> "${CLAUDE_PROJECT_DIR}/first-input-monitors"'
+  const sample = yield* invocationSample("claude:convex", { "monitors/monitors.json": JSON.stringify(monitors), "hooks/hooks.json": null })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const design = sample.description.entries.find(entry => entry.kind === "skill" && entry.sourceName === "design")!
+  const command = sample.hostNames[design.id]!
+  yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "First input invokes a skill", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* TestLLM.Test).always(TestLLM.text("Design started", "first-design"))
+  yield* commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Design as the first input" }, delivery: "queue" } })
+  yield* sessions.wait(session.id)
+  for (let waited = 0; waited < 1000 && !(yield* Effect.promise(() => Bun.file(join(location.directory, "first-input-monitors")).exists())); waited += 10) yield* Effect.sleep("10 millis")
+  expect(readFileSync(join(location.directory, "first-input-monitors"), "utf8").trim().split("\n").sort()).toEqual(["convex-occ-insights", "convex-runtime-errors"])
+})))
+
+packageIt.live("an always monitor waits for a real prompt and does not restart on later prompts", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:convex"))
+  const monitors = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("monitors/monitors.json")))) as { name: string; command: string; when?: string }[]
+  const monitor = monitors[0]!
+  delete monitor.when
+  monitor.command = 'printf "started\\n" >> "${CLAUDE_PROJECT_DIR}/always-monitor-started"; printf "ALWAYS_MONITOR_NOTICE\\n"'
+  const sample = yield* invocationSample("claude:convex", { "monitors/monitors.json": JSON.stringify([monitor]), "hooks/hooks.json": null })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Always monitor lifecycle", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "always-monitor-started")).exists())).toBe(false)
+  yield* (yield* TestLLM.Test).always(TestLLM.text("Always monitor task", "always-monitor-task"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Start a real task" })
+  yield* sessions.wait(session.id)
+  for (let waited = 0; waited < 1000 && !JSON.stringify(yield* sessions.context(session.id)).includes("ALWAYS_MONITOR_NOTICE"); waited += 10) yield* Effect.sleep("10 millis")
+  expect(JSON.stringify(yield* sessions.context(session.id))).toContain("ALWAYS_MONITOR_NOTICE")
+  yield* sessions.prompt({ sessionID: session.id, text: "Next ordinary prompt" })
+  yield* sessions.wait(session.id)
+  expect(readFileSync(join(location.directory, "always-monitor-started"), "utf8").trim().split("\n")).toEqual(["started"])
+})))
+
+packageIt.live("only command prompt lifecycle plaintext enters model context", () => packageJourney(Effect.gen(function* () {
+  const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+  const hooks = Object.fromEntries(["SessionStart", "UserPromptSubmit", "UserPromptExpansion", "PreToolUse", "PostToolUse"].map(event => [event, source.hooks[event] ?? structuredClone(source.hooks.UserPromptSubmit)]))
+  for (const groups of Object.values(hooks) as { matcher?: string; hooks: { command: string; args: string[] }[] }[][]) for (const group of groups) {
+    delete group.matcher
+    for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const input=await Bun.stdin.json();console.log(input.hook_event_name+'_PLAIN_CONTEXT')"]
+    }
+  }
+  const sample = yield* invocationSample("claude:feature-dev", { "hooks/hooks.json": JSON.stringify({ hooks }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  const commands = yield* Command.Service
+  yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Plain stdout boundary", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("plaintext_write", "write", { path: "plaintext.txt", content: "completed" }), TestLLM.text("Done", "plaintext-complete"))
+  yield* commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Write the file" }, delivery: "queue" } })
+  yield* sessions.wait(session.id)
+  const requests = JSON.stringify(yield* llm.requests())
+  for (const event of ["SessionStart", "UserPromptSubmit", "UserPromptExpansion"]) expect(requests).toContain(event + "_PLAIN_CONTEXT")
+  for (const event of ["PreToolUse", "PostToolUse"]) expect(requests).not.toContain(event + "_PLAIN_CONTEXT")
+  expect(readFileSync(join(location.directory, "plaintext.txt"), "utf8")).toBe("completed")
+})))
+
+packageIt.live("prompt hooks keep sensitive options as safe references before model generation", () => packageJourney(Effect.gen(function* () {
+  const tree = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("hooks/hooks.json"))))
+  const group = hooks.hooks.PreToolUse[0]
+  group.matcher = "Write"
+  group.hooks[0].prompt = "R21_PROMPT_SECURITY secret=${user_config.LANGFUSE_SECRET_KEY} public=${user_config.LANGFUSE_PUBLIC_KEY} root=${CLAUDE_PLUGIN_ROOT} $ARGUMENTS"
+  const sample = yield* invocationSample("claude:langfuse-observability", { "hooks/hooks.json": JSON.stringify({ hooks: { PreToolUse: [group] } }) })
+  const credential = join(sample.root, "prompt-option-fixture.json")
+  const secret = "r21_fake_prompt_secret_for_test_only"
+  handOver(credential, JSON.stringify(secret))
+  const id = sample.description.secrets.find(need => need.label === "LANGFUSE_SECRET_KEY")!.id
+  const settingsFile = join(sample.root, "ext-store", sample.key, "package-settings.json")
+  const settings = JSON.parse(readFileSync(settingsFile, "utf8"))
+  writeFileSync(settingsFile, JSON.stringify({ ...settings, values: { LANGFUSE_SECRET_KEY: { secret: id }, LANGFUSE_PUBLIC_KEY: "r21-public-value" }, secretRefs: { [id]: "{file:" + credential + "}" } }))
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt option security", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("prompt_option_write", "write", { path: "prompt-option.ts", content: "fixture" }), TestLLM.text('{"ok":true}', "prompt-option-judgment"), TestLLM.text("Done", "prompt-option-complete"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Write the file" })
+  yield* sessions.wait(session.id)
+  const judgments = (yield* llm.requests()).filter(request => JSON.stringify(request).includes("R21_PROMPT_SECURITY"))
+  expect(judgments).toHaveLength(1)
+  const prompt = JSON.stringify(judgments[0])
+  expect(prompt.includes(secret)).toBe(false)
+  expect(prompt).toContain("${user_config.LANGFUSE_SECRET_KEY}")
+  expect(prompt).toContain("r21-public-value")
+  expect(prompt).toContain(join(sample.live, "tree"))
+  expect(readFileSync(join(location.directory, "prompt-option.ts"), "utf8")).toBe("fixture")
+})))
+
+const runtimePromptSample = (event: "Stop" | "PostToolUse" | "PostToolUseFailure" | "UserPromptSubmit" | "UserPromptExpansion" | "PermissionRequest" | "PostToolBatch", continueOnBlock: boolean) => Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:paypal"))
+  const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("hooks/hooks.json"))))
+  const group = source.hooks.PreToolUse[0]
+  group.hooks[0].continueOnBlock = continueOnBlock
+  group.hooks[0].prompt = "Judge this fixture phase. " + group.hooks[0].prompt
+  if (!["PostToolUse", "PostToolUseFailure", "PermissionRequest"].includes(event)) delete group.matcher
+  source.hooks = { [event]: [group] }
+  const sample = yield* invocationSample(event === "UserPromptExpansion" ? "claude:feature-dev" : "claude:paypal", { "hooks/hooks.json": JSON.stringify(source) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  return sample
+})
+
+for (const impossible of [false, true]) packageIt.live(`package prompt Stop ${impossible ? "allows an impossible task to finish" : "continues the same task"}`, () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("Stop", false)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt Stop semantics", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Work remains", "prompt-stop-work"), TestLLM.text(JSON.stringify({ ok: false, reason: "fixture Stop judgment", impossible }), "prompt-stop-judgment"), ...(!impossible ? [TestLLM.text("Task finished", "prompt-stop-finished"), TestLLM.text('{"ok":true}', "prompt-stop-final-judgment")] : []))
+  yield* sessions.prompt({ sessionID: session.id, text: "Complete this task" })
+  yield* sessions.wait(session.id)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(impossible ? 2 : 4)
+  expect(requests[1]!.tools).toHaveLength(0)
+  expect(requests[1]!.messages.filter(message => message.role === "user").flatMap(message => message.content).filter(part => part.type === "text").map(part => part.text).join("\n")).toContain('"hook_event_name":"Stop"')
+  if (!impossible) expect(JSON.stringify(yield* sessions.context(session.id))).toContain("fixture Stop judgment")
+})))
+
+for (const continueOnBlock of [false, true]) packageIt.live(`package prompt PostToolUse ${continueOnBlock ? "feeds back" : "ends the turn"} after preserving the completed write`, () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("PostToolUse", continueOnBlock)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt post semantics", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("prompt_post_write", "write", { path: "completed-payment.ts", content: "paypal.Buttons()" }), TestLLM.text('{"ok":false,"reason":"fixture post judgment"}', "prompt-post-judgment"), TestLLM.text("Feedback received", "prompt-post-feedback"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Write the payment file" })
+  yield* sessions.wait(session.id)
+  const history = yield* sessions.context(session.id)
+  const call = history.flatMap(message => message.type === "assistant" ? message.content : []).find(part => part.type === "tool" && part.id === "prompt_post_write")
+  expect(call).toMatchObject({ type: "tool", state: { status: "completed" } })
+  expect(readFileSync(join(location.directory, "completed-payment.ts"), "utf8")).toBe("paypal.Buttons()")
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(continueOnBlock ? 3 : 2)
+  expect(requests[1]!.tools).toHaveLength(0)
+  expect(JSON.stringify(continueOnBlock ? requests[2]!.system : history)).toContain("fixture post judgment")
+})))
+
+packageIt.live("package prompt PostToolUseFailure feeds back even when continueOnBlock is false", () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("PostToolUseFailure", false)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt failure feedback", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("prompt_failed_write", "write", { path: "invalid-payment.ts" }), TestLLM.text('{"ok":false,"reason":"fixture failure feedback"}', "prompt-failure-judgment"), TestLLM.text("Recovered from the error", "prompt-failure-recovery"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Try the invalid write" })
+  yield* sessions.wait(session.id)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(3)
+  expect(requests[1]!.tools).toHaveLength(0)
+  expect(JSON.stringify(requests[2])).toContain("fixture failure feedback")
+})))
+
+for (const event of ["UserPromptSubmit", "UserPromptExpansion"] as const) packageIt.live(`package prompt ${event} rejects before the primary model despite continueOnBlock`, () => packageJourney(Effect.gen(function* () {
+  const sample = yield* runtimePromptSample(event, true)
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt entry rejection", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text('{"ok":false,"reason":"fixture prompt entry rejection"}', "prompt-entry-judgment"))
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]
+  if (event === "UserPromptExpansion") yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const exit = yield* (event === "UserPromptSubmit" ? sessions.prompt({ sessionID: session.id, text: "Reject this input" }) : commands.execute({ name: command!, invocation: { sessionID: session.id, prompt: { text: "Reject this expansion" }, delivery: "queue" } })).pipe(Effect.exit)
+  expect(Exit.isFailure(exit)).toBe(true)
+  expect(Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "").toContain("fixture prompt entry rejection")
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(1)
+  expect(requests[0]!.tools).toHaveLength(0)
+})))
+
+for (const ok of [false, true]) packageIt.live(`package prompt PermissionRequest ok=${ok} keeps the native approval`, () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("PermissionRequest", false)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt permission no-decision", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text(JSON.stringify({ ok, ...(ok ? {} : { reason: "fixture permission advice" }) }), "permission-prompt-judgment"))
+  const snapshot = yield* (yield* Tool.Service).snapshot()
+  const running = yield* snapshot.execute({ sessionID: session.id, agent: "build" as never, messageID: "msg_prompt_permission" as never, call: { type: "tool-call", name: "write", id: "prompt_permission_write", input: { path: "approved-payment.ts", content: "paypal.Buttons()" } } }).pipe(Effect.exit, Effect.forkChild)
+  const permission = yield* Permission.Service
+  let asks = 0
+  for (let waited = 0; waited < 2000 && !running.pollUnsafe(); waited += 10) {
+    for (const request of yield* permission.forSession(session.id)) { asks++; yield* permission.reply({ requestID: request.id, reply: "once" }) }
+    yield* Effect.sleep("10 millis")
+  }
+  expect(Exit.isSuccess(yield* Fiber.join(running))).toBe(true)
+  expect(asks).toBe(1)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(1)
+  expect(requests[0]!.tools).toHaveLength(0)
+}), { id: "prompt-permission-ask", setup: async context => { await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "edit", resource: "*", effect: "ask" }))) } }))
+
+packageIt.live("package prompt PostToolBatch stops the current turn despite continueOnBlock", () => packageJourney(Effect.gen(function* () {
+  yield* runtimePromptSample("PostToolBatch", true)
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Prompt batch rejection", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("prompt_batch_write", "write", { path: "batch-payment.ts", content: "paypal.Buttons()" }), TestLLM.text('{"ok":false,"reason":"fixture batch judgment"}', "batch-prompt-judgment"), TestLLM.text("Must not run", "unexpected-batch-continuation"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Write then judge the batch" })
+  yield* sessions.wait(session.id)
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(2)
+  expect(requests[1]!.tools).toHaveLength(0)
+  const history = yield* sessions.context(session.id)
+  expect(history.flatMap(message => message.type === "assistant" ? message.content : []).some(part => part.type === "text" && part.text.includes('"ok":false'))).toBe(false)
+  expect(JSON.stringify(history)).toContain("fixture batch judgment")
+})))
+
+packageIt.live("InstructionsLoaded runs actual package handlers after admission without replaying native AGENTS", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const groups of Object.values(hooks.hooks) as { hooks: { command: string; args?: string[] }[] }[][]) for (const group of groups) for (const handler of group.hooks) {
+    handler.command = process.execPath
+    handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();if(input.hook_event_name==='InstructionsLoaded')fs.appendFileSync('instruction-hook-events.jsonl',JSON.stringify(input)+'\\n')"]
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { InstructionsLoaded: hooks.hooks.InstructionsLoaded } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const discovery = yield* InstructionDiscovery.Service
+  const filePath = join(location.directory, "CLAUDE.md")
+  yield* discovery.transform(editor => {
+    editor.add(new InstructionDiscovery.File({ path: filePath, content: "INSTRUCTION_SOURCE_BOUNDARY", source: { sourcePath: filePath, scope: "Project" } }))
+    editor.add(new InstructionDiscovery.File({ path: join(location.directory, "AGENTS.md"), content: "native instructions" }))
+  })
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Instruction observer", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.always(TestLLM.text("Loaded", "instructions-loaded"))
+  yield* sessions.prompt({ sessionID: session.id, text: "Use these instructions" })
+  yield* sessions.wait(session.id)
+  const log = join(location.directory, "instruction-hook-events.jsonl")
+  yield* ext.finish(Effect.promise(() => Bun.file(log).exists()))
+  expect(yield* Effect.promise(() => Bun.file(log).exists())).toBe(true)
+  const first = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(first).toEqual([expect.objectContaining({ hook_event_name: "InstructionsLoaded", session_id: session.id, file_path: filePath, memory_type: "Project", load_reason: "session_start" })])
+  expect(JSON.stringify((yield* llm.requests())[0]!.system)).toContain("INSTRUCTION_SOURCE_BOUNDARY")
+  yield* sessions.prompt({ sessionID: session.id, text: "Continue" })
+  yield* sessions.wait(session.id)
+  expect(readFileSync(log, "utf8").trim().split("\n")).toHaveLength(1)
+})))
+
+packageIt.live("a held InstructionsLoaded process cannot delay native prompt admission or the model", () => packageJourney(Effect.gen(function* () {
+  const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+  for (const group of source.hooks.InstructionsLoaded) {
+    delete group.matcher
+    for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');await Bun.stdin.json();fs.writeFileSync('instruction-observer-started','');while(!fs.existsSync('instruction-observer-release'))await Bun.sleep(10);fs.writeFileSync('instruction-observer-completed','')"]
+    }
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { InstructionsLoaded: source.hooks.InstructionsLoaded } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const discovery = yield* InstructionDiscovery.Service
+  const filePath = join(location.directory, "CLAUDE.md")
+  yield* discovery.transform(editor => editor.add(new InstructionDiscovery.File({ path: filePath, content: "ASYNC_ADMITTED_SOURCE", source: { sourcePath: filePath, scope: "Project" } })))
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Async instruction observer", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const admission = yield* sessions.prompt({ sessionID: session.id, text: "Use the admitted instructions" }).pipe(Effect.forkScoped)
+  yield* Effect.gen(function* () {
+    yield* ext.finish(Effect.promise(() => Bun.file(join(location.directory, "instruction-observer-started")).exists()))
+    yield* ext.finish(Effect.sync(() => admission.pollUnsafe() !== undefined))
+    yield* sessions.wait(session.id)
+    expect(yield* Effect.promise(() => Bun.file(join(location.directory, "instruction-observer-completed")).exists())).toBe(false)
+    expect(JSON.stringify(yield* (yield* TestLLM.Test).requests())).toContain("ASYNC_ADMITTED_SOURCE")
+    writeFileSync(join(location.directory, "instruction-observer-release"), "")
+    yield* ext.finish(Effect.promise(() => Bun.file(join(location.directory, "instruction-observer-completed")).exists()))
+    yield* Fiber.join(admission)
+  }).pipe(Effect.ensuring(Effect.sync(() => writeFileSync(join(location.directory, "instruction-observer-release"), ""))))
+})))
+
+const subagentHookSample = (matcher?: string) => Effect.gen(function* () {
+  const agent = yield* invocationSample("claude:feature-dev")
+  const agentMembership = JSON.parse(readFileSync(join(agent.root, "skills-enabled.json"), "utf8"))
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const event of ["SubagentStart", "SubagentStop"]) for (const group of hooks.hooks[event]) {
+    if (matcher) group.matcher = matcher
+    else delete group.matcher
+    for (const handler of group.hooks) {
+      handler.command = process.execPath
+      handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();const log='subagent-hook-events.jsonl';fs.appendFileSync(log,JSON.stringify({...input,parent_projection:fs.readFileSync(input.transcript_path,'utf8'),child_projection:input.agent_transcript_path?fs.readFileSync(input.agent_transcript_path,'utf8'):''})+'\\n');if(input.hook_event_name==='SubagentStart')console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'SubagentStart',additionalContext:'CHILD_START_BEFORE_MODEL'}}));if(input.hook_event_name==='SubagentStop'&&fs.readFileSync(log,'utf8').trim().split('\\n').map(x=>JSON.parse(x)).filter(x=>x.hook_event_name==='SubagentStop').length===1)console.log(JSON.stringify({decision:'block',reason:'finish this child only'}))"]
+    }
+  }
+  const observer = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { SubagentStart: hooks.hooks.SubagentStart, SubagentStop: hooks.hooks.SubagentStop } }) })
+  const membership = JSON.parse(readFileSync(join(observer.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(observer.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...new Set([...membership.keys, ...agentMembership.keys, observer.key])] }))
+  return agent
+})
+
+packageIt.live("subagent hooks bind real child identity before its first model and continue only that child", () => packageJourney(Effect.gen(function* () {
+  const agent = yield* subagentHookSample("^feature-dev:code-reviewer$")
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const target = agent.hostNames["agent:agents/code-reviewer.md"]!
+  yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Real parent", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.text("Parent recorded", "subagent-parent"), TestLLM.text("Child first result", "subagent-first"), TestLLM.text("Child finished", "subagent-finished"))
+  yield* sessions.prompt({ sessionID: parent.id, text: "Prepare the real parent" })
+  yield* sessions.wait(parent.id)
+  yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_source_subagent" as never, call: { type: "tool-call", name: "subagent", id: "source_subagent", input: { agent: target, description: "Review", prompt: "Review this project", background: false } } })))
+  const children = (yield* sessions.list({ parentID: parent.id })).data
+  expect(children).toHaveLength(1)
+  const log = join(location.directory, "subagent-hook-events.jsonl")
+  expect(yield* Effect.promise(() => Bun.file(log).exists())).toBe(true)
+  const rows = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(rows.map(row => row.hook_event_name)).toEqual(["SubagentStart", "SubagentStop", "SubagentStop"])
+  for (const row of rows) {
+    expect(row).toMatchObject({ session_id: parent.id, agent_id: children[0]!.id, agent_type: "feature-dev:code-reviewer" })
+    expect(row.transcript_path).not.toBe(row.agent_transcript_path)
+    expect(row.parent_projection).toContain("Parent recorded")
+  }
+  expect(rows[1]).toMatchObject({ last_assistant_message: "Child first result", stop_hook_active: false })
+  expect(rows[2]).toMatchObject({ last_assistant_message: "Child finished", stop_hook_active: true })
+  expect(rows[1]!.child_projection).toContain("Child first result")
+  const requests = yield* llm.requests()
+  expect(requests).toHaveLength(3)
+  expect(JSON.stringify(requests[1]!.system)).toContain("CHILD_START_BEFORE_MODEL")
+  expect(JSON.stringify(requests[2])).toContain("finish this child only")
+})))
+
+packageIt.live("real subagents skip main session phases and release transports on completion and parent leave", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const sent: unknown[] = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge: createHubBridge({ postMessage: message => { sent.push(message) }, on: (_, listener) => { listeners.push(listener) } }) }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  let paused: string | undefined
+  let release = () => {}
+  yield* Effect.addFinalizer(() => Effect.sync(() => release()))
+  yield* packageJourney(Effect.gen(function* () {
+    const { sessionMcpHandler } = yield* Effect.promise(() => import("../../core/test/fixture/codepuppy-mcp-session"))
+    const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+    const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
+    const handler = yield* Effect.promise(sessionMcpHandler)
+    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: handler.fetch })
+    yield* Effect.addFinalizer(() => Effect.sync(() => { server.stop(true) }))
+    const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+    const hooks = Object.fromEntries(["SessionStart", "UserPromptSubmit", "SubagentStart", "SubagentStop", "Elicitation"].map(event => [event, source.hooks[event]]))
+    for (const groups of Object.values(hooks) as { matcher?: string; hooks: { command: string; args: string[] }[] }[][]) for (const group of groups) {
+      delete group.matcher
+      for (const hook of group.hooks) {
+        hook.command = process.execPath
+        hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('child-phases.jsonl',JSON.stringify(input)+'\\n')"]
+      }
+    }
+    const monitorTree = yield* Effect.promise(() => captureStandardFixture("claude:convex"))
+    const monitor = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => monitorTree.readFile("monitors/monitors.json"))))[0]
+    delete monitor.when
+    monitor.command = 'printf "unexpected child monitor\\n" >> "${CLAUDE_PROJECT_DIR}/child-always-monitor"'
+    const sample = yield* invocationSample("claude:feature-dev", { "hooks/hooks.json": JSON.stringify({ hooks }), "monitors/monitors.json": JSON.stringify([monitor]) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const target = sample.hostNames["agent:agents/code-reviewer.md"]!
+    yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    writeFileSync(join(location.directory, "child-probe.txt"), "controlled read")
+    const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Subagent resource owner", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const mcp = yield* Mcp.Service
+    yield* mcp.add("child-remote", new ConfigMCP.Remote({ type: "remote", url: server.url.href, oauth: false }))
+    yield* mcp.awaitStartup()
+    const snapshot = yield* (yield* Tool.Service).snapshot()
+    const llm = yield* TestLLM.Test
+    for (const leaveParent of [false, true]) {
+      paused = undefined
+      yield* llm.push(TestLLM.toolCall("child_pause_call", "read", { path: "child-probe.txt" }), TestLLM.text("Child complete", "child-complete"))
+      const task = yield* snapshot.execute({ sessionID: parent.id, agent: "build" as never, messageID: "msg_child_resource" as never, call: { type: "tool-call", name: "subagent", id: "child_resource", input: { agent: target, description: "Resource lifetime", prompt: "Pause before finishing", background: false } } }).pipe(Effect.forkScoped)
+      yield* ext.finish(Effect.sync(() => paused !== undefined))
+      const child = paused!
+      yield* mcp.callTool({ server: "child-remote", name: "echo", sessionID: child as never })
+      expect(handler.counts).toEqual({ opened: leaveParent ? 3 : 2, closed: leaveParent ? 1 : 0 })
+      const rows = readFileSync(join(location.directory, "child-phases.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+      expect(rows.filter(row => row.session_id === child && ["SessionStart", "UserPromptSubmit"].includes(row.hook_event_name))).toEqual([])
+      expect(yield* Effect.promise(() => Bun.file(join(location.directory, "child-always-monitor")).exists())).toBe(false)
+      if (leaveParent) {
+        for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 2023, sessionId: parent.id, action: "leave", reason: "clear" } })
+        yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 2023)))
+        expect(handler.counts.closed).toBe(2)
+      }
+      release()
+      yield* Fiber.join(task)
+      yield* ext.finish(Effect.sync(() => handler.counts.closed === (leaveParent ? 2 : 1)))
+      const completed = readFileSync(join(location.directory, "child-phases.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+      expect(completed.filter(row => row.hook_event_name === "SubagentStart")).toHaveLength(leaveParent ? 2 : 1)
+      expect(completed.filter(row => row.hook_event_name === "SubagentStop")).toHaveLength(leaveParent ? 2 : 1)
+    }
+    expect(yield* llm.requests()).toHaveLength(4)
+  }), { id: "child-resource-pause", setup: async context => {
+    await context.tool.transform(editor => editor.update("read", tool => {
+      const execute = tool.execute
+      tool.execute = async (value, frame) => {
+        paused = frame.sessionID
+        await new Promise<void>(resolve => { release = resolve; frame.signal.addEventListener("abort", resolve, { once: true }) })
+        return execute(value, frame)
+      }
+    }))
+  } })
+}))
+
+packageIt.live("a normal session with a parent does not fabricate subagent lifecycle events", () => packageJourney(Effect.gen(function* () {
+  yield* subagentHookSample()
+  yield* invocationNativeServices
+  yield* activateExtUntilFinished
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const parent = yield* sessions.create({ location: { directory: location.directory }, title: "Ordinary parent", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const child = yield* sessions.create({ location: { directory: location.directory }, parentID: parent.id, title: "Ordinary child", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* (yield* TestLLM.Test).push(TestLLM.text("Ordinary response", "ordinary-child"))
+  yield* sessions.prompt({ sessionID: child.id, text: "This was not a subagent invocation" })
+  yield* sessions.wait(child.id)
+  expect(yield* Effect.promise(() => Bun.file(join(location.directory, "subagent-hook-events.jsonl")).exists())).toBe(false)
+})))
+
+packageIt.live("the original Claude Security guard receives the source agent identity before a shell call", () => {
+  const observed = { executions: 0 }
+  return packageJourney(Effect.gen(function* () {
+    const sample = yield* invocationSample("claude:claude-security")
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const target = sample.hostNames["agent:agents/scan-verifier.md"]!
+    yield* ext.finish((yield* Agent.Service).get(target as never).pipe(Effect.map(Boolean)))
+    const location = yield* Location.Service
+    const sessions = yield* Sessions.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Original guard", agent: target, model: { providerID: "test", id: "picked" } } as never)
+    const result = yield* (yield* Tool.Service).snapshot().pipe(Effect.flatMap(snapshot => snapshot.execute({ sessionID: session.id, agent: target as never, messageID: "msg_security_source_guard" as never, call: { type: "tool-call", name: "shell", id: "security_source_guard", input: { command: "python3 -c 'print(7)'" } } })), Effect.exit)
+    expect(Exit.isFailure(result)).toBe(true)
+    expect(Exit.isFailure(result) ? Cause.pretty(result.cause) : "").toContain("interpreter")
+    expect(observed.executions).toBe(0)
+  }), { id: "source-guard-shell-probe", setup: async context => {
+    await context.tool.transform(editor => editor.add({ name: "shell", description: "Native shell execution boundary probe", options: { codemode: false }, input: ShellTool.Input, execute: async () => { observed.executions++; return { content: "shell reached" } } }))
+  } })
+})
+
+for (const { handled, matcher } of [{ handled: true, matcher: "^r17-elicitation$" }, { handled: false, matcher: "^r17-elicitation$" }, { handled: true, matcher: "*" }]) packageIt.live(`package elicitation ${matcher === "*" ? "match-all answers before native input" : handled ? "answers before native input" : "modifies the real user result"} through the actual stdio transport`, () => packageJourney(Effect.gen(function* () {
+  const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+  const { Form } = yield* Effect.promise(() => import("../../core/src/form"))
+  const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  // The fixed dash0 groups supply the real event format; only the executable is an observing handler.
+  for (const event of ["Elicitation", "ElicitationResult"]) for (const group of hooks.hooks[event]) {
+    group.matcher = matcher
+    for (const handler of group.hooks) {
+      handler.command = process.execPath
+      handler.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('elicitation-events.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({hookSpecificOutput:{hookEventName:input.hook_event_name,...(" + handled + "||input.hook_event_name==='ElicitationResult'?{action:'accept',content:{answer:'package result'}}:{})}}))"]
+    }
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { Elicitation: hooks.hooks.Elicitation, ElicitationResult: hooks.hooks.ElicitationResult } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Elicitation owner", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const mcp = yield* Mcp.Service
+  const forms = yield* Form.Service
+  yield* mcp.add("r17-elicitation", new ConfigMCP.Local({ type: "local", protocol: "legacy", command: [process.execPath, join(import.meta.dir, "../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")] }))
+  yield* mcp.awaitStartup()
+  const call = yield* mcp.callTool({ server: "r17-elicitation", name: "elicit", sessionID: session.id }).pipe(Effect.forkScoped)
+  if (!handled) {
+    yield* ext.finish(forms.list().pipe(Effect.map(list => list.length === 1)))
+    const form = (yield* forms.list())[0]!
+    expect(form.sessionID).toBe(session.id)
+    yield* forms.reply({ id: form.id, answer: { answer: "native response" } })
+  }
+  expect(JSON.stringify(yield* Fiber.join(call).pipe(Effect.timeout("3 seconds")))).toContain("package result")
+  expect(yield* forms.list()).toHaveLength(0)
+  const rows = readFileSync(join(location.directory, "elicitation-events.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))
+  expect(rows.map(row => row.hook_event_name)).toEqual(handled ? ["Elicitation"] : ["Elicitation", "ElicitationResult"])
+  expect(rows.every(row => row.session_id === session.id && row.mcp_server_name === "r17-elicitation")).toBe(true)
+  expect(rows[0]).toMatchObject({ mode: "form", message: "SDK fixture input", requested_schema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] } })
+  if (!handled) expect(rows[1]).toMatchObject({ action: "accept", content: { answer: "native response" } })
+})))
+
+// dash0 event groups and hookify skill frontmatter; controlled handlers observe a real paused native write.
+packageIt.live("leave during a running task preserves its pending decision scoped hooks and environment until idle", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const sent: unknown[] = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  const hubBridge = createHubBridge({ postMessage: message => { sent.push(message) }, on: (_, listener) => { listeners.push(listener) } })
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  yield* packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+    for (const group of hooks.hooks.SessionStart) for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');await Bun.stdin.json();fs.appendFileSync(process.env.CLAUDE_ENV_FILE,'export R20_RETAINED=retained\\n');fs.writeFileSync('task-env-path',process.env.CLAUDE_ENV_FILE)"]
+    }
+    for (const group of hooks.hooks.PreToolUse) {
+      delete group.matcher
+      for (const hook of group.hooks) {
+        hook.command = process.execPath
+        hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('task-scoped.jsonl',JSON.stringify({path:input.tool_input.file_path,value:process.env.R20_RETAINED})+'\\n');if(input.tool_input.file_path.endsWith('blocked.txt')){fs.writeFileSync('task-decision-started','');while(!fs.existsSync('task-release'))await Bun.sleep(10);console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason:'BLOCK_AFTER_LEAVE'}}))}"]
+      }
+    }
+    const skillTree = yield* Effect.promise(() => captureStandardFixture("claude:hookify"))
+    const skillSource = new TextDecoder().decode(yield* Effect.promise(() => skillTree.readFile("skills/writing-rules/SKILL.md")))
+    const sample = yield* invocationSample("claude:hookify", {
+      "hooks/hooks.json": JSON.stringify({ hooks: { SessionStart: hooks.hooks.SessionStart } }),
+      "skills/writing-rules/SKILL.md": skillSource.replace(/^---\r?\n/, () => "---\nhooks: " + JSON.stringify({ PreToolUse: hooks.hooks.PreToolUse }) + "\n"),
+    })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const skills = yield* Skill.Service
+    const name = sample.hostNames["skill:skills/writing-rules/SKILL.md"]!
+    yield* ext.finish(skills.list().pipe(Effect.map(list => list.some(item => item.name === name))))
+    const skill = (yield* skills.list()).find(item => item.name === name)!
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Leave during native write", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    const llm = yield* TestLLM.Test
+    yield* llm.push(TestLLM.toolCall("leave_blocked", "write", { path: "blocked.txt", content: "must not run" }), TestLLM.toolCall("leave_allowed", "write", { path: "allowed.txt", content: "task continued" }), TestLLM.text("Task complete", "leave-complete"))
+    yield* sessions.prompt({ sessionID: session.id, text: "Use the scoped skill", skills: [{ id: skill.id }] })
+    yield* ext.finish(Effect.promise(() => Bun.file(join(location.directory, "task-decision-started")).exists()))
+    yield* Effect.addFinalizer(() => Effect.sync(() => writeFileSync(join(location.directory, "task-release"), "")))
+    for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 2020, sessionId: session.id, action: "leave", reason: "clear" } })
+    yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 2020)))
+    const environment = readFileSync(join(location.directory, "task-env-path"), "utf8")
+    const retained = yield* Effect.promise(() => Bun.file(environment).exists())
+    writeFileSync(join(location.directory, "task-release"), "")
+    yield* sessions.wait(session.id)
+    expect(retained).toBe(true)
+    expect(yield* Effect.promise(() => Bun.file(join(location.directory, "blocked.txt")).exists())).toBe(false)
+    expect(readFileSync(join(location.directory, "allowed.txt"), "utf8")).toBe("task continued")
+    expect(JSON.stringify(yield* sessions.context(session.id))).toContain("BLOCK_AFTER_LEAVE")
+    expect(readFileSync(join(location.directory, "task-scoped.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line))).toEqual([
+      { path: join(location.directory, "blocked.txt"), value: "retained" },
+      { path: join(location.directory, "allowed.txt"), value: "retained" },
+    ])
+    yield* ext.finish(Effect.promise(async () => !await Bun.file(environment).exists()))
+  }))
+}))
+
+packageIt.live("hook matchers select compaction trigger instruction load reason and SessionEnd reason", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const sent: unknown[] = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge: createHubBridge({ postMessage: message => { sent.push(message) }, on: (_, listener) => { listeners.push(listener) } }) }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  yield* packageJourney(Effect.gen(function* () {
+    const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+    const hooks = Object.fromEntries(["PreCompact", "InstructionsLoaded", "SessionEnd"].map(event => [event, source.hooks[event]]))
+    for (const [event, groups] of Object.entries(hooks) as [string, { matcher: string; hooks: { command: string; args: string[] }[] }[]][]) for (const group of groups) {
+      group.matcher = event === "PreCompact" ? "manual" : event === "InstructionsLoaded" ? "session_start" : "clear"
+      for (const hook of group.hooks) {
+        hook.command = process.execPath
+        hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('matcher-fields.jsonl',JSON.stringify(input)+'\\n')"]
+      }
+    }
+    const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks }) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const location = yield* Location.Service
+    const sessions = yield* Sessions.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Official matcher fields", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    yield* sessions.prompt({ sessionID: session.id, text: "Start the real Session" })
+    yield* sessions.wait(session.id)
+    const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+    const port = runtime.packageRuntime(location)!
+    const log = join(location.directory, "matcher-fields.jsonl")
+    yield* Effect.promise(() => port.beforeCompaction({ sessionID: session.id, trigger: "auto", customInstructions: null }))
+    expect(yield* Effect.promise(() => Bun.file(log).exists())).toBe(false)
+    yield* Effect.promise(() => port.beforeCompaction({ sessionID: session.id, trigger: "manual", customInstructions: null }))
+    yield* Effect.promise(() => port.instructionsLoaded({ sessionID: session.id, occurrenceId: "r21-matcher", filePath: join(location.directory, "CLAUDE.md"), memoryType: "Project", loadReason: "session_start" }))
+    yield* ext.finish(Effect.sync(() => { try { return readFileSync(log, "utf8").trim().split("\n").length === 2 } catch { return false } }))
+    for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 2124, sessionId: session.id, action: "leave", reason: "clear" } })
+    yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 2124)))
+    yield* ext.finish(Effect.sync(() => { try { return readFileSync(log, "utf8").trim().split("\n").length === 3 } catch { return false } }))
+    const rows = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ hook_event_name: "PreCompact", trigger: "manual" }),
+      expect.objectContaining({ hook_event_name: "InstructionsLoaded", memory_type: "Project", load_reason: "session_start" }),
+      expect.objectContaining({ hook_event_name: "SessionEnd", reason: "clear" }),
+    ]))
+  }))
+}))
+
+packageIt.live("real SessionEnd runs the package hook and closes its remote transport before the parentPort reply", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const sent: unknown[] = []
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  const hubBridge = createHubBridge({ postMessage: message => { sent.push(message) }, on: (_, listener) => { listeners.push(listener) } })
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  yield* packageJourney(Effect.gen(function* () {
+    const { sessionMcpHandler } = yield* Effect.promise(() => import("../../core/test/fixture/codepuppy-mcp-session"))
+    const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+    const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
+    const handler = yield* Effect.promise(sessionMcpHandler)
+    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: handler.fetch })
+    yield* Effect.addFinalizer(() => Effect.sync(() => { server.stop(true) }))
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+    for (const event of ["SessionEnd", "Elicitation"]) for (const group of hooks.hooks[event]) for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.writeFileSync('session-end.json',JSON.stringify(input))"]
+    }
+    const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { SessionEnd: hooks.hooks.SessionEnd, Elicitation: hooks.hooks.Elicitation } }) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Session end lifetime", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    yield* sessions.prompt({ sessionID: session.id, text: "Start the real session" })
+    yield* sessions.wait(session.id)
+    const mcp = yield* Mcp.Service
+    yield* mcp.add("session-end-remote", new ConfigMCP.Remote({ type: "remote", url: server.url.href, oauth: false }))
+    yield* mcp.awaitStartup()
+    yield* mcp.callTool({ server: "session-end-remote", name: "echo", sessionID: session.id })
+    expect(handler.counts).toEqual({ opened: 2, closed: 0 })
+    for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 1776, sessionId: session.id, action: "leave", reason: "clear" } })
+    yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 1776)))
+    expect(sent.find(message => (message as { id?: number }).id === 1776)).toEqual({ id: 1776, ok: true })
+    expect(handler.counts).toEqual({ opened: 2, closed: 1 })
+    expect(JSON.parse(readFileSync(join(location.directory, "session-end.json"), "utf8"))).toMatchObject({ hook_event_name: "SessionEnd", session_id: session.id, reason: "clear" })
+    for (const listener of listeners) listener({ data: { type: "codepuppy.plugin.session", id: 1777, sessionId: session.id, action: "leave", reason: "clear" } })
+    yield* ext.finish(Effect.sync(() => sent.some(message => (message as { id?: number }).id === 1777)))
+    expect(handler.counts.closed).toBe(1)
+  }))
+}))
+
+packageIt.live("an unattended real session keeps native elicitation cancellation without package auto-answer", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const hubBridge = createHubBridge(undefined)
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state }))
+  yield* packageJourney(Effect.gen(function* () {
+    const { Mcp } = yield* Effect.promise(() => import("../../core/src/mcp"))
+    const { Form } = yield* Effect.promise(() => import("../../core/src/form"))
+    const { ConfigMCP } = yield* Effect.promise(() => import("../../schema/src/config/mcp"))
+    const { buildUnattendedLive } = yield* Effect.promise(() => import("../../ui-mac/src/main/codepuppy-sidecar-messages"))
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+    for (const event of ["Elicitation", "ElicitationResult"]) for (const group of hooks.hooks[event]) for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "require('node:fs').writeFileSync('unattended-hook-ran','bad');console.log(JSON.stringify({hookSpecificOutput:{action:'accept',content:{answer:'bypass'}}}))"]
+    }
+    const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { Elicitation: hooks.hooks.Elicitation, ElicitationResult: hooks.hooks.ElicitationResult } }) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Unattended elicitation", agent: "codepuppy-automation-standard", model: { providerID: "test", id: "picked" } } as never)
+    hubBridge.unattended.install(buildUnattendedLive({ seq: 1, nonce: "r17-elicitation", sessions: [{ sessionID: session.id, agent: "codepuppy-automation-standard", promptID: "msg_unattended_elicitation" }] }))
+    const mcp = yield* Mcp.Service
+    const forms = yield* Form.Service
+    yield* mcp.add("unattended-elicitation", new ConfigMCP.Local({ type: "local", protocol: "legacy", command: [process.execPath, join(import.meta.dir, "../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")] }))
+    yield* mcp.awaitStartup()
+    const call = yield* mcp.callTool({ server: "unattended-elicitation", name: "elicit", sessionID: session.id }).pipe(Effect.forkScoped)
+    yield* ext.finish(forms.list().pipe(Effect.map(list => list.length === 1)))
+    const form = (yield* forms.list())[0]!
+    expect(form.sessionID).toBe(session.id)
+    yield* forms.cancel(form.id)
+    const response = (yield* Fiber.join(call)).content.find(part => part.type === "text")!
+    expect(response.type === "text" ? JSON.parse(response.text) : undefined).toEqual({ action: "cancel" })
+    expect(yield* Effect.promise(() => Bun.file(join(location.directory, "unattended-hook-ran")).exists())).toBe(false)
+  }))
+}))
+
+packageIt.live("main forwards real permission and completion notifications to the package once per native occurrence", () => Effect.gen(function* () {
+  const { processState } = yield* Effect.promise(() => import("./plugin"))
+  const { createHubBridge } = yield* Effect.promise(() => import("./hub-bridge"))
+  const { createPluginSessionRequester, watchPluginSessionNotifications } = yield* Effect.promise(() => import("../../ui-mac/src/main/plugin-session-lifecycle"))
+  const state = processState()
+  const holder = globalThis as { [PROCESS_STATE_KEY]?: typeof state }
+  const listeners: Array<(event: { data: unknown }) => void> = []
+  const requester = createPluginSessionRequester(message => { for (const listener of listeners) listener({ data: message }) })
+  const hubBridge = createHubBridge({ postMessage: message => { requester.receive(message) }, on: (_, listener) => { listeners.push(listener) } })
+  holder[PROCESS_STATE_KEY] = { ...state, hubBridge }
+  yield* Effect.addFinalizer(() => Effect.sync(() => { holder[PROCESS_STATE_KEY] = state; requester.close() }))
+  let producer!: Plugin.Context
+  yield* packageJourney(Effect.gen(function* () {
+    const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+    const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+    for (const group of hooks.hooks.Notification) for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();fs.appendFileSync('native-notifications.jsonl',JSON.stringify(input)+'\\n');console.log(JSON.stringify({continue:false,systemMessage:'notification cannot stop execution'}))"]
+    }
+    const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { Notification: hooks.hooks.Notification } }) })
+    const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+    writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const watcher = watchPluginSessionNotifications(producer)
+    yield* Effect.addFinalizer(() => Effect.promise(watcher.stop))
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const agents = yield* Agent.Service
+    yield* agents.transform(editor => editor.update("build" as never, agent => { agent.permissions = [{ action: "shell", resource: "*", effect: "ask" }] }))
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Native notification", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+    yield* sessions.prompt({ sessionID: session.id, text: "Complete this native task" })
+    yield* sessions.wait(session.id)
+    const log = join(location.directory, "native-notifications.jsonl")
+    yield* ext.finish(Effect.promise(() => Bun.file(log).exists()))
+    const permissions = yield* Permission.Service
+    const ask = yield* permissions.ask({ sessionID: session.id, action: "shell", resources: ["native notification permission"] }).pipe(Effect.forkScoped)
+    yield* ext.finish(Effect.sync(() => readFileSync(log, "utf8").includes("permission_prompt")))
+    const pending = (yield* permissions.list())[0]!
+    yield* permissions.reply({ requestID: pending.id, reply: "once" })
+    yield* Fiber.join(ask)
+    const rows = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line))
+    expect(rows.filter(row => row.notification_type === "idle_prompt")).toHaveLength(1)
+    expect(rows.filter(row => row.notification_type === "permission_prompt")).toHaveLength(1)
+    expect(rows.every(row => row.session_id === session.id && typeof row.message === "string")).toBe(true)
+    expect(JSON.stringify(yield* sessions.context(session.id))).not.toContain("notification cannot stop execution")
+  }), { id: "actual-notification-producer", setup: async context => { producer = context } })
+}))
+
+packageIt.live("native Session deletion clears the main notification occurrence ledger", () => {
+  let producer!: Plugin.Context
+  return packageJourney(Effect.gen(function* () {
+    const { createPluginSessionRequester, watchPluginSessionNotifications } = yield* Effect.promise(() => import("../../ui-mac/src/main/plugin-session-lifecycle"))
+    const sent: Array<{ id: number }> = []
+    const requester = createPluginSessionRequester(message => { sent.push(message); queueMicrotask(() => requester.receive({ id: message.id, ok: true })) })
+    yield* Effect.addFinalizer(() => Effect.sync(() => requester.close()))
+    yield* invocationNativeServices
+    const ext = yield* activateExtUntilFinished
+    const watcher = watchPluginSessionNotifications(producer)
+    yield* Effect.addFinalizer(() => Effect.promise(watcher.stop))
+    const sessions = yield* Sessions.Service
+    const location = yield* Location.Service
+    const session = yield* sessions.create({ location: { directory: location.directory }, title: "Notification ledger owner" } as never)
+    const action = { sessionId: session.id, action: "notification" as const, notification: { message: "Original occurrence", notificationType: "idle_prompt", occurrenceId: "evt_removed_session" } }
+    yield* Effect.promise(() => requester.request(action))
+    expect(sent).toHaveLength(1)
+    yield* sessions.remove(session.id)
+    yield* ext.finish(Effect.promise(async () => { await requester.request(action); return sent.length === 2 }))
+    expect(sent).toHaveLength(2)
+  }), { id: "deletion-notification-producer", setup: async context => { producer = context } })
+})
+
+packageIt.live("FileChanged replaces each handler watch set and withdraws literal watchers with the package", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  const first = hooks.hooks.FileChanged[0]
+  first.matcher = "watched[1].txt"
+  for (const hook of first.hooks) {
+    hook.command = process.execPath
+    hook.args = ["-e", "const fs=require('node:fs');const path=require('node:path');const input=await Bun.stdin.json();fs.appendFileSync('file-events.jsonl',JSON.stringify({...input,owner:'dynamic'})+'\\n');console.log(JSON.stringify({continue:false,watchPaths:input.event==='unlink'||fs.readFileSync(input.file_path,'utf8').includes('withdraw')?[]:[path.join(input.cwd,'dynamic.txt')]}))"]
+  }
+  const observer = structuredClone(first)
+  observer.matcher = first.matcher
+  observer.hooks[0].args = ["-e", "const input=await Bun.stdin.json();require('node:fs').appendFileSync('file-events.jsonl',JSON.stringify({...input,owner:'static'})+'\\n')"]
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { FileChanged: [first, observer] } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const watched = join(location.directory, "watched[1].txt")
+  const dynamic = join(location.directory, "dynamic.txt")
+  const log = join(location.directory, "file-events.jsonl")
+  writeFileSync(watched, "initial")
+  writeFileSync(dynamic, "initial")
+  const rows = () => { try { return readFileSync(log, "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line)) } catch { return [] } }
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "File watcher", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* sessions.prompt({ sessionID: session.id, text: "Start watching" })
+  yield* sessions.wait(session.id)
+  writeFileSync(watched, "discover dynamic")
+  yield* ext.finish(Effect.sync(() => rows().length === 2))
+  // Settle the actual child exit and watch-list publication; this checks events, not elapsed time.
+  yield* Effect.sleep("150 millis")
+  writeFileSync(dynamic, "dynamic change")
+  yield* ext.finish(Effect.sync(() => rows().length === 3))
+  expect(rows()[2]).toMatchObject({ owner: "dynamic", file_path: dynamic, event: "change" })
+  writeFileSync(watched, "static handler only")
+  yield* ext.finish(Effect.sync(() => rows().length === 4))
+  expect(rows()[3]).toMatchObject({ owner: "static", file_path: watched })
+  writeFileSync(dynamic, "withdraw dynamic")
+  yield* ext.finish(Effect.sync(() => rows().length === 5))
+  yield* Effect.sleep("150 millis")
+  writeFileSync(dynamic, "withdrawn change")
+  rmSync(watched)
+  yield* ext.finish(Effect.sync(() => rows().length === 6))
+  expect(rows()[5]).toMatchObject({ owner: "static", file_path: watched, event: "unlink" })
+  writeFileSync(watched, "added after unlink")
+  yield* ext.finish(Effect.sync(() => rows().length === 7))
+  expect(rows()[6]).toMatchObject({ owner: "static", file_path: watched, event: "add" })
+  expect(rows().filter(row => row.file_path === dynamic)).toHaveLength(2)
+  expect(rows().filter(row => row.owner === "dynamic")).toHaveLength(3)
+  expect(rows().every(row => row.hook_event_name === "FileChanged" && row.session_id === session.id && row.cwd === location.directory)).toBe(true)
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify(membership))
+  writeFileSync(watched, "disabled change")
+  yield* sessions.prompt({ sessionID: session.id, text: "Continue without package" })
+  yield* sessions.wait(session.id)
+  expect(rows()).toHaveLength(7)
+})))
+
+packageIt.live("SessionStart and FileChanged shell environments reach later package processes only in that real Session", () => packageJourney(Effect.gen(function* () {
+  const capture = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => capture.readFile("claude/hooks.json"))))
+  for (const event of ["SessionStart", "FileChanged", "PostToolUse"]) for (const group of hooks.hooks[event]) {
+    if (event === "FileChanged") group.matcher = "signal.txt"
+    for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();if(input.hook_event_name==='SessionStart')fs.appendFileSync(process.env.CLAUDE_ENV_FILE,'export R18_HOOK_VALUE=\"$(printf session_start)\"\\n');if(input.hook_event_name==='FileChanged')fs.appendFileSync(process.env.CLAUDE_ENV_FILE,'export R18_HOOK_VALUE=\"$(printf file_changed)\"\\n');fs.appendFileSync('environment-events.jsonl',JSON.stringify({event:input.hook_event_name,session:input.session_id,value:process.env.R18_HOOK_VALUE,file:process.env.CLAUDE_ENV_FILE})+'\\n')"]
+    }
+  }
+  const sample = yield* invocationSample("claude:dash0", { "claude/hooks.json": JSON.stringify({ hooks: { SessionStart: hooks.hooks.SessionStart, FileChanged: hooks.hooks.FileChanged, PostToolUse: hooks.hooks.PostToolUse } }) })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  const log = join(location.directory, "environment-events.jsonl")
+  writeFileSync(join(location.directory, "signal.txt"), "initial")
+  const rows = () => { try { return readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line)) } catch { return [] } }
+  const first = yield* sessions.create({ location: { directory: location.directory }, title: "First environment", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const llm = yield* TestLLM.Test
+  yield* llm.push(TestLLM.toolCall("call_env_one", "write", { path: "one.txt", content: "one" }), TestLLM.text("First done", "env-one"))
+  yield* sessions.prompt({ sessionID: first.id, text: "Write one" })
+  yield* sessions.wait(first.id)
+  expect(rows().find(row => row.event === "PostToolUse")).toMatchObject({ session: first.id, value: "session_start" })
+  writeFileSync(join(location.directory, "signal.txt"), "changed")
+  yield* ext.finish(Effect.sync(() => rows().some(row => row.event === "FileChanged")))
+  yield* llm.push(TestLLM.toolCall("call_env_two", "write", { path: "two.txt", content: "two" }), TestLLM.text("Second done", "env-two"))
+  yield* sessions.prompt({ sessionID: first.id, text: "Write two" })
+  yield* sessions.wait(first.id)
+  expect(rows().filter(row => row.event === "PostToolUse").at(-1)).toMatchObject({ session: first.id, value: "file_changed" })
+  const second = yield* sessions.create({ location: { directory: location.directory }, title: "Separate environment", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  yield* llm.push(TestLLM.toolCall("call_env_other", "write", { path: "other.txt", content: "other" }), TestLLM.text("Other done", "env-other"))
+  yield* sessions.prompt({ sessionID: second.id, text: "Write other" })
+  yield* sessions.wait(second.id)
+  expect(rows().filter(row => row.event === "PostToolUse").at(-1)).toMatchObject({ session: second.id, value: "session_start" })
+  expect(rows().filter(row => row.event === "PostToolUse").every(row => row.file === undefined)).toBe(true)
+  expect(process.env.R18_HOOK_VALUE).toBeUndefined()
+})))
+
+// Original feature-dev command / Temporal SKILL.md and dash0 groups; only fixture shell bodies observe session exports.
+packageIt.live("first command and attached skill shells wait for SessionStart and read their own live session exports", () => packageJourney(Effect.gen(function* () {
+  const commandTree = yield* Effect.promise(() => captureStandardFixture("claude:feature-dev"))
+  const commandSource = new TextDecoder().decode(yield* Effect.promise(() => commandTree.readFile("commands/feature-dev.md")))
+  const skillTree = yield* Effect.promise(() => captureStandardFixture("codex:temporal"))
+  const skillSource = new TextDecoder().decode(yield* Effect.promise(() => skillTree.readFile("skills/temporal-developer/SKILL.md")))
+  const hooksTree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const hooks = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => hooksTree.readFile("claude/hooks.json"))))
+  for (const event of ["SessionStart", "FileChanged"]) for (const group of hooks.hooks[event]) {
+    if (event === "FileChanged") group.matcher = "session-signal.txt"
+    for (const hook of group.hooks) {
+      hook.command = process.execPath
+      hook.args = ["-e", "const fs=require('node:fs');const input=await Bun.stdin.json();const value=input.session_id+(input.hook_event_name==='SessionStart'?' start':' changed')+' ; $(printf INJECTED)';fs.appendFileSync(process.env.CLAUDE_ENV_FILE,\"export R19_SESSION_VALUE='\"+value+\"'\\n\");fs.appendFileSync('session-exports.jsonl',JSON.stringify(input)+'\\n')"]
+    }
+  }
+  const shell = "!`printf '%s' \"$R19_SESSION_VALUE\"`"
+  const sample = yield* invocationSample("claude:feature-dev", {
+    "commands/feature-dev.md": commandSource + "\nCOMMAND_SESSION=" + shell + "\n",
+    "skills/temporal-developer/SKILL.md": skillSource + "\nSKILL_SESSION=" + shell + "\n",
+    "hooks/hooks.json": JSON.stringify({ hooks: { SessionStart: hooks.hooks.SessionStart, FileChanged: hooks.hooks.FileChanged } }),
+  })
+  const membership = JSON.parse(readFileSync(join(sample.root,"skills-enabled.json"),"utf8"))
+  writeFileSync(join(sample.root,"skills-enabled.json"),JSON.stringify({...membership,keys:[...membership.keys,sample.key]}))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(items=>items.some(item=>item.name===command))))
+  const skills = yield* (yield* Skill.Service).list()
+  const skill = skills.find(item=>item.name===sample.hostNames["skill:skills/temporal-developer/SKILL.md"])!
+  const sessions = yield* Sessions.Service
+  const location = yield* Location.Service
+  writeFileSync(join(location.directory,"session-signal.txt"),"initial")
+  const first = yield* sessions.create({location:{directory:location.directory},title:"Command exports",agent:"build",model:{providerID:"test",id:"picked"}} as never)
+  yield* commands.execute({name:command,invocation:{sessionID:first.id,prompt:{text:"Use the exported environment"},delivery:"queue"}})
+  yield* sessions.wait(first.id)
+  const text = (yield* sessions.context(first.id)).filter(item=>item.type==="user").map(item=>item.text).join("\n")
+  expect(text).toContain("COMMAND_SESSION="+first.id+" start ; $(printf INJECTED)")
+  const second = yield* sessions.create({location:{directory:location.directory},title:"Skill exports",agent:"build",model:{providerID:"test",id:"picked"}} as never)
+  yield* sessions.prompt({sessionID:second.id,text:"Use this skill",skills:[{id:skill.id}]})
+  yield* sessions.wait(second.id)
+  const llm = yield* TestLLM.Test
+  expect(JSON.stringify(yield* llm.requests())).toContain("SKILL_SESSION="+second.id+" start ; $(printf INJECTED)")
+  const rows = ()=>readFileSync(join(location.directory,"session-exports.jsonl"),"utf8").trim().split("\n").map(line=>JSON.parse(line))
+  expect(rows().filter(row=>row.hook_event_name==="SessionStart").map(row=>row.session_id).toSorted()).toEqual([first.id,second.id].toSorted())
+  writeFileSync(join(location.directory,"session-signal.txt"),"changed")
+  yield* ext.finish(Effect.sync(()=>rows().filter(row=>row.hook_event_name==="FileChanged").length===2))
+  yield* commands.execute({name:command,invocation:{sessionID:first.id,prompt:{text:"Use updated exports"},delivery:"queue"}})
+  yield* sessions.wait(first.id)
+  const updated = (yield* sessions.context(first.id)).filter(item=>item.type==="user").map(item=>item.text).at(-1)
+  expect(updated).toContain("COMMAND_SESSION="+first.id+" changed ; $(printf INJECTED)")
+  expect(rows().filter(row=>row.hook_event_name==="SessionStart")).toHaveLength(2)
+  expect(process.env.R19_SESSION_VALUE).toBeUndefined()
+})))
+
+
+// Fixed feature-dev/Temporal inputs and dash0 SessionStart group; the temporary helper holds a real export source.
+for (const entry of ["command", "attached skill", "command expansion hook"] as const) packageIt.live(`cancelling a ${entry} call closes its SessionStart-written ENV_FILE source`, () => packageJourney(Effect.gen(function* () {
+  const tree = yield* Effect.promise(() => captureStandardFixture("claude:dash0"))
+  const source = JSON.parse(new TextDecoder().decode(yield* Effect.promise(() => tree.readFile("claude/hooks.json"))))
+  const skillTree = yield* Effect.promise(() => captureStandardFixture("codex:temporal"))
+  const skill = new TextDecoder().decode(yield* Effect.promise(() => skillTree.readFile("skills/temporal-developer/SKILL.md")))
+  const line = 'export R22_BLOCKED="$(' + JSON.stringify(process.execPath) + ' "$CLAUDE_PLUGIN_ROOT/source-blocker.mjs")"\n'
+  for (const group of source.hooks.SessionStart) for (const hook of group.hooks) {
+    hook.command = process.execPath
+    hook.args = ["-e", "const fs=require('node:fs');await Bun.stdin.json();fs.appendFileSync(process.env.CLAUDE_ENV_FILE," + JSON.stringify(line) + ")"]
+  }
+  if (entry === "command expansion hook") for (const group of source.hooks.UserPromptSubmit) for (const hook of group.hooks) {
+    hook.command = process.execPath
+    hook.args = ["-e", "await Bun.stdin.json()"]
+  }
+  const sample = yield* invocationSample("claude:feature-dev", {
+    "hooks/hooks.json": JSON.stringify({ hooks: { SessionStart: source.hooks.SessionStart, ...(entry === "command expansion hook" ? { UserPromptExpansion: source.hooks.UserPromptSubmit } : {}) } }),
+    "skills/temporal-developer/SKILL.md": skill,
+    "source-blocker.mjs": "import fs from 'node:fs';fs.writeFileSync('source-reader.pid',String(process.pid));while(!fs.existsSync('release-source'))await Bun.sleep(10);console.log('export completed')",
+  })
+  const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
+  writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const commands = yield* Command.Service
+  const command = sample.hostNames["command:commands/feature-dev.md"]!
+  yield* ext.finish(commands.list().pipe(Effect.map(items => items.some(item => item.name === command))))
+  const skillRegistry = yield* Skill.Service
+  yield* ext.finish(skillRegistry.list().pipe(Effect.map(items => items.some(item => item.name === sample.hostNames["skill:skills/temporal-developer/SKILL.md"]))))
+  const skills = yield* skillRegistry.list()
+  const attached = skills.find(item => item.name === sample.hostNames["skill:skills/temporal-developer/SKILL.md"])!
+  const location = yield* Location.Service
+  const sessions = yield* Sessions.Service
+  const session = yield* sessions.create({ location: { directory: location.directory }, title: "Source cancellation", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const call = yield* (entry !== "attached skill"
+    ? commands.execute({ name: command, invocation: { sessionID: session.id, prompt: { text: "Use the session exports" }, delivery: "queue" } })
+    : sessions.prompt({ sessionID: session.id, text: "Use the session exports", skills: [{ id: attached.id }] })).pipe(Effect.forkScoped)
+  yield* Effect.gen(function* () {
+    yield* ext.finish(Effect.promise(() => Bun.file(join(location.directory, "source-reader.pid")).exists()))
+    const pid = Number(readFileSync(join(location.directory, "source-reader.pid"), "utf8"))
+    expect(pid).toBeGreaterThan(0)
+    expect(() => process.kill(pid, 0)).not.toThrow()
+    yield* Fiber.interrupt(call)
+    const result = yield* Fiber.await(call)
+    expect(Exit.isFailure(result) && Cause.hasInterruptsOnly(result.cause)).toBe(true)
+    yield* ext.finish(Effect.sync(() => { try { process.kill(pid, 0); return false } catch { return true } }))
+    expect(() => process.kill(pid, 0)).toThrow()
+    expect(yield* (yield* TestLLM.Test).requests()).toHaveLength(0)
+  }).pipe(Effect.ensuring(Effect.sync(() => writeFileSync(join(location.directory, "release-source"), ""))))
+})))
 it.effect("shell uses only its Location's document projection and removes inherited host keys", () => Effect.gen(function* () {
   env({})
   yield* activate(CodePuppyExt)

@@ -16,6 +16,7 @@
 // 两个 file 探针对各自方案外的 key 都 **fail-closed**(同一句 "no typed probe for file item …"),
 // 因此新增 file 消费方必须在此显式登记探针,绝不会静默放行。
 
+import { pluginSettingsProbe } from "./plugin-package-config"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -75,6 +76,7 @@ export function extensionHealthProbeRouter(root: string): HealthProbe {
     const gen = await skillGenerationProbe(input)
     if (!gen.healthy) return gen
     if (input.action !== "file") return { healthy: true }
+    if (input.key.startsWith("bundle--") && input.key.endsWith("--settings")) return pluginSettingsProbe(input)
     return input.key.startsWith("agent--") ? agentProbe(input) : pluginProbe(input)
   }
 }

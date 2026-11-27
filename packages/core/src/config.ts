@@ -26,6 +26,8 @@ import { Connection } from "@opencode/schema/connection"
 import { WellKnown } from "./wellknown.js"
 import { AppProcess } from "@opencode/util/process"
 import { ChildProcess } from "effect/process"
+import type { ConfigSource } from "@opencode/plugin/codepuppy-package-runtime" // codepuppy(S-04)
+import { createPluginConfigRevisionReader } from "./config/codepuppy-plugin-config-change.js" // codepuppy(S-04)
 
 export function latest<K extends keyof Info>(entries: readonly Entry[], key: K): Info[K] | undefined {
   return entries.findLast((entry): entry is Document => entry.type === "document" && entry.info[key] !== undefined)
@@ -189,8 +191,9 @@ export const layer = (options?: Options) =>
       })
       // codepuppy ── end
 
-      const loadFile = Effect.fnUntraced(function* (filepath: string, gate?: CodePuppyProjectGate.Filter, codepuppyDocument?: "explicit") { // codepuppy(ADR-049, I-20)
-        const text = yield* fs.readFileStringSafe(filepath)
+      const pluginRevisions = createPluginConfigRevisionReader(location) // codepuppy(S-04)
+      const loadFile = Effect.fnUntraced(function* (filepath: string, source: ConfigSource, gate?: CodePuppyProjectGate.Filter, codepuppyDocument?: "explicit") { // codepuppy(ADR-049, I-20)
+        const text = yield* pluginRevisions.select(filepath, source, yield* fs.readFileStringSafe(filepath)) // codepuppy(S-04)
         if (text === undefined) return
         const prepared = codepuppyDocument ? yield* codepuppyCredentialText(text, codepuppyDocument) : text // codepuppy(I-20)
         const substituted = yield* ConfigVariable.substitute({ type: "path", path: filepath, text: prepared }) // codepuppy(I-20)
@@ -232,15 +235,15 @@ export const layer = (options?: Options) =>
           type: "virtual",
           source: plist,
           dir: path.dirname(plist),
-          text: ConfigDiscovery.stripPreferenceMetadata(result.value.stdout.toString()),
+          text: (yield* pluginRevisions.select(plist, "policy_settings", ConfigDiscovery.stripPreferenceMetadata(result.value.stdout.toString())))!, // codepuppy(S-04): managed policy cannot be rejected.
         })
         const info = yield* parseInfo(text, plist)
         return info ? [new Document({ type: "document", path: plist, info })] : []
       })
 
-      const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath, gate?: CodePuppyProjectGate.Filter) { // codepuppy(ADR-049)
+      const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath, source: ConfigSource, gate?: CodePuppyProjectGate.Filter) { // codepuppy(ADR-049)
         return [
-          ...(yield* Effect.forEach(ConfigDiscovery.names, (file) => loadFile(path.join(directory, file), gate)).pipe( // codepuppy(ADR-049)
+          ...(yield* Effect.forEach(ConfigDiscovery.names, (file) => loadFile(path.join(directory, file), source, gate)).pipe( // codepuppy(ADR-049)
             Effect.map((configs) => configs.filter((config): config is Document => config !== undefined)),
           )),
           new Directory({ type: "directory", path: directory }),
@@ -252,13 +255,13 @@ export const layer = (options?: Options) =>
         // filtered before normalization, project .opencode plugin directories are denied by a document right after managed policies
         const gate = yield* CodePuppyProjectGate.begin({ directory: location.directory, home: globalService.home })
         // codepuppy ── end
-        const direct = yield* Effect.forEach(sources.direct, (filepath) => loadFile(filepath, gate.document(filepath))).pipe( // codepuppy(ADR-049)
+        const direct = yield* Effect.forEach(sources.direct, (filepath) => loadFile(filepath, "project_settings", gate.document(filepath))).pipe( // codepuppy(ADR-049)
           Effect.orDie,
           Effect.map((entries) => entries.filter((entry): entry is Document => entry !== undefined)),
         )
 
         const explicit = sources.explicit
-          ? yield* loadFile(sources.explicit, undefined, "explicit").pipe( // codepuppy(I-20)
+          ? yield* loadFile(sources.explicit, "local_settings", undefined, "explicit").pipe( // codepuppy(I-20)
               Effect.map((config) => (config ? [config] : [])),
               Effect.orDie,
             )
@@ -278,7 +281,7 @@ export const layer = (options?: Options) =>
         // in reverse load order, so managed policies split off and load first
         // to keep final file-based authority.
         const managed = [
-          ...(sources.system?.present ? yield* loadDirectory(sources.system.path).pipe(Effect.orDie) : []),
+          ...(sources.system?.present ? yield* loadDirectory(sources.system.path, "policy_settings").pipe(Effect.orDie) : []),
           ...(sources.preferences ? yield* loadPreferences(sources.preferences).pipe(Effect.orDie) : []),
         ]
         const managedPolicies = managed
@@ -302,10 +305,10 @@ export const layer = (options?: Options) =>
         // Integration documents load right after managed policies: every remote, user, and project layer overrides
         // their settings, and since policies evaluate earliest-loaded first, only managed policies outrank theirs.
         // Global entries sit below explicit and direct files; project directories rank above them.
-        const globalSupplementary = sources.global ? yield* loadDirectory(sources.global).pipe(Effect.orDie) : []
+        const globalSupplementary = sources.global ? yield* loadDirectory(sources.global, "user_settings").pipe(Effect.orDie) : []
         const projectSupplementary = yield* Effect.forEach(
           sources.project.filter((root) => root.present),
-          (root) => loadDirectory(root.path, gate.directory(root.path)), // codepuppy(ADR-049)
+          (root) => loadDirectory(root.path, "project_settings", gate.directory(root.path)), // codepuppy(ADR-049)
         ).pipe(
           Effect.orDie,
           Effect.map((entries) => entries.flat()),
@@ -340,6 +343,7 @@ export const layer = (options?: Options) =>
       const initial = yield* ConfigDiscovery.discover(options)
       let sources = initial
       let configs = yield* load(initial)
+      pluginRevisions.ready() // codepuppy(S-04): initial load is not a file change.
       const updates = yield* PubSub.unbounded<Watcher.Update>()
       const reloads = yield* PubSub.sliding<void>(1)
       // Readiness rescans recover writes made before a watch attached.

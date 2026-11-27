@@ -1,12 +1,13 @@
+import type { EnvironmentForward, McpTimeouts } from "./host-extension-package-contract/plugin-package"
 export type EffectScopeV1 = { kind: "all-projects" } | { kind: "project"; directory: string }
 export type CreatedPluginDraftV1 = { searchId: string; name: string; description: string; files: { path: string; text: string }[] }
 export type InstallSourceRefV1 = { kind: "catalog"; catalogId: string } | { kind: "candidate"; candidateId: string } | { kind: "folder" } | { kind: "created"; draft: CreatedPluginDraftV1 }
 export type InstallRequestV1 = { requestId: string; source: InstallSourceRefV1; effect: EffectScopeV1; via: "hub" | "chat" }
-export type NotRunningReasonV1 = "kind-not-supported-yet" | "needs-plugin-files" | "unresolved-app-id" | "native-js-plugin" | "invalid-definition" | "missing-entry"
+export type NotRunningReasonV1 = "kind-not-supported-yet" | "needs-plugin-files" | "unresolved-app-id" | "native-js-plugin" | "invalid-definition" | "missing-entry" | "unavailable-trigger" | "unsupported-host-capability" | "unsupported-setting"
 export type PackageNotRunningV1 = { kind: string; sourceName: string; reason: NotRunningReasonV1 }
 export type McpConfigLeafV1 =
-  | { type: "local"; command: string[]; environment?: Record<string, string>; cwd?: string; timeout?: number }
-  | { type: "remote"; url: string; headers?: Record<string, string>; timeout?: number; oauth?: false | { clientId?: string; clientSecret?: string; scope?: string; redirectUri?: string } }
+  | { type: "local"; command: string[]; environment?: Record<string, string>; cwd?: string; timeout?: number; timeouts?: McpTimeouts; forwardEnvironment?: EnvironmentForward[] }
+  | { type: "remote"; transport?: "http" | "sse"; url: string; headers?: Record<string, string>; timeout?: number; timeouts?: McpTimeouts; oauth?: false | { clientId?: string; clientSecret?: string; scope?: string; redirectUri?: string } }
 export type PackageSourceV1 =
   | { kind: "catalog" }
   | { kind: "marketplace"; ecosystem: "claude" | "codex"; repository: string; commit: string; path: string; entryName: string }
@@ -15,7 +16,7 @@ export type PackageSourceV1 =
   | { kind: "created" } | { kind: "local-folder" }
 export type PackageEffectV1 = { kind: "project"; projectPath: string; projectPathHash: string }
 export type PackageDeclarationV1 = {
-  componentId: string; kind: "skill" | "mcp"; hostName: string; sourceName: string
+  componentId: string; kind: "skill" | "mcp" | "command" | "agent"; hostName: string; sourceName: string
   mcp?: McpConfigLeafV1
   secretNeeds: { needId: string; label: string }[]
   login?: { serverUrl: string }
@@ -25,11 +26,11 @@ export type PackageGraphAnnotationsV1 = {
   source?: PackageSourceV1; effect?: PackageEffectV1; notRunning?: PackageNotRunningV1[]; declarations?: PackageDeclarationV1[]
 }
 export type InstallOutcomeV1 =
-  | { ok: true; packageId: string; displayName: string; source: PackageSourceV1; installed: { kind: "skill" | "mcp"; hostName: string; sourceName: string }[]; notRunning: PackageNotRunningV1[]; alreadyInstalled?: true; resolvedToCatalog?: string }
+  | { ok: true; packageId: string; displayName: string; source: PackageSourceV1; installed: { kind: "skill" | "mcp" | "command" | "agent"; hostName: string; sourceName: string }[]; notRunning: PackageNotRunningV1[]; alreadyInstalled?: true; resolvedToCatalog?: string }
   | { ok: false; code: "nothing-runnable"; detail: string; notRunning: PackageNotRunningV1[] }
   | { ok: false; code: "unknown-id" | "source-unreachable" | "source-changed" | "invalid-draft" | "not-searched" | "transaction-failed"; detail: string }
 
-const REASONS = new Set<string>(["kind-not-supported-yet", "needs-plugin-files", "unresolved-app-id", "native-js-plugin", "invalid-definition", "missing-entry"])
+const REASONS = new Set<string>(["kind-not-supported-yet", "needs-plugin-files", "unresolved-app-id", "native-js-plugin", "invalid-definition", "missing-entry", "unavailable-trigger", "unsupported-host-capability", "unsupported-setting"])
 
 /** The graph decoder calls this before accepting annotations; no files, values or engine handles cross it. */
 export function validPackageGraphAnnotations(input: PackageGraphAnnotationsV1 | Record<string, unknown>): boolean {
@@ -43,18 +44,20 @@ export function validPackageGraphAnnotations(input: PackageGraphAnnotationsV1 | 
 export function validMcpConfigLeaf(input: unknown): input is McpConfigLeafV1 {
   if (!record(input)) return false
   if (input.timeout !== undefined && (!Number.isSafeInteger(input.timeout) || Number(input.timeout) <= 0)) return false
+  if (input.timeouts !== undefined && (!exact(input.timeouts, ["startupMs", "catalogMs", "executionMs"]) || !Object.values(input.timeouts).every(value => Number.isSafeInteger(value) && Number(value) > 0))) return false
+  if (input.forwardEnvironment !== undefined && (!Array.isArray(input.forwardEnvironment) || !input.forwardEnvironment.every(value => exact(value, ["name", "source"]) && nonempty(value.name) && (value.source === "local" || value.source === "remote")))) return false
   if (input.type === "local")
-    return exact(input, ["type", "command", "environment", "cwd", "timeout"]) && Array.isArray(input.command) && input.command.length > 0 && input.command.every((part: unknown) => typeof part === "string") && (input.environment === undefined || stringMap(input.environment)) && (input.cwd === undefined || typeof input.cwd === "string")
-  if (input.type !== "remote" || !exact(input, ["type", "url", "headers", "timeout", "oauth"]) || !nonempty(input.url) || (input.headers !== undefined && !stringMap(input.headers))) return false
+    return exact(input, ["type", "command", "environment", "cwd", "timeout", "timeouts", "forwardEnvironment"]) && Array.isArray(input.command) && input.command.length > 0 && input.command.every((part: unknown) => typeof part === "string") && (input.environment === undefined || stringMap(input.environment)) && (input.cwd === undefined || typeof input.cwd === "string")
+  if (input.type !== "remote" || !exact(input, ["type", "transport", "url", "headers", "timeout", "timeouts", "oauth"]) || !nonempty(input.url) || (input.transport !== undefined && input.transport !== "http" && input.transport !== "sse") || (input.headers !== undefined && !stringMap(input.headers))) return false
   return input.oauth === undefined || input.oauth === false || (exact(input.oauth, ["clientId", "clientSecret", "scope", "redirectUri"]) && Object.values(input.oauth).every((value) => typeof value === "string"))
 }
 
 function validDeclaration(input: unknown): boolean {
-  if (!exact(input, ["componentId", "kind", "hostName", "sourceName", "mcp", "secretNeeds", "login", "oauthNotApplied"]) || !nonempty(input.componentId) || !nonempty(input.hostName) || typeof input.sourceName !== "string" || (input.kind !== "skill" && input.kind !== "mcp")) return false
+  if (!exact(input, ["componentId", "kind", "hostName", "sourceName", "mcp", "secretNeeds", "login", "oauthNotApplied"]) || !nonempty(input.componentId) || !nonempty(input.hostName) || typeof input.sourceName !== "string" || !["skill", "mcp", "command", "agent"].includes(String(input.kind))) return false
   if (!Array.isArray(input.secretNeeds) || !input.secretNeeds.every((need: unknown) => exact(need, ["needId", "label"]) && nonempty(need.needId) && typeof need.label === "string")) return false
   if (input.login !== undefined && (!exact(input.login, ["serverUrl"]) || !nonempty(input.login.serverUrl))) return false
   if (input.oauthNotApplied !== undefined && (!Array.isArray(input.oauthNotApplied) || !input.oauthNotApplied.every((field) => field === "resource" || field === "authorizationServerUrl"))) return false
-  if (input.kind === "skill") return input.mcp === undefined && input.secretNeeds.length === 0
+  if (input.kind !== "mcp") return input.mcp === undefined && input.secretNeeds.length === 0
   if (!validMcpConfigLeaf(input.mcp)) return false
   const needs = new Set(input.secretNeeds.map((need: { needId: string }) => need.needId))
   if (needs.size !== input.secretNeeds.length) return false
@@ -62,7 +65,7 @@ function validDeclaration(input: unknown): boolean {
   if (placeholders.size !== needs.size || [...placeholders].some((need) => !needs.has(need))) return false
   if (JSON.stringify(input.mcp).includes("{file:")) return false
   if (input.mcp.type !== "remote") return true
-  if (Object.entries(input.mcp.headers ?? {}).some(([key, value]) => /authorization|token|secret|api[_-]?key|cookie/i.test(key) && value !== "" && !value.includes("{secret:"))) return false
+  if (Object.entries(input.mcp.headers ?? {}).some(([key, value]) => /authorization|token|secret|api[_-]?key|cookie/i.test(key) && value !== "" && !value.includes("{secret:") && !value.includes("${user_config."))) return false
   return !input.mcp.oauth || input.mcp.oauth.clientSecret === undefined || input.mcp.oauth.clientSecret.includes("{secret:")
 }
 
@@ -101,5 +104,5 @@ export function isInstallOutcomeV1(input: unknown): input is InstallOutcomeV1 {
     if (input.code === "nothing-runnable") return Array.isArray(input.notRunning) && validPackageGraphAnnotations({ notRunning: input.notRunning })
     return input.notRunning === undefined && ["unknown-id", "source-unreachable", "source-changed", "invalid-draft", "not-searched", "transaction-failed"].includes(String(input.code))
   }
-  return exact(input, ["ok", "packageId", "displayName", "source", "installed", "notRunning", "alreadyInstalled", "resolvedToCatalog"]) && nonempty(input.packageId) && typeof input.displayName === "string" && validSource(input.source) && Array.isArray(input.notRunning) && validPackageGraphAnnotations({ notRunning: input.notRunning }) && Array.isArray(input.installed) && input.installed.every((item: unknown) => exact(item, ["kind", "hostName", "sourceName"]) && (item.kind === "skill" || item.kind === "mcp") && nonempty(item.hostName) && typeof item.sourceName === "string") && (input.alreadyInstalled === undefined || input.alreadyInstalled === true) && (input.resolvedToCatalog === undefined || typeof input.resolvedToCatalog === "string")
+  return exact(input, ["ok", "packageId", "displayName", "source", "installed", "notRunning", "alreadyInstalled", "resolvedToCatalog"]) && nonempty(input.packageId) && typeof input.displayName === "string" && validSource(input.source) && Array.isArray(input.notRunning) && validPackageGraphAnnotations({ notRunning: input.notRunning }) && Array.isArray(input.installed) && input.installed.every((item: unknown) => exact(item, ["kind", "hostName", "sourceName"]) && ["skill", "mcp", "command", "agent"].includes(String(item.kind)) && nonempty(item.hostName) && typeof item.sourceName === "string") && (input.alreadyInstalled === undefined || input.alreadyInstalled === true) && (input.resolvedToCatalog === undefined || typeof input.resolvedToCatalog === "string")
 }

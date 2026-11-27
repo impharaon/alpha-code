@@ -1,3 +1,5 @@
+import { requestSidecarStop } from "./sidecar-stop"
+import { createPluginSessionRequester, watchPluginSessionNotifications } from "./plugin-session-lifecycle"
 import type { CodePuppySidecarHost } from "./hub-view"
 import { HOMEBREW_PREFIXES } from "./platform/darwin"
 import { packageManagerHelperPath } from "./package-manager-helper"
@@ -9,6 +11,9 @@ import type { WriteScopeRequest, WriteScopeReply } from "./codepuppy-sidecar-mes
 import { parsePackageManagerEnvironmentRequest, type PackageManagerEnvironmentReply } from "../shared/package-manager-environment"
 import { publishVideoEnvironment } from "./codepuppy-video-environment"
 import { engineClient } from "./engine-client"
+import { configurePluginMcpProxy, attachPluginMcpProxyPublisher, pluginMcpProxySnapshot } from "./plugin-mcp-proxy"
+import type { PluginMcpProxies } from "@opencode/util/codepuppy-plugin-mcp"
+import { publishPluginDataHome, publishPluginEnvironment } from "./plugin-package-data"
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
@@ -58,7 +63,6 @@ import { isEphemeralLocalServerUrl } from "../shared/ephemeral-server-url"
 import { ensureEngineScratchCwd } from "./engine-scratch-cwd"
 import { markStartupTimeline } from "./startup-timeline"
 import { codepuppyUserWorkspaceDir } from "./codepuppy-user-workspace"
-import { SIDECAR_STOP_COMMAND } from "./sidecar-stop"
 import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
@@ -133,7 +137,6 @@ export type SidecarListener = {
 
 const SIDECAR_SERVICE_NAME = "opencode server"
 const SIDECAR_START_STALL_TIMEOUT = 60_000
-const SIDECAR_STOP_TIMEOUT = 6_000
 
 type SpawnLocalServerOptions = {
   userDataPath: string
@@ -205,6 +208,7 @@ function ensureEgressPolicyProxy(): Promise<EgressProxyHandle> {
     // Conversation approval is registered by the main composition root before the sidecar starts.
     egressProxySingleton = startEgressPolicyProxy({ log }).then(
       (handle) => {
+        configurePluginMcpProxy(handle)
         getLogger()?.log(`network egress policy proxy listening on ${handle.host}:${handle.port} — the only way out of the engine tree (REQ-137); destinations = network-egress-registry.ts`)
         return handle
       },
@@ -311,7 +315,7 @@ function capturePackageManagerUserEnvironment(userDataPath: string, source: Reco
   return snapshot
 }
 
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[] }
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; roots?: ProcessFencePlan["roots"] }
 
 type ProductionFenceInput = {
   userDataPath: string
@@ -690,6 +694,9 @@ export async function spawnLocalServer(
       throw new Error(`network egress policy proxy failed to start — sidecar fork refused: ${serializeError(error).message}`)
     }
     Object.assign(sidecarEnv, sidecarEgressProxyEnv(egressProxyPort))
+  } else {
+    // The instance-private MCP proxy is also used where the process-wide fence/proxy is absent.
+    await (options.egressProxy ?? ensureEgressPolicyProxy)()
   }
   // `#1667`(基线 S2 / S7):会话库与全局配置目录由 main 算(与 db-safety / mcp-default-deny 同一推导),显式进 `start()` 的选项。
   // 数据目录里的独立 OpenCode `auth.json` 会在 OpenCode 2 第一次跑导入迁移时进凭证表 ⇒ 拒 fork(fail-closed,原因可读)。
@@ -841,6 +848,8 @@ export async function spawnLocalServer(
   // literal deny keeps it uncovered), which can be issued once more; a second extension for the same directory is
   // harmless (DESIGN-engine-config-fence D14). A definite consume failure, or a failure before any token existed, may retry.
   const possiblyConsumed = new Set<string>()
+  publishPluginDataHome((fence?.roots ?? resolveEngineRoots(sidecarEnv, sidecarEnv.HOME!)).dataHome)
+  publishPluginEnvironment(sidecarEnv)
   // The one source of this generation's write roots: the exact profile bytes it applies, parsed by the renderer's
   // module (its allow rules and, after them, the protected deny blocks). An unrecognised form leaves this undefined, and
   // every directory then counts as covered (no issue).
@@ -913,6 +922,8 @@ export async function spawnLocalServer(
     }) }
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
+  let pluginNotifications: ReturnType<typeof watchPluginSessionNotifications> | undefined
+  const packageSessions = createPluginSessionRequester(message => child.postMessage(message))
   const postCodePuppy = (message: CodePuppySidecarOutbound) => child.postMessage(message)
   // DESIGN-stored-credentials-fence §4.2:引擎装载配置之前的拉取 —— 同步建表并回复(收到与回复之间没有 await)。
   let credentialRespawnRequested = false
@@ -930,6 +941,7 @@ export async function spawnLocalServer(
   // SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.5):ext 的工具策略改写由 main 写进这一代 sidecar 环境算出的数据目录(ext 读的同一处),写完再回复
   const toolPolicyBaseDir = defaultPolicyBaseDir(dataDir)
   child.on("message", (message: unknown) => {
+    if (packageSessions.receive(message)) return
     if (projectConfigViews.receive(message)) return
     if (writeProbes.receive(message)) return
     if (writeGrants.receive(message)) return
@@ -956,7 +968,23 @@ export async function spawnLocalServer(
     getLogger()?.warn(line)
   }
   const pushThisGeneration = () => child.postMessage({ type: "credentials", credentials: credentialTable(options.userDataPath, credentialLog) } satisfies CredentialsMessage)
+  let proxyRevision = 0
+  const pendingProxies = new Map<number, { resolve(): void; reject(error: Error): void }>()
+  const detachProxies = attachPluginMcpProxyPublisher((bindings: PluginMcpProxies) => new Promise<void>((resolve, reject) => {
+    const revision = ++proxyRevision
+    pendingProxies.set(revision, { resolve, reject })
+    try { child.postMessage({ type: "plugin-mcp-proxies", revision, bindings }) }
+    catch { pendingProxies.delete(revision); reject(Error("Plugin MCP proxy publication failed")) }
+  }))
+  child.on("message", (message: unknown) => {
+    if (!message || typeof message !== "object" || !("type" in message) || message.type !== "plugin-mcp-proxies-ready" || !("revision" in message) || typeof message.revision !== "number") return
+    pendingProxies.get(message.revision)?.resolve()
+    pendingProxies.delete(message.revision)
+  })
   child.once("exit", (code) => {
+    detachProxies()
+    for (const pending of pendingProxies.values()) pending.reject(Error("Sidecar exited before plugin MCP proxy publication"))
+    pendingProxies.clear()
     if (pushCredentialTable === pushThisGeneration) pushCredentialTable = undefined
     clearOfficialConnectorRuntimeOnExit(runtimeGeneration)
     stopExplicitConfigWatch()
@@ -965,6 +993,8 @@ export async function spawnLocalServer(
     fence?.cancelGoQuery?.()
     void packageManagers?.close().catch((error) => getLogger()?.error("package-manager generation cleanup failed", error))
     electronNs.app.off("child-process-gone", onProcessGone)
+    void pluginNotifications?.stop()
+    packageSessions.close()
     projectConfigViews.close()
     writeProbes.close(`sidecar exited with code ${code}`)
     writeGrants.close(`sidecar exited with code ${code}`)
@@ -1043,6 +1073,7 @@ export async function spawnLocalServer(
       bootstrap,
       packageManagerEnvironment: fence?.cacheEnv ?? {},
       credentials,
+      pluginMcpProxies: pluginMcpProxySnapshot(),
       // REQ-159:profile 全文 + 模块路径。sidecar 在 import 引擎之前 apply;缺席(darwin)即拒绝启动。
       ...(fence ? { fence: { profile: fence.profile, addonPath: fence.addonPath } } : {}),
     })
@@ -1054,6 +1085,7 @@ export async function spawnLocalServer(
   // REQ-234 `#1529`:ready 之后接上重载请求的发送口(重发 main 记录里仍在途的 generation)。
   if (!exited) {
     const client = engineClient({ url: `http://${hostname}:${port}`, username: null, password })
+    pluginNotifications = watchPluginSessionNotifications(client)
     detachCodePuppy = options.codepuppySidecar?.attach(postCodePuppy, options.generation, {
       session: async (ref) => {
         const info = await client.session.get({ sessionID: ref.sessionID })
@@ -1105,13 +1137,7 @@ export async function spawnLocalServer(
       stop: () => {
         if (stopping) return stopping
         if (exited) return Promise.resolve()
-        child.postMessage(SIDECAR_STOP_COMMAND)
-        stopping = Promise.race([
-          exit.promise.then(() => undefined),
-          delay(SIDECAR_STOP_TIMEOUT).then(() => {
-            if (!exited) child.kill()
-          }),
-        ])
+        stopping = requestSidecarStop(child, exit.promise)
         return stopping
       },
   }

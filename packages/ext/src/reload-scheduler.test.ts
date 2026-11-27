@@ -182,6 +182,29 @@ describe("reload-scheduler(I5 规则,OpenCode 2 进程级路由)", () => {
     expect(reports.at(-1)?.error).toBe("reload failed 3 times — restart the app to apply")
   })
 
+  // The failed report promises "retrying when the engine is idle": with no further session event the retry still happens.
+  test("重载失败后没有任何后续事件也会在空闲时再试一次", async () => {
+    const engine = fakeEngine()
+    engine.state.reloadFails = 1
+    const reports: ReloadReport[] = []
+    const s = createReloadScheduler({
+      engine: () => engine.fetch,
+      report: (r) => void reports.push(r),
+      log: () => {},
+      error: () => {},
+      statusTimeoutMs: 20,
+      retryDelayMs: 10,
+    })
+    s.register("/a", {})
+    s.request({ generation: 7, scope: "global", reason: "x" })
+    await s.settled()
+    expect(reports.map((r) => r.outcome)).toEqual(["failed"])
+    for (const deadline = Date.now() + 2_000; reports.length < 2 && Date.now() < deadline; ) await Bun.sleep(5)
+    await s.settled()
+    expect(engine.state.reloads).toBe(2)
+    expect(reports.map((r) => r.outcome)).toEqual(["failed", "reloaded"])
+  })
+
   test("同一 generation 重发只排一次(sidecar ready 时 main 重发全部在途代际)", async () => {
     const engine = fakeEngine({ ses_1: running })
     const { s, reports } = scheduler(engine.fetch)

@@ -793,6 +793,29 @@ describe("spawnLocalServer", () => {
     })
   }
 
+  test("plugin MCP proxy publication waits for its sidecar acknowledgement and revokes on exit", async () => {
+    const { startEgressPolicyProxy } = await import("./network-egress-proxy")
+    const { configurePluginMcpProxy, bindPluginMcpProxy, pluginMcpProxySnapshot } = await import("./plugin-mcp-proxy")
+    const proxy = await startEgressPolicyProxy({ log: () => {} })
+    const child = new CredentialChild()
+    configurePluginMcpProxy(proxy)
+    try {
+      const running = await spawnWith(child, [])
+      await running.health.wait
+      expect(child.posted.find(message => message.type === "start")?.pluginMcpProxies).toEqual({})
+      let acknowledged = false
+      const pending = bindPluginMcpProxy("rill", { packageId: "claude:rill", entryId: "mcp:rill-developer", generation: "gen-000001-abcdef", definitionDigest: ("sha256:" + "e".repeat(64)) as `sha256:${string}`, serverUrl: "http://127.0.0.1:9009/mcp" }).then(() => { acknowledged = true })
+      const update = child.posted.at(-1)!
+      expect(update.type).toBe("plugin-mcp-proxies")
+      expect(acknowledged).toBe(false)
+      child.emit("message", { type: "plugin-mcp-proxies-ready", revision: update.revision })
+      await pending
+      expect(acknowledged).toBe(true)
+      child.emit("exit", 0)
+      expect(pluginMcpProxySnapshot()).toEqual({})
+    } finally { child.emit("exit", 0); await proxy.close() }
+  })
+
   test("I-20 T1 / P / T2:start 带存放点整表;credentials.request 同步回复当刻盘上的表;续期推整表;unavailable ⇒ credential-change;退出后推送跳过", async () => {
     process.env.CODEPUPPY_API_KEY = "FAKE-platform-A"
     const child = new CredentialChild()

@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test"
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, chmodSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, chmodSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { spawn, spawnSync } from "node:child_process"
@@ -93,7 +93,7 @@ test("H4 three real interpreters preserve leaf redirections, stdin and private p
     ]) {
       const nodes = plan(source, shell)
       expect(nodes.length).toBe(1)
-      const rewritten = planner.packageManagerExecutionSource({ command: source, nodes, executionID: "test-id", helperService: "test.service", helper, privateInput: { fd: 3, data: Buffer.from(proof + "\n") } })
+      const rewritten = planner.packageManagerExecutionSource({ command: source, shell, nodes, executionID: "test-id", helperService: "test.service", helper, privateInput: { fd: 3, data: Buffer.from(proof + "\n") } })
       expect(rewritten).not.toContain(proof)
       const child = spawn(shell, ["-ax", "-c", rewritten], { cwd: root, env: { HOME: root, PATH: "/usr/bin:/bin" }, stdio: ["ignore", "pipe", "pipe", "pipe"] })
       const stdout: Buffer[] = [], stderr: Buffer[] = []
@@ -116,6 +116,24 @@ test("H4 three real interpreters preserve leaf redirections, stdin and private p
       if (source.includes("2>&9")) expect(readFileSync(join(root, "log"), "utf8")).toContain("helper stderr")
       if (source.includes("9>out")) expect(readFileSync(join(root, "out"), "utf8")).toBe("")
     }
+  }
+})
+
+test("H4 the proof writer is a shell builtin: an external printf first on PATH never runs", async () => {
+  const proof = "b".repeat(64), fake = join(root, "fake-bin"), recorded = join(root, "external-printf-argv"), helper = join(root, "builtin-helper")
+  mkdirSync(fake, { recursive: true })
+  // A same-user process can read any external program's argv; the proof must never be one.
+  writeFileSync(join(fake, "printf"), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${recorded}'\nexec /usr/bin/printf "$@"\n`)
+  writeFileSync(helper, `#!/bin/sh\nIFS= read -r proof <&9 || exit 126\n[ "$proof" = '${proof}' ] || exit 126\n`)
+  for (const file of [join(fake, "printf"), helper]) chmodSync(file, 0o755)
+  for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) {
+    const source = "brew --prefix"
+    const rewritten = planner.packageManagerExecutionSource({ command: source, shell, nodes: plan(source, shell), executionID: "test-id", helperService: "test.service", helper, privateInput: { fd: 3, data: Buffer.from(proof + "\n") } })
+    const child = spawn(shell, ["-c", rewritten], { cwd: root, env: { HOME: root, PATH: `${fake}:/usr/bin:/bin` }, stdio: ["ignore", "pipe", "pipe", "pipe"] })
+    const exited = new Promise<number | null>((resolve, reject) => { child.once("close", resolve); child.once("error", reject) })
+    ;(child.stdio[3] as Writable).end(proof + "\n")
+    expect({ shell, code: await exited }).toEqual({ shell, code: 0 })
+    expect(existsSync(recorded) ? readFileSync(recorded, "utf8") : "", shell).toBe("")
   }
 })
 

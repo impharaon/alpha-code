@@ -164,15 +164,17 @@ export function shellDialect(shell: string): "bash" | "zsh" | "posix" {
 }
 
 export function packageManagerExecutionSource(input: {
-  command: string; nodes: readonly PackageManagerCommand[]; executionID: string; helperService: string; helper: string; privateInput: ShellPrivateInput
+  command: string; shell: string; nodes: readonly PackageManagerCommand[]; executionID: string; helperService: string; helper: string; privateInput: ShellPrivateInput
 }): string {
+  // zsh's `command printf` (POSIX_BUILTINS off) runs the external printf, whose argv any same-user process can read.
+  const printf = shellDialect(input.shell) === "posix" ? "command printf" : "builtin printf"
   const variable = (node: PackageManagerCommand) => `codepuppy_proof_${input.executionID.replaceAll("-", "")}_${node.start}`
   const options = `codepuppy_options_${input.executionID.replaceAll("-", "")}`
   const prelude = `${options}=$-; { set +x; } 2>/dev/null; set +a; ${input.nodes.map((node) => `unset ${variable(node)}; IFS= read -r ${variable(node)} <&${input.privateInput.fd} || ${variable(node)}=;`).join(" ")} exec ${input.privateInput.fd}<&-; case $${options} in *a*) set -a;; esac; case $${options} in *x*) set -x;; esac;\n`
   const source = [...input.nodes].sort((a, b) => b.leafStart - a.leafStart).reduce((source, node) => {
     const args = [input.helper, "--service", input.helperService, "--execution", input.executionID, "--node", node.nodeID, "--proof-fd", "9", "--", node.program, ...node.argv].map(shellQuote).join(" ")
     const helper = `${node.prefix ? node.prefix + " " : ""}${args}`
-    const writer = `{ { set +x; } 2>/dev/null; command printf '%s\\n' "$${variable(node)}"; }`
+    const writer = `{ { set +x; } 2>/dev/null; ${printf} '%s\\n' "$${variable(node)}"; }`
     // Attach the pipe to a shell group before copying it: zsh attaches a command's pipe after its redirects.
     const stdin = `${writer} | { ${helper} 9<&0 0<&8 8<&-; }`
     const closed = `${writer} | { ${helper} 9<&0 0<&- 8<&-; }`

@@ -944,3 +944,12 @@ R1 的反向材料必须进入同一真实入口证明：改写/删除 launcher�
 **留档：** “只让安装类子命令围栏外运行”尚无 owner 批准，本次不实施、不形成限制/新 gate，也不将它记成 owner 决定。它不阻止按现有 SPEC v5 与本轮技术修正冻结；后续如 owner 改规格，再只重开受影响部分。
 
 **交接收据：** 输入 SPEC v5 `834e269da9`、v4 `efc8ba3abd`、v5 送审版 `176ba25a68` 与本轮 R1/编排者处置。Codex（GPT-6，designer）核对上述符号与全部受影响 H1–H4 接缝，v1–v4 正文未改；V5-P09 的 canonical marker 正反探针通过（非 canonical 规则的失败观察也留档）；旧名称扫描 10 pass/0 fail，`git diff --check` 通过；文档契约相对输入 HEAD 仍为 72 error/249 warning、无新增 finding。生产实现/签名/真实安装和负向证明尚未执行，留 §6。结论为 v5 已修并 frozen，无本次交付需要等待的 owner 决定。未 merge/rebase、实现、push、PR 或变动 v4 裁决。
+
+### 代码审查 R1 修正轮的编排裁决（2026-11-27，#1759 实施车道修正轮第 7、8、12 项）
+
+| 裁决 | 内容 | 依据 |
+| --- | --- | --- |
+| C-1｜R6 接缝增量（第 7 项） | `WriteScopeReply.result.targets[].outcome` 增加 `"fixed"`：目标命中经 R7 验证的 R3 固定 global/user-config 表而可写。`"writable"` 保留给其余可写来源（/tmp、缓存、本运行已批准目录）。ext 的 evaluate hook 只在全部目标都是 `"fixed"` 时不再问 external_directory；其余情形保持 BR-08 原行为。两端（`codepuppy-sidecar-messages.ts` 的 parser/build 与 HubBridge 调用）在同一 R6 raise 内同步。 | R6 原文「固定 global/user-config 文件不额外问 external_directory……表外写目标的目录批准保留 BR-08 行为」；现有 `writable` 混合了固定表与其它来源，ext 无法区分，按现状会把 /tmp、缓存一并放过，超出 R6。只是让实现符合已冻结的决定，不新增步骤。 |
+| C-2｜H3 接缝增量（第 12 项） | `PackageManagerCommand` 增加 `unset: readonly string[]`：源码里 `unset NAME` 以及真实 shell 启动时丢弃的继承名（如 bash/sh 的 `OLDPWD`），main 在 spawn 前从快照环境删除。`PWD` 的值取起始目录的物理路径（与真实 shell 一致），仍用现有 assignment 表达。 | 冻结的 `PackageManagerAssignment` 只能设值，无法表达删除，brew 环境因此与真实 shell 不同；补一个删除列表是最小形状。 |
+| C-3｜第 8 项：维持已声明残留 | 围栏内可写的 `/opt/homebrew/bin` 中被替换的程序，会在围栏外 brew 的 post_install 阶段经用户 PATH 运行（实施车道真实探针已证实：`formula.rb:1745-1747` 以 `ORIGINAL_PATHS` 设 PATH，`PLANTED_TOOL_RAN git`）。这正是 R1-P0 已记的「其它工具链软链可被 v4 bin allow 改写并供 brew 调用」，本增量不加机制。探针证据记在 plan.md「代码审查 R1 修正轮」第 8 项；收窄提议作为 pending 条目回到 alpha-work INT-safety。 | §5 / R1-P0 已声明的残留；新证据只把推断变成观察，没有改变后果，不重开冻结裁决。 |
+

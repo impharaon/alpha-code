@@ -2591,4 +2591,25 @@ describe("v7 BR-11: after-the-fact approval of a write refused mid-command", () 
     const later = yield* hooks.trigger("session", "context", request(shellID, "/outside-bg-stop") as never)
     expect(lastText(later)).toBe(WRITE_APPROVED_RETRY_NOTE)
   }))
+
+  // BR-08 before the write, the AC-08 side (SPEC child-process-write-fence BR-08 / AC-08): a write whose folder main resolves
+  // to HOME itself (R6 `ineligible`, the eligibility R4 and BR-11 use) shows no card, so the write meets the fence and the
+  // one stop sentence (BR-06). A folder outside the project that is not HOME keeps its card. The request is the one the
+  // engine's file-access transform raises for a recognised write (ui-mac `file-access-transform`).
+  it.live("a recognised write into HOME itself asks no card; another outside folder keeps its card", () => Effect.gen(function* () {
+    const r6 = fakeWriteScope({ "/home-like": "ineligible" })
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope })
+    const permission = yield* Permission.Service
+    const writeIn = (folder: string) => permission.assert({ sessionID: session.id, agent: "build", action: "external_directory", resources: [`${folder}/*`], save: [`${folder}/*`],
+      metadata: { directoryAccess: { access: "write", targets: [{ absolute: `${folder}/note.txt`, directory: folder }] } } } as never)
+    const home = yield* Effect.forkChild(writeIn("/home-like").pipe(Effect.exit))
+    yield* Effect.sleep("200 millis")
+    expect((yield* requests(session.id)).map((request) => request.resources)).toEqual([])
+    expect(Exit.isSuccess(yield* E.Fiber.join(home))).toBe(true)
+    const outside = yield* Effect.forkChild(writeIn("/outside-b").pipe(Effect.exit))
+    const [card] = yield* pending
+    expect(card).toMatchObject({ sessionID: session.id, action: "external_directory", resources: ["/outside-b/*"] })
+    yield* permission.reply({ requestID: card!.id, reply: "reject" })
+    expect(Exit.isFailure(yield* E.Fiber.join(outside))).toBe(true)
+  }))
 })

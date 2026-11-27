@@ -1,29 +1,30 @@
 ---
 id: DESIGN-secrets-usable-not-visible
 title: 密钥文件程序可用、助手不可见 技术设计
-summary: v3.4 冻结：消费规格 v5——项目外按项目规则命中的名单文件经 match 认定、读过后计入采集；env 只取凭据名变量与值里内嵌的连接地址密码；值里凭据名键的 key=value 段同样只遮其值；写回按位置换回每个遮盖符。SC-01/SC-02 与两处引擎授权不变。
+summary: v3.5 冻结：消费规格 v6——命令里字面写出的项目外名单文件在 Shell create.before 登记、capture start 读出，第一段输出起遮盖；其余同 v3.4：项目外按项目规则命中的名单文件经 match 认定、读过后计入采集；env 只取凭据名变量与值里内嵌的连接地址密码；值里凭据名键的 key=value 段同样只遮其值；写回按位置换回每个遮盖符。SC-01/SC-02 与两处引擎授权不变。
 kind: tech-design
 status: frozen
-design_version: "3.4"
+design_version: "3.5"
 spec: SPEC-secrets-usable-not-visible
-spec_version: 5
+spec_version: 6
 review:
   rounds: 2
   reviewed_sha: "d336e59d04"
-  verdict: "v3.4 frozen; spec v5 sync of §4.1/§4.3/§4.3.1/§4.4 to the implemented rule, no new seam or engine change; R2 receipt retained"
+  verdict: "v3.5 frozen; spec v6 sync of §4.1/§4.3/§4.5 (literal command paths registered at create.before), no new seam or engine change; R2 receipt retained"
 owners: [owner]
 last_reviewed: 2026-11-27
 ---
 
 # DESIGN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 技术设计
 
-本设计对应 #1758；**v3.4 为 frozen，消费规格 v5**。v3.4 只把 §4.1/§4.3/§4.3.1/§4.4 与规格 v5 的 BR-05、BR-06 对齐（项目外按项目规则命中的名单文件、env 只取凭据字段、值里内嵌的连接地址密码），公开签名、SC-01/SC-02 与授权不变，裁决见 §10「v3.4」。以下为 v3.3 增量说明：v3.3 只修订 SC-01 的单槽发布形状：同一 capture 回调可逐段 await Core 的 publish，不聚合全部安全字节。原顺序、背压、故障锁存与终态仅说明保证不变，沿用 U-38 的同一引擎接管，不新增 hook 或 owner 项。v3.2 的原 read 分页/after 安全视图及 U-42 不新增 SC-03 的说明文件边界继承；SC-02 及其余已定契约不变。review 轮数/版本保留真实 R2 收据，不冒报本轮独立审查。
+本设计对应 #1758；**v3.5 为 frozen，消费规格 v6**。v3.5 只把 §4.1/§4.3/§4.5 与规格 v6 BR-05 的 v6 句对齐：命令里字面写出的项目外名单文件在 Shell create.before 登记、capture start 读出，第一段输出起遮盖；公开签名只新增 `ProtectedFiles.named` 与 `SecretMask.command`，SC-01/SC-02 与授权不变，裁决见 §10「v3.5」。v3.4 只把 §4.1/§4.3/§4.3.1/§4.4 与规格 v5 的 BR-05、BR-06 对齐（项目外按项目规则命中的名单文件、env 只取凭据字段、值里内嵌的连接地址密码），公开签名、SC-01/SC-02 与授权不变，裁决见 §10「v3.4」。以下为 v3.3 增量说明：v3.3 只修订 SC-01 的单槽发布形状：同一 capture 回调可逐段 await Core 的 publish，不聚合全部安全字节。原顺序、背压、故障锁存与终态仅说明保证不变，沿用 U-38 的同一引擎接管，不新增 hook 或 owner 项。v3.2 的原 read 分页/after 安全视图及 U-42 不新增 SC-03 的说明文件边界继承；SC-02 及其余已定契约不变。review 轮数/版本保留真实 R2 收据，不冒报本轮独立审查。
 
 ## 1. 基线
 
-- Spec：[SPEC-secrets-usable-not-visible v5](spec.md)，固定输入提交 `3776643a6e84e1a7afd620a05b9b7f981da88e68`（v5 首版 `5d56d0cae1`；`d14b2e3c64` 补 BR-06 的内嵌密码句与 AC-12 扩写，`3776643a6e` 按代码审查 R1 第 6 项补「值里以 `Password=`、`?password=` 这类键写出的密码同样只遮这一段」，两次均注明批准行不变）。v4 固定提交 `0099c0c248` 的 U-42 说明文件限制在 v5 中不变；v1..v4 的有效证据继承。
+- Spec：[SPEC-secrets-usable-not-visible v6](spec.md)，固定输入提交 `2e99186d59`（v6 只补 BR-05 的 v6 句、限制表一行与 AC-13，owner U-44 批准；其余与 v5 相同）。v5 固定输入提交 `3776643a6e84e1a7afd620a05b9b7f981da88e68`（v5 首版 `5d56d0cae1`；`d14b2e3c64` 补 BR-06 的内嵌密码句与 AC-12 扩写，`3776643a6e` 按代码审查 R1 第 6 项补「值里以 `Password=`、`?password=` 这类键写出的密码同样只遮这一段」，两次均注明批准行不变）。v4 固定提交 `0099c0c248` 的 U-42 说明文件限制在 v5 中不变；v1..v4 的有效证据继承。
 - v3.4 输入：本工作树 `d14b2e3c64`（分支 feat/1758-i50-i51，未 push）；plan.md「⑥ 规格 v5」的改动表、偏离记录（plan.md:861-865）、实施收据（:867-877）与「⑥ 核对修正：值里内嵌的密码」（:879-886）；v3.4 修订再消费 `3776643a6e` 的「⑥ 审查 R1 修正（FIX-THEN-MERGE）」（plan.md:888-897），实现为红例 `099c3ec893`、修正 `fc825e9e6d`。只消费已实施的 BR-05/BR-06 v5 行为，不重开 v3.3 及更早决定；I-52 不在本增量。
-- 覆盖：BR-01..BR-07、AC-01..AC-12（AC-11、AC-12 为 v5 新增，由 §4.1/§4.3/§4.4 的 v5 句保持）。AC-09 由实时 flush 保持，AC-10 由逐 profile 凭据字段提取保持；成功结果 hook 沿用 §2 证据，本文探针不代替验收。
+- v3.5 输入：工作树 `/Users/pharaon/app/wt/alpha-code-feat-1758-i54-literal-paths` 的 `859207d427`（分支 feat/1758-i54-literal-paths，基线 origin/alpha `a56d861523`，未 push）；plan.md「⑦ 规格 v6」的改动表、风险、「设计待同步」、偏离记录与实施收据，实现为红例 `c425bed85b`、实现 `18f8f451b6`。只消费 BR-05 v6 句，不重开 v3.4 及更早决定。
+- 覆盖：BR-01..BR-07、AC-01..AC-13（AC-11、AC-12 为 v5 新增，由 §4.1/§4.3/§4.4 的 v5 句保持；AC-13 为 v6 新增，由 §4.1/§4.3/§4.5 的 v3.5 句保持）。AC-09 由实时 flush 保持，AC-10 由逐 profile 凭据字段提取保持；成功结果 hook 沿用 §2 证据，本文探针不代替验收。
 - 输入收据：owner 2026-11-26 的 U-38「好的。」已批准 SC-01、前后可读值边界及失败整次隐藏；U-39「这两个你的建议是什么，按你的建议吧。」批准实时逐段遮盖、先打印后写入的窄残留，以及非 env 格式只提取凭据字段，已落入规格 v3。继承 Windows 发布时真机验收和「复用工具卡文本区、无需 frames」约定。自动化仍消费 [SPEC-unattended-run-permissions v2](../unattended-run-permissions/spec.md) BR-03。
 - 背景：规格[来源](spec.md#来源)所指的协调仓安全意图 I-45、讨论 P-06/P-08；不重开「程序可用」「全部批准读项目外文件不问」和原样匹配边界。
 - r3 输入：独立 R2 审查 `582f056887..d336e59d04`，FIX-THEN-MERGE；本轮按六项 finding 与三项补充处置冻结。执行 `git fetch`、`git rebase origin/alpha`（上游 `d4a849e524`），无冲突，没有新增 merge；只改本文与必要索引行。
@@ -190,18 +191,20 @@ declare const ProtectedFiles: {
     root: string; include: readonly string[]; exclude: readonly string[]
   }[]
   match(input: { path: string; roots: ProtectedRoots }): ProtectedFile | undefined
-  probe(input: { text: string; roots: ProtectedRoots }): readonly string[] // 命中 rule ID
+  // v3.5：命令文本里路径词经同一 match 命中的文件，按 path 去重；相对路径以 roots.directory 为基准
+  named(input: { text: string; roots: ProtectedRoots }): readonly ProtectedFile[]
+  probe(input: { text: string; roots: ProtectedRoots }): readonly string[] // named 命中文件的 rule ID（去重）
   isPublicValue(input: { name: string; value: string | number | boolean | null }): boolean
 }
 ```
 
-roots 全部必填，由宿主实际目录事实提供，不从工具输出或模型参数覆盖；没有机器绝对路径默认值。路径传入仍遵守现有 read 输入校验。`match` 是总函数：不适用返回 undefined，不读取文件，不请求权限。`probe` 只对命令载荷中的路径词调用同一 `match` 做词法探测（因而与 match 同样认下文的项目外范围），不能另抄受保护路径正则；无法从命令推断某个动态路径属于既有风险标注能力的边界，不影响匹配已解析文件。
+roots 全部必填，由宿主实际目录事实提供，不从工具输出或模型参数覆盖；没有机器绝对路径默认值。路径传入仍遵守现有 read 输入校验。`match` 是总函数：不适用返回 undefined，不读取文件，不请求权限。`named` 只对命令载荷中的路径词（引号内整段与按空白拆出的词，去掉 `--opt=`/`NAME=` 前缀与 `@`，`$HOME`/`${HOME}` 展开为 roots.home）调用同一 `match` 做词法探测，不读文件、不请求权限；`probe` 取其结果的 rule ID（因而两者都与 match 同样认下文的项目外范围），不能另抄受保护路径正则；无法从命令推断某个动态路径属于既有风险标注能力的边界，不影响匹配已解析文件。
 
 现有 `classifyPermissionRequest` 的输入增加必填 `protectedRoots: ProtectedRoots`；permission、patterns、always、metadata 的形状与结果维持原契约。调用方从同一 Location 的 SecretMask 路径事实供数，不在分类器里做 IO，也不从审批 metadata 反推可信根。现有 gate 和能力轴调用共同消费这一个参数，不能让无根调用退回另一张旧正则表。
 
 首版名单与 profile 是同一份发布数据。项目的递归文件名规则只发现项目自己的文件；默认剪枝 `node_modules`、`vendor`、`.venv`、`venv`、`site-packages` 这类依赖树，不因依赖自带 `.env` 把第三方样本纳入匹配集。名单中的显式文件/目录位置或已支持的显式凭据路径变量仍优先，即使落在依赖树内也直接处理；这种例外由同一名单判定，不增加用户配置。match、sources、probe 消费相同的规则、示例排除与依赖树剪枝，不能只剪枝采集而让读工具持有另一套名单。其它项目目录不因 `.gitignore` 跳过，按真实身份去重以终止符号链接环。
 
-**项目外范围（v3.4，规格 v5 BR-05）**：路径落在 `roots.project` 之外时，`match` 在全部定位规则之后再用同一份项目规则判定——项目文件名规则原样、项目固定位置（如 `config/master.key`）加 `**/` 前缀，以该路径的文件系统根为根，沿用同一示例排除与依赖树剪枝，返回的 `rule` ID 与项目内相同；因而另一个项目的 `.env` 得 env/variables，项目外 `*.pem` 等得 opaque/notice，与项目内一致。`sources` **不含**这一范围：不预先扫描、不遍历其目录；这类文件只在读文件工具读过之后由 §4.3 的已读文件来源计入采集。`ProtectedFiles` 签名不变；风险标注、结果里的文件引用和 §4.3.1 写回都经 match 自然覆盖它。
+**项目外范围（v3.4，规格 v5 BR-05）**：路径落在 `roots.project` 之外时，`match` 在全部定位规则之后再用同一份项目规则判定——项目文件名规则原样、项目固定位置（如 `config/master.key`）加 `**/` 前缀，以该路径的文件系统根为根，沿用同一示例排除与依赖树剪枝，返回的 `rule` ID 与项目内相同；因而另一个项目的 `.env` 得 env/variables，项目外 `*.pem` 等得 opaque/notice，与项目内一致。`sources` **不含**这一范围：不预先扫描、不遍历其目录；这类文件只在读文件工具读过之后，或（v3.5，规格 v6 BR-05）shell 命令里字面写出其路径时，由 §4.3 的已登记文件来源计入采集。`ProtectedFiles` 签名不变；风险标注、结果里的文件引用和 §4.3.1 写回都经 match 自然覆盖它。
 
 | 位置 / 文件族 | 格式与直接读视图 |
 | --- | --- |
@@ -279,7 +282,7 @@ Windows 的 home 使用宿主 `os.homedir()`（一般为 USERPROFILE）；APPDAT
 
 ### 4.3 采集、外层事务与私有材料
 
-扩展为每个 Location 建一个私有 SecretMask，按名单 profile 读取两类来源：`sources` 给出的项目/主目录（含显式路径变量），以及（v3.4，规格 v5 BR-05）本 Location 内读文件工具已读过的项目外名单文件——SecretMask.read 先登记该 ProtectedFile，之后每次采集与其它来源一起处理，Location 释放时清空；不预先扫描项目外、不对其目录 readdir，未读过的项目外名单文件不贡献值（规格 v5 批准记录所列边界）。不是模型可调用工具，不把值放入 main/UI/storage。Schema 只持有发布规则与固定说明。每次根工具调用前采集，普通工具/连接器结果到达时再采集；shell start 前采集、每个直播 flush 前检查目录变化并重读变化来源、end 再采集。读到的值保留至 Location 释放，不在并发输出仍可能引用旧值时撤销。
+扩展为每个 Location 建一个私有 SecretMask，按名单 profile 读取两类来源：`sources` 给出的项目/主目录（含显式路径变量），以及（v3.4，规格 v5 BR-05）本 Location 内读文件工具已读过的项目外名单文件——SecretMask.read 先登记该 ProtectedFile，以及（v3.5，规格 v6 BR-05）shell 命令字面写出的这类文件——Shell `create.before` 时由 `SecretMask.command` 以该命令的工作目录（相对 Location 目录解析，开头 `~` 按 roots.home 展开，与引擎解析 `workdir` 同义）为相对路径基准调用 `ProtectedFiles.named` 并逐个登记；登记同步、不读文件，读取发生在随后 capture start 的采集（Core 顺序为 create.before → capture start → spawn，`packages/core/src/shell.ts:303,343,363`），因此该命令的第一段输出起即按其值遮盖。登记的文件之后每次采集与其它来源一起处理，Location 释放时清空；不预先扫描项目外、不对其目录 readdir。create.before 早于 Core 自己的工作目录解析与审批，被拒的命令也已登记其文件，只会多遮、不放出内容；已在 sources 内的路径重复登记只多一次 stat。边界按规格 v6 限制表：变量或其它命令拼出的路径、先 `cd` 再写的相对路径不认，这类项目外名单文件在读文件工具读过或被字面写出之前不贡献值。不是模型可调用工具，不把值放入 main/UI/storage。Schema 只持有发布规则与固定说明。每次根工具调用前采集，普通工具/连接器结果到达时再采集；shell start 前采集、每个直播 flush 前检查目录变化并重读变化来源、end 再采集。读到的值保留至 Location 释放，不在并发输出仍可能引用旧值时撤销。
 
 允许跳过未变来源的重读，唯一缓存键为 `(dev,ino,size,mtimeNs,ctimeNs)`，取 `fs.stat({bigint:true})`；任一不同就读内容，不能仅看 mtime。SQLite 同时纳入主库、WAL、SHM 的身份；发现/消失也算变化。新受保护文件的发现使用目录五元组缓存：首次按 sources 建立已发现目录/候选文件集合；每次 flush stat 已发现目录，只对目录 stat 变化的那一层 readdir，新增子目录首次发现时按同一剪枝规则遍历。不存在的发布根保留最近现存父目录的变化检测；子目录各自 stat，不能用祖先目录未变推断整棵树未变。已知文件仍独立 stat，不能漏掉不改变目录 stat 的原地写入；已读的项目外名单文件只以文件自身 stat 五元组判定变化，沿用同一缺失/不可读重试；不逐 chunk 全量递归 readdir，也不依赖 watcher。没有 TTL 或自行选择的数量/长度上限。ENOENT/EACCES/EPERM 表示该次缺失/不可读，不贡献新值，后续仍重试判定；其它无法完成采集/解析/匹配的异常进入本次隐藏分支。
 
@@ -301,6 +304,7 @@ type SecretMask = {
   progress(input: { call: MaskCall; update: Tool.Metadata }): Promise<Tool.Metadata>
   prepareMutation(input: EnvMutation): Promise<EnvMutation>
   stream(input: ShellCapture): Promise<ShellCapture>
+  command(input: { command: string; cwd: string }): void // v3.5：create.before 时登记字面路径命中的文件
 }
 ```
 
@@ -369,7 +373,7 @@ interface ShellHooks {
 }
 ```
 
-创建时以已有 PluginHooks.has 判定是否进入 capture 模式；无 hook 的裸引擎保留普通路径。已进入模式后 disposition 默认 hold：仅表示不自动发布输入 bytes，不撤回已由 publish 写出的安全段；不能因重载失去回调而透传。扩展只设置原事件的 disposition/replacement，安全字节改经 publish，返回新对象不会被 hooks.trigger 自动采用。start 在 spawn 前只初始化；chunk 顺序处理合并 stdout/stderr，end 覆盖原进程结束/超时/取消后的流关闭；没有新增命令超时。
+创建时以已有 PluginHooks.has 判定是否进入 capture 模式；无 hook 的裸引擎保留普通路径。已进入模式后 disposition 默认 hold：仅表示不自动发布输入 bytes，不撤回已由 publish 写出的安全段；不能因重载失去回调而透传。（v3.5）扩展另以既有 `ShellHooks["create.before"]` 只读消费 `command`/`cwd` 交 `SecretMask.command`，不改该事件，注册在 `policy.seal` 内与 capture 同处（`packages/ext/src/policy/index.ts:292-293`）；ShellHooks 接口不变。扩展只设置原事件的 disposition/replacement，安全字节改经 publish，返回新对象不会被 hooks.trigger 自动采用。start 在 spawn 前只初始化；chunk 顺序处理合并 stdout/stderr，end 覆盖原进程结束/超时/取消后的流关闭；没有新增命令超时。
 
 #### 回调内发布、顺序与背压
 
@@ -557,6 +561,16 @@ const hiddenResult: Tool.Result = {
 不适用。没有数据迁移、不可逆数据改动或规格要求的回退路径；不设计旧版本行为或兼容期。
 
 ## 10. 裁决与审查结论
+
+### v3.5：规格 v6 同步（U-44）
+
+| 裁决 | 依据 / 后果 |
+| --- | --- |
+| SPEC6-01：命令里字面写出的项目外名单文件在 Shell create.before 登记、capture start 读出，第一段输出起遮盖；拼出的路径与先 `cd` 再写的相对路径不认 | 产品依据为规格 v6 BR-05（`2e99186d59`）：协调仓安全意图 I-54，owner 2026-11-27 U-44 选「补上：命令里写出的路径先登记（推荐）」；拼出路径不认与「这条命令的输出要多等一次文件读取」两项均列入规格 v6 限制表，同一原话批准。设计后果：§4.1 新增 `ProtectedFiles.named`，`probe` 改取其 rule ID（结果不变）；§4.3 新增已登记来源 `SecretMask.command({command, cwd})`；§4.5 扩展只读消费既有 `create.before`。不新增引擎接缝、hook 或配置，SC-01/SC-02 及 U-38/U-40 授权不变；不新增规格外的用户步骤、选项或限制。v3.4 及更早裁决不重开。 |
+
+| 本增量收据 | 检查方 / 结论 | 遗留去向 |
+| --- | --- | --- |
+| v3.5 / 工作树 `859207d427`，规格 v6 `2e99186d59` + plan.md ⑦（红 `c425bed85b` → 实现 `18f8f451b6`） | Claude Opus 5.5 设计方定向同步：按 plan.md ⑦「设计待同步」三项逐句对照 §4.1/§4.3/§4.5 与实现（`packages/schema/src/codepuppy-protected-files.ts:293-314` 的 `named`/`probe`，`packages/ext/src/secret-mask.ts:251-257` 的 `command`，`packages/ext/src/policy/index.ts:292` 的注册，`packages/core/src/shell.ts:303,343,363` 的顺序），只改这些句子与基线/元数据；行为证据继承 plan.md ⑦ 实施收据的红例、移除臂与场景，本轮未重跑测试。没有新增独立审查轮次，review 元数据保留 R2 真实收据 | **v3.5 frozen**；无 owner-only 决定。plan.md ⑦ 注明本节未经编排器单独核对、由审查时核对。 |
 
 ### v3.4：规格 v5 同步（U-43 与编排器核对修正）
 

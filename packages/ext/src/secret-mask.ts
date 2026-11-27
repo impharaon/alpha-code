@@ -40,6 +40,11 @@ const WRAPPED = Symbol("secret-progress")
 export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
   const files = createSecretFiles(roots)
   const calls = new Map<string, CallState>()
+  // Design §10 SPEC5-03: Location release takes no new calls; the calls already running finish masking, then values clear.
+  let closing = false
+  const settle = () => {
+    if (closing && calls.size === 0) files.dispose()
+  }
   const views = new WeakMap<object, () => Tool.Result>()
   type Capture = { raw: SecretSpool; stream: ReturnType<typeof createSecretStream>; publish: ShellCapture["publish"] }
   const captures = new Map<string, Capture>()
@@ -254,7 +259,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
     },
     isRoot: (call: MaskCall, tool: string) => stateOf(call, tool) !== undefined,
     begin: async (input: { call: MaskCall; kind: "tool" | "execute" }) => {
-      if (calls.get(toolCallKey(input.call))?.kind === "execute") return
+      if (closing || calls.get(toolCallKey(input.call))?.kind === "execute") return
       const state: CallState = { kind: input.kind, failed: false }
       calls.set(toolCallKey(input.call), state)
       try {
@@ -295,6 +300,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         return { content: [{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }], metadata: safe }
       } finally {
         if (state) calls.delete(toolCallKey(input.call))
+        settle()
       }
     },
     error: async (input: { call: MaskCall; tool: string; error: Tool.Error }): Promise<Tool.Error> => {
@@ -325,6 +331,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
         return new Constructor({ message: ProtectedFiles.MASKING_FAILED_TEXT, error: permissionCause(input.error, "hide"), metadata: hiddenMetadata(state, input.error.metadata) })
       } finally {
         if (state) calls.delete(toolCallKey(input.call))
+        settle()
       }
     },
     progress: async (input: { call: MaskCall; facts: ToolFacts | undefined; update: Tool.Metadata }): Promise<Tool.Metadata> => {
@@ -410,12 +417,15 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
           draft.execute = wrapped
         })
     },
-    release: (call: MaskCall) => { calls.delete(toolCallKey(call)) },
+    release: (call: MaskCall) => {
+      calls.delete(toolCallKey(call))
+      settle()
+    },
     dispose: () => {
-      calls.clear()
+      closing = true
       for (const state of captures.values()) { void state.stream.dispose(); void state.raw.dispose() }
       captures.clear()
-      files.dispose()
+      settle()
     },
   }
   return service

@@ -344,8 +344,8 @@ test("R6: only fixed global/user-config targets skip external_directory; other w
   const targets = [{ absolute: "/tmp/out/file", directory: "/tmp/out" }, { absolute: "/Users/me/.zshrc", directory: "/Users/me" }]
   const ask = () => ({ action: "external_directory", effect: "ask" as "allow" | "ask" | "deny", metadata: { directoryAccess: { access: "write" as const, targets } } })
   const scope = (first: string, second: string) => async () => ({ revision: 1, targets: [{ absolute: targets[0]!.absolute, outcome: first }, { absolute: targets[1]!.absolute, outcome: second }] }) as never
-  // v7: `ineligible` (a folder R4 can never grant) keeps BR-08's ask before the write; only the after-the-fact path skips it.
-  for (const [first, second, effect] of [["fixed", "fixed", "allow"], ["writable", "writable", "ask"], ["writable", "fixed", "ask"], ["needs-approval", "fixed", "ask"], ["ineligible", "fixed", "ask"], ["ineligible", "protected", "deny"], ["protected", "fixed", "deny"]] as const) {
+  // `ineligible` (a folder R4 can never grant) offers no card before the write either (AC-08); the fence's refusal and the stop sentence follow.
+  for (const [first, second, effect] of [["fixed", "fixed", "allow"], ["writable", "writable", "ask"], ["writable", "fixed", "ask"], ["needs-approval", "fixed", "ask"], ["ineligible", "fixed", "allow"], ["ineligible", "ineligible", "allow"], ["ineligible", "writable", "ask"], ["ineligible", "needs-approval", "ask"], ["ineligible", "protected", "deny"], ["protected", "fixed", "deny"]] as const) {
     const event = ask()
     await evaluateDirectoryWrite(event, scope(first, second))
     expect({ first, second, effect: event.effect }).toEqual({ first, second, effect })
@@ -357,7 +357,7 @@ test("external write scope preserves read and deny while asking for an unapprove
   for (const access of ["read", "write"] as const) for (const outcome of ["writable", "needs-approval", "ineligible", "protected", "no-fence"] as const) {
     const event = { action: "external_directory", effect: "allow" as "allow" | "ask" | "deny", metadata: { directoryAccess: { access, targets } } }
     await evaluateDirectoryWrite(event, async () => ({ revision: 1, targets: [{ absolute: targets[0]!.absolute, outcome, realDirectory: targets[0]!.directory }] }))
-    expect(event.effect).toBe(access === "read" ? "allow" : outcome === "protected" ? "deny" : outcome === "needs-approval" || outcome === "ineligible" ? "ask" : "allow")
+    expect(event.effect).toBe(access === "read" ? "allow" : outcome === "protected" ? "deny" : outcome === "needs-approval" ? "ask" : "allow")
     event.effect = "deny"
     await evaluateDirectoryWrite(event, async () => ({ revision: 2, targets: [{ absolute: targets[0]!.absolute, outcome: "writable", realDirectory: targets[0]!.directory }] }))
     expect(event.effect).toBe("deny")

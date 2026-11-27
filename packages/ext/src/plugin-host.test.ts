@@ -2193,18 +2193,27 @@ packageIt.live("package output styles select through the command entry and leave
   const CODING = "a coding agent harness"
   // The instructions part carries user/project instruction sources and the real environment; it is not a coding prompt.
   const INSTRUCTIONS = '"key":"core/environment"'
-  const main = yield* sessions.create({ location: { directory: location.directory }, title: "Styled session", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const conversation = (title: string) => sessions.create({ location: { directory: location.directory }, title, agent: "build", model: { providerID: "test", id: "picked" } } as never)
+  const main = yield* conversation("Styled session")
   const unstyled = yield* turn(main.id, "default")
   expect(unstyled).toContain(CODING)
   expect(unstyled).not.toContain(STYLE)
+  const earlier = yield* conversation("Started before the choice")
+  yield* turn(earlier.id, "earlier")
   expect(Exit.isFailure(yield* select(main.id, "Missing Style").pipe(Effect.exit))).toBe(true)
   yield* select(main.id, "Domino Learning")
   const kept = yield* turn(main.id, "kept")
   expect(kept).toContain(STYLE)
   expect(kept).toContain(CODING)
+  // The choice is remembered: a later new conversation starts with it; a conversation already under way does not.
+  expect(yield* turn((yield* conversation("Remembered style")).id, "remembered")).toContain(STYLE)
+  expect(yield* turn(earlier.id, "earlier-after")).not.toContain(STYLE)
 
-  // The copy differs from the pinned source only in keep-coding-instructions.
+  // The copy differs from the pinned source only in keep-coding-instructions. An update keeps the remembered choice.
   yield* install({ "output-styles/domino-learning.md": learning.replace("keep-coding-instructions: true", "keep-coding-instructions: false") })
+  const updated = yield* turn((yield* conversation("Remembered after update")).id, "updated")
+  expect(updated).toContain(STYLE)
+  expect(updated).not.toContain(CODING)
   yield* select(main.id, "Domino Learning")
   const replaced = yield* turn(main.id, "replaced")
   expect(replaced).toContain(STYLE)
@@ -2229,6 +2238,10 @@ packageIt.live("package output styles select through the command entry and leave
   const ownedSystem = yield* turn(owned.id, "owned")
   expect(ownedSystem).toContain(STYLE)
   expect(ownedSystem).toContain(USER_SYSTEM)
+  // `default` ends the remembered choice too; choosing again remembers it again.
+  yield* select(main.id, "default")
+  expect(yield* turn((yield* conversation("After default")).id, "after-default")).not.toContain(STYLE)
+  yield* select(main.id, "Domino Learning")
 
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
   yield* commands.reload()
@@ -2251,6 +2264,8 @@ packageIt.live("package output styles select through the command entry and leave
   expect(yield* withdrawn).toBe(true)
   enable(true)
   expect(yield* turn(main.id, "reopened")).not.toContain(STYLE)
+  // Turning the package off ended the remembered choice as well: a new conversation after reopening starts at default.
+  expect(yield* turn((yield* conversation("New after reopening")).id, "reopened-new")).not.toContain(STYLE)
 }), { id: "test.user-primary-agent", async setup(context) {
   await context.agent.transform(editor => editor.update("user-primary", agent => { agent.mode = "primary"; agent.system = USER_SYSTEM }))
 } }))

@@ -1996,3 +1996,26 @@ U/E 分别在 packages/ui-mac、packages/ext 下执行 `bun test --max-concurren
 - Minor 5：`shared/plugin-install.ts` 的 `sourceCommandFailure`/`isSourceCommandFailure` 是命令失败 detail 的唯一写法；候选行与聊天卡只在该写法时显示 detail，其他 `source-unreachable` 仅显示本地化句。
 - Small 6：超时按 setTimeout 上限 2^31−1 ms 截取（声明值照旧显示）；`server.test.ts` 新增断言：locator 使用本次 ProcessFencePlan 的 configFence（去掉该传递时用例失败）。
 - 验证：改动文件 `plugin-sources`、`plugin-command-source`、`install-from-source`、`hub-view`、`plugin-conversion`、`host-extension-package-artifact`、`ext-package-presentation`、`process-fence-profile`、`process-fence-plan` 共 262 pass；DOM 两 cases 文件经 `subprocess-cases.test.ts` 2 pass（12/16 例）；`server.test.ts` 52 pass / 1 fail（同前，ext dist 未构建的既有环境原因）；较宽集 ui-mac 五文件 92 pass、ext `hub-bridge`/`hub-tools` 37 pass；两包 typecheck 0 error，改动文件 oxlint 0/0，两 generator `--check` 通过。宿主 aggregate 再变为 `9c02be752c14f1bc562e23e36995086ba3c264a19ef72325d9d20515a2bc30af`（本轮只 `plugin-conversion.mjs` 与清单变化；相对 `9eaf…` 的成员集合同上）。
+
+## I-26 · #1776：输出样式记住，新对话沿用
+
+- 依据：owner 批准 alpha-work INT-extensions I-26，U-18 选项原文「记住，新对话沿用（推荐）」。选项说明：选过一次后，之后的新对话都用它，直到改掉或关掉插件；代价是持久保存一项设置。在片 8（[design v3.4 @50573da](https://github.com/impharaon/alpha-work/blob/50573da/docs/specs/local-plugin-install/design.md) §4.14「选择存在原会话/设置权威」、§5「更新保留用户设置」）的实现上增量修改；基线 origin/alpha `f6df1b0b5f`（#1825）。
+- 核对：编排器派发 2026-11-27，同轮实施（无单独 PLAN 停点）· Claude Opus 5.5。
+- BR/AC 变化（spec 在 alpha-work，由编排器修订；本节只记录）：BR-24 的「用户选用后，样式正文作为后续回复的系统指令生效」改为「用户选用后，样式正文作为本对话后续回复的系统指令生效，并被记住：之后新开的对话沿用它，直到用户改选或选回默认样式，或关闭、移除本包；插件更新不清除这项选择」。AC-28 增加一条：选用 Domino Learning 后新开的对话也含该样式正文，已在进行中的对话不变；选回默认样式后新对话不再带该样式；关闭本包后再打开，新对话为默认样式。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ext/src/plugin-package-styles.ts` | `output-style <名称>` 除写本会话 metadata 外，把这项选择写进 engine 为 ext 持久保存的插件存储（`context.storage`，一个键，不新增存储）；`default` 同时清掉它。新会话第一条消息时，若记住的样式此刻在本 Location 启用，就写进该会话；已开始的会话不受影响。会话的「默认样式」记成 `null`，以区别于「还没处理第一条消息」。包关闭或移除时，复用片 8 对启用集的监视：只要该包在全局和所有项目范围都没有启用，就清掉记住的选择；包更新不清。 |
+| `packages/ext/src/plugin-host.test.ts` | 在原样式旅程里加五臂：选后新对话带样式、已开始的对话不变、更新后仍记住（keep=false 版本生效）、`default` 清除、关包再开后新对话为默认。 |
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-28 记住与清除 | E `plugin-host.test.ts`：`package output styles select through the command entry and leave with their package` 的上述五臂 | integration；受影响 PR＋nightly | 不记住时新对话没有正文；对已开始的对话也套用时 earlier 臂变红；关包不清时重开后新对话仍带样式；`default` 不清时新对话仍带样式 |
+
+### 偏离记录
+
+暂无。

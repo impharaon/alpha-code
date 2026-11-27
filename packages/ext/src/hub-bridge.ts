@@ -331,10 +331,17 @@ export function createHubBridge(
   }
 }
 
+let authorizationFailureLogged = false
 export async function delegatePackageManagerShell(shell: { delegatePreparedShell(handler: (input: PreparedShellExecution) => Promise<PreparedShellDelegate | undefined>): Promise<void> }, bridge: HubBridge) {
   await shell.delegatePreparedShell(async (input) => {
-    // No lease (main unavailable, bridge failure): the original spawn runs unchanged.
-    const lease = await bridge.authorizePackageManagerExecution(input).catch(() => undefined)
+    // No lease (main unavailable, bridge failure): the original spawn runs unchanged; logged once so a fenced fallback is diagnosable.
+    const lease = await bridge.authorizePackageManagerExecution(input).catch((error) => {
+      if (!authorizationFailureLogged) {
+        authorizationFailureLogged = true
+        console.error(`[@codepuppy/ext] package-manager authorization failed; the Shell runs as spawned: ${error instanceof Error ? error.message : String(error)}`)
+      }
+      return undefined
+    })
     if (!lease || lease.nodes.length === 0) return
     return {
       executionSource: lease.executionSource,

@@ -662,9 +662,12 @@ export async function evaluateDirectoryWrite(event: { action: string; effect: "a
   if (result.targets.length !== request.targets.length || result.targets.some((target, index) => target.absolute !== request.targets[index]!.absolute)) { event.effect = "ask"; return }
   if (result.targets.every((target) => target.outcome === "no-fence")) return
   if (result.targets.some((target) => target.outcome === "protected")) { event.effect = "deny"; return }
-  // BR-08 before the write is unchanged by v7: a folder R4 cannot grant still asks here (R4 refuses it on the card).
-  if (result.targets.some((target) => target.outcome === "needs-approval" || target.outcome === "ineligible")) { event.effect = "ask"; return }
+  // BR-08: a folder R4 can grant asks. One it can never grant (`ineligible`: HOME itself, the data directory — the same
+  // eligibility BR-11 uses) offers no card, since approving it still fails; the write goes on to the fence's refusal and
+  // the BR-06 stop sentence (AC-08).
+  const grantable = result.targets.filter((target) => target.outcome !== "ineligible")
+  if (grantable.some((target) => target.outcome === "needs-approval")) { event.effect = "ask"; return }
   // R6: only fixed global-install/user-config targets skip external_directory; for /tmp, caches and run-approved
   // folders the engine's own decision stands (BR-08).
-  if (result.targets.every((target) => target.outcome === "fixed")) event.effect = "allow"
+  if (grantable.every((target) => target.outcome === "fixed")) event.effect = "allow"
 }

@@ -65,9 +65,12 @@ export function placeAfterBase(id: string, permissions: Rule[], rules: Rule[]): 
 /** Execution facts, never permission metadata, identify the exceptional read operation. */
 export function createExternalDirectoryRead() {
   const reads = new Map<string, { agent: string; file?: ProtectedFiles.ProtectedFile }>()
+  // Design §10 SPEC5-03: after release no read is taken in; a running one keeps its correlation until it ends.
+  let closing = false
   return {
     begin: (call: { sessionID: string; messageID: string; id: string; agent: string }, facts: ToolFacts) => {
       reads.delete(toolCallKey(call))
+      if (closing) return
       if (facts.identity.source === "builtin" && facts.identity.name === "read" && !Object.hasOwn(AUTOMATION_PROFILES, call.agent))
         reads.set(toolCallKey(call), { agent: call.agent })
     },
@@ -83,6 +86,6 @@ export function createExternalDirectoryRead() {
       if (event.action === "external_directory" && event.agent === FULLY_APPROVED_AGENT || event.action === "read" && read.file?.format === "env") event.effect = "allow"
     },
     end: (call: { sessionID: string; messageID: string; id: string }) => { reads.delete(toolCallKey(call)) },
-    dispose: () => { reads.clear() },
+    dispose: () => { closing = true },
   }
 }

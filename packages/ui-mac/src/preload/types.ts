@@ -780,6 +780,8 @@ export type ElectronAPI = {
   popupAppMenu: () => Promise<void>
   readClipboardImage: () => Promise<{ buffer: ArrayBuffer; width: number; height: number } | null>
   writeClipboard: (text: string) => Promise<boolean>
+  pluginSessionViewed: (sessionId: string | undefined) => Promise<void>
+  pluginSessionLeave: (input: Omit<Extract<import("../main/codepuppy-sidecar-messages").PackageSessionMessage, { action: "leave" }>, "id" | "type">) => Promise<void>
   showNotification: (title: string, body?: string) => void
   getWindowFocused: () => Promise<boolean>
   setWindowFocus: () => Promise<void>
@@ -906,7 +908,7 @@ export type ElectronAPI = {
     installPackage: (packageId: string) => Promise<PackageActionResultV1>
     setPackageState: (intent: { packageId: string; state: "enabled" | "disabled" }) => Promise<PackageActionResultV1>
     packageAuthorization: (packageId: string) => Promise<PackageAuthorizationResultV1>
-    savePackageSecrets: (intent: { packageId: string; secrets: Record<string, string> }) => Promise<PackageActionResultV1>
+    savePackageSecrets: (intent: import("../shared/package-admission").PackageSettingsIntentV1) => Promise<PackageActionResultV1>
     /** REQ-032:远程 catalog(main 拉取+ed25519 验签+ETag 缓存;source 指示回退层级,renderer 内置兜底)。
      *  REQ-098 #302:通道 = main 冻结环境快照(renderer 无输入权);via = 传输面,channel = 内容通道
      *  (结构化,勿解析 via)。 */

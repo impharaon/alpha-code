@@ -57,6 +57,9 @@ export type PreloadStubOverrides = {
 
 function createBaseStub(data: PreloadStubData, overrides: PreloadStubOverrides) {
   return {
+    // S-03 OS bridge acknowledgements; lifecycle behaviour is exercised in the shell/main tests.
+    pluginSessionViewed: async () => {},
+    pluginSessionLeave: async () => {},
     endpoints: async () => null,
     openLink: () => {},
     moderation: { check: overrides.moderationCheck ?? (async () => false) },

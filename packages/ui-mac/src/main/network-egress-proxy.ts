@@ -1,3 +1,4 @@
+import { pluginMcpLoopback, pluginMcpEndpoint, PLUGIN_MCP_SSE_ENDPOINT_HEADER, type McpProxyBinding } from "@opencode/util/codepuppy-plugin-mcp"
 // REQ-137 (`#1336`) —— 本地 loopback CONNECT 策略代理:目的地闸门的**咽喉点**。
 //
 // 强制层(seatbelt `(deny network*)` + 只放行本代理端口,`#1337`)把 sidecar 那棵树的全部出网逼到这里;
@@ -40,11 +41,11 @@
 // electron-free:日志、授权、拨号都可注入,默认值才是生产接线(authorize = 注册表,dial = net.connect)。
 // 这样 network-egress-proxy.test.ts 能在 bun 里对真 TCP 靶站跑正反两臂,并证明「换成恒答允许的替身,判据会红」。
 
-import { randomUUID } from "node:crypto"
+import { randomBytes, randomUUID } from "node:crypto"
 import dns from "node:dns/promises"
 import * as http from "node:http"
 import * as net from "node:net"
-import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS } from "@opencode/schema/codepuppy-net-failure"
+import { classifyNetFailure, EGRESS_DIAL_FAILURE_STATUS, withFailureCode, PLUGIN_MCP_SERVICE_UNAVAILABLE } from "@opencode/schema/codepuppy-net-failure"
 import { egressDenialLine, egressDenialDescription, type EgressDenialDetail } from "../shared/egress-denial"
 import { isEgressAuthorizedForSidecar } from "./network-egress-derived"
 import { canonicalEgressHost, admitUserEgressGrant, currentEgressPass, recordEgressPass, denyEgressPass, type EgressPassBasis, requestUserEgressGrant, type EgressGrantOutcome } from "./network-egress-grants"
@@ -141,6 +142,8 @@ export type EgressProxyDeps = {
    * 不参与放行判定,头不转发、不进日志。
    */
   attribute?: (authorization: string | string[] | undefined, fact: { host: string; port: number; outcome: "refused" | "granted" | "not-asked" }) => void
+  /** #1760 R5: true for a connector attempt's attribution header (live or ended); such a header is not a plugin MCP capability. */
+  attributionHeader?: (authorization: string | string[] | undefined) => boolean
 }
 
 export type EgressProxyHandle = {
@@ -148,6 +151,8 @@ export type EgressProxyHandle = {
   port: number
   /** 关掉监听并切断在途隧道;resolve 时端口已释放。 */
   close: () => Promise<void>
+  bindPluginMcp(input: Omit<McpProxyBinding, "proxyUrl" | "proxyAuthorization">, transport?: "http" | "sse"): McpProxyBinding
+  revokePluginMcp(binding: McpProxyBinding): void
 }
 
 const REGISTRY_PATH = "packages/ui-mac/src/main/network-egress-registry.ts"
@@ -181,6 +186,23 @@ export function parseConnectAuthority(authority: string | undefined): { host: st
   const port = Number(portPart)
   if (port < 1 || port > 65535) return undefined
   return { host: hostPart, port }
+}
+
+const loopbackLookup: net.LookupFunction = (_hostname, options, callback) => options.all
+  ? callback(null, [{ address: "::1", family: 6 }, { address: "127.0.0.1", family: 4 }])
+  : callback(null, options.family === 6 ? "::1" : "127.0.0.1", options.family === 6 ? 6 : 4)
+
+/** A bound plugin MCP CONNECT to `localhost`: loopback only, never DNS (bindPluginMcp admits only its declared loopback endpoint). */
+function connectLoopback(port: number, signal: AbortSignal): Promise<net.Socket> {
+  signal.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const socket = net.connect({ host: "localhost", port, autoSelectFamily: true, lookup: loopbackLookup })
+    const abort = () => socket.destroy(signal.reason instanceof Error ? signal.reason : undefined)
+    signal.addEventListener("abort", abort, { once: true })
+    socket.on("error", () => {})
+    socket.once("error", reject)
+    socket.once("connect", () => { signal.removeEventListener("abort", abort); socket.off("error", reject); resolve(socket) })
+  })
 }
 
 function denialBody(reason: EgressDenyReason, authority: string, detail?: string): string {
@@ -242,6 +264,12 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   const log = deps.log
   const runID = randomUUID()
   let seq = 0
+  const bindings = new Map<string, { binding: McpProxyBinding; transport: "http" | "sse"; streams: Set<{ destroy(): void }>; events: Set<http.ServerResponse>; posts: Set<string> }>()
+  const bound = (authorization: string | string[] | undefined) => typeof authorization === "string" ? bindings.get(authorization) : undefined
+  const bindStream = (capability: NonNullable<ReturnType<typeof bound>>, stream: { destroy(): void; once(event: "close", callback: () => void): unknown }) => {
+    capability.streams.add(stream)
+    stream.once("close", () => capability.streams.delete(stream))
+  }
   const live = new Set<net.Socket>()
   const track = (s: net.Socket) => {
     live.add(s)
@@ -251,6 +279,43 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   const server = http.createServer((req, res) => {
     if (req.method === "POST" && req.url === "/codepuppy/package-manager/process") {
       void import("./package-manager-execution").then(({ handlePackageManagerProcess }) => handlePackageManagerProcess(req, res)).catch(() => res.destroy())
+      return
+    }
+    const capability = bound(req.headers["proxy-authorization"])
+    const url = URL.canParse(req.url ?? "") ? new URL(req.url!) : undefined
+    if (capability && url && capability.transport === "sse" && capability.events.size && req.method === "POST" && req.headers[PLUGIN_MCP_SSE_ENDPOINT_HEADER] === capability.binding.serverUrl && pluginMcpLoopback(url) && url.origin === new URL(capability.binding.serverUrl).origin)
+      capability.posts.add(url.href)
+    if (capability && url?.protocol === "http:" && (pluginMcpEndpoint(capability.binding, url) || req.method === "POST" && capability.posts.has(url.href))) {
+      const headers: http.OutgoingHttpHeaders = { ...req.headers, host: url.host }
+      delete headers["proxy-authorization"]
+      delete headers["proxy-connection"]
+      delete headers[PLUGIN_MCP_SSE_ENDPOINT_HEADER]
+      // localhost resolves to loopback here; neither DNS nor a redirected peer may broaden the capability.
+      const host = url.hostname === "[::1]" ? "::1" : url.hostname
+      const upstream = http.request({ hostname: host, port: url.port || 80, path: url.pathname + url.search, method: req.method, headers, agent: false,
+        ...(host === "localhost" ? { lookup: loopbackLookup, autoSelectFamily: true } : {}),
+      }, response => {
+        if (capability.transport === "sse" && req.method === "GET" && response.headers["content-type"]?.startsWith("text/event-stream")) {
+          capability.events.add(res)
+          res.once("close", () => { capability.events.delete(res); if (!capability.events.size) capability.posts.clear() })
+        }
+        res.writeHead(response.statusCode ?? 502, response.headers)
+        response.pipe(res)
+        res.once("close", () => response.destroy())
+      })
+      bindStream(capability, upstream)
+      bindStream(capability, res)
+      upstream.on("error", (error: NodeJS.ErrnoException) => {
+        if (res.headersSent) { res.destroy(); return }
+        const status = dialFailureStatus(error)
+        const layer = classifyNetFailure(error, { via: "other" })?.layer ?? "tcp"
+        log({ event: "egress.connect", id: `${runID}:${++seq}`, at: new Date().toISOString(), method: req.method ?? "", authority: url.host, host: url.hostname, port: Number(url.port || 80), verdict: "deny", reason: "dial-failed", status, detail: error.code })
+        res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" })
+        res.end(withFailureCode(layer, PLUGIN_MCP_SERVICE_UNAVAILABLE + ": " + denialBody("dial-failed", url.host, error.code)))
+      })
+      req.once("aborted", () => upstream.destroy())
+      res.once("close", () => upstream.destroy())
+      req.pipe(upstream)
       return
     }
     // 明文 HTTP 的绝对 URI 形式(`GET http://host/ …`)—— 本代理不做明文转发,fail-closed。
@@ -293,6 +358,14 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
     const parsed = parseConnectAuthority(authority)
     if (!parsed) return deny(400, "bad-authority")
     const attribute = (outcome: "refused" | "granted" | "not-asked") => deps.attribute?.(req.headers["proxy-authorization"], { host: parsed.host, port: parsed.port, outcome })
+    const capability = bound(req.headers["proxy-authorization"])
+    const endpoint = capability && new URL(capability.binding.serverUrl)
+    if (capability && endpoint?.protocol === "https:" && parsed.host === endpoint.hostname.replace(/^\[|\]$/g, "") && parsed.port === Number(endpoint.port || 443)) {
+      void openTunnel(parsed, capability)
+      return
+    }
+    // #1760 R5: a connector attempt's attribution mark is not a capability; its CONNECT takes the ordinary policy below.
+    if (req.headers["proxy-authorization"] !== undefined && !deps.attributionHeader?.(req.headers["proxy-authorization"])) return deny(403, "unregistered", parsed)
     if (!authorize(parsed.host, parsed.port) && !admitUserEgressGrant(parsed.host, parsed.port)) {
       attribute("refused")
       return deny(403, "unregistered", parsed)
@@ -300,7 +373,7 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
     void openTunnel(parsed)
     return
 
-    async function openTunnel(parsed: { host: string; port: number }): Promise<void> {
+    async function openTunnel(parsed: { host: string; port: number }, capability?: NonNullable<ReturnType<typeof bound>>): Promise<void> {
       let basis: EgressPassBasis | undefined
       const fail = (err: NodeJS.ErrnoException) => {
         if (settled || clientSocket.destroyed) return
@@ -314,52 +387,60 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
       resume()
       try {
         for (;;) {
-          basis = authorize(parsed.host, parsed.port) ? undefined : await currentEgressPass(controller.signal)
-          if (stopped()) return
-          if (!basis && !authorize(parsed.host, parsed.port)) {
-            // Human decision time is outside the existing dial budget. Reuse the same
-            // card path both initially and when a route lookup invalidates allow-all.
-            pause()
-            let outcome: EgressGrantOutcome
-            try { outcome = await requestGrant(parsed.host, parsed.port, controller.signal) }
-            catch { if (!stopped()) { attribute("refused"); deny(403, "unregistered", parsed, "approval-unavailable") } return }
-            if (stopped()) return
-            if (outcome !== "granted") {
-              // Any decision the protection made (denied, timed out, nobody to ask) is "refused"; only an absent channel is not-asked.
-              attribute(outcome === "not-asked" ? "not-asked" : "refused")
-              if (outcome !== "not-asked") log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: "refused" })
-              deny(403, "unregistered", parsed, outcome === "not-asked" ? undefined : outcome)
-              return
-            }
-            resume()
+          let upstream: net.Socket
+          if (capability) {
+            // The capability is its declared loopback endpoint (bindPluginMcp): no registry, approval,
+            // system proxy route or public-address pass applies, and localhost never goes through DNS.
+            upstream = parsed.host === "localhost" ? await connectLoopback(parsed.port, controller.signal) : (await dial(parsed, [{ kind: "direct" }], { kind: "existing-authorization" }, controller.signal)).socket
+          } else {
             basis = authorize(parsed.host, parsed.port) ? undefined : await currentEgressPass(controller.signal)
             if (stopped()) return
-            if (authorize(parsed.host, parsed.port)) { attribute("granted"); log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: "granted" }) }
-            else if (!basis) { deny(403, "unregistered", parsed, "approval-unavailable"); return }
+            if (!basis && !authorize(parsed.host, parsed.port)) {
+              // Human decision time is outside the existing dial budget. Reuse the same
+              // card path both initially and when a route lookup invalidates allow-all.
+              pause()
+              let outcome: EgressGrantOutcome
+              try { outcome = await requestGrant(parsed.host, parsed.port, controller.signal) }
+              catch { if (!stopped()) { attribute("refused"); deny(403, "unregistered", parsed, "approval-unavailable") } return }
+              if (stopped()) return
+              if (outcome !== "granted") {
+                // Any decision the protection made (denied, timed out, nobody to ask) is "refused"; only an absent channel is not-asked.
+                attribute(outcome === "not-asked" ? "not-asked" : "refused")
+                if (outcome !== "not-asked") log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: "refused" })
+                deny(403, "unregistered", parsed, outcome === "not-asked" ? undefined : outcome)
+                return
+              }
+              resume()
+              basis = authorize(parsed.host, parsed.port) ? undefined : await currentEgressPass(controller.signal)
+              if (stopped()) return
+              if (authorize(parsed.host, parsed.port)) { attribute("granted"); log({ event: "egress.grant", id, at: new Date().toISOString(), host: parsed.host, port: parsed.port, decision: "granted" }) }
+              else if (!basis) { deny(403, "unregistered", parsed, "approval-unavailable"); return }
+            }
+            const routes = await resolveRoutes(parsed, controller.signal)
+            if (stopped()) return
+            basis = authorize(parsed.host, parsed.port) ? undefined : await currentEgressPass(controller.signal)
+            if (stopped()) return
+            if (!authorize(parsed.host, parsed.port) && !basis) continue
+            const address = server.address()
+            const filtered = (await Promise.all(routes.map(async (route) => {
+              if (route.kind === "direct" || !address || typeof address === "string" || route.port !== address.port) return route
+              const host = canonicalEgressHost(route.host) ?? route.host
+              if (isLoopbackHost(host)) return
+              const addresses = net.isIP(host) ? [host] : (await dns.lookup(host, { all: true }).catch(() => [])).map((entry) => entry.address)
+              return addresses.some((entry) => isLoopbackHost(canonicalEgressHost(entry) ?? entry)) ? undefined : route
+            }))).filter((route): route is NonNullable<typeof route> => route !== undefined)
+            if (stopped()) return
+            if (!filtered.length && routes.length) throw Object.assign(new Error("proxy loop"), { code: "EPROXYLOOP" })
+            const passBasis = basis
+            upstream = (await dial(parsed, filtered, passBasis ? { kind: "allow-all", onPass: () => {
+              const record: EgressPass = { event: "egress.policy-pass", id, at: new Date().toISOString(), destination: parsed, basis: "allow-all", attribution: { kind: "unknown" }, ...passBasis }
+              log(record)
+              recordEgressPass(record)
+            } } : { kind: "existing-authorization" }, controller.signal)).socket
           }
-          const routes = await resolveRoutes(parsed, controller.signal)
-          if (stopped()) return
-          basis = authorize(parsed.host, parsed.port) ? undefined : await currentEgressPass(controller.signal)
-          if (stopped()) return
-          if (!authorize(parsed.host, parsed.port) && !basis) continue
-          const address = server.address()
-          const filtered = (await Promise.all(routes.map(async (route) => {
-            if (route.kind === "direct" || !address || typeof address === "string" || route.port !== address.port) return route
-            const host = canonicalEgressHost(route.host) ?? route.host
-            if (isLoopbackHost(host)) return
-            const addresses = net.isIP(host) ? [host] : (await dns.lookup(host, { all: true }).catch(() => [])).map((entry) => entry.address)
-            return addresses.some((entry) => isLoopbackHost(canonicalEgressHost(entry) ?? entry)) ? undefined : route
-          }))).filter((route): route is NonNullable<typeof route> => route !== undefined)
-          if (stopped()) return
-          if (!filtered.length && routes.length) throw Object.assign(new Error("proxy loop"), { code: "EPROXYLOOP" })
-          const passBasis = basis
-          const { socket: upstream } = await dial(parsed, filtered, passBasis ? { kind: "allow-all", onPass: () => {
-            const record: EgressPass = { event: "egress.policy-pass", id, at: new Date().toISOString(), destination: parsed, basis: "allow-all", attribution: { kind: "unknown" }, ...passBasis }
-            log(record)
-            recordEgressPass(record)
-          } } : { kind: "existing-authorization" }, controller.signal)
           if (stopped()) { upstream.destroy(); return }
           track(upstream)
+          if (capability) { bindStream(capability, upstream); bindStream(capability, clientSocket) }
           settled = true
           clearTimeout(timer)
           const remote = upstream.remoteAddress
@@ -449,8 +530,21 @@ export async function startEgressPolicyProxy(deps: EgressProxyDeps): Promise<Egr
   return {
     host: "127.0.0.1",
     port: address.port,
+    bindPluginMcp: (input, transport = "http") => {
+      if (!pluginMcpLoopback(new URL(input.serverUrl))) throw Error("Plugin MCP binding requires its declared loopback endpoint")
+      const binding = { ...input, proxyUrl: "http://127.0.0.1:" + address.port, proxyAuthorization: "Bearer " + randomBytes(32).toString("hex") }
+      bindings.set(binding.proxyAuthorization, { binding, transport, streams: new Set(), events: new Set(), posts: new Set() })
+      return binding
+    },
+    revokePluginMcp: binding => {
+      const capability = bindings.get(binding.proxyAuthorization)
+      bindings.delete(binding.proxyAuthorization)
+      for (const stream of capability?.streams ?? []) stream.destroy()
+    },
     close: () =>
       new Promise<void>((resolve) => {
+        for (const capability of bindings.values()) for (const stream of capability.streams) stream.destroy()
+        bindings.clear()
         for (const s of live) s.destroy()
         live.clear()
         server.close(() => resolve())

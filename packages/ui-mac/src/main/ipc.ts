@@ -1,5 +1,7 @@
 import { connectorLaunchApi } from "./connector-launch-state"
 import { isLaunchIdentity } from "../../../util/src/codepuppy-connector-launch"
+import { notePluginSessionViewed, sendPluginSessionAction, endViewedPluginSessions } from "./plugin-session-lifecycle"
+import { parsePackageSessionMessage } from "./codepuppy-sidecar-messages"
 import { parseDirectoryAccessDescriptionInput, parseDirectoryWriteApproval } from "../shared/directory-write-approval"
 import type { createDirectoryWriteApproval } from "./directory-write-approval"
 import { execFile } from "node:child_process"
@@ -93,6 +95,7 @@ type Deps = {
 
 export function registerIpcHandlers(deps: Deps) {
   const updaterSubscriptions = createUpdaterSubscriptions()
+  const sessionViewers = new Set<number>()
   app.once("will-quit", updaterSubscriptions.clear)
   registerStartupTimelineIpc(ipcMain)
   ipcMain.handle("connector-launch-list", (_event, directory: unknown) => typeof directory === "string" ? connectorLaunchApi.list(directory) : [])
@@ -107,6 +110,18 @@ export function registerIpcHandlers(deps: Deps) {
   // REQ-098(AC#6):环境快照只读 IPC —— 回调零参数(不读任何 renderer 输入),返回启动时冻结的
   // 快照;不存在任何对应写面(环境只由 main 的构建事实解析,见 codepuppy-environment.ts)。
   ipcMain.handle("codepuppy-environment", () => getCodePuppyEnvironment())
+  ipcMain.handle("plugin-session-viewed", (event: IpcMainInvokeEvent, sessionId: unknown) => {
+    if (sessionId !== undefined && (typeof sessionId !== "string" || !sessionId)) return
+    notePluginSessionViewed(event.sender.id, sessionId)
+    if (sessionViewers.has(event.sender.id)) return
+    sessionViewers.add(event.sender.id)
+    event.sender.once("destroyed", () => { sessionViewers.delete(event.sender.id); notePluginSessionViewed(event.sender.id, undefined) })
+  })
+  ipcMain.handle("plugin-session-leave", (_event: IpcMainInvokeEvent, input: unknown) => {
+    const message = parsePackageSessionMessage(typeof input === "object" && input ? { ...input, type: "codepuppy.plugin.session", id: 0 } : input)
+    if (!message || message.action !== "leave") throw Error("runtime-failed: invalid package session leave")
+    return sendPluginSessionAction(message)
+  })
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
   ipcMain.handle("sidecar-generation-state", () => deps.sidecarGenerationState())
   // The probe consumes eligibility; only the concrete open-action channel may register it.
@@ -174,7 +189,7 @@ export function registerIpcHandlers(deps: Deps) {
   )
   ipcMain.handle("auth-get-state", () => deps.auth.getState())
   ipcMain.handle("auth-start", () => deps.auth.start())
-  ipcMain.handle("auth-logout", () => deps.auth.logout())
+  ipcMain.handle("auth-logout", async () => { await endViewedPluginSessions("logout"); return deps.auth.logout() })
   ipcMain.handle("auth-set-mode", (_event: IpcMainInvokeEvent, mode: AuthMode) => deps.auth.setMode(mode))
   ipcMain.handle("auth-enable-proxy", () => deps.auth.enableProxy())
   ipcMain.handle("store-get", async (_event: IpcMainInvokeEvent, name: string, key: string) => {

@@ -2,6 +2,8 @@ import { expect, test } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { engineSandbox, assertEngineSandboxed, engineSlot } from "../../test-component/engine-sandbox"
+import { publishPluginDataHome } from "./plugin-package-data"
+import { pluginHostName } from "./plugin-package-install"
 import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
@@ -17,6 +19,11 @@ import { uninstallPackageV1 } from "./ext-package-uninstall"
 import { removeInstallGrants } from "./ext-install-planner"
 
 const sandbox = engineSandbox()
+// server.ts publishes the generation's engine data home before main installs anything (#1776 793de9eb96, plugin-package-data.ts);
+// these cases drive main's installer without server.ts, so they publish the sandbox engine's data home the same way.
+publishPluginDataHome(sandbox.data)
+// c6197943ad: a created package's skill is installed under the product's package-scoped host name, not its source name.
+const REPORT = pluginHostName({ kind: "skill", sourceName: "report", sourcePath: "" }, "mine:own-report", new Set(), () => true)
 const repo = join(import.meta.dir, "../../../..")
 async function until<T>(read: () => Promise<T>, done: (value: T) => boolean) {
   for (const end = Date.now() + 20000;; await Bun.sleep(20)) {
@@ -87,9 +94,10 @@ export default {id:"test.created-plugin",setup:async(ctx)=>{
         { path: "skills/report/summarize.mjs", text: "import {readFileSync} from 'node:fs';const totals=new Map();for(const row of JSON.parse(readFileSync(process.argv[2],'utf8')).rows)totals.set(row.name,(totals.get(row.name)||0)+row.count);console.log([...totals].map(([name,count])=>name+'='+count).join('|'));\n" },
       ],
     } } })).toMatchObject({ ok: true, packageId: "mine:own-report", source: { kind: "created" } })
-    expect(reloaded).toEqual(["mine:own-report"])
-    const skills = await until(() => rpc("skills"), (items) => items.some((skill) => skill.name === "report"))
-    const report = skills.find((skill) => skill.name === "report")
+    // AC-14 (docs/specs/local-plugin-install/plan.md r3): the content transaction returns first; activation and the skill reload run one event turn later.
+    expect(await until(async () => [...reloaded], (ids) => ids.length > 0)).toEqual(["mine:own-report"])
+    const skills = await until(() => rpc("skills"), (items) => items.some((skill) => skill.name === REPORT))
+    const report = skills.find((skill) => skill.name === REPORT)
     const result = await rpc("run", { id: report.id, sessionID: session.id, file: input })
     expect(result.output.exit).toBe(0)
     expect(JSON.stringify(result)).toContain("柚子=7|苹果=3")
@@ -97,9 +105,9 @@ export default {id:"test.created-plugin",setup:async(ctx)=>{
     expect(state.ok && state.packageGraphs).toHaveLength(1)
     expect(state.ok && state.records[0]).toMatchObject({ origin: "created", desiredState: "enabled", scope: { kind: "global" } })
     const unexpected = (): never => { throw Error("unexpected non-skill removal") }
-    expect(uninstallPackageV1("mine:own-report", { globalRoot: () => root, installers: { removeFsInstall: unexpected, removeMcpConfig: unexpected, removeCommandConfig: unexpected, removeMcpSecretsStrict: unexpected, releaseCodePuppyConnectionBindings: unexpected, removePluginPath: unexpected, removeInstallGrants } })).toMatchObject({ ok: true, removed: [{ kind: "skill", name: "report" }] })
-    await until(() => rpc("skills"), (items) => !items.some((skill) => skill.name === "report"))
-    expect(existsSync(join(root, "ext-store", "skill--report"))).toBe(false)
+    expect(uninstallPackageV1("mine:own-report", { globalRoot: () => root, installers: { removeFsInstall: unexpected, removeMcpConfig: unexpected, removeCommandConfig: unexpected, removeMcpSecretsStrict: unexpected, releaseCodePuppyConnectionBindings: unexpected, removePluginPath: unexpected, removeInstallGrants } })).toMatchObject({ ok: true, removed: [{ kind: "skill", name: REPORT }] })
+    await until(() => rpc("skills"), (items) => !items.some((skill) => skill.name === REPORT))
+    expect(existsSync(join(root, "ext-store", "skill--" + REPORT))).toBe(false)
     expect(readPackageLedgerStateV1(root)).toMatchObject({ ok: true, packageGraphs: [], records: [] })
     expect(snapshot(slot.projectDirectory)).toEqual(before)
   } finally { stop(); await engine.close(); process.chdir(previous) }

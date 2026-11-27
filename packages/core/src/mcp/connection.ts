@@ -1,3 +1,4 @@
+import { pluginMcpFetch } from "@opencode/util/codepuppy-plugin-mcp" // codepuppy(#1776): private per-instance proxy capability
 export * as McpConnection from "./connection.js"
 
 import type { OAuthClientProvider } from "@modelcontextprotocol/client"
@@ -219,7 +220,8 @@ export function make(input: Input): Connection {
           }).pipe(Effect.provideService(Environment.Service, input.environment))
         : undefined
       state.attempt = attempt
-      const authProvider = yield* input.authProvider
+      const fetch = input.config.type === "remote" ? pluginMcpFetch(input.name, input.config.url, input.fetch, input.config.transport ?? "http") : input.fetch
+      const authProvider = yield* input.authProvider.pipe(Effect.provideService(FetchHttpClient.Fetch, fetch))
       const { McpClient } = yield* Effect.promise(() => import("./client.js"))
       // List tools as part of connect so a failure here marks the server failed rather than
       // leaving it connected with a silently empty tool list and no path to recover. A shared connection
@@ -300,7 +302,7 @@ export function make(input: Input): Connection {
         )
       }).pipe(
         Effect.provideService(Environment.Service, attempt?.environment ?? input.environment),
-        Effect.provideService(FetchHttpClient.Fetch, input.fetch),
+        Effect.provideService(FetchHttpClient.Fetch, fetch),
         Scope.provide(scope),
         Effect.onInterrupt(() => attempt?.disabled ?? Effect.void),
         Effect.exit,

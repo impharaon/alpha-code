@@ -1,9 +1,10 @@
+import { pluginDataDirectory } from "../shared/installed-plugin-settings"
 import { sha256Hex } from "./ext-manifest-v2"
 import { expect, spyOn, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, statSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { captureFixture, captureWholeFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
+import { captureFixture, captureWholeFixture, captureStandardFixture, fixtureRoot } from "../../test-fixtures/plugin-helper/fixture"
 import { convertPluginTree } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import { buildSkillTxItems } from "./ext-package-tx-builders"
 import { promotePayloadToCas, setPackageStateV1, removeInstallGrants } from "./ext-install-planner"
@@ -42,13 +43,18 @@ async function sourceHarness(temporary: string) {
   const activation: string[] = []
   const reloads: string[] = []
   const install = createSourceInstaller({ sources, globalRoot: () => root, casBaseRoot: () => temporary, environment: () => "dev", userDataPath: temporary,
-    gate: makeRecoveryGate(() => ({})), advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("non-catalog must use graph declarations") },
+    dataHome: () => join(temporary, "data"), gate: makeRecoveryGate(() => ({})), advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("non-catalog must use graph declarations") },
     catalogInstall: async () => ({ ok: false, code: "unknown-id", detail: "no catalog entries in this controlled search" }),
     activateMcp: async (id) => { activation.push(id) }, reloadSkills: (id) => { reloads.push(id) }, removeDeparting: () => {},
   })
   const candidate = async (query: string, source = "claude-marketplace") => (await sources.searchSources(query)).candidates.find((row) => row.source === source)!.id
   const request = (candidateId: string, requestId = "request_a2_01") => ({ requestId, source: { kind: "candidate" as const, candidateId }, effect: { kind: "all-projects" as const }, via: "chat" as const })
-  return { install, sources, root, temporary, activation, reloads, candidate, request, fetched }
+  const installAndApply = async (request: Parameters<typeof install>[0]) => {
+    const result = await install(request)
+    await new Promise<void>(resolve => setImmediate(resolve))
+    return result
+  }
+  return { install: installAndApply, installContent: install, sources, root, temporary, activation, reloads, candidate, request, fetched }
 }
 
 test("whole plugin skills retain sibling directories and root resources", () => installerHarness(async h => {
@@ -65,7 +71,31 @@ test("whole plugin skills retain sibling directories and root resources", () => 
   const resource = (graph as typeof graph & { pluginTree: { storeKey: string } }).pluginTree
   const live = resolveLiveGenerationDir(h.root, resource.storeKey)!
   expect(readFileSync(join(live, "tree/README.md"))).toEqual(Buffer.from(await capture.readFile("README.md")))
-  expect(readFileSync(join(live, "tree/skills/skill-development/../hook-development/SKILL.md"))).toEqual(Buffer.from(await capture.readFile("skills/hook-development/SKILL.md")))
+  expect(readFileSync(join(live, "tree/skills/skill-development/../hook-development/SKILL.md"), "utf8")).toBe(new TextDecoder().decode(await capture.readFile("skills/hook-development/SKILL.md")).replace("name: hook-development", "name: " + graph.children.find(node => node.name.startsWith("hook-development-"))!.name))
+}))
+
+test("plugin-dev installs commands and agents from the same live bundle", () => installerHarness(async h => {
+  const capture = await captureStandardFixture("claude:plugin-dev")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const outcome = await h.install(h.request("real_plugin_dev_invocation"))
+  expect(outcome.ok).toBe(true)
+  if (!outcome.ok) throw new Error(outcome.detail)
+  expect(outcome.installed.filter(entry => entry.kind === "command")).toHaveLength(1)
+  expect(outcome.installed.filter(entry => entry.kind === "agent")).toHaveLength(3)
+  expect(outcome.notRunning.filter(entry => entry.kind === "command" || entry.kind === "agent")).toEqual([])
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw new Error(state.reason)
+  const graph = state.packageGraphs.find(graph => graph.packageId === outcome.packageId)!
+  const live = resolveLiveGenerationDir(h.root, graph.pluginTree!.storeKey)!
+  for (const entry of converted.package.entries.filter(entry => entry.kind === "command" || entry.kind === "agent")) {
+    expect(readFileSync(join(live, "tree", entry.sourcePath), "utf8")).toBe(new TextDecoder().decode(await capture.readFile(entry.sourcePath)))
+    expect(graph.declarations).toContainEqual(expect.objectContaining({ kind: entry.kind, sourceName: entry.sourceName }))
+  }
+  const keys = () => JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8")).keys as string[]
+  expect(keys().filter(key => key.startsWith("command--") || key.startsWith("agent--"))).toHaveLength(4)
+  expect((await setPackageStateV1({ packageId: outcome.packageId, state: "disabled" }, { globalRoot: () => h.root, advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("direct source") } })).ok).toBe(true)
+  expect(keys().filter(key => key.startsWith("command--") || key.startsWith("agent--"))).toEqual([])
 }))
 
 test("whole plugin remotion enables real cross-skill references", () => installerHarness(async h => {
@@ -88,6 +118,18 @@ test("whole plugin removal deletes its owned tree without treating member skills
   if (!before.ok) throw Error(before.reason)
   const graph = before.packageGraphs[0]!
   const store = join(h.root, "ext-store", graph.pluginTree!.storeKey)
+  const data = pluginDataDirectory(join(h.temporary, "data"), installed.packageId)
+  expect(statSync(data).mode & 0o777).toBe(0o700)
+  writeFileSync(join(data, "state"), "persistent")
+  const neighbor = pluginDataDirectory(join(h.temporary, "data"), "claude:neighbor-package")
+  mkdirSync(neighbor)
+  writeFileSync(join(neighbor, "state"), "neighbor")
+  const outside = join(h.temporary, "outside")
+  mkdirSync(outside)
+  writeFileSync(join(outside, "retained"), "unrelated")
+  symlinkSync(outside, join(data, "link"))
+  expect((await setPackageStateV1({ packageId: installed.packageId, state: "disabled" }, { globalRoot: () => h.root, environment: () => "dev", advisoryGate: () => ({ allowed: true }), resolvePackage: async () => { throw Error("not catalog") } })).ok).toBe(true)
+  expect(readFileSync(join(data, "state"), "utf8")).toBe("persistent")
   const flat = join(h.root, "skills/using-superpowers/SKILL.md")
   mkdirSync(join(h.root, "skills/using-superpowers"), { recursive: true })
   const bytes = Buffer.from(await capture.readFile("skills/using-superpowers/SKILL.md"))
@@ -95,6 +137,9 @@ test("whole plugin removal deletes its owned tree without treating member skills
   const unused = () => { throw Error("No independent component files may be removed") }
   expect(uninstallPackageV1(installed.packageId, { globalRoot: () => h.root, installers: { removeFsInstall: unused, removeMcpConfig: unused, removeCommandConfig: unused, removeMcpSecretsStrict: unused, releaseCodePuppyConnectionBindings: unused, removePluginPath: unused, removeInstallGrants } })).toMatchObject({ ok: true })
   expect(existsSync(store)).toBe(false)
+  expect(existsSync(data)).toBe(false)
+  expect(readFileSync(join(neighbor, "state"), "utf8")).toBe("neighbor")
+  expect(readFileSync(join(outside, "retained"), "utf8")).toBe("unrelated")
   expect(readFileSync(flat)).toEqual(bytes)
   const after = readPackageLedgerStateV1(h.root)
   expect(after.ok && after.records).toEqual([])
@@ -104,12 +149,13 @@ test("whole plugin removal deletes its owned tree without treating member skills
 test("A2 marketplace context7 commits one real enabled package and durable declarations", () => installerHarness(async (h) => {
   const input = h.request(await h.candidate("context7"))
   const outcome = await h.install(input)
-  expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7", source: { kind: "marketplace", ecosystem: "claude" }, installed: [{ kind: "mcp", hostName: "context7", sourceName: "context7" }] })
+  expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7", source: { kind: "marketplace", ecosystem: "claude" }, installed: [{ kind: "mcp", hostName: "context7-de6dee1ccd", sourceName: "context7" }] })
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled"])
   expect(state.ok && state.packageGraphs[0]?.declarations?.[0]?.mcp).toMatchObject({ type: "remote", url: "https://mcp.context7.com/mcp?client=claude-code-plugin" })
-  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=claude-code-plugin" } })
+  expect(readMcpLeafStrict("context7-de6dee1ccd")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=claude-code-plugin" } })
   expect(h.activation).toEqual(["claude:context7"])
+  // Ruling on AC-14 ("沿既有 reload 发布"): a source tree reloads only when it carries skills; this MCP-only package activates without one.
   expect(h.reloads).toEqual([])
   expect(await h.install(input)).toEqual(outcome)
   expect(await h.install(h.request(input.source.candidateId, "request_a2_02"))).toMatchObject({ ok: true, packageId: "claude:context7", alreadyInstalled: true })
@@ -151,17 +197,20 @@ test("E2 project-only MCP stays globally disabled through install and package-ro
   if (!identity.ok) throw new Error(identity.reason)
   const outcome = await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: alias } })
   expect(outcome).toMatchObject({ ok: true, packageId: "claude:context7" })
-  expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
+  expect(persistedMcp(h.root, "context7-de6dee1ccd")).toMatchObject({ enabled: false })
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
   expect(state.ok && state.records.every((record) => record.scope.kind === "global" && record.desiredState === "enabled")).toBe(true)
   const deps = { globalRoot: () => h.root, advisoryGate: () => ({ allowed: true as const }), resolvePackage: async () => { throw new Error("non-catalog package") } }
   for (const state of ["disabled", "enabled"] as const) {
     expect((await setPackageStateV1({ packageId: "claude:context7", state }, deps)).ok).toBe(true)
-    expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
+    expect(persistedMcp(h.root, "context7-de6dee1ccd")).toMatchObject({ enabled: false })
   }
   expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({
-    v: 3, keys: [], scoped: [{ kind: "mcp", name: "context7", projectPath: realpathSync(project) }], mcp: [{ name: "context7", enabled: false }],
+    v: 3, keys: [], scoped: [
+      { kind: "bundle", name: state.ok && state.packageGraphs[0]!.root.name, projectPath: realpathSync(project) },
+      { kind: "mcp", name: "context7-de6dee1ccd", projectPath: realpathSync(project) },
+    ], mcp: [{ name: "context7-de6dee1ccd", enabled: false }],
   })
   expect(readdirSync(project)).toEqual(["existing.json"])
   expect(readFileSync(join(project, "existing.json"), "utf8")).toBe("project bytes\n")
@@ -172,10 +221,10 @@ test("E3 remote definition publication retains the project-only disabled project
   const project = join(h.temporary, "remote-project")
   mkdirSync(project)
   expect(await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: project } })).toMatchObject({ ok: true })
-  const leaf = readMcpLeafStrict("context7")
+  const leaf = readMcpLeafStrict("context7-de6dee1ccd")
   if (!leaf.ok || !leaf.value) throw Error("installed definition missing")
-  expect(persistMcp("context7", leaf.value)).toMatchObject({ ok: true })
-  expect(persistedMcp(h.root, "context7")).toEqual({ enabled: false })
+  expect(persistMcp("context7-de6dee1ccd", leaf.value)).toMatchObject({ ok: true })
+  expect(persistedMcp(h.root, "context7-de6dee1ccd")).toEqual({ enabled: false })
 }))
 
 test("E2 project-only skill is stored globally and projected only as scoped", () => installerHarness(async (h) => {
@@ -190,7 +239,10 @@ test("E2 project-only skill is stored globally and projected only as scoped", ()
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs[0]?.effect).toEqual(identity.scope)
   expect(JSON.parse(readFileSync(join(h.root, "skills-enabled.json"), "utf8"))).toEqual({
-    v: 3, keys: [], scoped: [{ kind: "skill", name: "frontend-design", projectPath: identity.scope.projectPath }], mcp: [],
+    v: 3, keys: [], scoped: [
+      { kind: "bundle", name: state.ok && state.packageGraphs[0]!.root.name, projectPath: identity.scope.projectPath },
+      { kind: "skill", name: "frontend-design-3ee253227f", projectPath: identity.scope.projectPath },
+    ], mcp: [],
   })
   expect(existsSync(join(project, ".codepuppy"))).toBe(false)
 }))
@@ -209,7 +261,7 @@ test("E2 startup reconcile cannot globally enable a project-only MCP", () => ins
   mkdirSync(project)
   expect((await h.install({ ...h.request(await h.candidate("context7")), effect: { kind: "project", directory: project } })).ok).toBe(true)
   expect(reconcileDesiredStateAtBoot(h.root, { userDataPath: h.temporary, channel: "stable" }).ok).toBe(true)
-  expect(persistedMcp(h.root, "context7")).toMatchObject({ enabled: false })
+  expect(persistedMcp(h.root, "context7-de6dee1ccd")).toMatchObject({ enabled: false })
 }))
 
 test("A2 host-name collision preserves existing content and rewrites only installed skill name", () => installerHarness(async (h) => {
@@ -220,7 +272,7 @@ test("A2 host-name collision preserves existing content and rewrites only instal
   const outcome = await h.install(h.request(await h.candidate("frontend-design")))
   expect(outcome.ok).toBe(true)
   if (!outcome.ok) throw Error(outcome.detail)
-  expect(outcome.installed[0]?.hostName).toMatch(/^frontend-design-[a-f0-9]{8}$/)
+  expect(outcome.installed[0]?.hostName).toMatch(/^frontend-design-[a-f0-9]{10}$/)
   expect(readFileSync(original, "utf8")).toBe("user owned bytes")
   expect(h.reloads).toEqual([outcome.packageId])
   const { readCurrentGeneration } = await import("./ext-transaction")
@@ -395,7 +447,7 @@ test("A2 same pinned source with changed real bytes updates its package instead 
   const after = readPackageLedgerStateV1(h.root)
   expect(after.ok && after.packageGraphs).toHaveLength(1)
   expect(after.ok && before.ok && after.packageGraphs[0]!.installedGraphDigest).not.toBe(before.ok && before.packageGraphs[0]!.installedGraphDigest)
-  expect(readMcpLeafStrict("context7")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
+  expect(readMcpLeafStrict("context7-de6dee1ccd")).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
   expect(after.ok && after.records.map((record) => record.desiredState)).toEqual(["enabled", "enabled"])
 }))
 
@@ -487,8 +539,9 @@ test("BC2a pinned marketplace prepares opaque choices and only the selected real
   expect(await h.install(h.request(selected.id, "bc2_selected_context7"))).toMatchObject({ ok: true, packageId: "claude:context7" })
   const state = readPackageLedgerStateV1(h.root)
   expect(state.ok && state.packageGraphs.map(graph => graph.packageId)).toEqual(["claude:context7"])
-  expect(state.ok && state.records.map(record => record.name)).toEqual([state.ok && state.packageGraphs[0]!.root.name, "context7"])
+  expect(state.ok && state.records.map(record => record.name)).toEqual([state.ok && state.packageGraphs[0]!.root.name, "context7-de6dee1ccd"])
   expect(h.activation).toEqual(["claude:context7"])
+  // Ruling on AC-14 ("沿既有 reload 发布"): a source tree reloads only when it carries skills; this MCP-only package activates without one.
   expect(h.reloads).toEqual([])
 }))
 
@@ -530,25 +583,32 @@ test("R12 A4 identical package bytes update the same identity when the requested
  expect(readdirSync(a)).toEqual([]);expect(readdirSync(b)).toEqual([])
 }))
 
-test("R12 A5 unsupported real command agent and hook entries explain nothing-runnable without ledger writes", () => installerHarness(async h => {
-  for (const [name, kinds] of [["explanatory-output-style", ["hook"]], ["pr-review-toolkit", ["command", "agent", "agent", "agent", "agent", "agent", "agent"]]] as const) {
+test("R12 A5 command agent and connected package hooks retain whole package content", () => installerHarness(async h => {
+  for (const [name, kinds] of [["explanatory-output-style", []], ["pr-review-toolkit", []]] as const) {
     const result = await h.install(h.request(await h.candidate(name), "r12_unsupported_" + name))
-    expect(result).toMatchObject({ ok: false, code: "nothing-runnable" })
-    if (result.ok || result.code !== "nothing-runnable") throw Error("expected unsupported components")
+    expect(result).toMatchObject({ ok: true })
+    if (!result.ok) throw Error("expected content installation")
     expect(result.notRunning.map(entry => entry.kind).sort()).toEqual([...kinds].sort())
     expect(result.notRunning.every(entry => entry.reason === "kind-not-supported-yet" && !!entry.sourceName)).toBe(true)
   }
-  expect(readPackageLedgerStateV1(h.root)).toMatchObject({ ok: true, records: [], packageGraphs: [] })
+  const state = readPackageLedgerStateV1(h.root)
+  expect(state.ok && state.packageGraphs).toHaveLength(2)
+  expect(state.ok && state.records.filter(record => record.kind === "bundle")).toHaveLength(2)
+  expect(state.ok && state.records.filter(record => record.kind === "command")).toHaveLength(1)
+  expect(state.ok && state.records.filter(record => record.kind === "agent")).toHaveLength(6)
 }))
 
-test("R14 A6 an unpublishable substituted remote leaf leaves no committed package", () => installerHarness(async h => {
+test("R14 A6 an unresolved environment URL preserves installed content until runtime binding", () => installerHarness(async h => {
  const capture=await captureFixture("external_plugins/context7")
  const definition=JSON.parse(new TextDecoder().decode(await capture.readFile(".mcp.json")))
  const prepared=await h.sources.prepareCapture(await captureFixture("external_plugins/context7",{".mcp.json":JSON.stringify({...definition,mcpServers:{...definition.mcpServers,context7:{...definition.mcpServers.context7,url:"${WHOLE_URL}",oauth:false}}})}))
  if(prepared.kind!=="package")throw Error("expected a real package variant")
- expect(await h.install(h.request(prepared.candidateId,"r14_remote_publish"))).toMatchObject({ok:false,code:"transaction-failed"})
- expect(readPackageLedgerStateV1(h.root)).toMatchObject({ok:true,records:[],packageGraphs:[]})
- expect(readMcpLeafStrict("context7")).toMatchObject({ok:true,value:undefined})
+ const installed=await h.install(h.request(prepared.candidateId,"r14_remote_publish"))
+ expect(installed).toMatchObject({ok:true})
+ const state=readPackageLedgerStateV1(h.root)
+ expect(state.ok&&state.packageGraphs).toHaveLength(1)
+ if(!installed.ok)throw Error(installed.detail)
+ expect(readMcpLeafStrict(installed.installed[0]!.hostName)).toMatchObject({ok:true,value:{url:"${WHOLE_URL}"}})
 }))
 
 for(const kind of ["agent","command"] as const)test("R14 A7 catalog "+kind+" schedules a non-force content reload",()=>installerHarness(async h=>{
@@ -564,8 +624,12 @@ for(const kind of ["agent","command"] as const)test("R14 A7 catalog "+kind+" sch
  const planner={globalRoot:()=>h.root,resolveEntry:async()=>null,advisoryGate:()=>({allowed:true}),resolvePackage:async(id:string,version:string)=>resolveVerifiedPackageV1(catalog,id,version)}
  const admission={root:()=>h.root,userDataPath:h.temporary,casBaseRoot:()=>h.temporary,environment:()=>"dev" as const,loadVerifiedCatalog:async()=>({source:"remote" as const,catalog,snapshotDigest:sha256Hex(JSON.stringify(catalog))}),installability:{fetchPayload:fetchBytes},fetchAsset:fetchBytes}
  const reloads:string[]=[]
- const result=await installCatalogFromSource(envelope.prelude.packageId,{requestId:"r14_reload_"+kind,source:{kind:"catalog",catalogId:envelope.prelude.packageId},effect:{kind:"all-projects"},via:"chat"},{planner:planner as never,admission,activateMcp:async()=>[],reloadSkills:id=>{reloads.push(id)},removeDeparting:()=>{}})
+ const {createSourceInstaller}=await import("./install-from-source")
+ const installer=createSourceInstaller({globalRoot:()=>h.root,casBaseRoot:()=>h.temporary,environment:()=>"dev",userDataPath:h.temporary,sources:h.sources,advisoryGate:planner.advisoryGate,resolvePackage:planner.resolvePackage as never,activateMcp:async()=>[],reloadSkills:id=>{reloads.push(id)},removeDeparting:()=>{},catalogInstall:(id,request)=>installCatalogFromSource(id,request,{planner:planner as never,admission,activateMcp:async()=>[],reloadSkills:()=>{},removeDeparting:()=>{}})})
+ const result=await installer({requestId:"r14_reload_"+kind,source:{kind:"catalog",catalogId:envelope.prelude.packageId},effect:{kind:"all-projects"},via:"chat"})
  expect(result).toMatchObject({ok:true})
+ expect(reloads).toEqual([])
+ await new Promise<void>(resolve=>setImmediate(resolve))
  expect(reloads).toEqual([envelope.prelude.packageId])
 }))
 
@@ -591,7 +655,7 @@ test("review C5 one real multi-component transaction rolls back a mid-populate f
   try {
     expect(await h.install(h.request(id, "c5_failed"))).toMatchObject({ ok: false, code: "transaction-failed" })
     expect(populated).toBe(1)
-    expect(probe.mock.calls[0]![1].items.map(item => item.action)).toEqual([undefined, "receipt", "config"])
+    expect(probe.mock.calls[0]![1].items.map(item => item.action)).toEqual([undefined, "receipt", "file", "config"])
     expect(probe).toHaveBeenCalledTimes(1)
     const failed = readPackageLedgerStateV1(h.root)
     expect(failed.ok && failed.records).toEqual([])
@@ -622,7 +686,7 @@ test("review C5 an existing user MCP keeps its name and bytes when a real same-n
   const result = await h.install(h.request(id, "c5_collision"))
   if (!result.ok) throw Error(result.detail)
   expect(result.installed).toHaveLength(1)
-  expect(result.installed[0]!.hostName).toMatch(/^context7-[a-f0-9]{8}$/)
+  expect(result.installed[0]!.hostName).toMatch(/^context7-[a-f0-9]{10}$/)
   expect(readMcpLeafStrict("context7")).toEqual(before)
   expect(readMcpLeafStrict(result.installed[0]!.hostName)).toMatchObject({ ok: true })
   const state = readPackageLedgerStateV1(h.root)
@@ -652,9 +716,324 @@ test("review AC11 local marketplace folder installs only the selected real plugi
   const state = readPackageLedgerStateV1(h.root)
   if (!state.ok) throw Error(state.reason)
   expect(state.packageGraphs.map(graph => graph.packageId)).toEqual([result.packageId])
-  expect(state.records.map(record => record.name)).toEqual(["context7"])
+  expect(state.records.filter(record => record.kind !== "bundle").map(record => record.name)).toEqual(result.installed.map(entry => entry.hostName))
   expect(result.source).toEqual({ kind: "local-folder" })
   expect(h.activation).toEqual([result.packageId])
+  // Ruling on AC-14 ("沿既有 reload 发布"): a source tree reloads only when it carries skills; this MCP-only package activates without one.
   expect(h.reloads).toEqual([])
   expect(state.records.some(record => ["github", "playwright", "frontend-design"].includes(record.name))).toBe(false)
+}))
+
+
+test("folder and Git use the whole plugin tree", () => installerHarness(async h => {
+  const capture = await captureWholeFixture("plugin-dev", path => path.endsWith("/SKILL.md") || path === ".claude-plugin/plugin.json" || path === "README.md")
+  for (const kind of ["folder", "git"] as const) {
+    const source = { ...capture, source: { ...capture.source, kind, locator: kind + "-real-plugin-dev" } }
+    const converted = await convertPluginTree(source)
+    h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture: source, runtimeIdentity: undefined })
+    const outcome = await h.install(h.request(kind + "_plugin_dev", kind + "_whole_tree"))
+    expect(outcome.ok && outcome.installed.filter(entry => entry.kind === "skill")).toHaveLength(7)
+    const state = readPackageLedgerStateV1(h.root)
+    if (!state.ok) throw Error(state.reason)
+    const graph = state.packageGraphs.find(graph => graph.packageId === (outcome.ok && outcome.packageId))!
+    expect(graph.root.kind).toBe("bundle")
+    expect(readFileSync(join(resolveLiveGenerationDir(h.root, graph.pluginTree!.storeKey)!, "tree/README.md"))).toEqual(Buffer.from(await source.readFile("README.md")))
+  }
+}))
+
+test("source component names preserve logical identity across kind case and definition relocation", async () => {
+  const { pluginHostName, pluginComponentId } = await import("./plugin-package-install")
+  const converted = await convertPluginTree(await captureStandardFixture("codex:supabase"))
+  const entries = converted.package.entries.filter(entry => entry.sourceName === "supabase")
+  expect(entries.map(entry => entry.kind).sort()).toEqual(["mcp", "skill"])
+  const names = entries.map(entry => pluginHostName(entry, "codex:supabase", new Set(), () => true))
+  expect(new Set(names).size).toBe(2)
+  for (const [i, entry] of entries.entries()) {
+    expect(names[i]).toMatch(/^[a-z0-9][a-z0-9_-]*-[a-f0-9]{10}$/)
+    expect(pluginComponentId("codex:supabase", entry)).toBe("user:" + names[i])
+  }
+  const codspeed = await convertPluginTree(await captureStandardFixture("claude:codspeed"))
+  const entry = codspeed.package.entries.find(entry => entry.kind === "mcp")!
+  const first = pluginHostName(entry, "claude:codspeed", new Set(), () => true)
+  expect(first).toBe(first.toLowerCase())
+  expect(first.length).toBeLessThanOrEqual(24)
+  const moved = { ...entry, sourcePath: "mcp.json", id: "mcp:mcp.json#" + entry.sourceName }
+  expect(pluginHostName(moved, "claude:codspeed", new Set(), () => true)).toBe(first)
+  expect(pluginComponentId("claude:codspeed", moved)).toBe(pluginComponentId("claude:codspeed", entry))
+})
+
+test("allocated plugin host names survive removal of a colliding connector", () => installerHarness(async h => {
+  const { pluginHostName } = await import("./plugin-package-install")
+  const { removeMcp } = await import("./ext-config")
+  const capture = await captureFixture("external_plugins/context7")
+  const converted = await convertPluginTree(capture)
+  const entry = converted.package.entries.find(entry => entry.kind === "mcp")!
+  const occupied = pluginHostName(entry, "claude:context7", new Set(), () => true)
+  expect(persistMcp(occupied, { type: "remote", url: "https://mcp.context7.com/mcp?client=user", oauth: false })).toMatchObject({ ok: true })
+  const candidate = await h.candidate("context7")
+  const installed = await h.install(h.request(candidate, "allocated_name_first"))
+  if (!installed.ok) throw Error(installed.detail)
+  const dataState = join(pluginDataDirectory(join(h.temporary, "data"), installed.packageId), "state")
+  writeFileSync(dataState, "retained across source update")
+  const hostName = installed.installed[0]!.hostName
+  expect(hostName).not.toBe(occupied)
+  expect(removeMcp(occupied)).toMatchObject({ ok: true })
+  const updatedCapture = await captureFixture("external_plugins/context7", { ".mcp.json": new TextDecoder().decode(await capture.readFile(".mcp.json")).replace("claude-code-plugin", "updated-definition") })
+  const updated = await convertPluginTree(updatedCapture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...updated, capture: updatedCapture, runtimeIdentity: undefined })
+  const result = await h.install(h.request(candidate, "allocated_name_update"))
+  expect(result.ok && result.installed[0]!.hostName).toBe(hostName)
+  expect(readFileSync(dataState, "utf8")).toBe("retained across source update")
+  expect(readMcpLeafStrict(hostName)).toMatchObject({ ok: true, value: { url: "https://mcp.context7.com/mcp?client=updated-definition" } })
+}))
+
+test("standard plugin content installs before configuration programs or local services are ready", async () => {
+  for (const name of ["claude:grafana-mcp", "claude:langfuse-observability", "claude:rill", "claude:cockroachdb", "claude:sap-hana-cli"]) await installerHarness(async h => {
+    const capture = await captureStandardFixture(name)
+    const converted = await convertPluginTree(capture)
+    h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+    const result = await h.install(h.request(name, "standard_content_" + name.split(":")[1]!.replaceAll("-", "_")))
+    expect(result.ok).toBe(true)
+    const state = readPackageLedgerStateV1(h.root)
+    if (!state.ok) throw Error(state.reason)
+    expect(state.packageGraphs[0]?.root.kind).toBe("bundle")
+    expect(state.packageGraphs[0]?.pluginTree).toBeDefined()
+    expect(result.ok && result.installed.length).toBe(converted.package.entries.filter(entry => entry.kind === "skill" || entry.kind === "mcp").length)
+  })
+})
+
+
+test("plugin service settings save typed values and keep sensitive values out of public state", () => installerHarness(async h => {
+  const { readPackageAuthorizationV1, savePackageSecretsV1 } = await import("./package-admission")
+  const deps = { root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => { throw Error("Direct package never loads catalog") } }
+  for (const name of ["claude:grafana-mcp", "claude:langfuse-observability"]) {
+    const capture = await captureStandardFixture(name)
+    const converted = await convertPluginTree(capture)
+    h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+    const installed = await h.install(h.request(name, "settings_" + name.replace(/[^a-zA-Z0-9_]/g, "_")))
+    if (!installed.ok) throw Error(installed.detail)
+    const before = await readPackageAuthorizationV1(installed.packageId, deps)
+    expect(before.ok && before.items.some(item => item.kind === "option")).toBe(true)
+    const options = name.includes("grafana") ? { grafana_url: "http://localhost:3000", grafana_service_account_token: "fixture-secret-do-not-publish" } : { LANGFUSE_SECRET_KEY: "fixture-secret-do-not-publish", CC_LANGFUSE_DEBUG: false, CC_LANGFUSE_MAX_CHARS: 0, LANGFUSE_USER_ID: "" }
+    expect(await savePackageSecretsV1({ packageId: installed.packageId, options }, deps)).toMatchObject({ ok: true })
+    const after = await readPackageAuthorizationV1(installed.packageId, deps)
+    expect(JSON.stringify(after)).not.toContain("fixture-secret-do-not-publish")
+    expect(after.ok && after.items.filter(item => item.kind === "option" && item.sensitive).every(item => item.configured && !("value" in item))).toBe(true)
+    if (name.includes("langfuse")) {
+      expect(after).toMatchObject({ items: expect.arrayContaining([
+        expect.objectContaining({ kind: "option", key: "CC_LANGFUSE_DEBUG", value: false }),
+        expect.objectContaining({ kind: "option", key: "CC_LANGFUSE_MAX_CHARS", value: 0 }),
+        expect.objectContaining({ kind: "option", key: "LANGFUSE_USER_ID", value: "" }),
+        expect.objectContaining({ kind: "option", key: "LANGFUSE_BASE_URL", value: "https://cloud.langfuse.com" }),
+      ]) })
+      expect(await savePackageSecretsV1({ packageId: installed.packageId, options: { CC_LANGFUSE_DEBUG: "false" } }, deps)).toMatchObject({ ok: false })
+    }
+    expect(readFileSync(join(h.root, "installs.json"), "utf8")).not.toContain("fixture-secret-do-not-publish")
+  }
+}))
+
+test("plugin MCP runtime binds saved options and DATA while content retains references", () => installerHarness(async h => {
+  const { savePackageSecretsV1 } = await import("./package-admission")
+  const { installedPluginDescription } = await import("./plugin-package-config")
+  const { bindPluginMcp } = await import("../shared/plugin-mcp-config")
+  const { readInstalledPluginSettings } = await import("../shared/installed-plugin-settings")
+  const { connectorCredentials } = await import("./package-mcp-activation")
+  const { resolveConnectorLeaf } = await import("@opencode/util/codepuppy-credentials")
+  const capture = await captureStandardFixture("claude:grafana-mcp")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const installed = await h.install(h.request("grafana", "grafana_bind"))
+  if (!installed.ok) throw Error(installed.detail)
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs[0]!
+  const metadata = installedPluginDescription(h.root, graph)!
+  const entry = metadata.description.entries.find(entry => entry.kind === "mcp")!
+  if (entry.kind !== "mcp") throw Error("Real Grafana sample has MCP")
+  const deps = { root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => { throw Error("no catalog") } }
+  const bind = () => bindPluginMcp({ description: metadata.description, entry, settings: readInstalledPluginSettings(h.root, graph.pluginTree!.storeKey)!, pluginRoot: metadata.pluginRoot, projectDir: h.temporary,
+    resolveEnvironment: () => undefined, resolveSecret: () => undefined,
+    resolveOptionSecret: reference => {
+      const value = resolveConnectorLeaf({ server: graph.root.name, leaf: { environment: { value: reference } }, ...connectorCredentials({ root: deps.root, userDataPath: () => h.temporary }) }) as { environment: { value: string } }
+      return value.environment.value
+    },
+  })
+  expect(bind).toThrow(/missing-config: grafana_(url|service_account_token)/)
+  expect(await savePackageSecretsV1({ packageId: installed.packageId, options: { grafana_url: "http://localhost:3000", grafana_service_account_token: "runtime-only-fixture-token" } }, deps)).toMatchObject({ ok: true })
+  const bound = bind()
+  expect(bound).toMatchObject({ type: "local", command: ["docker", "run", "--rm", "-i", "-e", "GRAFANA_URL", "-e", "GRAFANA_SERVICE_ACCOUNT_TOKEN", "grafana/mcp-grafana", "-t", "stdio"], environment: { GRAFANA_URL: "http://localhost:3000", GRAFANA_SERVICE_ACCOUNT_TOKEN: "runtime-only-fixture-token", CLAUDE_PLUGIN_DATA: pluginDataDirectory(join(h.temporary, "data"), installed.packageId) } })
+  expect(JSON.stringify(graph)).not.toContain("runtime-only-fixture-token")
+  const settingsFile = join(h.root, "ext-store", graph.pluginTree!.storeKey, "package-settings.json")
+  const previous = readFileSync(settingsFile)
+  const refs = Object.values(readInstalledPluginSettings(h.root, graph.pluginTree!.storeKey)!.secretRefs)
+  expect(await savePackageSecretsV1({ packageId: installed.packageId, options: { grafana_service_account_token: "replacement-token" } }, { ...deps, transaction: (root, plan, hooks) => runExtensionTransaction(root, plan, { ...hooks, probePrepared: () => ({ healthy: false, reason: "injected option resource failure" }) }) })).toMatchObject({ ok: false })
+  expect(readFileSync(settingsFile)).toEqual(previous)
+  expect(refs.every(ref => existsSync(ref.slice(6, -1)))).toBe(true)
+  expect(await savePackageSecretsV1({ packageId: installed.packageId, options: { grafana_service_account_token: "replacement-token" } }, deps)).toMatchObject({ ok: true })
+  expect(refs.every(ref => existsSync(ref.slice(6, -1)))).toBe(false)
+}))
+
+test("connector version selection preserves the source argv when pinned or cleared", () => installerHarness(async h => {
+  const { readPackageAuthorizationV1, savePackageSecretsV1 } = await import("./package-admission")
+  const { installedPluginDescription } = await import("./plugin-package-config")
+  const { bindPluginMcp } = await import("../shared/plugin-mcp-config")
+  const { readInstalledPluginSettings } = await import("../shared/installed-plugin-settings")
+  const capture = await captureStandardFixture("codex:build-ios-apps")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const installed = await h.install(h.request("build-ios-apps", "version_selection"))
+  if (!installed.ok) throw Error(installed.detail)
+  const deps = { versionSuggestion: async () => undefined, root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => { throw Error("no catalog") } }
+  const authorization = await readPackageAuthorizationV1(installed.packageId, deps)
+  expect(authorization.ok && authorization.items.some(item => item.kind === "mcp-version")).toBe(true)
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const graph = state.packageGraphs[0]!
+  const metadata = installedPluginDescription(h.root, graph)!
+  const entry = metadata.description.entries.find(entry => entry.kind === "mcp")!
+  if (entry.kind !== "mcp") throw Error("build-ios-apps has its real XcodeBuildMCP definition")
+  for (const version of ["2.0.0", ""]) {
+    expect(await savePackageSecretsV1({ packageId: installed.packageId, mcpVersions: { [entry.id]: version } }, deps)).toMatchObject({ ok: true })
+    const bound = bindPluginMcp({ description: metadata.description, entry, settings: readInstalledPluginSettings(h.root, graph.pluginTree!.storeKey)!, pluginRoot: metadata.pluginRoot, projectDir: h.temporary, resolveEnvironment: () => undefined, resolveSecret: () => undefined, resolveOptionSecret: () => undefined })
+    expect(bound).toMatchObject({ type: "local", command: ["npx", "-y", version ? "xcodebuildmcp@2.0.0" : "xcodebuildmcp@latest", "mcp"] })
+  }
+}))
+
+
+test("remote plugin declarations retain explicit transport in their installed MCP projection", async () => {
+  const { pluginMcpConfig } = await import("../shared/plugin-mcp-config")
+  const { validMcpConfigLeaf } = await import("../shared/plugin-install")
+  const converted = await convertPluginTree(await captureStandardFixture("claude:cloudinary"))
+  for (const entry of converted.package.entries) {
+    if (entry.kind !== "mcp" || entry.transport === "stdio") continue
+    for (const transport of ["http", "sse"] as const) {
+      const leaf = pluginMcpConfig({ ...entry, transport })
+      expect(leaf).toMatchObject({ type: "remote", transport })
+      expect(validMcpConfigLeaf(leaf)).toBe(true)
+    }
+  }
+})
+
+
+test("source installation returns committed content before default enable and runtime activation", () => installerHarness(async h => {
+  const capture = await captureStandardFixture("claude:sap-hana-cli")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const result = await h.installContent(h.request("sap", "install_before_activation"))
+  expect(result.ok).toBe(true)
+  const before = readPackageLedgerStateV1(h.root)
+  expect(before.ok && before.records.every(record => record.desiredState === "disabled")).toBe(true)
+  expect(h.activation).toEqual([])
+  expect(readdirSync(join(h.root, "ext-tx/journal")).map(file => JSON.parse(readFileSync(join(h.root, "ext-tx/journal", file), "utf8")).state)).toEqual(["committed"])
+  await new Promise<void>(resolve => setImmediate(resolve))
+  const after = readPackageLedgerStateV1(h.root)
+  expect(after.ok && after.records.every(record => record.desiredState === "enabled")).toBe(true)
+  expect(h.activation).toEqual([result.ok ? result.packageId : ""])
+}))
+
+// Real build-ios-apps fixture declares xcodebuildmcp@latest; metadata is held, not a timing fixture.
+test("connector version metadata never blocks authorization and is refreshed once available", () => installerHarness(async h => {
+  const { readPackageAuthorizationV1 } = await import("./package-admission")
+  const capture = await captureStandardFixture("codex:build-ios-apps")
+  const converted = await convertPluginTree(capture)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture, runtimeIdentity: undefined })
+  const installed = await h.install(h.request("build-ios-apps", "version_hint_pending"))
+  if (!installed.ok) throw Error(installed.detail)
+  let release!: (version: string) => void
+  const metadata = new Promise<string>(resolve => { release = resolve })
+  let requests = 0
+  const deps = { versionSuggestion: async () => { requests++; return metadata }, root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => { throw Error("no catalog") } }
+  let first: Awaited<ReturnType<typeof readPackageAuthorizationV1>> | undefined
+  const pending = readPackageAuthorizationV1(installed.packageId, deps).then(result => { first = result })
+  try {
+    await new Promise<void>(resolve => setImmediate(resolve))
+    expect(first).toMatchObject({ ok: true })
+    expect(first?.ok && first.items.find(item => item.kind === "mcp-version")).toMatchObject({ value: "" })
+    if (first?.ok) expect(first.items.find(item => item.kind === "mcp-version")).not.toHaveProperty("suggestion")
+  } finally { release("2.0.0"); await metadata; await pending }
+  const refreshed = await readPackageAuthorizationV1(installed.packageId, deps)
+  expect(refreshed.ok && refreshed.items.find(item => item.kind === "mcp-version")).toMatchObject({ value: "2.0.0", suggestion: "2.0.0" })
+  expect(requests).toBe(1)
+}))
+
+test("unset plugin MCP environment variables preserve the source and report a named dependency at binding", async () => {
+  const { bindPluginMcp, PluginMcpBindingError } = await import("../shared/plugin-mcp-config")
+  const captured = await captureFixture("external_plugins/github")
+  const source = new TextDecoder().decode(await captured.readFile(".mcp.json"))
+  // Real GitHub connector, with a non-sensitive named URL variable instead of the recorded literal URL.
+  const converted = await convertPluginTree(await captureFixture("external_plugins/github", { ".mcp.json": source.replace("https://api.githubcopilot.com/mcp/", "${PLUGIN_REMOTE_ENDPOINT}") }))
+  const entry = converted.package.entries.find(entry => entry.kind === "mcp")!
+  if (entry.kind !== "mcp" || entry.transport === "stdio") throw Error("Expected the real GitHub remote connector")
+  const input = { description: converted.package, entry, settings: { packageId: "claude:github", dataHome: "/tmp/plugin-data", values: {}, secretRefs: {}, versions: {}, mcpVersions: {} }, pluginRoot: "/tmp/plugin-tree", projectDir: "/tmp/project", resolveEnvironment: () => undefined, resolveSecret: () => undefined, resolveOptionSecret: () => undefined }
+  expect(() => bindPluginMcp(input)).toThrow("dependency-missing: PLUGIN_REMOTE_ENDPOINT")
+  try { bindPluginMcp(input) } catch (error) { expect(error).toBeInstanceOf(PluginMcpBindingError) }
+  expect(entry.url).toEqual([{ environment: { name: "PLUGIN_REMOTE_ENDPOINT" } }])
+  const resolved = bindPluginMcp({ ...input, resolveEnvironment: name => name === "PLUGIN_REMOTE_ENDPOINT" ? "https://example.com/mcp" : name === "GITHUB_PERSONAL_ACCESS_TOKEN" ? "invalid-local-token" : undefined })
+  expect(resolved).toMatchObject({ type: "remote", url: "https://example.com/mcp", headers: { Authorization: "Bearer invalid-local-token" } })
+  expect(() => bindPluginMcp({ ...input, resolveEnvironment: name => name === "PLUGIN_REMOTE_ENDPOINT" ? "https://example.com/mcp" : undefined })).toThrow("dependency-missing: GITHUB_PERSONAL_ACCESS_TOKEN")
+})
+
+test("a nonlocal plain HTTP plugin connector fails by itself after the whole package installs", () => installerHarness(async h => {
+  const { createManagedMcpConvergence } = await import("./package-mcp-activation")
+  const capture = await captureFixture("external_plugins/context7")
+  const source = new TextDecoder().decode(await capture.readFile(".mcp.json"))
+  const skill = new TextDecoder().decode(await (await captureFixture("plugins/frontend-design")).readFile("skills/frontend-design/SKILL.md"))
+  const variant = await captureFixture("external_plugins/context7", { ".mcp.json": source.replace("https://mcp.context7.com/", "http://mcp.context7.com/"), "skills/frontend-design/SKILL.md": skill })
+  const converted = await convertPluginTree(variant)
+  h.sources.convertCandidate = async () => ({ ok: true, ...converted, capture: variant, runtimeIdentity: undefined })
+  const installed = await h.install(h.request("context7", "plain_http_connector"))
+  expect(installed).toMatchObject({ ok: true })
+  if (!installed.ok) throw Error(installed.detail)
+  expect(installed.installed.some(entry => entry.kind === "skill")).toBe(true)
+  const name = installed.installed.find(entry => entry.kind === "mcp")!.hostName
+  expect(readMcpLeafStrict(name)).toMatchObject({ ok: true, value: { url: "http://mcp.context7.com/mcp?client=claude-code-plugin" } })
+  const requests: string[] = []
+  // This repository's own typed API response shape (protocol/groups/{debug,mcp}); no MCP protocol imitation.
+  const engine = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch(request) {
+    const path = new URL(request.url).pathname
+    requests.push(request.method + " " + path)
+    if (path === "/api/debug/location") return Response.json([])
+    if (path === "/api/mcp") return Response.json({ location: { directory: h.temporary }, data: [] })
+    if (path.endsWith("/disconnect")) return new Response(null, { status: 204 })
+    return new Response(null, { status: 500 })
+  } })
+  try {
+    const converge = createManagedMcpConvergence({ root: () => h.root, directory: () => h.temporary, userDataPath: () => h.temporary, awaitServer: async () => ({ url: engine.url.href, username: null, password: null }) })
+    expect(await converge([name])).toMatchObject([{ name, status: "failed", detail: "only https:// server URLs are supported" }])
+    expect(requests.some(request => request.startsWith("PUT "))).toBe(false)
+    expect(readPackageLedgerStateV1(h.root)).toMatchObject({ ok: true, packageGraphs: [{ packageId: installed.packageId }] })
+  } finally { await engine.stop(true) }
+}))
+
+test("a custom MCP record never inherits plugin validation from a colliding graph name", () => installerHarness(async h => {
+  const { upsertRecordV2 } = await import("./ext-receipt-v2")
+  const installed = await h.install(h.request(await h.candidate("context7"), "origin_not_name"))
+  if (!installed.ok) throw Error(installed.detail)
+  const name = installed.installed.find(entry => entry.kind === "mcp")!.hostName
+  const state = readPackageLedgerStateV1(h.root)
+  if (!state.ok) throw Error(state.reason)
+  const record = state.records.find(record => record.kind === "mcp" && record.name === name)!
+  expect(persistMcp(name, { type: "local", command: ["/tmp/plugin-entry", "--source-argv"] })).toMatchObject({ ok: true })
+  expect(upsertRecordV2(h.root, { ...record, origin: "created", transaction: undefined })).toMatchObject({ ok: true })
+  expect(persistMcp(name, { type: "local", command: ["/tmp/custom-entry", "--source-argv"] })).toMatchObject({ ok: false, reason: "command not allowed: /tmp/custom-entry" })
+  expect(persistMcp(name, { type: "remote", url: "http://localhost:9876/mcp" })).toMatchObject({ ok: false })
+}))
+
+test("catalog cloud content requests its startup refresh after installation has returned", () => installerHarness(async h => {
+  const { createSourceInstaller, installCatalogFromSource } = await import("./install-from-source")
+  const { resolveVerifiedPackageV1 } = await import("./package-installability")
+  const { canonicalArtifactJsonBytesV1 } = await import("../shared/host-extension-package-contract/generate-artifact")
+  // Shipped cloud-v1 decoder corpus, the same input used by the real lifecycle engine case.
+  const corpus = await Bun.file(join(import.meta.dir, "../shared/host-extension-package-contract/testvectors/decoder-corpus.v1.json")).json() as { cases: Array<{ name: string; envelope: import("../shared/host-extension-package-contract/decoder").CodePuppyPackageEnvelopeV1; components: Array<{ payload: unknown }> }> }
+  const cloud = corpus.cases.find(entry => entry.name === "cloud-v1")!
+  const catalog = { version: "cloud-runtime", entries: [], packages: [cloud.envelope] }
+  const fetchBytes = async () => canonicalArtifactJsonBytesV1(cloud.components[0]!.payload)
+  const planner = { globalRoot: () => h.root, resolveEntry: async () => null, advisoryGate: () => ({ allowed: true }), resolvePackage: async (id: string, version: string) => resolveVerifiedPackageV1(catalog, id, version) }
+  const admission = { root: () => h.root, userDataPath: h.temporary, casBaseRoot: () => h.temporary, environment: () => "dev" as const, loadVerifiedCatalog: async () => ({ source: "remote" as const, catalog, snapshotDigest: sha256Hex(JSON.stringify(catalog)) }), installability: { fetchPayload: fetchBytes }, fetchAsset: fetchBytes }
+  const reloads: string[] = []
+  const installer = createSourceInstaller({ globalRoot: () => h.root, casBaseRoot: () => h.temporary, environment: () => "dev", userDataPath: h.temporary, sources: h.sources, advisoryGate: planner.advisoryGate, resolvePackage: planner.resolvePackage as never, activateMcp: async () => [], reloadSkills: id => { reloads.push(id) }, removeDeparting: () => {}, catalogInstall: (id, request) => installCatalogFromSource(id, request, { planner: planner as never, admission, activateMcp: async () => [], reloadSkills: () => {}, removeDeparting: () => {} }) })
+  expect(await installer({ requestId: "cloud_deferred_refresh", source: { kind: "catalog", catalogId: cloud.envelope.prelude.packageId }, effect: { kind: "all-projects" }, via: "hub" })).toMatchObject({ ok: true })
+  expect(reloads).toEqual([])
+  await new Promise<void>(resolve => setImmediate(resolve))
+  expect(reloads).toEqual([cloud.envelope.prelude.packageId])
 }))

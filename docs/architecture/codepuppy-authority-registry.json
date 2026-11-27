@@ -1616,7 +1616,7 @@
           "name": "a subtask command: the child session runs on the parent's picked model"
         }
       ],
-      "note": "The pick is the session's `model`. L6 contract: Code Puppy's adapter switches the session model to the composer's pick before every send, so the field always carries the user's choice (orchestrator, plan 6bc34b3ce5). Upstream-native and kept: a session with no model takes a command's model, which then stays the session's model."
+      "note": "The pick is the session's `model`. L6 contract: Code Puppy's adapter switches the session model to the composer's pick before every send, so the field always carries the user's choice (orchestrator, plan 6bc34b3ce5). Upstream-native and kept: a session with no model takes a command's model, which then stays the session's model. #1776 S-01: package instructions share the source-before-values renderer; explicit session model priority and the existing project interpolation gate remain owned here. See plugin-invocation-semantics."
     },
     {
       "id": "mcp-independent-startup",
@@ -2145,7 +2145,7 @@
       },
       "mechanism": {
         "file": "packages/core/src/config/codepuppy-project-gate.ts",
-        "ladder": "L3 (四个读取点只调用同一项目配置闸门)"
+        "ladder": "L3 (四个读取点只调用同一项目配置闸门); #1776 S-04 (orchestrator ruling 2026-11-27): Config file load and the skill watcher/rescan select a revision before the same native project-trust filters and parsers. Rejection retains prior bytes only within currently eligible sources; managed policy remains authoritative."
       },
       "tests": [
         {
@@ -2180,7 +2180,8 @@
           "file": "packages/ui-mac/src/renderer/subprocess-cases.test.ts",
           "name": "项目信任组件:不完整下次再查"
         }
-      ]
+      ],
+      "note": " #1776 S-01: package instructions share the source-before-values renderer; explicit session model priority and the existing project interpolation gate remain owned here. See plugin-invocation-semantics."
     },
     {
       "id": "package-disable-pending-mcp-requests",
@@ -2201,6 +2202,632 @@
         }
       ],
       "note": "Orchestrator r16 requires the original busy-disable assertions to remain; the real lifecycle case fails with the revoke call removed. This preserves the existing explicit package-off authority, with no new grant or owner decision."
+    },
+    {
+      "id": "plugin-local-mcp",
+      "decision": "Only the managed plugin MCP instance receives a main-issued, generation-bound loopback proxy capability; ordinary tools and child processes retain the existing destination authority. Review r20 A1: every Location plugin setup publishes its readiness over the existing private sidecar channel; main uses the same managed MCP convergence after that build and after every reload. Plugin-tree graphs are always selected regardless of the reloading items; other graphs retain their item selection. Runtime projections and startup templates keep their original owners. Review r20 A5: main retains only the current named dependency-missing convergence detail per Location/server and notifies the existing hub view. That view uses its existing non-reloadable not-loaded detail when the connector is not connected; a later non-error convergence clears the detail. No new engine or UI status DTO.",
+      "adr": [
+        "ADR-029"
+      ],
+      "lane": "#1776 slice 4",
+      "takeovers": [
+        "packages/core/src/mcp/connection.ts",
+        "packages/core/src/mcp/index.ts"
+      ],
+      "mechanism": {
+        "file": "packages/util/src/codepuppy-plugin-mcp.ts",
+        "ladder": "L0 in the existing main egress proxy; L3 at the already-owned MCP connection and OAuth-provider FetchHttpClient.Fetch composition points (DESIGN-local-plugin-install v3 §10 S-09). mcp.transform cannot supply a private fetch. L1/L2 would wrap the same private scope; no additional transport or OAuth authority is created."
+      },
+      "tests": [
+        {
+          "file": "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts",
+          "name": "plugin local MCP uses its private proxy for HTTP sessions and keeps proxy auth off the server"
+        },
+        {
+          "file": "packages/ui-mac/src/main/network-egress-proxy.test.ts",
+          "name": "plugin loopback HTTP requires its endpoint capability and revocation closes the stream"
+        },
+        {
+          "file": "packages/ui-mac/src/main/network-egress-proxy.test.ts",
+          "name": "plugin CONNECT capabilities never authorize a different target or ordinary CONNECT"
+        },
+        {
+          "file": "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts",
+          "name": "package MCP capabilities retain a definition and revoke on replacement, off and sidecar exit"
+        },
+        {
+          "file": "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts",
+          "name": "explicit SSE registers its real POST endpoint for the same proxy generation and revokes it with the stream"
+        },
+        {
+          "file": "packages/ui-mac/src/main/package-hub-lifecycle.engine.cases.ts",
+          "name": "plugin MCP connects in a Location created after engine ready"
+        },
+        {
+          "file": "packages/ui-mac/src/main/package-hub-lifecycle.engine.cases.ts",
+          "name": "plugin MCP remains connected after a skills-only package reload"
+        },
+        {
+          "file": "packages/ui-mac/src/main/package-hub-lifecycle.engine.cases.ts",
+          "name": "plugin MCP missing environment dependency appears in the hub row detail"
+        }
+      ],
+      "note": "The existing connection input fetch is scoped before McpClient.connect. index.ts connectProvider and explicit authorization already override that service with the layer-captured fetch, so their exact composition points also consume the same private wrapper. oauth.ts, the public server schema, global fetch, NO_PROXY, seatbelt and the gate are unchanged. #1776 r11 A4 (orchestrator r9 S-12 ruling): source transport reaches the existing connection fetch. Only the bound SSE transport issues endpoint registration through its private proxy headers; main checks the live declared SSE stream, origin and generation capability, registers the exact POST URL, and removes the control header. Same bearer and stream revocation; no second SSE parser, SDK private access, general same-origin grant or public binding fields."
+    },
+    {
+      "id": "plugin-mcp-transport",
+      "decision": "Preserve the declared remote MCP transport: absent or http uses existing HTTP; explicit sse uses the existing SDK SSE transport, same auth/fetch and no HTTP session cleanup (DESIGN-local-plugin-install v3.1 S-12; #1776 r3).",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "MCP/runtime (#1776 slice 4)",
+      "takeovers": [
+        "packages/schema/src/mcp.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/schema/test/mcp.test.ts",
+        "packages/client/src/promise/generated/types.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/client.ts",
+        "ladder": "L3: RemoteConfig one-field schema raise plus narrow increment in the existing client. L0 cannot extend shared decoding or choose a private transport; L1/L2 would add a source/build apply/restore pipeline for the same two boundaries (design v3.1 §10 S-12)."
+      },
+      "tests": [
+        {
+          "file": "packages/schema/test/mcp.test.ts",
+          "name": "remote MCP transport preserves explicit HTTP or SSE and leaves the default absent"
+        },
+        {
+          "file": "packages/ext/src/engine-transforms.test.ts",
+          "name": "remote MCP projection preserves explicit transport without inventing a default"
+        },
+        {
+          "file": "packages/ui-mac/src/main/mcp-server-truth.test.ts",
+          "name": "remote MCP truth persists explicit transport without adding it to default records"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "explicit SSE opens the declared GET URL and never probes HTTP codemode"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "absent and explicit HTTP retain the same streamable HTTP request"
+        },
+        {
+          "file": "packages/ui-mac/src/main/network-egress-proxy.test.ts",
+          "name": "plugin loopback refused upstream is a named TCP failure with local service copy"
+        },
+        {
+          "file": "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts",
+          "name": "explicit SSE registers its real POST endpoint for the same proxy generation and revokes it with the stream"
+        }
+      ],
+      "note": " #1776 r10 A3: the existing client takeover decodes only the main proxy's named TCP refusal, retains that layer before HTTP fallback, and publishes a body-free local-service marker through the existing status prefix. No new failure code, transport, credential or permission authority. #1776 r11 A4 (orchestrator r9 S-12 ruling): source transport reaches the existing connection fetch. Only the bound SSE transport issues endpoint registration through its private proxy headers; main checks the live declared SSE stream, origin and generation capability, registers the exact POST URL, and removes the control header. Same bearer and stream revocation; no second SSE parser, SDK private access, general same-origin grant or public binding fields. #1776 r15: register the existing S-12 paired schema regression and generated Promise API projection. Both differ from base 1db6a3bbf5 only for the approved transport domain; this is artifact/proof synchronization, not a further runtime takeover."
+    },
+    {
+      "id": "plugin-invocation-semantics",
+      "decision": "DESIGN-local-plugin-install v3 S-01: one Location-owned command renderer compiles original source nodes before binding arguments and Text values; package calls use the same renderer as native commands. PreparedInstruction.arguments is the verbatim Invocation name order ([] if undeclared), per orchestrator ruling 2026-11-27. Orchestrator ruling 2026-11-27 r9: S-01 also binds shell commands without executing, returning the selected executable, argv and invocation env for the existing AppProcess consumer. Review r9 B5: runtime values enter per-invocation environment slots, never escaped command text; source quote/substitution/heredoc context only chooses the reference. Orchestrator review ruling r9 B2 (2026-11-27): shell ARGUMENTS and native trailing rest expand as parsed argv; text retains raw arguments. Review r9 B1: inline and fenced shell source share the same recognizer for execution and project trust; bound values never introduce shell nodes. PackageAllowSetV3 includes bundle roots in the existing keys/scoped projection per orchestrator ruling 2026-11-27 (r8); roots remain absent from component rows. Orchestrator ruling 2026-11-27 r19: additive S-01 PreparedInstruction.environment optionally carries this Invocation Session ENV_FILE export delta. Core merges it below its generated binding env; only the existing renderer executes shell nodes. The ext source is the existing AppProcess shell export authority, with managed package variables retained by that same owner. The first expansion awaits the same once-per-lifetime SessionStart; all native skill attachments register their scopes before that boundary. Review r20 A2: native and package shell nodes extend the process environment, then apply the invocation environment and generated binding slots; PATH/HOME and the existing fence environment are retained. Review r20 A3: the same binder keeps comment quotes out of shell quote state. Quoted heredoc values remain literal; its quoted wire delimiter is chosen absent from all source/value bytes, so a value cannot close the heredoc. Unquoted heredocs retain environment references. End-of-source closing delimiters are preserved. Review r20 A4: bind-only uses ShellSelect compat; instruction shell nodes with actual source-bound values use compat, including literal quoted-heredoc values with no env slot. Static native nodes retain configured shell selection. The bound-value fact stays private to the binder, not the runtime DTO. Orchestrator ruling 2026-11-27 r22 (B7): promise command.execute and hook callbacks receive a call-level InvocationContext.signal from the existing Effect-to-Promise adapter. That same signal reaches instruction/preload/attachment/tool/path preparation and synchronous hook ENV_FILE source, combined with the existing runner-owned cancellation; no new timeout or execution mechanism.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slices 3/5, r22",
+      "takeovers": [
+        "packages/core/src/config/plugin/command.ts",
+        "packages/plugin/src/promise/adapter.ts",
+        "packages/plugin/src/promise/command.ts",
+        "packages/plugin/src/promise/registration.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/config/plugin/command.ts",
+        "ladder": "Existing L3 increment only: private renderer exposed through self-owned @opencode/plugin/codepuppy-package-runtime, scoped disposal; ext does not import core or run a second shell renderer. L0 extension hooks wrap the existing skill/subagent executors and consume the r6 command/agent allow-set projection; actual model/tool registries own identity, effort, discovery and execution. Shell tool-rule matching consumes the existing pure ShellScan leaf, never executes or reparses a shell template. S-01 r19 is a narrow increment of the same owned command.ts env composition; no additional upstream file or renderer. S-01 r22 exact L3 adds only the promise callback types and their existing adapter. L0 receives no native invocation abort in the old callback; Session execution events cannot cancel pre-admission command/attachment source. L1/L2 would patch the same adapter and add a source/build synchronization authority. The adapter supplies its original Effect signal and AppProcess remains the sole process/source cancellation owner."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "bind-only shell target shares the binding authority without executing"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "shell runtime values stay data in command substitutions and unquoted heredocs"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "shell argument lists preserve each parsed word while text retains the raw arguments"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "fenced shell source executes before arguments without executing bound fences"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "untrusted project fenced shell stays source and records deferred execution"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "package instruction renders source nodes before bound values and arguments"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "declared argument names select their ordered values"
+        },
+        {
+          "file": "packages/plugin/test/codepuppy-package-runtime.test.ts",
+          "name": "instruction renderer follows the Location lifetime across module consumers"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "native argument suffix stays on the native syntax axis"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package agent delegates with its instructions and tool set"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package commands invoke the source renderer only after an explicit call"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package invocation applies preload memory effort and native turn limits"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package paths activate on real file access while Temporal manual skills stay explicit"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package YAML dependencies resolve to a real connected MCP tool"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package Claude background agents stop when their package is disabled"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package skill arguments and denies expire at the next user prompt"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package agent Edit remains available when source Write is denied"
+        },
+        {
+          "file": "packages/ext/src/policy/register-policy.test.ts",
+          "name": "package Bash prefix grants cover every parsed command and preserve quoted executable paths"
+        },
+        {
+          "file": "packages/ui-mac/src/main/ext-receipt-v2.test.ts",
+          "name": "a bundle-only package projects enabled disabled and project-enabled root membership"
+        },
+        {
+          "file": "packages/ext/src/package-scope.test.ts",
+          "name": "bundle root membership decodes without enabling its same-named instructions"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "package inline shells receive the invocation environment without reinterpreting its values"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "first command and attached skill shells wait for SessionStart and read their own live session exports"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "native and package inline shells inherit process PATH and HOME"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "quoted heredoc retains source variables and binds literal argument data"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "quoted heredoc cannot be closed by a delimiter line in argument data"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "quoted heredoc closes at the end of source without a final newline"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "an apostrophe in a shell comment does not change argument quoting"
+        },
+        {
+          "file": "packages/core/test/codepuppy-command-model-priority.test.ts",
+          "name": "bound package shells use the compatible shell while static native source keeps the configured shell"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "call closes its SessionStart-written ENV_FILE source"
+        }
+      ]
+    },
+    {
+      "id": "plugin-hook-lifecycle",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.4/4.12 S-03: the ext runner consumes actual session lifecycle and existing idle/synthetic primitives. Package command SessionStart/UserPromptSubmit, Stop, PreToolUse, PostToolUse, PermissionRequest, UserPromptExpansion, PostToolUseFailure and StopFailure, plus prompt PreToolUse, are active; Stop block/reason continues the same Session via its native idle drain, never a second inference loop. PreToolUse runs between policy deny and confirm/pin; the existing identity owner converts source tool fields. Final input, live generation and service digest bind a same-call decision in the existing policy authority; ask wins over allow and native hard deny remains authoritative. Prompt handlers use the existing stateless generate.text without tools and preserve native approval for ok=true. A rejected tool records its native error before the awaited context barrier ends the turn when continueOnBlock=false. Other lifecycle domains are registered only as their consumers land. S-03 subagent phases use the native subagent tool progress barrier to bind the real child before its first prompt; source agent identity maps from the existing installed entry. Start context enters the child; Stop uses separate actual parent/child transcripts and child-only synthetic continuation. An ordinary session parentID alone is not evidence of subagent execution. Common hook input carries the actual source agent identity on tool events too; Claude plugin names retain their source namespace, so original guards can distinguish their agents. Real subagent metadata is derived from native invocation ownership, never merely parentID. R20 B2: UI leave ends view resources and remote Session transports; a running native task retains synchronous decisions, instruction scopes and ENV_FILE until its real execution terminal event. R21 B3: actual subagents skip main SessionStart/UserPromptSubmit and always monitors. Native child execution terminal events release child resources; parent leave also ends child resources through the same lifecycle, preserving running synchronous decisions until idle.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r19",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-package-hooks.ts",
+        "ladder": "L0: existing event.subscribe, awaited session prompt/context/experimental.idle, tool.execute.before between policy head/tail, same-session synthetic and AppProcess; no engine takeover. S-03/S-07 private main parentPort SessionEnd receiver awaits the actual Session Location runner and the MCP owner before replying; Cleanup awaits active lifetimes. Main router/navigation/delete and logout send the fixed private message; main stop races known viewed Sessions and child exit within the existing stop budget starting at the request, and before-quit awaits stopSidecars only when the current generation has actual viewed Sessions to settle. The view map owns only renderer view facts, not Session epochs or process lifetimes. Main consumes original native permission/completion/MCP-form event IDs through the same private notification action, independent of OS notification settings; requester deduplicates occurrences per engine generation. Declared literal file watchers share the runner and active ownership, with handler-owned replacement watchPaths and native add/change/unlink facts. SessionStart/FileChanged alone receive a session-owned ENV_FILE; existing AppProcess sources its exported delta for later hooks/monitors, without mutating process.env. Per accepted r19 S-01, the same Session ENV_FILE source now supplies instruction rendering too; first expansion and native prompts await the same SessionStart promise, while export values remain per Invocation and generated binding variables win. Hook matcher evaluation is shared with remote-session elicitation ownership and uses official per-event fields, wildcard/all and exact-list versus regexp semantics; malformed regexp yields a named diagnostic rather than breaking connector calls. Per official hook output rules, ordinary plaintext enters model context only for SessionStart, UserPromptSubmit and UserPromptExpansion; other supported events log redacted stdout. Structured hook context keeps its existing path. Notification occurrence dedup is Session-owned inside its generation: a successful leave receipt, or the same generation native archive/delete fact, clears that Session cache; generation close clears all. Other Sessions retain their dedup entries. Prompt hook model text uses the same renderPluginText and publicPluginOption authority as package instructions. Sensitive options and secret nodes remain safe references; process-only environment/credential resolvers are not available to the model-facing binding."
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "dash0 failure hooks receive actual tool and execution failures without a Stop recovery"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the real security expansion activates its skill hook only for that native task"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a real Ralph Stop continuation retains invocation permissions until the task ends"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the real security PermissionRequest hook denies before a native approval card"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the real hookify PostToolUse rule adds context after the native write"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the real PayPal prompt hook"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a rejecting PayPal prompt hook"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "real hookify PreToolUse blocks the matching native write using source tool fields"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the real Convex hook allow is scoped to one call and never overrides a native deny"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the real ralph-loop Stop hook continues the same task and stops at its completion promise"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package SessionStart hooks run before the first model request and follow bundle activity"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "subagent hooks bind real child identity before its first model and continue only that child"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a normal session with a parent does not fabricate subagent lifecycle events"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "the original Claude Security guard receives the source agent identity before a shell call"
+        },
+        {
+          "file": "packages/ext/src/hub-bridge.test.ts",
+          "name": "private package SessionEnd awaits the owning Location and replies only after cleanup"
+        },
+        {
+          "file": "packages/ui-mac/src/renderer/sidebar/shell-commands.test.ts",
+          "name": "leaving a real local Session waits for the main SessionEnd acknowledgement before router release"
+        },
+        {
+          "file": "packages/ui-mac/src/main/hub-view.test.ts",
+          "name": "plugin SessionEnd requester awaits the real receiver reply and rejects a dead generation"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
+          "name": "main waits for SessionEnd acknowledgements before sending the sidecar stop command"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
+          "name": "without a viewed Session main posts stop immediately and waits for the real child exit"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "main forwards real permission and completion notifications to the package once per native occurrence"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "SessionStart and FileChanged shell environments reach later package processes only in that real Session"
+        },
+        {
+          "file": "packages/ui-mac/src/main/hub-view.test.ts",
+          "name": "unified plugin notifications retain the original occurrence identity across duplicate producers"
+        },
+        {
+          "file": "packages/ext/src/plugin-package-process.test.ts",
+          "name": "session environment uses actual shell exports before bindings without changing the host or accumulating PATH"
+        },
+        {
+          "file": "packages/ui-mac/src/main/sidecar-stop.test.ts",
+          "name": "a deaf child with a viewed Session is killed within the existing stop budget"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "leave during a running task preserves its pending decision scoped hooks and environment until idle"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "real subagents skip main session phases and release transports on completion and parent leave"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "hookify match-all group still blocks a matching native write"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "match-all answers before native input"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "hook matchers select compaction trigger instruction load reason and SessionEnd reason"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "only command prompt lifecycle plaintext enters model context"
+        },
+        {
+          "file": "packages/ui-mac/src/main/hub-view.test.ts",
+          "name": "plugin quit does not intercept when no viewed Sessions need settlement"
+        },
+        {
+          "file": "packages/ui-mac/src/main/hub-view.test.ts",
+          "name": "plugin quit waits for actual viewed Session receipts and then quits once"
+        },
+        {
+          "file": "packages/ui-mac/src/main/hub-view.test.ts",
+          "name": "plugin notification dedup ends with its Session receipt and engine generation"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "native Session deletion clears the main notification occurrence ledger"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "prompt hooks keep sensitive options as safe references before model generation"
+        }
+      ]
+    },
+    {
+      "id": "plugin-hook-config-change",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-04 plus orchestrator ruling 2026-11-27: await the same Location runtime before publishing changed settings or skill revisions, including the skill watcher and config.updated rescan. Rejection keeps the previous effective view without rewriting disk; policy_settings cannot be blocked. Rejected revisions reuse one occurrence and active handler result; disabling its package releases the rejection.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r14",
+      "takeovers": [
+        "packages/core/src/config.ts",
+        "packages/core/src/config/plugin/skill.ts",
+        "packages/core/test/config/reload.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/config/codepuppy-plugin-config-change.ts",
+        "ladder": "Existing L3 increments only: config.updated is after publication and lacks source/rejection authority. L1/L2 would modify the same owned load and skill refresh lifecycles. Core selects raw revisions before its existing parser/trust authority; ext invokes the existing process runner through the frozen Code Puppy Location slot, with no DTO/signature change."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/config/reload.test.ts",
+          "name": "configuration hooks retain rejected file revisions across unrelated native rescans"
+        },
+        {
+          "file": "packages/core/test/config/reload.test.ts",
+          "name": "skill configuration hooks retain rejected bytes through config rescans then release them"
+        },
+        {
+          "file": "packages/core/test/config/reload.test.ts",
+          "name": "managed configuration changes are observed but package hooks cannot reject policy settings"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "ConfigChange uses active package handlers once per revision and releases their rejection on disable"
+        },
+        {
+          "file": "packages/plugin/test/codepuppy-package-runtime.test.ts",
+          "name": "package runtime handlers share the native Location slot and release only their generation"
+        }
+      ]
+    },
+    {
+      "id": "plugin-hook-instructions",
+      "decision": "DESIGN-local-plugin-install v3.1 §6/10 S-05 plus orchestrator ruling 2026-11-27 r16: optional instruction source provenance (package ID, source path and memory scope) survives the native File constructor, editor and admission codec. Existing files without provenance keep their native behavior. The actual configured-source reader supplies provenance; InstructionState commit and nested SessionInstructions load notify the same runtime asynchronously only after durable admission, once for each changed source value. Direct AGENTS reads have no Claude event; missing include/conditional facts are not fabricated.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r16",
+      "takeovers": [
+        "packages/core/src/instruction-discovery.ts",
+        "packages/core/test/instruction-discovery.test.ts",
+        "packages/core/src/config/plugin/instruction.ts",
+        "packages/core/src/session/instruction-state.ts",
+        "packages/core/src/session/instructions.ts",
+        "packages/core/test/instruction-state.test.ts",
+        "packages/core/test/session-instructions.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/session/codepuppy-instructions-loaded.ts",
+        "ladder": "Exact L3 S-05 increment accepted in r16: L0 transforms cannot preserve source fields dropped by the native constructor/schema codec. L1/L2 would patch the same native value boundary through an additional source/build synchronization path. One additive optional field in the existing File schema; no shadow provenance registry. The three source/admission boundaries named by frozen S-05 are registered here: rendered context cannot recover origin or pre-publication ordering. Native state/codec and the existing Location slot remain the sole authorities; the helper only forwards admitted facts. R21 B6: independent informational fibers dispatch admitted files without serially awaiting handler completion; the ext callback schedules its existing runner and logs failure. Active package processes still belong to the same runner and are cancelled on its lifetime end."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/instruction-discovery.test.ts",
+          "name": "preserves instruction source provenance through editing and admission encoding"
+        },
+        {
+          "file": "packages/core/test/instruction-discovery.test.ts",
+          "name": "retains the actual scope of configured Claude sources without labelling direct AGENTS"
+        },
+        {
+          "file": "packages/core/test/instruction-state.test.ts",
+          "name": "notifies package instruction hooks once after each actual source admission"
+        },
+        {
+          "file": "packages/core/test/session-instructions.test.ts",
+          "name": "notifies package hooks only for admitted Claude sources and dedups actual nested loads"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "InstructionsLoaded runs actual package handlers after admission without replaying native AGENTS"
+        },
+        {
+          "file": "packages/core/test/instruction-state.test.ts",
+          "name": "informational instruction hooks do not hold admission or serialize source notifications"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a held InstructionsLoaded process cannot delay native prompt admission or the model"
+        }
+      ]
+    },
+    {
+      "id": "plugin-hook-tool-batch",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-08: aggregate terminal native tool calls by actual assistant message ID, including validation failures, in model order. Drain once at the awaited context boundary before a request, or at native idle; use the same processed/pending state and existing synthetic continuation. Seed registration with actual history, never replay prior batches or emit an empty batch.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r14",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-package-hooks.ts",
+        "ladder": "L0: existing session.hook.context + experimental.idle + session.context and same-session synthetic. Existing policy identity projection supplies each source tool name/input/response; no runner/step.ts takeover or public afterToolBatch port."
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "PostToolBatch groups native terminal calls before the next request and never replays old batches"
+        }
+      ]
+    },
+    {
+      "id": "plugin-hook-compaction",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.12/6 S-06: await PreCompact before provider work or precomputed-summary adoption; manual veto is a named failure, automatic veto skips, overflow veto is a named failure. AfterCompaction observes only a committed window, once with the same occurrence; unreadable native replacement windows do not invent a summary. No callback during background precomputation.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r14",
+      "takeovers": [
+        "packages/core/src/session/compaction.ts",
+        "packages/core/test/session-compaction.test.ts",
+        "packages/core/test/session-native-compaction.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/session/compaction.ts",
+        "ladder": "New exact L3: the existing compaction model hook excludes adoption of a held summary and is too late for the common before-commit decision. L1/L2 still patch those same lifecycle points and add synchronization authority. Only compact() admission and publish() success call the frozen Location reverse port; summary, native compaction, budget, retry and precompute algorithms remain native."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/session-native-compaction.test.ts",
+          "name": "package compaction hooks veto before provider work and observe only committed windows"
+        },
+        {
+          "file": "packages/core/test/session-native-compaction.test.ts",
+          "name": "package compaction rejection skips automatic work and names an overflow failure"
+        },
+        {
+          "file": "packages/core/test/session-compaction.test.ts",
+          "name": "package compaction events only surround adoption of a precomputed summary"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "package compact hooks block before a summary and observe the actual committed summary"
+        }
+      ]
+    },
+    {
+      "id": "plugin-session-monitors",
+      "decision": "DESIGN-local-plugin-install v3.1 §4.15: an enabled package registers always monitors only on a real session prompt, and skill monitors only when their actual named skill is invoked, including a first-input command. One process per package/entry/session generation; output lines enter that same session through native synthetic/inbox. Package off/update/removal, session close and Location disposal invalidate queued lines and cancel the owned process tree. Task scope release does not turn a session monitor into a short-lived hook. No crash restart loop.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r14",
+      "takeovers": [],
+      "mechanism": {
+        "file": "packages/ext/src/plugin-package-hooks.ts",
+        "ladder": "L0: same active package projection, Invocation activation, session lifecycle/resource table and AppProcess streaming helper. Hook and monitor source configuration share one package process binding owner; no new engine seam, source registry, timer-based inference loop or global environment mutation."
+      },
+      "tests": [
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "Convex skill monitors start once per session and stop without late delivery when the bundle closes"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "a first-input Convex skill invocation arms only its matching monitors"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "an always monitor waits for a real prompt and does not restart on later prompts"
+        },
+        {
+          "file": "packages/ext/src/plugin-package-process.test.ts",
+          "name": "monitor output flushes its final line and cancellation releases its child"
+        }
+      ]
+    },
+    {
+      "id": "plugin-hook-elicitation",
+      "decision": "DESIGN-local-plugin-install v3.1 §6 S-07 and orchestrator ruling r17: matching HTTP/SSE transports belong to the actual Session; stdio remains Location-owned. Freeze actual request ownership through ElicitationResult. Ambiguous cross-session stdio requests retain native forms and a named diagnostic. SessionEnd, native removal/archive and Location disposal release owned remote transports through the same MCP connection lifecycle.",
+      "adr": [
+        "ADR-029",
+        "ADR-047"
+      ],
+      "lane": "#1776 slice 5, r17",
+      "takeovers": [
+        "packages/core/src/mcp/index.ts",
+        "packages/core/src/mcp/client.ts",
+        "packages/core/test/codepuppy-mcp-runtime.test.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/mcp/index.ts",
+        "ladder": "Existing L3 increment only: MCP index selects session-owned remote connections through existing McpConnection.make/stop/auth/fetch; client tracks real in-flight call ownership. L0 has no inbound elicitation or connection-lifetime hook; L1/L2 patch the same points and add synchronization. The Code Puppy Location reverse port carries callbacks only, not a second transport registry."
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "a real session owns matching remote MCP transports until SessionEnd and removal while stdio stays open"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "stdio cross-session elicitation only diagnoses ambiguous ownership and retains native forms"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "stdio native form keeps its request owner through ElicitationResult"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "withdrawing the matching package handlers releases only owned remote transports on reload"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "real SessionEnd runs the package hook and closes its remote transport before the parentPort reply"
+        },
+        {
+          "file": "packages/ext/src/plugin-host.test.ts",
+          "name": "an unattended real session keeps native elicitation cancellation without package auto-answer"
+        },
+        {
+          "file": "packages/plugin/test/codepuppy-package-runtime.test.ts",
+          "name": "session MCP release shares a Location across bundles and preserves a replacement generation"
+        },
+        {
+          "file": "packages/core/test/codepuppy-mcp-runtime.test.ts",
+          "name": "explicit SSE keeps a session-owned stream until SessionEnd without closing its Location stream"
+        }
+      ]
     }
   ]
 }

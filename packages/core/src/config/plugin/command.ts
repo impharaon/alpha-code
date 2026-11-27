@@ -1,11 +1,13 @@
 export * as ConfigCommandPlugin from "./command.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
+import { registerPackageInstructionRenderer, type PreparedInstruction } from "@opencode/plugin/codepuppy-package-runtime"
 import type { Entry } from "@opencode/schema/config"
 import { ConfigCommand } from "@opencode/schema/config/command"
 import { AppProcess } from "@opencode/util/process"
 import path from "path"
-import { Effect, Option, Schema } from "effect"
+import { randomUUID } from "node:crypto"
+import { Effect, FiberSet, Option, Schema } from "effect"
 import { ChildProcess } from "effect/process"
 import { Agent } from "../../agent.js"
 import { Config } from "../../config.js"
@@ -41,6 +43,18 @@ export const Plugin = define({
     const sessions = yield* Session.Service
     const agents = yield* Agent.Service
     const subagents = yield* SubagentJob.Service
+    // S-01: the Location owns the only renderer and its process service, including package invocations.
+    const runInstruction = yield* FiberSet.makeRuntimePromise()
+    yield* Effect.acquireRelease(
+      Effect.sync(() => registerPackageInstructionRenderer(location, input =>
+        runInstruction(evaluateTemplate(input, { location, processes, shell })), input =>
+        runInstruction(Effect.gen(function* () {
+          const executable = yield* shell.resolve({ priority: "compat" })
+          const bound = bindTemplateNode({ kind: "shell", parts: input.parts.map(part => typeof part === "string" ? { source: part } : part) }, "literal", () => undefined)
+          return { executable, argv: ShellSelect.args(executable, bound.text), env: bound.env }
+        })))),
+      registration => Effect.sync(() => registration.dispose()),
+    )
     const load = Effect.fn("ConfigCommandPlugin.load")(function* () {
       return yield* CodePuppyProjectGate.observe(ctx.location.directory, "command", // codepuppy(ADR-049)
         Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat())), // codepuppy(ADR-049)
@@ -56,7 +70,7 @@ export const Plugin = define({
     yield* ctx.command.transform((editor) => {
       for (const document of loaded.documents) {
         for (const [name, command] of Object.entries(document.commands ?? {})) {
-          const gated = CodePuppyProjectGate.interpolation(ctx.location.directory, name, document.gated, document.file, command.template.match(shellRegex) !== null) // codepuppy(ADR-049)
+          const gated = CodePuppyProjectGate.interpolation(ctx.location.directory, name, document.gated, document.file, instructionNodes({ parts: [command.template], syntax: "opencode" }).some(node => node.kind === "shell")) // codepuppy(ADR-049)
           const subagent = command.subagent ?? command.subtask
           editor.add({
             name,
@@ -73,7 +87,7 @@ export const Plugin = define({
                         providerID: command.model.providerID,
                         ...(command.model.variant === undefined ? {} : { variant: command.model.variant }),
                       }
-                const text = yield* evaluateTemplate(command.template, input.prompt.text, {
+                const text = yield* evaluateTemplate({ parts: [command.template], syntax: "opencode", rawArguments: input.prompt.text, arguments: [], cwd: location.directory }, {
                   location,
                   processes,
                   shell,
@@ -192,67 +206,203 @@ function decode(directory: string, filepath: string, content: string | undefined
 }
 // codepuppy ── end
 
+type InstructionNode = { source: string } | { boundValue: string }
+type TemplateNode = { kind: "text" | "shell"; parts: InstructionNode[]; delimiter?: "`" | "```" }
+
+// Compile source boundaries before inserting values. A bound value can occur inside a static shell node.
+function instructionNodes(input: Pick<PreparedInstruction, "parts" | "syntax">): TemplateNode[] {
+  const characters = input.parts.flatMap<string | { boundValue: string }>(part => typeof part === "string" ? [...part] : [part])
+  const nodes: TemplateNode[] = [{ kind: "text", parts: [] }]
+  const matches = (index: number, text: string) => [...text].every((character, offset) => characters[index + offset] === character)
+  const fence = (index: number) => (index === 0 || characters[index - 1] === "\n") && matches(index, "```")
+  for (let index = 0; index < characters.length; index++) {
+    const character = characters[index]!
+    const node = nodes.at(-1)!
+    if (input.syntax !== "literal" && node.kind === "text") {
+      const delimiter = fence(index) && matches(index, "```!") ? "```" : matches(index, "!`") ? "`" : undefined
+      const start = index + (delimiter === "```" ? 4 : 2)
+      if (delimiter && characters.some((_, closing) => closing >= start && (delimiter === "```" ? fence(closing) : matches(closing, "`")))) {
+        nodes.push({ kind: "shell", parts: [], delimiter })
+        index = start - 1
+        continue
+      }
+    }
+    if (node.kind === "shell" && (node.delimiter === "```" ? fence(index) : matches(index, "`"))) {
+      index += node.delimiter!.length - 1
+      nodes.push({ kind: "text", parts: [] })
+      continue
+    }
+    const previous = node.parts.at(-1)
+    if (typeof character === "string" && previous && "source" in previous) previous.source += character
+    else node.parts.push(typeof character === "string" ? { source: character } : character)
+  }
+  return nodes
+}
+
 function evaluateTemplate(
-  template: string,
-  input: string,
+  input: PreparedInstruction,
   services: {
     readonly location: Location.Info
     readonly processes: AppProcess.Interface
     readonly shell: ShellSelect.Interface
   },
-  gated = false, // codepuppy(ADR-049)
+  gated = false,
 ) {
   return Effect.gen(function* () {
-    const args = parseArguments(input)
-    const placeholders = template.match(placeholderRegex) ?? []
-    const last = Math.max(0, ...placeholders.map((item) => Number(item.slice(1))))
-    const withArguments = template.replaceAll(argumentRegex, (match, index) => {
-      if (match === "$ARGUMENTS") return input
-      const position = Number(index)
-      const argIndex = position - 1
-      if (argIndex >= args.length) return ""
-      if (position === last) return args.slice(argIndex).join(" ")
-      return args[argIndex]
-    })
-    const text =
-      placeholders.length === 0 && !template.includes("$ARGUMENTS") && input.trim()
-        ? `${withArguments}\n\n${input}`.trim()
-        : withArguments.trim()
-    const matches = Array.from(text.matchAll(shellRegex))
-    if (gated || matches.length === 0) return text // codepuppy(ADR-049)
-    const shell = yield* services.shell.resolve({ priority: "config" })
-    const outputs = yield* Effect.forEach(
-      matches,
-      (match) => {
-        const source = match[1] ?? ""
-        return services.processes
-          .run(
-            ChildProcess.make(shell, ShellSelect.args(shell, source), {
-              cwd: services.location.directory,
-              stdin: "ignore",
-            }),
-            { combineOutput: true },
-          )
-          .pipe(
-            Effect.map((result) => (result.output ?? Buffer.concat([result.stdout, result.stderr])).toString("utf8")),
-            Effect.mapError(
-              (error) => new Error(`Shell interpolation failed for ${JSON.stringify(source)}: ${error.message}`),
-            ),
-          )
-      },
-      { concurrency: 2 },
-    )
-    const iterator = outputs[Symbol.iterator]()
-    return text.replace(shellRegex, () => iterator.next().value ?? "")
+    const nodes = instructionNodes(input)
+    const args = parseArguments(input.rawArguments, input.syntax)
+    const last = Math.max(0, ...nodes.flatMap(node => node.parts.flatMap(part => "source" in part ? [...part.source.matchAll(/\$([1-9]\d*)/g)].map(match => Number(match[1])) : [])))
+    let hasArguments = false
+    const parameter = (token: string, kind: TemplateNode["kind"]): string | string[] | undefined => {
+      if (input.syntax === "literal") return
+      if (token === "$ARGUMENTS") { hasArguments = true; return kind === "shell" ? args : input.rawArguments }
+      const index = token.match(input.syntax === "claude" ? /^\$(?:ARGUMENTS\[(\d+)\]|(\d+))$/ : /^\$([1-9]\d*)$/)
+      if (index) {
+        hasArguments = true
+        const position = Number(index[1] ?? index[2])
+        const offset = position - (input.syntax === "claude" ? 0 : 1)
+        if (offset >= args.length) return input.syntax === "opencode" ? "" : token
+        return input.syntax === "opencode" && position === last ? kind === "shell" ? args.slice(offset) : args.slice(offset).join(" ") : args[offset]!
+      }
+      if (input.syntax !== "claude") return
+      const named = input.arguments.indexOf(token.slice(1))
+      if (named < 0) return
+      hasArguments = true
+      return args[named] ?? ""
+    }
+    const rendered = nodes.map(node => ({ kind: node.kind, delimiter: node.delimiter, ...bindTemplateNode(gated ? { ...node, kind: "text" } : node, input.syntax, parameter) }))
+    const outputs = yield* Effect.forEach(rendered, node => {
+      if (node.kind !== "shell") return Effect.succeed(node.text)
+      if (gated) return Effect.succeed(node.delimiter === "```" ? "```!" + node.text + "```" : "!`" + node.text + "`")
+      return Effect.gen(function* () {
+        const shell = yield* services.shell.resolve({ priority: node.hasValues ? "compat" : "config" })
+        return yield* services.processes.run(ChildProcess.make(shell, ShellSelect.args(shell, node.text), { cwd: input.cwd, stdin: "ignore", extendEnv: true, env: { ...input.environment, ...node.env } }), { combineOutput: true }).pipe(
+          Effect.map(result => (result.output ?? Buffer.concat([result.stdout, result.stderr])).toString("utf8")),
+          Effect.mapError(error => new Error("Shell interpolation failed: " + error.message)),
+        )
+      })
+    }, { concurrency: 2 })
+    const text = outputs.join("").trim()
+    if (hasArguments || !input.rawArguments.trim()) return text
+    return text + "\n\n" + (input.syntax === "opencode" ? input.rawArguments : "ARGUMENTS: " + input.rawArguments)
   })
 }
 
-function parseArguments(input: string) {
-  return (input.match(argsRegex) ?? []).map((arg) => arg.replace(quoteTrimRegex, ""))
+function bindTemplateNode(node: TemplateNode, syntax: PreparedInstruction["syntax"], parameter: (token: string, kind: TemplateNode["kind"]) => string | string[] | undefined) {
+  const env: Record<string, string> = {}
+  const prefix = "CODEPUPPY_PACKAGE_" + randomUUID().replaceAll("-", "") + "_"
+  const pieces: ({ source: string } | { values: readonly string[] })[] = []
+  for (const part of node.parts) {
+    if ("boundValue" in part) { pieces.push({ values: [part.boundValue] }); continue }
+    const pattern = syntax === "claude" ? /\$(?:ARGUMENTS(?:\[\d+\])?|\d+|[A-Za-z_][A-Za-z_0-9]*)/g : /\$(?:ARGUMENTS|[1-9]\d*)/g
+    let end = 0
+    for (const match of part.source.matchAll(pattern)) {
+      pieces.push({ source: part.source.slice(end, match.index) })
+      const argument = parameter(match[0], node.kind)
+      pieces.push(argument === undefined ? { source: match[0] } : { values: Array.isArray(argument) ? argument : [argument] })
+      end = match.index + match[0].length
+    }
+    pieces.push({ source: part.source.slice(end) })
+  }
+  const payload = pieces.flatMap(piece => "source" in piece ? [piece.source] : piece.values).join("")
+  let wireDelimiter = prefix + "HEREDOC"
+  while (payload.includes(wireDelimiter)) wireDelimiter += "_"
+  const quotes = [""]
+  const pending: { delimiter: string; tabs: boolean; quoted: boolean }[] = []
+  let heredoc: typeof pending[number] | undefined
+  let line = ""
+  let lineHasValue = false
+  let escaped = false
+  let comment = false
+  let wordStart = true
+  let text = ""
+  const endHeredocLine = () => {
+    if (heredoc && !lineHasValue && (heredoc.tabs ? line.replace(/^\t+/, "") : line) === heredoc.delimiter) {
+      if (heredoc.quoted) text = text.slice(0, text.length - line.length) + (heredoc.tabs ? line.match(/^\t*/)?.[0] ?? "" : "") + wireDelimiter
+      heredoc = pending.shift()
+    }
+    line = ""
+    lineHasValue = false
+  }
+  const source = (input: string) => {
+    if (node.kind !== "shell") { text += input; return }
+    for (let index = 0; index < input.length; index++) {
+      const character = input[index]!
+      if (heredoc) {
+        if (character !== "\n") { line += character; text += character; continue }
+        endHeredocLine()
+        text += character
+        wordStart = true
+        continue
+      }
+      if (comment) {
+        text += character
+        if (character === "\n") { comment = false; wordStart = true; heredoc = pending.shift() }
+        continue
+      }
+      const quote = quotes.at(-1)!
+      if (escaped) { text += character; escaped = false; wordStart = false; continue }
+      if (character === "\\" && quote !== "'") { text += character; escaped = true; wordStart = false; continue }
+      if (quote !== "'" && input.slice(index, index + 2) === "$(") { text += "$("; quotes.push(""); index++; wordStart = true; continue }
+      if (quote) { text += character; if (character === quote) quotes[quotes.length - 1] = ""; wordStart = false; continue }
+      if (character === "#" && wordStart) { comment = true; text += character; continue }
+      const redirect = input.slice(index).match(/^<<(-?)(?!<)[ \t]*(?:'([^']+)'|"([^"]+)"|([^\s;&|<>]+))/)
+      if (redirect) {
+        const delimiter = redirect[2] ?? redirect[3] ?? redirect[4]!
+        const quoted = redirect[2] !== undefined || redirect[3] !== undefined
+        pending.push({ delimiter, tabs: redirect[1] === "-", quoted })
+        text += quoted ? redirect[0].slice(0, -delimiter.length - 2) + "'" + wireDelimiter + "'" : redirect[0]
+        index += redirect[0].length - 1
+        wordStart = false
+        continue
+      }
+      text += character
+      if (character === "'" || character === '"') quotes[quotes.length - 1] = character
+      if (character === "(") quotes.push("")
+      if (character === ")" && quotes.length > 1) quotes.pop()
+      wordStart = /[\s;&|()<>]/.test(character)
+      if (character === "\n" && pending.length) heredoc = pending.shift()
+    }
+  }
+  const value = (input: string) => {
+    if (node.kind !== "shell") return input
+    if (heredoc) {
+      lineHasValue = true
+      if (heredoc.quoted) return input
+    }
+    const name = prefix + Object.keys(env).length
+    env[name] = input
+    const reference = "${" + name + "}"
+    if (heredoc || quotes.at(-1) === '"') return reference
+    return quotes.at(-1) === "'" ? "'\"" + reference + "\"'" : '"' + reference + '"'
+  }
+  for (const piece of pieces) {
+    if ("source" in piece) { source(piece.source); continue }
+    const quote = quotes.at(-1)!
+    text += piece.values.map(value).join(heredoc || !quote ? " " : quote + " " + quote)
+    if (piece.values.length && !heredoc && !comment) wordStart = false
+  }
+  endHeredocLine()
+  return { text, env, hasValues: pieces.some(piece => "values" in piece) }
 }
 
-const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
-const placeholderRegex = /\$([1-9]\d*)/g
-const argumentRegex = /\$(?:ARGUMENTS|([1-9]\d*))/g
-const quoteTrimRegex = /^["']|["']$/g
-const shellRegex = /!`([^`]+)`/g
+function parseArguments(input: string, syntax: PreparedInstruction["syntax"]) {
+  if (syntax !== "claude") return (input.match(/(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi) ?? []).map(arg => arg.replace(/^["']|["']$/g, ""))
+  const args: string[] = []
+  let word = ""
+  let active = false
+  let quote = ""
+  let escaped = false
+  for (const character of input) {
+    if (escaped) { word += character; active = true; escaped = false; continue }
+    if (character === "\\" && quote !== "'") { escaped = true; active = true; continue }
+    if (quote) { if (character === quote) quote = ""; else word += character; continue }
+    if (character === '"' || character === "'") { quote = character; active = true; continue }
+    if (/\s/.test(character)) { if (active) args.push(word); word = ""; active = false; continue }
+    active = true
+    word += character
+  }
+  if (escaped) word += "\\"
+  if (active) args.push(word)
+  return args
+}

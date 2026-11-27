@@ -134,6 +134,8 @@ const leaf = (name: string) => () => <div data-harness-leaf={name} />
 export function installPreloadStub() {
   const noop = () => () => {}
   const api = {
+    pluginSessionViewed: async () => {},
+    pluginSessionLeave: async () => {},
     auth: {
       subscribe: noop,
       onError: noop,

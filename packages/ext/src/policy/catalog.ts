@@ -21,6 +21,10 @@ import { effectiveFor, evaluate } from "./gate"
 import { CODE_MODE_TOOL, type ToolFacts } from "./identity"
 import type { ToolPolicySnapshot } from "./resolver"
 import { HUB_READ_ACTIONS } from "../hub-tools"
+import { packageToolRule } from "./identity"
+import type { Invocation } from "../../../ui-mac/src/shared/host-extension-package-contract/plugin-package"
+
+export type PackageAgentPolicy = { invocation: Pick<Invocation, "availableTools" | "deniedTools">; bindings: Readonly<Record<string, string>> }
 
 /**
  * I9: the tier pseudo-action the injected tier-carrier agents carry (`codepuppy-config-injection.ts`, L5). Its resource is
@@ -34,8 +38,13 @@ export function catalogRules(
   configured: readonly PermissionRule[],
   tools: readonly ToolFacts[],
   snapshot: ToolPolicySnapshot,
+  source?: PackageAgentPolicy,
 ): PermissionRule[] {
   const rules: PermissionRule[] = []
+  const available = source?.invocation.availableTools
+  const deniedBySource = (facts: ToolFacts) => source?.invocation.deniedTools.some(rule => (rule.pattern === undefined || rule.pattern === "*") && packageToolRule(rule, facts, source.bindings))
+  const availableBySource = (facts: ToolFacts) => !available || available.some(rule => packageToolRule(rule, facts, source!.bindings))
+  const actions = source && new Set(tools.filter(facts => availableBySource(facts) && !deniedBySource(facts)).map(facts => facts.permission))
   for (const facts of tools) {
     let canonical: string
     try {
@@ -47,6 +56,11 @@ export function catalogRules(
     const effective = effectiveFor(facts, snapshot, configured)
     if (effective.action === "deny") {
       rules.push({ action: facts.permission, resource: "*", effect: "deny" })
+      rules.push({ action: canonical, resource: "*", effect: "deny" })
+      continue
+    }
+    if (deniedBySource(facts) || !availableBySource(facts)) {
+      if (!actions?.has(facts.permission)) rules.push({ action: facts.permission, resource: "*", effect: "deny" })
       rules.push({ action: canonical, resource: "*", effect: "deny" })
       continue
     }
@@ -65,6 +79,7 @@ export function catalogRules(
 }
 
 export interface CatalogDeps {
+  readonly packageAgent?: (agent: string) => PackageAgentPolicy | undefined
   /** Facts for every registered tool (current registry). */
   readonly tools: () => Promise<readonly ToolFacts[]>
   readonly snapshot: () => Promise<ToolPolicySnapshot>
@@ -91,7 +106,7 @@ export function createCatalog(deps: CatalogDeps) {
     for (const agent of editor.list()) {
       configured.set(agent.id, [...agent.permissions])
       if (!snapshot) continue
-      const extra = catalogRules(agent.permissions, tools, snapshot)
+      const extra = catalogRules(agent.permissions, tools, snapshot, deps.packageAgent?.(agent.id))
       if (extra.length > 0) editor.update(agent.id, (draft) => draft.permissions.push(...extra))
     }
   }

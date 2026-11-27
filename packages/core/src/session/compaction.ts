@@ -24,6 +24,7 @@ import { Bus } from "../bus.js"
 import { Database } from "../database/database.js"
 import { llmClient } from "../effect/app-node-platform.js"
 import { Instructions } from "../instructions/index.js"
+import { packageRuntime } from "@opencode/plugin/codepuppy-package-runtime" // codepuppy(S-06)
 import { Model } from "../model.js"
 import { State } from "../state.js"
 import { Token } from "../util/token.js"
@@ -306,6 +307,17 @@ export const layer = Layer.effect(
         !due(context, calculateCeiling(context.model.limit, settings.buffer), trigger.estimate)
       )
         return { status: "skipped" }
+      // codepuppy(S-06): decide before consuming a precomputed window or doing provider work.
+      const occurrenceId = crypto.randomUUID()
+      const runtime = packageRuntime(context.session.location)
+      const decision = runtime ? yield* Effect.promise(() => runtime.beforeCompaction({
+        sessionID: context.session.id, occurrenceId, trigger: trigger.reason === "manual" ? "manual" : "auto", customInstructions: null,
+      })) : { proceed: true }
+      if (!decision.proceed) {
+        if (trigger.reason === "auto") return { status: "skipped" }
+        return yield* publish(trigger, { error: { type: "compaction.blocked", message: "runtime-failed: PreCompact blocked" + (decision.reason ? ": " + decision.reason : "") } })
+      }
+      // codepuppy ── end
       const held = precomputed.get(context.session.id)
       precomputed.delete(context.session.id)
       const native = context.model.compaction?.type === "native"
@@ -329,7 +341,7 @@ export const layer = Layer.effect(
           : summarize(selected, budget, settings.keep)
       return yield* compaction.pipe(
         Effect.matchEffect({
-          onSuccess: (result) => publish(selected, result),
+          onSuccess: (result) => publish(selected, result, occurrenceId),
           onFailure: (failure) => publish(selected, failure),
         }),
       )
@@ -905,6 +917,7 @@ export const layer = Layer.effect(
     const publish = Effect.fnUntraced(function* (
       trigger: Trigger,
       outcome: Result | Failure,
+      occurrenceId?: string, // codepuppy(S-06)
     ): Effect.fn.Return<Outcome> {
       const context = trigger.context
       const sessionID = context.session.id
@@ -934,6 +947,11 @@ export const layer = Layer.effect(
         },
         { metadata: outcome.metadata },
       )
+      // codepuppy(S-06): publication has committed; a notification cannot undo that window.
+      const runtime = packageRuntime(context.session.location)
+      if (runtime && occurrenceId) yield* Effect.promise(() => runtime.afterCompaction({
+        sessionID, occurrenceId, trigger: reason, ...(outcome.text ? { summary: outcome.text } : {}),
+      })).pipe(Effect.catchCause(cause => Effect.logWarning("runtime-failed: PostCompact notification", { cause })))
       return { status: "completed" }
     })
 

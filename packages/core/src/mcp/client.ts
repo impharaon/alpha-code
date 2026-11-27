@@ -20,6 +20,7 @@ import {
   SdkErrorCode,
   SdkHttpError,
   StreamableHTTPClientTransport,
+  SSEClientTransport, // codepuppy(#1776, S-12)
   UnauthorizedError,
   UnsupportedProtocolVersionError,
   type CallToolRequestOptions,
@@ -46,7 +47,7 @@ import type { Session } from "@opencode/schema/session"
 import { isRecord } from "@opencode/util/record"
 import { McpStdio } from "./stdio.js"
 import { classifyStartFailure } from "./codepuppy-startup.js" // codepuppy(#1563)
-import { isCodepuppyFailureCode } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1564)
+import { isCodepuppyFailureCode, parseFailureCode, withFailureCode, EGRESS_DIAL_FAILURE_STATUS, PLUGIN_MCP_SERVICE_UNAVAILABLE } from "@opencode/schema/codepuppy-net-failure" // codepuppy(#1564)
 import { governedCredentialFetch, isGovernedMcpEntry } from "@opencode/plugin/alpha-cloud-authority" // codepuppy(#1562)
 import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap" // codepuppy(#1562, #1698)
 
@@ -75,11 +76,19 @@ const describe = (error: unknown) => {
 // failure is its status, a local server that exited is its exit, never the remote body or the server's stderr tail
 // (packages/core/src/mcp/stdio.ts appends it). Errors the client wrapped keep the SDK error as their cause.
 const STDIO_EXIT = /^MCP server process exited(?: with code -?\d+)?/
+function pluginProxyDialFailure(error: unknown) {
+  if (!(error instanceof SdkHttpError) || error.status !== EGRESS_DIAL_FAILURE_STATUS.tcp || typeof error.data.text !== "string") return
+  const failure = parseFailureCode(error.data.text)
+  if (failure?.code === "tcp" && failure.text.startsWith(PLUGIN_MCP_SERVICE_UNAVAILABLE + ": ")) return { code: failure.code, text: PLUGIN_MCP_SERVICE_UNAVAILABLE }
+}
+
 export function safeDescription(error: unknown): string {
   const source =
     error instanceof Error && !(error instanceof SdkError) && !(error instanceof SdkHttpError) && error.cause instanceof Error
       ? error.cause
       : error
+  const proxyFailure = pluginProxyDialFailure(source)
+  if (proxyFailure) return proxyFailure.text
   if (source instanceof SdkHttpError) return `HTTP ${source.status}`
   const exit = source instanceof Error ? STDIO_EXIT.exec(source.message) : null
   if (exit) return exit[0]
@@ -153,12 +162,14 @@ export interface CallToolResult {
 export type ElicitationFormParams = ElicitRequestFormParams
 export type ElicitationParams = ElicitRequestParams
 export type ElicitationResult = ElicitResult
+export type ElicitationOwner = { readonly sessionID: Session.ID } | { readonly ambiguous: true }
 
 export interface ElicitationHandler {
   readonly create: (input: {
     readonly server: string
     readonly params: ElicitationParams
     readonly signal: AbortSignal
+    readonly owner?: ElicitationOwner
   }) => Effect.Effect<ElicitationResult, Error>
   /**
    * Legacy era only: the server announces that a URL-mode elicitation finished out of band. Removed in
@@ -168,12 +179,14 @@ export interface ElicitationHandler {
   readonly complete: (input: {
     readonly server: string
     readonly elicitationID: ElicitRequestURLParams["elicitationId"]
+    readonly owner?: ElicitationOwner
   }) => Effect.Effect<void>
 }
 
 /** For a request that can come back asking for input: tool calls, prompts and resource reads. */
 export interface PerRequest {
   readonly preparation?: PinnedFilesCallPreparation
+  readonly sessionID?: Session.ID
   /**
    * Answers the elicitations this request causes instead of the connection's handler, for a connection
    * that serves several callers. 2026-07-28 only.
@@ -266,9 +279,11 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   })
 
   // Requests that bring their own elicitation handler, keyed by the signal each passes to the SDK.
-  const callers = new WeakMap<AbortSignal, ElicitationHandler["create"]>()
+  const callers = new WeakMap<AbortSignal, PerRequest>()
+  const inFlight = new Set<PerRequest>()
+  const urlOwners = new Map<string, ElicitationOwner | undefined>()
   const claim = (signal: AbortSignal, input: PerRequest) => {
-    if (input.elicitation) callers.set(signal, input.elicitation)
+    callers.set(signal, input)
     return signal
   }
 
@@ -339,11 +354,22 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
       client.setRequestHandler("elicitation/create", (request, ctx) => {
         const origin = (ctx.mcpReq as { readonly origin?: { readonly options?: { readonly signal?: AbortSignal } } })
           .origin?.options?.signal
-        const create = (origin && callers.get(origin)) ?? elicitation.create
-        return runPromise(create({ server, params: request.params, signal: ctx.mcpReq.signal }))
+        const caller = origin ? callers.get(origin) : undefined
+        const sessions = new Set([...inFlight].map(call => call.sessionID))
+        const owner: ElicitationOwner | undefined = caller?.sessionID
+          ? { sessionID: caller.sessionID }
+          : sessions.size > 1 && !sessions.has(undefined)
+            ? { ambiguous: true }
+            : sessions.size === 1 && !sessions.has(undefined) ? { sessionID: [...sessions][0]! } : undefined
+        const id = request.params.mode === "url" ? request.params.elicitationId : undefined
+        if (id !== undefined) urlOwners.set(id, owner)
+        const create = caller?.elicitation ?? elicitation.create
+        return runPromise(create({ server, params: request.params, signal: ctx.mcpReq.signal, owner }).pipe(
+          Effect.ensuring(Effect.sync(() => { if (id !== undefined) urlOwners.delete(id) })),
+        ))
       })
       client.setNotificationHandler("notifications/elicitation/complete", (notification) =>
-        runPromise(elicitation.complete({ server, elicitationID: notification.params.elicitationId })),
+        runPromise(elicitation.complete({ server, elicitationID: notification.params.elicitationId, owner: urlOwners.get(notification.params.elicitationId) })),
       )
     }
 
@@ -358,14 +384,14 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   // it with 404, or with the 400 a freshly restarted single-session server emits, means it no longer
   // knows this connection. Modern connections never carry a session id, so a modern 404 for an unknown
   // method is not mistaken for expiry. Other 400s pass through untouched.
-  const session: { transport?: StreamableHTTPClientTransport; expired?: () => void; reported: boolean } = {
+  const session: { transport?: StreamableHTTPClientTransport | SSEClientTransport; expired?: () => void; reported: boolean } = {
     reported: false,
   }
   const failure = (error: unknown) => {
     // A tool call that relists first can fail with the list's already mapped expiry.
     if (error instanceof SessionExpiredError) return error
     // codepuppy(#1645): the SDK error stays the cause, so a failed listing is named with its HTTP status (startFailure).
-    if (!(error instanceof SdkHttpError) || session.transport?.sessionId === undefined) return new Error(explain(error), { cause: error })
+    if (!(error instanceof SdkHttpError) || !(session.transport instanceof StreamableHTTPClientTransport) || session.transport.sessionId === undefined) return new Error(explain(error), { cause: error })
     const expired =
       error.status === 404 ||
       (error.status === 400 &&
@@ -429,14 +455,12 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     // Servers that bundle their own Code Mode (Cloudflare and others) expose raw tools when asked
     // with ?codemode=false, which is what our Code Mode wants. The configured URL stays the OAuth identity.
     const url = new URL(config.url)
-    const addedCodemode = config.codemode !== false && !url.searchParams.has("codemode") && !rejectsUnknownQuery(url)
+    const addedCodemode = config.transport !== "sse" && config.codemode !== false && !url.searchParams.has("codemode") && !rejectsUnknownQuery(url)
     if (addedCodemode) url.searchParams.set("codemode", "false")
     const open = Effect.fnUntraced(function* (url: URL) {
-      session.transport = new StreamableHTTPClientTransport(url, {
-        requestInit: config.headers ? { headers: config.headers } : undefined,
-        authProvider: options.authProvider,
-        fetch,
-      })
+      // codepuppy(#1776, S-12): both SDK transports retain this instance's auth and fetch boundary.
+      const transportOptions = { requestInit: config.headers ? { headers: config.headers } : undefined, authProvider: options.authProvider, fetch }
+      session.transport = config.transport === "sse" ? new SSEClientTransport(url, transportOptions) : new StreamableHTTPClientTransport(url, transportOptions)
       return yield* initialize(session.transport)
     })
 
@@ -464,7 +488,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         const transport = session.transport
         // Termination failures are logged below; onerror would report them a second time.
         client.onerror = undefined
-        if (transport?.sessionId !== undefined && !session.reported)
+        if (transport instanceof StreamableHTTPClientTransport && transport.sessionId !== undefined && !session.reported)
           yield* Effect.tryPromise({ try: () => transport.terminateSession(), catch: toError }).pipe(
             Effect.timeoutOrElse({
               duration: TERMINATE_TIMEOUT,
@@ -623,14 +647,18 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         })
         // A modern server rejects headers mirrored from a stale definition before running the tool,
         // so relist and retry once with the fresh definition.
-        return call.pipe(
-          Effect.catchIf(
-            (error) => connection.modern && error instanceof ProtocolError && error.code === HEADER_MISMATCH,
-            () => connection.tools().pipe(Effect.andThen(call)),
+        return Effect.acquireUseRelease(
+          Effect.sync(() => { const request = { ...input }; inFlight.add(request); return request }),
+          () => call.pipe(
+            Effect.catchIf(
+              (error) => connection.modern && error instanceof ProtocolError && error.code === HEADER_MISMATCH,
+              () => connection.tools().pipe(Effect.andThen(call)),
+            ),
+            Effect.mapError(failure),
+            Effect.tapError((error) => Effect.logWarning("failed to call MCP tool", { server, error: safeDescription(error) })), // codepuppy(#1645)
+            Effect.map(toCallToolResult),
           ),
-          Effect.mapError(failure),
-          Effect.tapError((error) => Effect.logWarning("failed to call MCP tool", { server, error: safeDescription(error) })), // codepuppy(#1645)
-          Effect.map(toCallToolResult),
+          request => Effect.sync(() => { inFlight.delete(request) }),
         )
       },
       onClose: (callback) => {
@@ -674,7 +702,8 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
 export function startFailure(error: unknown, config: { readonly type: string; readonly url?: string; readonly command?: readonly string[] }) {
   const listed = !(error instanceof SdkError) && error instanceof Error && (error.cause instanceof SdkError || error.cause instanceof SdkHttpError) ? error.cause : error
   const cause = listed instanceof SdkError && listed.code === SdkErrorCode.EraNegotiationFailed && listed.cause !== undefined ? listed.cause : listed
-  return classifyStartFailure(cause, config, {
+  const proxyFailure = pluginProxyDialFailure(cause)
+  return classifyStartFailure(proxyFailure ? new Error(withFailureCode(proxyFailure.code, proxyFailure.text)) : cause, config, {
     timedOut: cause instanceof SdkError && cause.code === SdkErrorCode.RequestTimeout,
     httpStatus: cause instanceof SdkHttpError ? cause.status : undefined,
   })

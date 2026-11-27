@@ -26,6 +26,13 @@ export function endConnectorEgressAttempt(identity: LaunchIdentity) {
   attempts.delete(mark)
 }
 
+/** The shape of an attempt's attribution header (live or ended): it is never a plugin MCP capability, which is a Bearer token. */
+export function isConnectorAttributionHeader(authorization: string | string[] | undefined): boolean {
+  if (typeof authorization !== "string") return false
+  const basic = /^Basic\s+([A-Za-z0-9+/=]+)$/i.exec(authorization.trim())
+  return !!basic && /^[0-9a-f]{32}:attempt$/.test(Buffer.from(basic[1]!, "base64").toString("utf8"))
+}
+
 /** Called by the policy proxy for each decided CONNECT; never logs or forwards the header. */
 export function attributeConnectorEgress(authorization: string | string[] | undefined, fact: Omit<ConnectorEgressEvidence, "identity">) {
   if (typeof authorization !== "string") return

@@ -13,6 +13,18 @@ packages/ext/src/codepuppy-tools.ts	writeFileSync	join(root, "codepuppy.jsonc.tm
 # #1761 §4.4：job 是宿主验证后的所属 Location/.document-output；沿启动工作区 W1 或用户打开项目 X1，不新增可写根。
 packages/ext/src/document-render.ts	mkdir	job	W1+X1
 packages/ext/src/document-render.ts	writeFile	join(job, "render.json")	W1+X1
+# #1776 hooks runtime(plugin-package-hooks.ts):每个 Location 一个私有会话目录 mkdtempSync(join(tmpdir(), "codepuppy-plugin-session-")),
+# 其中放 Claude 形状的会话 transcript(.jsonl)与 CLAUDE_ENV_FILE(.sh),Location 释放时整目录删除。tmpdir() 是 $TMPDIR(macOS 在
+# /private/var/folders 下,W12);未设置时为 /tmp(W11)。不新增可写根。
+packages/ext/src/plugin-package-hooks.ts	chmodSync	transcript	W11+W12
+packages/ext/src/plugin-package-hooks.ts	mkdtempSync	join(tmpdir(), "codepuppy-plugin-session-")	W11+W12
+packages/ext/src/plugin-package-hooks.ts	rmSync	directory	W11+W12
+packages/ext/src/plugin-package-hooks.ts	rmSync	environment.file	W11+W12
+packages/ext/src/plugin-package-hooks.ts	writeFileSync	file	W11+W12
+packages/ext/src/plugin-package-hooks.ts	writeFileSync	transcript	W11+W12
+# #1776 agent memory(plugin-package-invocation.ts 的 memory):project 档在 <项目>/.codepuppy/agent-memory(启动工作区 W1 或用户打开的项目 X1);
+# user / local 档在 pluginDataDirectory(<XDG_DATA_HOME>, …) = <XDG_DATA_HOME>/opencode/plugin-data/…(W4)。不新增可写根。
+packages/ext/src/plugin-package-invocation.ts	mkdirSync	root	W1+X1+W4
 packages/ext/src/policy/store.ts	mkdirSync	path.dirname(file)	main-only
 packages/ext/src/policy/store.ts	renameSync	file	main-only
 packages/ext/src/policy/store.ts	renameSync	tmp	main-only
@@ -27,7 +39,7 @@ packages/ui-mac/src/main/codepuppy-config-injection.ts	writeFileSync	file	W3
 packages/ui-mac/src/main/codepuppy-environment.ts	mkdirSync	directory	main-only
 packages/ui-mac/src/main/codepuppy-environment.ts	rmdirSync	directory	main-only
 # DESIGN-engine-config-fence §4.7:安装账本(codepuppy-installs.ts、ext-receipt-v2.ts)只由 main 写;sidecar 闭包里只有读法 readPackageLedgerStateV1,
-# 两处调用(engine-explicit-config.ts、ext-disabled-injection.ts)都带 sideEffectFree: true,不写证据文件。
+# 三处调用(codepuppy-config-injection.ts、engine-explicit-config.ts、ext-disabled-injection.ts)都带 sideEffectFree: true,不写证据文件。
 packages/ui-mac/src/main/codepuppy-installs.ts	mkdirSync	root	main-only
 packages/ui-mac/src/main/codepuppy-installs.ts	renameSync	file	main-only
 packages/ui-mac/src/main/codepuppy-live-allowlist.ts	mkdirSync	userDataPath	W3

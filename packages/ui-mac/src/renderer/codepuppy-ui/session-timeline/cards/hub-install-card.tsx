@@ -145,8 +145,8 @@ export function HubInstallCard(props: { row: HubInstallRow }) {
         title: added,
         detail: t("codepuppy.timeline.hub.login", { name: safeText(login.serviceName) }),
       }
-    const token = auth.find(item => item.kind === "secret" && !item.saved)
-    if (token) return { ...base, state: "token", token, title: added, detail: t("codepuppy.timeline.hub.token") }
+    const token = auth.find(item => (item.kind === "secret" && !item.saved || item.kind === "option" && item.required && !item.configured))
+    if (token) return { ...base, state: "token", token, title: added, detail: t(token.kind === "option" ? "codepuppy.ext.packagePendingConfig" : "codepuppy.timeline.hub.token") }
     const row = current.view?.rows.find((row) => row.id === pack?.packageId)
     if (pack?.desiredState === "enabled" && row?.state === "available")
       return {

@@ -147,7 +147,23 @@ export type AgentTxBuildInputV1 = CommonInput & { asset?: Buffer; agentEntry?: R
 /** `#840`:commandEntry = admission 从 payload 字段 + template asset 字节合成的引擎叶
  *  `{template, description?, agent?, model?, subtask?}`。本层不解释其内容,只落 config。 */
 export type CommandTxBuildInputV1 = CommonInput & { commandEntry?: Record<string, unknown> }
+
+/** Whole-tree instructions stay in their generation; only agent enable projection needs a config leaf. */
+export function buildPackageInstructionTxItems(input: CommonInput & { kind: "command" | "agent"; description?: string }): PackageTxBuildV1 {
+  if (input.kind === "agent") input.receipt.configKey = "agent." + input.name
+  return {
+    receipt: input.receipt,
+    items: [
+      { key: input.key, action: "receipt", receipt: input.receipt, manifestDigest: input.manifestDigest, capabilities: input.capabilities },
+      ...(input.kind === "agent" ? [{ key: agentConfigItemKey(input.name), action: "config" as const, config: { target: join(input.root, "codepuppy.jsonc"), edits: [{ keyPath: ["agent", input.name], value: { mode: "subagent", ...(input.description ? { description: input.description } : {}), ...(input.receipt.desiredState === "disabled" ? { disable: true } : {}) } }] } }] : []),
+    ],
+    populate: () => {},
+    precondition: () => probeLedgerForWrite(input.root),
+    probe: extensionHealthProbeRouter(input.root),
+  }
+}
 export type McpTxBuildInputV1 = CommonInput & {
+  source?: "plugin" | "connector"
   effect?: PackageEffectV1
   userDataPath: string
   /** 用户本次提交的密钥明文(只在 populate 闭包内用,不进描述符、不进 receipt)。 */
@@ -401,7 +417,7 @@ export function buildMcpTxItems(input: McpTxBuildInputV1): PackageTxBuildResultV
         : undefined
   )
   if (!config) return { ok: false, reason: "profile cannot build an MCP transaction" }
-  const valid = validateServer(config)
+  const valid = validateServer(config, input.source ?? "connector")
   if (!valid.ok) return { ok: false, reason: valid.reason }
   receipt.configKey = `mcp.${input.name}`
   const items: TxPlanItem[] = [

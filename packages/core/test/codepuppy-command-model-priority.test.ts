@@ -19,13 +19,18 @@ import { SessionInbox } from "@opencode/schema/session-inbox"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { Command } from "@opencode/core/command"
 import { Config } from "@opencode/core/config"
+import { CodePuppyProjectGate } from "@opencode/core/config/codepuppy-project-gate"
 import { ConfigCommandPlugin } from "@opencode/core/config/plugin/command"
+import { renderPackageInstruction, bindPackageShellCommand } from "@opencode/plugin/codepuppy-package-runtime"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Bus } from "@opencode/core/bus"
 import { AppProcess } from "@opencode/util/process"
+import { ChildProcess } from "effect/process"
+import { tmpdirScoped } from "./fixture/tmpdir"
 import { Location } from "@opencode/core/location"
+import { AbsolutePath } from "@opencode/core/schema"
 import { Mcp } from "@opencode/core/mcp/index"
 import { ShellSelect } from "@opencode/core/shell/select"
 import { Global } from "@opencode/util/global"
@@ -58,14 +63,156 @@ const PICKED = { providerID: "picked", id: "user-choice" }
 const COMMAND_MODEL = { providerID: "cmd", model: "command-choice" }
 const AGENT_MODEL = { providerID: "agent", id: "agent-choice" }
 
+it.live("native argument suffix stays on the native syntax axis", () => Effect.gen(function* () {
+  const result = yield* runCommand({ template: "$ARGUMENTS[0]" }, {})
+  expect(result.prompts).toEqual(["go[0]"])
+}))
+
+it.live("package instruction renders source nodes before bound values and arguments", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const render = (parts: Parameters<typeof renderPackageInstruction>[1]["parts"], rawArguments: string) => Effect.promise(() => renderPackageInstruction(location, { parts, rawArguments, arguments: ["target"], syntax: "claude", cwd: location.directory }))
+  expect(yield* render(["$0 | $1 | $ARGUMENTS[2] | $target | ", { boundValue: "!`printf BOUND_EXECUTED` $0" }], '"first value" second')).toBe('first value | second | $ARGUMENTS[2] | first value | !`printf BOUND_EXECUTED` $0')
+  expect(yield* render(["$ARGUMENTS"], '!`printf ARG_EXECUTED`')).toBe('!`printf ARG_EXECUTED`')
+  expect(yield* render(["!`printf '<%s>' $0`"], "'a b' c")).toBe("<a b>")
+  expect(yield* render(["!`printf '<%s>' \"$0\"`"], "'a$HOME`printf injected`\"b'")).toBe('<a$HOME`printf injected`"b>')
+  expect(yield* render(["!`printf '<%s>' '$0'`"], '"it\'s safe"')).toBe("<it's safe>")
+  expect(yield* render(["!`printf '<%s>' ", { boundValue: "root with ' quote" }, "`"], "")).toBe("<root with ' quote>")
+  expect(yield* render(["$0,$1,$2,$3"], "'' escaped\\ space 'literal\\slash'")).toBe(",escaped space,literal\\slash,$3")
+  expect(yield* render(["No placeholders"], "raw input")).toBe("No placeholders\n\nARGUMENTS: raw input")
+}))
+
+it.live("native and package inline shells inherit process PATH and HOME", () => Effect.gen(function* () {
+  const source = "!`printf '%s\\n%s' \"$PATH\" \"$HOME\"`"
+  const expected = process.env.PATH + "\n" + process.env.HOME
+  const native = yield* runCommand({ template: source + "\n$ARGUMENTS" }, {})
+  expect(native.prompts).toEqual([expected + "\ngo"])
+  const location = yield* Location.Service
+  expect(yield* Effect.promise(() => renderPackageInstruction(location, { parts: [source], rawArguments: "", arguments: [], syntax: "claude", cwd: location.directory }))).toBe(expected)
+}))
+
+it.live("package inline shells receive the invocation environment without reinterpreting its values", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const value = "session value ; $(printf INJECTED)"
+  const result = yield* Effect.promise(() => renderPackageInstruction(location, {
+    parts: ["!`printf '%s|%s|%s' \"$PACKAGE_SESSION_VALUE\" \"$0\" \"${HOME-unset}\"`"],
+    syntax: "claude", rawArguments: "'argument ; literal'", arguments: [], cwd: location.directory,
+    environment: { PACKAGE_SESSION_VALUE: value, HOME: undefined },
+  }))
+  expect(result).toBe(value + "|argument ; literal|unset")
+}))
+
+it.live("declared argument names select their ordered values", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const render = (names: readonly string[]) => Effect.promise(() => renderPackageInstruction(location, { parts: ["$target/$missing/$2"], rawArguments: "first second", arguments: names, syntax: "claude", cwd: location.directory }))
+  expect(yield* render(["target", "missing"])).toBe("first/second/$2")
+  expect(yield* render(["unused", "target", "missing"])).toBe("second//$2")
+}))
+
+// Fenced shell form from anthropics/claude-plugins-official@0fbfda5a91f4,
+// commands/ralph-loop.md; replace only the setup command with an observable printf.
+it.live("fenced shell source executes before arguments without executing bound fences", () => Effect.gen(function* () {
+  expect((yield* runCommand({ template: "```!\nprintf FENCED_SETUP\n```\n$ARGUMENTS" }, {})).prompts).toEqual(["FENCED_SETUP\ngo"])
+  const location = yield* Location.Service
+  const bound = "```!\nprintf BOUND_SETUP\n```"
+  expect(yield* Effect.promise(() => renderPackageInstruction(location, { parts: [{ boundValue: bound }], rawArguments: "", arguments: [], syntax: "claude", cwd: location.directory }))).toBe(bound)
+}))
+
+it.live("untrusted project fenced shell stays source and records deferred execution", () => Effect.gen(function* () {
+  const location = yield* Location.Service
+  const template = "```!\nprintf UNTRUSTED_SETUP\n```"
+  const filepath = AbsolutePath.make(location.directory + "/opencode.json")
+  CodePuppyProjectGate.install({ trusted: () => false })
+  const gate = yield* CodePuppyProjectGate.begin({ directory: location.directory, home: location.directory + "/home" })
+  const raw = { commands: { review: { template } } }
+  gate.document(filepath)!.raw(JSON.stringify(raw), filepath)
+  const document = new Document({ type: "document", path: filepath, info: decode(raw) })
+  yield* gate.finish([document])
+  expect((yield* runCommand({ template }, {}, document)).prompts).toEqual([template + "\n\ngo"])
+  expect(CodePuppyProjectGate.view(location.directory)?.withheld).toContainEqual(expect.objectContaining({ kind: "command-run", name: "review", fields: ["shell"] }))
+}).pipe(Effect.ensuring(Effect.sync(() => CodePuppyProjectGate.resetForTest()))))
+
+it.live("shell argument lists preserve each parsed word while text retains the raw arguments", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const render = (source: string, syntax: "claude" | "opencode") => Effect.promise(() => renderPackageInstruction(location, { parts: [source], rawArguments: '\"first value\" \"x;id\" \"\"', arguments: [], syntax, cwd: location.directory }))
+  expect(yield* render("!`printf '<%s>' $ARGUMENTS`", "claude")).toBe("<first value><x;id><>")
+  expect(yield* render("!`printf '<%s>' $1`", "opencode")).toBe("<first value><x;id><>")
+  expect(yield* render("$ARGUMENTS", "claude")).toBe('\"first value\" \"x;id\" \"\"')
+}))
+
+it.live("shell runtime values stay data in command substitutions and unquoted heredocs", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const cases = [
+    { source: `!\`printf '<%s>' "$(printf '%s' "$0")"\``, value: 'x"; printf INJECTED; printf "', expected: '<x"; printf INJECTED; printf ">' },
+    { source: "!`cat <<EOF\n$0\nEOF\n`", value: "x;$(printf INJECTED)", expected: "x;$(printf INJECTED)" },
+    { source: `!\`printf '<%s>' "$(printf '%s' "$0")"\``, value: "two words *", expected: "<two words *>" },
+  ]
+  const actual: string[] = []
+  for (const item of cases) actual.push(yield* Effect.promise(() => renderPackageInstruction(location, { parts: [item.source], rawArguments: "'" + item.value + "'", arguments: [], syntax: "claude", cwd: location.directory })))
+  expect(actual).toEqual(cases.map(item => item.expected))
+}))
+
+for (const item of [
+  { name: "quoted heredoc retains source variables and binds literal argument data", source: "!`cat <<'EOF'\n$HOME\n$0\nEOF\n`", value: "hello ; $(printf INJECTED)", prefix: "$HOME\n" },
+  { name: "quoted heredoc cannot be closed by a delimiter line in argument data", source: "!`cat <<'EOF'\n$0\nEOF\n`", value: "first\nEOF\nprintf INJECTED\n#", prefix: "" },
+  { name: "quoted heredoc closes at the end of source without a final newline", source: "!`cat <<\"EOF\"\n$0\nEOF`", value: "end of source ; $(printf INJECTED)", prefix: "" },
+  { name: "an apostrophe in a shell comment does not change argument quoting", source: "!`# don't open a quote\nprintf '%s' $0\n`", value: "x;$(printf INJECTED)", prefix: "" },
+]) it.live(item.name, () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const actual = yield* Effect.promise(() => renderPackageInstruction(location, { parts: [item.source], rawArguments: "'" + item.value + "'", arguments: [], syntax: "claude", cwd: location.directory }))
+  expect(actual).toBe(item.prefix + item.value)
+}))
+
+it.live("bound package shells use the compatible shell while static native source keeps the configured shell", () => {
+  const priorities: (string | undefined)[] = []
+  return Effect.gen(function* () {
+    yield* runCommand({ template: "Initialize native command services" }, {})
+    const location = yield* Location.Service
+    const bound = yield* Effect.promise(() => bindPackageShellCommand(location, { parts: ["printf '%s' ", { boundValue: "bound value" }] }))
+    const render = (parts: Parameters<typeof renderPackageInstruction>[1]["parts"], rawArguments = "") => Effect.promise(() => renderPackageInstruction(location, { parts, rawArguments, arguments: [], syntax: "claude", cwd: location.directory }))
+    expect(yield* render(["!`printf '%s' ", { boundValue: "bound value" }, "`"])).toBe("bound value")
+    expect(yield* render(["!`cat <<'EOF'\n$0\nEOF\n`"], "argument")).toBe("argument")
+    expect(yield* render(["!`printf STATIC`"])).toBe("STATIC")
+    expect(priorities).toEqual(["compat", "compat", "compat", "config"])
+    expect(bound.executable).toBe("/bin/sh")
+  }).pipe(Effect.provideService(ShellSelect.Service, ShellSelect.Service.of({
+    resolve: input => Effect.sync(() => { priorities.push(input.priority); return input.priority === "compat" ? "/bin/sh" : "/bin/bash" }),
+    transform: () => Effect.die("unused"), reload: () => Effect.void,
+  })))
+})
+
+it.live("bind-only shell target shares the binding authority without executing", () => Effect.gen(function* () {
+  yield* runCommand({ template: "Initialize native command services" }, {})
+  const location = yield* Location.Service
+  const fs = yield* FSUtil.Service
+  const processes = yield* AppProcess.Service
+  const tmp = yield* tmpdirScoped()
+  const marker = tmp.path + "/bound marker"
+  const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+  const value = 'two words; $(printf INJECTED) " quote'
+  const bound = yield* Effect.promise(() => runtime.bindPackageShellCommand(location, { parts: ["printf '%s' ", { boundValue: value }, "; printf touched > ", { boundValue: marker }] }))
+  expect(yield* fs.exists(marker)).toBe(false)
+  expect(bound.argv.join(" ")).not.toContain(value)
+  const result = yield* processes.run(ChildProcess.make(bound.executable, [...bound.argv], { cwd: tmp.path, env: bound.env }))
+  expect(result.stdout.toString()).toBe(value)
+  expect(yield* fs.readFileString(marker)).toBe("touched")
+}))
+
 /** Runs one configured command through the production plugin and Command service; records what it asked the session to do. */
-const runCommand = (command: Record<string, unknown>, session: { model?: typeof PICKED }) =>
+const runCommand = (command: Record<string, unknown>, session: { model?: typeof PICKED }, document?: Document) =>
   Effect.gen(function* () {
+    const location = yield* Location.Service
     const commands = yield* Command.Service
     const switched: unknown[] = []
     const prompts: string[] = []
     yield* ConfigCommandPlugin.Plugin.effect(
       host({
+        location: new Location.Info(location),
         command: { list: () => Effect.die("unused"), transform: commands.transform, reload: commands.reload },
         agent: {
           get: () => Effect.succeed({ data: { model: AGENT_MODEL, mode: "primary" } } as never),
@@ -91,7 +238,7 @@ const runCommand = (command: Record<string, unknown>, session: { model?: typeof 
             }),
         },
       }),
-    ).pipe(Effect.provide(Config.testLayer([new Document({ type: "document", info: decode({ commands: { review: command } }) })])))
+    ).pipe(Effect.provide(Config.testLayer([document ?? new Document({ type: "document", info: decode({ commands: { review: command } }) })])))
     yield* commands.execute({ name: "review", invocation: { sessionID: Session.ID.make("ses_cmd"), prompt: { text: "go" }, delivery: "queue" } })
     return { switched, prompts }
   })

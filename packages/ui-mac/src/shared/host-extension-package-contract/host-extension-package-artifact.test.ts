@@ -133,8 +133,10 @@ describe("HostExtensionPackageV1 artifact", () => {
         .digest("hex"),
     )
     expect(manifest.files.map((file) => file.path)).toEqual([...HOST_EXTENSION_PACKAGE_ARTIFACT_FILES])
-    for (const path of ["plugin-conversion.ts", "plugin-conversion.mjs", "plugin-conversion.d.mts"])
+    for (const path of ["plugin-conversion.ts"])
       expect(manifest.files.map(file => file.path)).not.toContain(path)
+    expect(manifest.files.map(file => file.path)).toContain("plugin-conversion.mjs")
+    expect(manifest.files.map(file => file.path)).toContain("plugin-conversion.d.mts")
     for (const file of manifest.files) {
       const bytes = new Uint8Array(await Bun.file(resolve(import.meta.dir, file.path)).arrayBuffer())
       expect(file.bytes, file.path).toBe(bytes.byteLength)

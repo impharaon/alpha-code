@@ -1,3 +1,5 @@
+import { PLUGIN_HOOK_EVENTS } from "./plugin-hook-events"
+export { PLUGIN_HOOK_EVENTS } from "./plugin-hook-events"
 // Default import lets browser consumers prune the unused backend digest validator.
 import crypto from "node:crypto"
 import type { PackagePayloadRefV1 } from "./decoder"
@@ -23,9 +25,16 @@ export type TreeNode =
   | { kind: "file"; path: RelPath; mode: number; bytes: number; digest: Sha256 }
   | { kind: "symlink"; path: RelPath; target: string }
 export type Capture = { source: Source; nodes: readonly TreeNode[]; readFile(path: RelPath): Promise<Uint8Array> }
-export type Text = readonly (string | { binding: "pluginRoot" | "skillDir" | "projectDir" } | { secret: string })[]
+export type Text = readonly (string | { binding: "pluginRoot" | "skillDir" | "projectDir" | "pluginData" } | { secret: string } | { option: string } | { environment: { name: string; default?: Text } })[]
+export type PluginOption = { type: "string" | "number" | "boolean"; title: string; description: string; required: boolean; sensitive: boolean; default?: string | number | boolean | { secret: string } }
+export type EnvironmentForward = { name: string; source: "local" | "remote" }
+export type McpTimeouts = { startupMs?: number; catalogMs?: number; executionMs?: number }
+export type PackageTextBindings = { pluginRoot: string; skillDir?: string; projectDir: string; pluginData: string; resolveOption(key: string): string | number | boolean | undefined; resolveEnvironment(name: string): string | undefined; resolveSecret(id: string): string | undefined }
 export type ToolRule = { tool: string; pattern?: string }
 export type ModelHint = { alias: string } | { providerID: string; modelID: string }
+export type ArgumentSyntax = "claude" | "codex" | "opencode" | "literal"
+export type SkillDisplay = { displayName?: string; shortDescription?: string; iconSmall?: RelPath; iconLarge?: RelPath; brandColor?: string; defaultPrompt?: string }
+export type McpToolDependency = { type: "mcp"; value: string; description?: string; transport?: "stdio" | "http" | "sse"; url?: Text }
 export type Invocation = {
   argumentHint?: string
   model?: ModelHint
@@ -36,6 +45,14 @@ export type Invocation = {
   allowedTools: ToolRule[]
   deniedTools: ToolRule[]
   availableTools?: ToolRule[]
+  arguments: string[]
+  argumentSyntax: ArgumentSyntax
+  effort?: "low" | "medium" | "high" | "xhigh" | "max"
+  paths: string[]
+  preloadSkills: string[]
+  memory?: "user" | "project" | "local"
+  maxTurns?: number
+  background?: boolean
 }
 export type SecretNeed = {
   id: string
@@ -58,28 +75,19 @@ export type LoginNeed = {
     authorizationServerUrl?: string
   }
 }
-export type HookEvent =
-  | "SessionStart"
-  | "UserPromptSubmit"
-  | "UserPromptExpansion"
-  | "PreToolUse"
-  | "PostToolUse"
-  | "PostToolUseFailure"
-  | "Stop"
-  | "StopFailure"
-  | "PermissionRequest"
+export type HookEvent = typeof PLUGIN_HOOK_EVENTS[number]
 export type Hook = {
   event: HookEvent
   matcher?: string
   if?: string
-  command: Text
   timeoutSeconds: number
-  async: boolean
-  asyncRewake: boolean
   onFailure: "continue" | "block"
   order: number
   scope: { kind: "package" } | { kind: "skill" | "agent"; entryId: string }
-}
+} & (
+  | { type: "command"; command: Text; args?: Text[]; async: boolean; asyncRewake: boolean }
+  | { type: "prompt"; prompt: Text; model?: ModelHint; continueOnBlock: boolean }
+)
 type EntryBase = { id: string; sourcePath: RelPath; sourceName: string }
 export type Entry = EntryBase &
   (
@@ -88,7 +96,8 @@ export type Entry = EntryBase &
         directory: RelPath
         instruction: Text
         invocation: Invocation
-        display: Record<string, Json>
+        display: SkillDisplay
+        dependencies: McpToolDependency[]
         mcpDependencies: string[]
       }
     | { kind: "command" | "agent"; instruction: Text; invocation: Invocation }
@@ -97,6 +106,8 @@ export type Entry = EntryBase &
         transport: "stdio"
         command: Text[]
         environment: Record<string, Text>
+        forwardEnvironment?: EnvironmentForward[]
+        timeouts?: McpTimeouts
         cwd?: Text
         timeoutMs?: number
         floatingVersion?: { commandIndex: number; token: string }
@@ -106,15 +117,17 @@ export type Entry = EntryBase &
         transport: "http" | "sse"
         url: Text
         headers: Record<string, Text>
+        timeouts?: McpTimeouts
         timeoutMs?: number
         oauth?: false | LoginNeed
       }
     | { kind: "hook"; hook: Hook }
+    | { kind: "monitor"; command: Text; description: string; when: { kind: "always" } | { kind: "skill"; sourceName: string } }
   )
 export type Diagnostic = {
   path: RelPath
   field?: string
-  code: "invalid-definition" | "missing-entry" | "unresolved-app-id" | "native-js-plugin"
+  code: "invalid-definition" | "missing-entry" | "unresolved-app-id" | "native-js-plugin" | "unavailable-trigger" | "unsupported-host-capability" | "unsupported-setting"
   sourceName?: string
   message: string
 }
@@ -129,6 +142,8 @@ export type PluginPackage = {
   treeDigest: Sha256
   entries: Entry[]
   secrets: SecretNeed[]
+  options?: Record<string, PluginOption>
+  defaults?: { agent?: string }
   diagnostics: Diagnostic[]
 }
 export type MarketplaceEntry = {
@@ -231,6 +246,8 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
       "entries",
       "secrets",
       "diagnostics",
+      "options",
+      "defaults",
     ]) ||
     value.schema !== "codepuppy.plugin-package.v1"
   )
@@ -273,6 +290,8 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
     new Set(value.entries.map((entry) => entry.id)).size !== value.entries.length
   )
     return false
+  if (value.options !== undefined && (!object(value.options) || !Object.values(value.options).every(validPluginOption))) return false
+  if (value.defaults !== undefined && (!object(value.defaults) || !keys(value.defaults, ["agent"]) || !optionalString(value.defaults.agent))) return false
   const paths = new Set(value.tree.filter((node) => node.kind !== "directory").map((node) => node.path))
   if (value.entries.some((entry) => !paths.has(entry.sourcePath))) return false
   const entries = value.entries
@@ -284,7 +303,7 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
         keys(need, ["id", "componentId", "label", "targets"]) &&
         typeof need.id === "string" &&
         typeof need.componentId === "string" &&
-        entries.some((entry: Entry) => entry.id === need.componentId) &&
+        (need.componentId === "$package" || entries.some((entry: Entry) => entry.id === need.componentId)) &&
         typeof need.label === "string" &&
         Array.isArray(need.targets) &&
         need.targets.every(
@@ -307,20 +326,25 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
         optionalString(item.field) &&
         optionalString(item.sourceName) &&
         typeof item.message === "string" &&
-        ["invalid-definition", "missing-entry", "unresolved-app-id", "native-js-plugin"].includes(String(item.code)),
+        ["invalid-definition", "missing-entry", "unresolved-app-id", "native-js-plugin", "unavailable-trigger", "unsupported-host-capability", "unsupported-setting"].includes(String(item.code)),
     )
   )
 }
 
-export function renderPluginText(
-  text: Text,
-  paths: { pluginRoot: string; skillDir: string; projectDir: string },
-): string {
-  return text
-    .map((part) =>
-      typeof part === "string" ? part : "secret" in part ? "{secret:" + part.secret + "}" : paths[part.binding],
-    )
-    .join("")
+export function validPluginOption(value: unknown): value is PluginOption {
+  return object(value) && keys(value, ["type", "title", "description", "required", "sensitive", "default"]) && ["string", "number", "boolean"].includes(String(value.type)) && typeof value.title === "string" && typeof value.description === "string" && typeof value.required === "boolean" && typeof value.sensitive === "boolean" && (value.default === undefined || typeof value.default === value.type && (typeof value.default !== "number" || Number.isFinite(value.default)) || value.sensitive === true && object(value.default) && keys(value.default, ["secret"]) && typeof value.default.secret === "string")
+}
+
+export function pluginOptionEnvironmentName(key: string): string { return "CLAUDE_PLUGIN_OPTION_" + key.toUpperCase() }
+
+export function renderPluginText(text: Text, paths: Pick<PackageTextBindings, "pluginRoot" | "projectDir"> & Partial<PackageTextBindings>): string {
+  return text.map(part => {
+    if (typeof part === "string") return part
+    if ("secret" in part) return paths.resolveSecret?.(part.secret) ?? "{secret:" + part.secret + "}"
+    if ("option" in part) return String(paths.resolveOption?.(part.option) ?? "${user_config." + part.option + "}")
+    if ("environment" in part) return paths.resolveEnvironment?.(part.environment.name) ?? (part.environment.default ? renderPluginText(part.environment.default, paths) : "${" + part.environment.name + "}")
+    return paths[part.binding] ?? "${" + (part.binding === "pluginData" ? "CLAUDE_PLUGIN_DATA" : "CLAUDE_SKILL_DIR") + "}"
+  }).join("")
 }
 
 function validEntry(value: unknown): value is Entry {
@@ -336,19 +360,23 @@ function validEntry(value: unknown): value is Entry {
     if (!text(value.instruction) || !invocation(value.invocation)) return false
     if (value.kind !== "skill") return keys(value, [...base, "instruction", "invocation"])
     return (
-      keys(value, [...base, "directory", "instruction", "invocation", "display", "mcpDependencies"]) &&
+      keys(value, [...base, "directory", "instruction", "invocation", "display", "dependencies", "mcpDependencies"]) &&
       (value.directory === "" || pluginRelativePath(value.directory)) &&
       value.sourcePath === (value.directory ? value.directory + "/" : "") + "SKILL.md" &&
-      object(value.display) &&
+      object(value.display) && keys(value.display, ["displayName", "shortDescription", "iconSmall", "iconLarge", "brandColor", "defaultPrompt"]) && Object.values(value.display).every(item => typeof item === "string") &&
+      [value.display.iconSmall, value.display.iconLarge].every(item => item === undefined || pluginRelativePath(item)) &&
+      Array.isArray(value.dependencies) && value.dependencies.every(item => object(item) && keys(item, ["type", "value", "description", "transport", "url"]) && item.type === "mcp" && typeof item.value === "string" && optionalString(item.description) && (item.transport === undefined || ["stdio", "http", "sse"].includes(String(item.transport))) && (item.url === undefined || text(item.url))) &&
       strings(value.mcpDependencies)
     )
   }
   if (value.kind === "mcp") {
+    if (value.timeouts !== undefined && (!object(value.timeouts) || !keys(value.timeouts, ["startupMs", "catalogMs", "executionMs"]) || !Object.values(value.timeouts).every(value => typeof value === "number" && Number.isFinite(value) && value >= 0))) return false
+    if (value.forwardEnvironment !== undefined && (!Array.isArray(value.forwardEnvironment) || !value.forwardEnvironment.every(item => object(item) && keys(item, ["name", "source"]) && typeof item.name === "string" && (item.source === "local" || item.source === "remote")))) return false
     if (value.timeoutMs !== undefined && (!Number.isSafeInteger(value.timeoutMs) || Number(value.timeoutMs) < 0))
       return false
     if (value.transport === "stdio")
       return (
-        keys(value, [...base, "transport", "command", "environment", "cwd", "timeoutMs", "floatingVersion"]) &&
+        keys(value, [...base, "transport", "command", "environment", "cwd", "timeoutMs", "floatingVersion", "forwardEnvironment", "timeouts"]) &&
         Array.isArray(value.command) &&
         value.command.every(text) &&
         textMap(value.environment) &&
@@ -362,7 +390,7 @@ function validEntry(value: unknown): value is Entry {
             typeof value.floatingVersion.token === "string"))
       )
     return (
-      keys(value, [...base, "transport", "url", "headers", "timeoutMs", "oauth"]) &&
+      keys(value, [...base, "transport", "url", "headers", "timeoutMs", "oauth", "timeouts"]) &&
       (value.transport === "http" || value.transport === "sse") &&
       text(value.url) &&
       textMap(value.headers) &&
@@ -386,48 +414,16 @@ function validEntry(value: unknown): value is Entry {
               optionalString(value.oauth.oauth.authorizationServerUrl)))))
     )
   }
+  if (value.kind === "monitor") return keys(value, [...base, "command", "description", "when"]) && text(value.command) && typeof value.description === "string" && object(value.when) && (value.when.kind === "always" && keys(value.when, ["kind"]) || value.when.kind === "skill" && keys(value.when, ["kind", "sourceName"]) && typeof value.when.sourceName === "string")
   if (value.kind !== "hook" || !keys(value, [...base, "hook"]) || !object(value.hook)) return false
   const hook = value.hook
-  return (
-    keys(hook, [
-      "event",
-      "matcher",
-      "if",
-      "command",
-      "timeoutSeconds",
-      "async",
-      "asyncRewake",
-      "onFailure",
-      "order",
-      "scope",
-    ]) &&
-    [
-      "SessionStart",
-      "UserPromptSubmit",
-      "UserPromptExpansion",
-      "PreToolUse",
-      "PostToolUse",
-      "PostToolUseFailure",
-      "Stop",
-      "StopFailure",
-      "PermissionRequest",
-    ].includes(String(hook.event)) &&
-    optionalString(hook.matcher) &&
-    optionalString(hook.if) &&
-    text(hook.command) &&
-    typeof hook.timeoutSeconds === "number" &&
-    Number.isFinite(hook.timeoutSeconds) &&
-    hook.timeoutSeconds >= 0 &&
-    typeof hook.async === "boolean" &&
-    typeof hook.asyncRewake === "boolean" &&
-    (hook.onFailure === "continue" || hook.onFailure === "block") &&
-    Number.isSafeInteger(hook.order) &&
-    object(hook.scope) &&
-    ((hook.scope.kind === "package" && keys(hook.scope, ["kind"])) ||
-      (["skill", "agent"].includes(String(hook.scope.kind)) &&
-        keys(hook.scope, ["kind", "entryId"]) &&
-        typeof hook.scope.entryId === "string"))
-  )
+  return keys(hook, ["event", "matcher", "if", "type", "command", "args", "prompt", "model", "continueOnBlock", "timeoutSeconds", "async", "asyncRewake", "onFailure", "order", "scope"]) &&
+    (PLUGIN_HOOK_EVENTS as readonly string[]).includes(String(hook.event)) && optionalString(hook.matcher) && optionalString(hook.if) &&
+    typeof hook.timeoutSeconds === "number" && Number.isFinite(hook.timeoutSeconds) && hook.timeoutSeconds > 0 &&
+    (hook.onFailure === "continue" || hook.onFailure === "block") && Number.isSafeInteger(hook.order) && Number(hook.order) >= 0 &&
+    object(hook.scope) && (hook.scope.kind === "package" && keys(hook.scope, ["kind"]) || ["skill", "agent"].includes(String(hook.scope.kind)) && keys(hook.scope, ["kind", "entryId"]) && typeof hook.scope.entryId === "string") &&
+    (hook.type === "command" && text(hook.command) && (hook.args === undefined || Array.isArray(hook.args) && hook.args.every(text)) && typeof hook.async === "boolean" && typeof hook.asyncRewake === "boolean" && hook.prompt === undefined && hook.model === undefined && hook.continueOnBlock === undefined ||
+     hook.type === "prompt" && text(hook.prompt) && (hook.model === undefined || modelHint(hook.model)) && typeof hook.continueOnBlock === "boolean" && hook.command === undefined && hook.args === undefined && hook.async === undefined && hook.asyncRewake === undefined)
 }
 function invocation(value: unknown): boolean {
   if (
@@ -442,6 +438,7 @@ function invocation(value: unknown): boolean {
       "allowedTools",
       "deniedTools",
       "availableTools",
+      "arguments", "argumentSyntax", "effort", "paths", "preloadSkills", "memory", "maxTurns", "background",
     ])
   )
     return false
@@ -457,17 +454,18 @@ function invocation(value: unknown): boolean {
   return (
     optionalString(value.argumentHint) &&
     optionalString(value.agent) &&
-    (value.model === undefined ||
-      (object(value.model) &&
-        ((keys(value.model, ["alias"]) && typeof value.model.alias === "string") ||
-          (keys(value.model, ["providerID", "modelID"]) &&
-            typeof value.model.providerID === "string" &&
-            typeof value.model.modelID === "string")))) &&
+    (value.model === undefined || modelHint(value.model)) &&
     typeof value.fork === "boolean" &&
     typeof value.userInvocable === "boolean" &&
     typeof value.implicitInvocation === "boolean" &&
     rules(value.allowedTools) &&
     rules(value.deniedTools) &&
+    strings(value.arguments) && ["claude", "codex", "opencode", "literal"].includes(String(value.argumentSyntax)) &&
+    strings(value.paths) && strings(value.preloadSkills) &&
+    (value.effort === undefined || ["low", "medium", "high", "xhigh", "max"].includes(String(value.effort))) &&
+    (value.memory === undefined || ["user", "project", "local"].includes(String(value.memory))) &&
+    (value.maxTurns === undefined || Number.isSafeInteger(value.maxTurns) && Number(value.maxTurns) > 0) &&
+    (value.background === undefined || typeof value.background === "boolean") &&
     (value.availableTools === undefined || rules(value.availableTools))
   )
 }
@@ -478,8 +476,8 @@ function text(value: unknown): value is Text {
       (part) =>
         typeof part === "string" ||
         (object(part) &&
-          ((keys(part, ["binding"]) && ["pluginRoot", "skillDir", "projectDir"].includes(String(part.binding))) ||
-            (keys(part, ["secret"]) && typeof part.secret === "string"))),
+          ((keys(part, ["binding"]) && ["pluginRoot", "skillDir", "projectDir", "pluginData"].includes(String(part.binding))) ||
+            (keys(part, ["secret"]) && typeof part.secret === "string") || (keys(part, ["option"]) && typeof part.option === "string") || (keys(part, ["environment"]) && object(part.environment) && keys(part.environment, ["name", "default"]) && typeof part.environment.name === "string" && (part.environment.default === undefined || text(part.environment.default))))),
     )
   )
 }
@@ -502,23 +500,32 @@ function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-export function pluginText(value: string): Text {
+export function pluginText(value: string, target: "process" | "instruction" = "process"): Text {
   const parts: Text[number][] = []
   let offset = 0
-  for (const match of value.matchAll(/\$\{(CLAUDE_PLUGIN_ROOT|CLAUDE_SKILL_DIR|CLAUDE_PROJECT_DIR)\}/g)) {
-    if (match.index > offset) parts.push(value.slice(offset, match.index))
-    parts.push({ binding: pluginPathBinding(match[1]!)! })
-    offset = match.index + match[0].length
+  for (const match of value.matchAll(/\$\{/g)) {
+    if (match.index! < offset) continue
+    let depth = 1
+    let end = match.index! + 2
+    for (; end < value.length && depth; end++) {
+      if (value[end] === "$" && value[end + 1] === "{") { depth++; end++ }
+      else if (value[end] === "}") depth--
+    }
+    if (depth) continue
+    const expression = value.slice(match.index! + 2, end - 1)
+    if (!/^(?:user_config\.[^}]+|[A-Za-z_][\w]*(?::-[\s\S]*)?)$/.test(expression)) continue
+    const binding = pluginPathBinding(expression)
+    if (target === "instruction" && !binding && !expression.startsWith("user_config.")) continue
+    const split = expression.indexOf(":-")
+    if (match.index! > offset) parts.push(value.slice(offset, match.index))
+    parts.push(binding ? { binding } : expression.startsWith("user_config.") ? { option: expression.slice(12) } : { environment: { name: split < 0 ? expression : expression.slice(0, split), ...(split < 0 ? {} : { default: pluginText(expression.slice(split + 2)) }) } })
+    offset = end
   }
   if (offset < value.length) parts.push(value.slice(offset))
   return parts.length ? parts : [value]
 }
-export function pluginPathBinding(value: string): "pluginRoot" | "skillDir" | "projectDir" | undefined {
-  return value === "CLAUDE_PLUGIN_ROOT"
-    ? "pluginRoot"
-    : value === "CLAUDE_SKILL_DIR"
-      ? "skillDir"
-      : value === "CLAUDE_PROJECT_DIR"
-        ? "projectDir"
-        : undefined
+export function pluginPathBinding(value: string): "pluginRoot" | "skillDir" | "projectDir" | "pluginData" | undefined {
+  return value === "CLAUDE_PLUGIN_ROOT" || value === "PLUGIN_ROOT" ? "pluginRoot" : value === "CLAUDE_SKILL_DIR" ? "skillDir" : value === "CLAUDE_PROJECT_DIR" ? "projectDir" : value === "CLAUDE_PLUGIN_DATA" || value === "PLUGIN_DATA" ? "pluginData" : undefined
 }
+
+function modelHint(value: unknown): value is ModelHint { return object(value) && (keys(value, ["alias"]) && typeof value.alias === "string" || keys(value, ["providerID", "modelID"]) && typeof value.providerID === "string" && typeof value.modelID === "string") }

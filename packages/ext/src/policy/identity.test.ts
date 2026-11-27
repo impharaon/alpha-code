@@ -17,6 +17,7 @@ import {
   codeModeFacts,
   mcpEffectiveName,
   normalizeToolName,
+  packageToolCall,
   toolFacts,
   type IdentityInput,
 } from "./identity"
@@ -212,6 +213,47 @@ describe("authority minting (ADR-041 §5)", () => {
       location: { kind: "local" },
     })
   })
+})
+
+// MCP entries use the real engine issuer, including the otherwise unforgeable registration mark.
+test("long plugin MCP aliases retain the original definition and case-sensitive tool identity", async () => {
+  const { aliasPluginMcpTools } = await import("../plugin-package-tools")
+  const server = { hostName: "cloudinary-a123456789", sourceName: "Cloudinary", packageId: "claude:cloudinary" }
+  const names = ["get_asset_" + "details_".repeat(8), "Get_asset_" + "details_".repeat(8), "short"]
+  const registered = names.map(name => ({ id: mcpEffectiveName(server.hostName, name), name, options: { namespace: server.hostName }, ...mcpToolMark(server.hostName, name) }))
+  const definitions = names.map(() => ({ description: "MCP tool", input: { type: "object" } }))
+  const tools = Object.fromEntries(registered.map((tool, index) => [tool.id, definitions[index]!]))
+  aliasPluginMcpTools(tools, registered, [server])
+  expect(Object.keys(tools)).toHaveLength(3)
+  expect(Object.keys(tools).every(name => name.length <= 64)).toBe(true)
+  expect(tools[registered[0]!.id]).toBeUndefined()
+  expect(tools[registered[1]!.id]).toBeUndefined()
+  expect(Object.values(tools).filter(value => value === definitions[0])).toHaveLength(1)
+  expect(Object.values(tools).filter(value => value === definitions[1])).toHaveLength(1)
+  expect(tools[registered[2]!.id]).toBe(definitions[2])
+  expect(Object.keys(tools).filter(name => name.length === 64).every(name => /_[a-f0-9]{10}$/.test(name))).toBe(true)
+})
+
+
+test("package hook source names and fields use the verified tool identity", () => {
+  // Claude spellings consumed by the pinned hookify pre/post scripts and Convex lint script.
+  const input = base({ early: new Set(["write", "edit", "read", "shell"]) })
+  for (const [native, source] of [["write", "Write"], ["edit", "Edit"], ["read", "Read"], ["shell", "Bash"]]) {
+    const facts = toolFacts({ id: native!, name: native! }, input)
+    const value = native === "shell" ? { command: "printf fixture" } : { path: "/project/fixture.ts", oldString: "before", newString: "after", replaceAll: false }
+    const result = packageToolCall(facts, value, {}, "claude", "/project")
+    expect(result.name).toBe(source)
+    expect(result.input).toEqual(native === "shell" ? value : { file_path: "/project/fixture.ts", old_string: "before", new_string: "after", replace_all: false })
+    expect(packageToolCall(facts, result.input, {}, "runtime", "/project").input).toEqual(value)
+  }
+  const mcp = toolFacts({ id: "policy_paid_action", name: "paid_action", options: { namespace: "policy" }, ...mcpToolMark("policy", "paid_action") }, input)
+  expect(packageToolCall(mcp, { account: "fixture" }, { "mcp::source-server": "policy" }, "claude", "/project")).toEqual({ name: "mcp__source-server__paid_action", input: { account: "fixture" } })
+})
+
+
+test("Claude hook file paths resolve in the native tool call Location", () => {
+  const facts = toolFacts({ id: "write", name: "write" }, base({ early: new Set(["write"]) }))
+  expect(packageToolCall(facts, { path: "src/payment.ts", content: "fixture" }, {}, "claude", "/project").input).toEqual({ file_path: "/project/src/payment.ts", content: "fixture" })
 })
 
 

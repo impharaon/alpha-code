@@ -46,7 +46,7 @@ import {
   Tool,
   WebFetchTool,
 } from "./policy-host.cases"
-import { registerPolicy } from "./index"
+import { registerPolicy, type PolicyRegistration } from "./index"
 import { attachDirectoryDisplay } from "./display"
 import { projectPluginContext, trackMcpNamespaces } from "../plugin-fanout"
 import { createToolPolicyStore, defaultPolicyBaseDir } from "./resolver"
@@ -118,7 +118,7 @@ const setup = (options: Setup = {}) =>
     const plugins = yield* Plugin.Service
     const location = yield* Location.Service
     const services = yield* Effect.context<never>()
-    let registration: Awaited<ReturnType<typeof registerPolicy>> | undefined
+    let registration: PolicyRegistration | undefined
     const tool = (name: string, key: keyof typeof counts, extra: Record<string, unknown> = {}) => ({
       name,
       description: name,
@@ -203,7 +203,7 @@ const setup = (options: Setup = {}) =>
       delivery: "queue",
     } as never)
     // The Location's release (what plugin disposal runs), for cases that release while a call is running.
-    return { session, release: () => registration?.dispose() }
+    return { session, registration, release: () => registration?.dispose() }
   })
 
 /** The catalog the model request is built from (`SessionContext.select`), after the context hook. */
@@ -287,6 +287,33 @@ const pending = Effect.gen(function* () {
 const disabled = (canonical: string) => ({ selector: { level: "tool", canonical }, state: "disabled" })
 const classEnabled = (cls: string) => ({ selector: { level: "class", class: cls }, state: "enabled" })
 const NEUTRAL = [classEnabled("third-party-mcp"), classEnabled("plugin")]
+
+it.live("package invocation permissions expire without changing persistent rules", () => Effect.gen(function* () {
+  const { session, registration } = yield* setup({ rules: [ALLOW_ALL, { action: ID_BUILTIN_WRITE, resource: "*", effect: "ask" }] })
+  const policy = registration!
+  policy.bindPackageInvocation(session.id, { allowedTools: [{ tool: ALIAS_WRITE }], deniedTools: [] }, {}, () => true)
+  expect(Exit.isSuccess(yield* callRaw(session.id, ALIAS_WRITE))).toBe(true)
+  expect(counts.write).toBe(1)
+  policy.clearPackageInvocation(session.id)
+  const blocked = yield* Effect.forkChild(callRaw(session.id, ALIAS_WRITE))
+  const permission = yield* Permission.Service
+  const request = (yield* pending)[0]
+  expect(request).toBeDefined()
+  expect(counts.write).toBe(1)
+  yield* permission.reply({ requestID: request!.id, reply: "reject" })
+  expect(Exit.isFailure(yield* E.Fiber.join(blocked))).toBe(true)
+}))
+
+it.live("package invocation allows preserve hard deny and available tools", () => Effect.gen(function* () {
+  const { session, registration } = yield* setup({ records: [...NEUTRAL, disabled(ID_BUILTIN_WRITE)] })
+  const policy = registration!
+  policy.bindPackageInvocation(session.id, { allowedTools: [{ tool: ALIAS_WRITE }], deniedTools: [] }, {}, () => true)
+  expect(Exit.isFailure(yield* callRaw(session.id, ALIAS_WRITE))).toBe(true)
+  expect(counts.write).toBe(0)
+  policy.bindPackageInvocation(session.id, { allowedTools: [{ tool: "*" }], deniedTools: [], availableTools: [{ tool: ALIAS_WRITE }] }, {}, () => true)
+  expect((yield* catalog(session.id)).direct).not.toContain(ALIAS_PROBE)
+  policy.clearPackageInvocation(session.id)
+}))
 
 describe("catalog gate (#725 group A) — SessionContext.select + session.hook.context", () => {
   it.live("A5 negative control: with no deny, every source is in the catalog (direct and Code Mode)", () =>
@@ -1871,6 +1898,50 @@ describe("safe file tools", () => {
     expect(JSON.stringify(read)).toContain("PORT=3000")
   }))
 
+  // Spec v6 BR-05: another project's protected file that a command names literally (relative to the command's working
+  // directory) is registered before the command's output is released, so a first contact by command is masked from its
+  // first live chunk, never read by the read tool. The path is the word the shell reads: escapes undone, quoted pieces joined;
+  // a project link named in the command registers the list file its literal target is.
+  for (const form of ["path relative to the project", "working directory under ~", "escaped path", "quoted directory joined to the file name", "project link to the file"] as const) it.live(`outside project protected files a command names are masked from its first output (${form})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const name = `other project-${randomUUID()}`
+    // The link's target lies outside every collection source (the home directory is one), where the project scan never follows.
+    const other = form === "project link to the file" ? path.join(os.tmpdir(), name) : path.join(os.homedir(), "work", name)
+    const directory = path.relative(location.directory, other)
+    fs.mkdirSync(other, { recursive: true })
+    const value = randomUUID()
+    fs.writeFileSync(path.join(other, ".env"), `TOKEN=${value}\nPORT=3000\n`)
+    const link = path.join(location.directory, `link-to-other-env-${randomUUID()}`)
+    if (form === "project link to the file") fs.symlinkSync(path.join(other, ".env"), link)
+    const live: string[] = []
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, rules: [ALLOW_ALL, { action: "external_directory", resource: "*", effect: "allow" }], after: promisePlugin("observe-live-capture", async (ctx) => {
+      await ctx.shell.hook("capture", async (event) => {
+        if (event.phase === "chunk") live.push(await fs.promises.readFile(event.file, "utf8"))
+      })
+    }) })
+    // This host points the engine's home (OPENCODE_TEST_HOME) away from os.homedir(), which the policy's roots use; in
+    // production the engine's `~` is os.homedir() too, so the engine resolves this workdir there for the call.
+    const engineHome = process.env.OPENCODE_TEST_HOME
+    if (form === "working directory under ~") process.env.OPENCODE_TEST_HOME = os.homedir()
+    const input = {
+      "path relative to the project": { command: `cat ${JSON.stringify(path.join(directory, ".env"))}` },
+      "working directory under ~": { command: "cat .env", workdir: `~/work/${name}` },
+      "escaped path": { command: `cat ${directory.replaceAll(" ", "\\ ")}/\\.env` },
+      "quoted directory joined to the file name": { command: `cat "${directory}"/.env` },
+      "project link to the file": { command: `cat ./${path.basename(link)}` },
+    }[form]
+    const shell = yield* callRaw(session.id, "shell", input).pipe(Effect.ensuring(Effect.sync(() => { process.env.OPENCODE_TEST_HOME = engineHome })))
+    fs.rmSync(other, { recursive: true, force: true })
+    fs.rmSync(link, { force: true })
+    if (Exit.isFailure(shell)) throw new Error(String(failure(shell)?.message ?? Cause.pretty(shell.cause)))
+    expect(live.length).toBeGreaterThan(0)
+    expect(live.some((text) => text.includes(value))).toBe(false)
+    expect(live.join("\n")).toContain("PORT=3000")
+    expect(JSON.stringify(shell).includes(value)).toBe(false)
+    expect(JSON.stringify(shell)).toContain("TOKEN=[REDACTED]")
+    expect(JSON.stringify(shell)).toContain("PORT=3000")
+  }))
+
   it.live("env files mask only credential-named values", () => Effect.gen(function* () {
     const location = yield* Location.Service
     const value = randomUUID()
@@ -2181,3 +2252,111 @@ describe("secret result boundaries", () => {
 
 void Agent
 void SchemaTool
+
+it.live("package Bash prefix grants cover every parsed command and preserve quoted executable paths", () => Effect.gen(function* () {
+  const { session, registration } = yield* setup({ builtins: ["shell"], rules: [ALLOW_ALL, { action: "builtin::shell", resource: "*", effect: "ask" }] })
+  // ralph-loop's actual allowed-tools form: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/setup-ralph-loop.sh:*).
+  registration!.bindPackageInvocation(session.id, { allowedTools: [{ tool: "Bash", pattern: "/tmp/plugin path/scripts/setup-ralph-loop.sh:*" }], deniedTools: [] }, {}, () => true)
+  expect(Exit.isSuccess(yield* callRaw(session.id, "shell", { command: '"/tmp/plugin path/scripts/setup-ralph-loop.sh" prompt --max-iterations 2' }))).toBe(true)
+  expect(counts.write).toBe(1)
+  const blocked = yield* Effect.forkChild(callRaw(session.id, "shell", { command: '"/tmp/plugin path/scripts/setup-ralph-loop.sh" prompt; touch /tmp/ungranted' }))
+  const permission = yield* Permission.Service
+  const request = (yield* pending)[0]
+  expect(request).toBeDefined()
+  expect(counts.write).toBe(1)
+  yield* permission.reply({ requestID: request!.id, reply: "reject" })
+  expect(Exit.isFailure(yield* E.Fiber.join(blocked))).toBe(true)
+}))
+
+
+for (const variant of ["ask", "changed-input", "revoked"] as const) {
+  it.live(`package hook ${variant} requires approval without persisting a grant`, () => Effect.gen(function* () {
+    let policy: PolicyRegistration
+    let active = true
+    const { session, registration } = yield* setup({
+      rules: [ALLOW_ALL, { action: ID_BUILTIN_WRITE, resource: "*", effect: "ask" }],
+      inside: async context => {
+        await context.tool.hook("execute.before", async event => {
+          await policy.bindPackageHook(event, variant === "ask" ? "ask" : "allow", () => active)
+          if (variant === "changed-input") event.input = { note: "changed after the hook decision" }
+          if (variant === "revoked") active = false
+        })
+      },
+    })
+    policy = registration!
+    if (variant === "ask") policy.bindPackageInvocation(session.id, { allowedTools: [{ tool: ALIAS_WRITE }], deniedTools: [] }, {}, () => true)
+    const running = yield* Effect.forkChild(callRaw(session.id, ALIAS_WRITE, { note: "original" }))
+    const [request] = yield* pending
+    expect(request).toBeDefined()
+    expect(counts.write).toBe(0)
+    if (variant === "changed-input") expect(request!.metadata?.args).toEqual({ note: "changed after the hook decision" })
+    const permission = yield* Permission.Service
+    yield* permission.reply({ requestID: request!.id, reply: "once" })
+    expect(Exit.isSuccess(yield* E.Fiber.join(running))).toBe(true)
+    expect(counts.write).toBe(1)
+    expect(yield* permission.list()).toEqual([])
+  }))
+}
+
+
+it.live("a package hook allow cannot approve another permission action inside its tool call", () => Effect.gen(function* () {
+  let policy: PolicyRegistration
+  const { session, registration } = yield* setup({
+    builtins: ["read"],
+    rules: [ALLOW_ALL, { action: "read", resource: "*", effect: "ask" }],
+    inside: async context => {
+      await context.tool.transform(editor => editor.update(ALIAS_WRITE, tool => {
+        const original = tool.execute
+        tool.execute = async (input, call) => {
+          await context.permission.assert({ sessionID: call.sessionID, agent: call.agent, action: "read", resources: ["other-resource"], save: [], source: { type: "tool", messageID: call.messageID, id: call.id } })
+          return original(input, call)
+        }
+      }))
+      await context.tool.hook("execute.before", event => policy.bindPackageHook(event, "allow", () => true))
+    },
+  })
+  policy = registration!
+  const running = yield* Effect.forkChild(callRaw(session.id, ALIAS_WRITE))
+  const [request] = yield* pending
+  expect(request?.action).toBe("read")
+  expect(counts.write).toBe(0)
+  const permission = yield* Permission.Service
+  yield* permission.reply({ requestID: request!.id, reply: "reject" })
+  expect(Exit.isFailure(yield* E.Fiber.join(running))).toBe(true)
+}))
+
+
+for (const action of [ID_BUILTIN_WRITE, ALIAS_WRITE]) {
+  it.live(`package PermissionRequest allows the current ${action === ID_BUILTIN_WRITE ? "identity" : "native"} ask without showing a card`, () => Effect.gen(function* () {
+    const { session, registration } = yield* setup({
+      rules: [ALLOW_ALL, { action, resource: "*", effect: "ask" }],
+      inside: async context => {
+        await context.tool.transform(editor => editor.update(ALIAS_WRITE, tool => {
+          const original = tool.execute
+          tool.execute = async (input, call) => {
+            await context.permission.assert({ sessionID: call.sessionID, agent: call.agent, action: ALIAS_WRITE, resources: ["fixture"], save: [], source: { type: "tool", messageID: call.messageID, id: call.id } })
+            return original(input, call)
+          }
+        }))
+      },
+    })
+    const policy = registration!
+    let invoked = 0
+    const release = policy.onPackagePermissionRequest(async call => {
+      invoked++
+      await policy.bindPackageHook(call, "allow", () => true)
+    })
+    expect(Exit.isSuccess(yield* callRaw(session.id, ALIAS_WRITE).pipe(Effect.timeout("1 second")))).toBe(true)
+    expect(invoked).toBe(1)
+    expect(counts.write).toBe(1)
+    expect(yield* (yield* Permission.Service).list()).toEqual([])
+    release()
+    const next = yield* Effect.forkChild(callRaw(session.id, ALIAS_WRITE))
+    const [request] = yield* pending
+    expect(request).toBeDefined()
+    const permission = yield* Permission.Service
+    yield* permission.reply({ requestID: request!.id, reply: "reject" })
+    expect(Exit.isFailure(yield* E.Fiber.join(next))).toBe(true)
+    expect(counts.write).toBe(1)
+  }))
+}

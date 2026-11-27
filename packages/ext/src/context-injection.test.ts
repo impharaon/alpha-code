@@ -21,6 +21,8 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { Effect } from "effect"
 import { PluginHooks } from "../../core/src/plugin/hooks.ts"
+import { Location } from "../../core/src/location.ts"
+import { Session as Sessions } from "../../core/src/session.ts"
 import { Tool } from "../../core/src/tool.ts"
 import { Message } from "../../ai/src/schema/messages.ts"
 import * as Media from "../../ai/src/media.ts"
@@ -161,7 +163,7 @@ const handOver = (file: string, value: string) => publishCodePuppyCredentials({ 
 
 /** 本文件为之设了咽喉的通路。② 要求它与「真 CodePuppyExt 注册且分类为 context」的集合逐字相等。 */
 // SC-01/02 throat proofs are in secret-mask/register-policy and Core tool-shell/tool-registry.
-const THROATED = ["shell.capture", "tool.execute.progress", "agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.generate", "session.http.request", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.execute.before", "tool.transform", "websearch.transform"].sort()
+const THROATED = ["shell.capture", "tool.execute.progress", "agent.transform", "command.transform", "mcp.transform", "session.compaction", "session.context", "session.experimental.idle", "session.generate", "session.http.request", "session.prompt", "session.title", "skill.transform", "tool.execute.after", "tool.execute.before", "tool.transform", "websearch.transform"].sort()
 /** 2.x 组装一次模型请求的四条钩子(`session/model-request.ts`:主循环 / 压缩 / 无工具生成 / 起标题各触发自己那条,互不经过)。 */
 const REQUEST_HOOKS = ["context", "compaction", "generate", "title"] as const
 
@@ -177,11 +179,11 @@ describe("② alpha 注册的每个载上下文通路都有咽喉", () => {
     const ctx = registered.filter((k) => HOOK_CONTEXT_CLASS[k as keyof typeof HOOK_CONTEXT_CLASS] === "context").sort()
     expect(ctx).toEqual(THROATED)
     // 四条请求钩子挂的是**同一个**回调对象:下面 ③b / ③h 在四条钩子上逐一过真宿主,这里再钉住它们不会各自漂移。
-    // session.context 上另有 L4 策略的目录闸(registerPolicy 里先注册,只删工具表条目、不写字;③b / ③h 的真宿主链里同在);
-    // 联网 notice 仅在 context 的中间回调按事实写登记文本；四者共用的组装回调仍在最后。
+    // context 另有 policy、联网 notice、包 Invocation、package hooks 与 MCP 别名回调;共用的请求组装器恰好出现一次。
     const [context, ...rest] = REQUEST_HOOKS.map((name) => recorded.hooks[`session.${name}`] ?? [])
-    expect(context).toHaveLength(3)
-    const assemble = context!.at(-1)!
+    expect(context).toHaveLength(6)
+    const assemble = rest[0]![0]!
+    expect(context!.filter(callback => callback === assemble)).toHaveLength(1)
     for (const other of rest) {
       expect(other).toHaveLength(1)
       expect(other[0]).toBe(assemble)
@@ -800,7 +802,9 @@ describe("③i session.prompt 咽喉:用户消息上 alpha 一个字不加", () 
     Effect.gen(function* () {
       yield* activate(CodePuppyExt)
       const hooks = yield* PluginHooks.Service
-      const input = () => ({ sessionID: "ses_prompt_throat", messageID: "msg_prompt_throat", prompt: { text: "帮我看一下 a.txt" }, delivery: "queue" })
+      // core 只对已存在的会话触发 prompt 钩子(session/prompt.ts 的 prepare 拿的是 Session.Info),这里用本 Location 里的真会话。
+      const session = yield* (yield* Sessions.Service).create({ location: { directory: (yield* Location.Service).directory }, title: "prompt throat" })
+      const input = () => ({ sessionID: session.id, messageID: "msg_prompt_throat", prompt: { text: "帮我看一下 a.txt" }, delivery: "queue" })
       const leaves = (event: unknown) => stringLeaves(event).map((leaf) => `${leaf.pointer}=${leaf.value}`)
       const added = (event: unknown) => leaves(event).filter((leaf) => !leaves(input()).includes(leaf))
       const info = spyOn(console, "info").mockImplementation(() => {})
@@ -1060,3 +1064,12 @@ describe("AC3 库存:一处列全,快照逐字节比对(codepuppy-check 第 [12/
   expect(contextText("network.egress.notice.system")).toBe(contextText("network.egress.notice.result"))
   expect(contextText("network.egress.notice.result")).toContain("请等待决定或获准后重试，不要排查网络或绕开代理。")
 })
+
+it.live("package idle cleanup preserves the context-bearing event unchanged", () => Effect.gen(function* () {
+  yield* activate(CodePuppyExt)
+  const hooks = yield* PluginHooks.Service
+  const event = { sessionID: "ses_package_idle" as never, background: [] }
+  const before = structuredClone(event)
+  yield* hooks.trigger("session", "experimental.idle", event)
+  expect(event).toEqual(before)
+}))

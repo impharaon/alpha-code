@@ -12,6 +12,9 @@ import { MessageDecodeError } from "./error.js"
 import { SessionHistory } from "./history.js"
 import { SessionMessage } from "./message.js"
 import { SessionSchema } from "./schema.js"
+import { InstructionDiscovery } from "../instruction-discovery.js" // codepuppy(S-05)
+import { pluginInstructionSource } from "../config/codepuppy-instruction-source.js"
+import { notifyInstructionsLoaded } from "./codepuppy-instructions-loaded.js"
 
 const InjectedMetadata = Schema.Struct({
   instruction: Schema.Struct({ paths: Schema.Array(Schema.String) }),
@@ -72,12 +75,13 @@ const layer = Layer.effect(
         // cannot depend on Session (it routes through LocationServiceMap, forming a type
         // cycle with this node). The durable publish commits the synthetic and its metadata
         // ledger atomically, so releasing the claim afterwards cannot readmit the paths.
-        yield* bus.publish(SessionEvent.Synthetic, {
+        const event = yield* bus.publish(SessionEvent.Synthetic, {
           sessionID: input.sessionID,
           text: readable.map((file) => `Instructions from: ${file.path}\n${file.content}`).join("\n\n"),
           description: `Loaded ${readable.map((file) => describePath(root, file.path)).join(", ")}`,
           metadata: { instruction: { paths: readable.map((file) => file.path) } },
         })
+        yield* notifyInstructionsLoaded(db, input.sessionID, readable.map(file => new InstructionDiscovery.File({ ...file, source: pluginInstructionSource(file.path, FSUtil.contains(root, file.path) ? "Project" : "User") })), event.id, "nested_traversal")
       }).pipe(
         Effect.ensuring(
           Ref.update(inFlight, (map) => {

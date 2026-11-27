@@ -157,7 +157,7 @@
     ],
     "root": {
       "compatibility": {
-        "reportSha256": "b5f58ca4fd7651d7c0398cb5496fe334d1ad04baf5f2b3a9b2d9530c911c1d32",
+        "reportSha256": "d12e1486a55dd76f8a2fe1156ff64d0872d0cbde9ccb8c3bf11a105de2e25302",
         "verdict": "compatible"
       },
       "componentId": "agent:generic-bundle-agent",

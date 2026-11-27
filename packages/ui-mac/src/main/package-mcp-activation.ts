@@ -1,3 +1,12 @@
+import { pluginMcpLoopback } from "@opencode/util/codepuppy-plugin-mcp"
+import { bindPluginMcpProxy, revokePluginMcpProxy } from "./plugin-mcp-proxy"
+import { canonicalJson, sha256Hex } from "./ext-manifest-v2"
+import { basename, dirname } from "node:path"
+import { bindPluginMcp, PluginMcpBindingError } from "../shared/plugin-mcp-config"
+import { readInstalledPluginSettings } from "../shared/installed-plugin-settings"
+import { installedPluginDescription } from "./plugin-package-config"
+import { collectMcpFileRefPaths } from "./codepuppy-mcp-secrets"
+import { pluginEnvironment } from "./plugin-package-data"
 import { Schema } from "effect"
 import { ToolIdentity } from "@opencode/schema/tool-identity"
 import { realpathSync, statSync } from "node:fs"
@@ -9,7 +18,7 @@ import { projectServerConfig } from "../../../ext/src/engine-transforms"
 import type { EngineConnection } from "./engine-authorization"
 import { engineClient } from "./engine-client"
 import { launchedByPackageRunner, RUNNER_FIRST_FETCH_STARTUP_MS } from "./engine-explicit-config"
-import { readMcpLeafStrict } from "./ext-config"
+import { readMcpLeafStrict, validateServer } from "./ext-config"
 import { projectScopeIdentity, readPackageLedgerStateV1 } from "./ext-receipt-v2"
 import type { PackageGraphV1 } from "./ext-package-ledger-v3"
 import { credentialStores, readCredentialTable, readRegularFileNoFollow } from "./codepuppy-secret-files"
@@ -75,6 +84,7 @@ async function converge(name: string, deps: ManagedMcpConvergenceDeps): Promise<
   if (!state.ok) return [{ directory, name, status: "unavailable", detail: "Package state could not be read" }]
   const record = state.records.find((entry) => entry.kind === "mcp" && entry.name === name && entry.scope.kind === "global")
   const graph = state.packageGraphs.find((entry) => [entry.root, ...entry.children].some((node) => node.kind === "mcp" && node.name === name))
+  if (!record || record.desiredState === "disabled") revokePluginMcpProxy(name)
   const official = record && isOfficialConnector(name) ? name : undefined
   // Official recipe: materialize before applying an enabled intent, and clear after disconnecting a disabled one.
   const materialized = official && record?.desiredState === "enabled" ? settleOfficialConnectorCredential(official, "enabled") : true
@@ -87,7 +97,7 @@ async function converge(name: string, deps: ManagedMcpConvergenceDeps): Promise<
     // Read once per run, and only when some Location applies an enabled definition (a disable never opens a store).
     let read: ConnectorCredentials | undefined
     const credentials = () => (read ??= connectorCredentials(deps))
-    results = await Promise.all(directories.map((target) => applyAt(client, target, name, record, graph, allowSet, credentials)))
+    results = await Promise.all(directories.map((target) => applyAt(client, target, name, record, graph, allowSet, credentials, deps.root())))
   } catch {
     results = [{ directory, name, status: "unavailable", detail: "Engine is unavailable; installed content is retained" }]
   }
@@ -106,6 +116,7 @@ async function applyAt(
   graph: PackageGraphV1 | undefined,
   allowSet: ReturnType<typeof readPackageAllowSet>,
   credentials: () => ConnectorCredentials,
+  root: string,
 ): Promise<PackageMcpActivationV1> {
   const location = { directory: target }
   try {
@@ -120,7 +131,32 @@ async function applyAt(
         return { directory: target, name, status: "unavailable", detail: "Installed connector definition is unavailable" }
       // The credential table is read only for a definition that references a file (review R1 item 3: one unreadable store entry must not
       // make a connector without credentials unavailable).
-      const resolved = JSON.stringify(leaf.value).includes("{file:") ? resolveConnectorLeaf({ server: name, leaf: leaf.value, ...credentials() }) : leaf.value
+      const installed = graph?.pluginTree && installedPluginDescription(root, graph)
+      const settings = graph?.pluginTree && readInstalledPluginSettings(root, graph.pluginTree.storeKey)
+      const entry = installed && installed.description.entries.find(entry => entry.kind === "mcp" && installed.hostNames[entry.id] === name)
+      const refs = collectMcpFileRefPaths(leaf.value)
+      const bound = installed && settings && entry?.kind === "mcp" ? bindPluginMcp({ description: installed.description, entry, settings, pluginRoot: installed.pluginRoot, projectDir: target,
+        resolveEnvironment: pluginEnvironment,
+        resolveOptionSecret: reference => (resolveConnectorLeaf({ server: graph!.root.name, leaf: { environment: { value: reference } }, ...credentials() }) as { environment: { value: string } }).environment.value,
+        resolveSecret: id => refs.find(file => basename(file) === id) ? "{file:" + refs.find(file => basename(file) === id)! + "}" : undefined,
+      }) : leaf.value
+      const resolved = JSON.stringify(bound).includes("{file:") ? resolveConnectorLeaf({ server: name, leaf: bound, ...credentials() }) : bound
+      if (installed && bound.type === "remote") {
+        const config = projectServerConfig(resolved)
+        if (config?.type === "remote") {
+          const address = URL.canParse(config.url) && pluginMcpLoopback(new URL(config.url)) ? { ok: true as const } : validateServer({ type: "remote", url: config.url })
+          if (!address.ok) {
+            revokePluginMcpProxy(name)
+            await client.experimental.mcp.disconnect({ server: name, location }).catch(() => undefined)
+            return { directory: target, name, status: "failed", detail: address.reason }
+          }
+        }
+      }
+      if (installed && settings && entry?.kind === "mcp" && bound.type === "remote" && typeof bound.url === "string") await bindPluginMcpProxy(name, {
+        packageId: graph!.packageId, entryId: entry.id, generation: basename(dirname(installed.pluginRoot)),
+        definitionDigest: ("sha256:" + sha256Hex(canonicalJson([entry, settings.values, settings.versions]))) as `sha256:${string}`,
+        serverUrl: resolved && typeof resolved === "object" && "url" in resolved && typeof resolved.url === "string" ? resolved.url : bound.url,
+      }, entry.transport === "sse" ? "sse" : "http")
       const config = projectServerConfig(resolved)
       if (!config) return { directory: target, name, status: "failed", detail: "Installed connector definition is invalid" }
       const startup = launchedByPackageRunner(config) && !config.timeout ? { timeout: { startup: RUNNER_FIRST_FETCH_STARTUP_MS } } : {}
@@ -153,7 +189,12 @@ async function applyAt(
       status: server?.status.status ?? "not-loaded",
       ...(server?.status.status === "failed" ? { detail: server.status.error } : {}),
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof PluginMcpBindingError) {
+      revokePluginMcpProxy(name)
+      await client.experimental.mcp.disconnect({ server: name, location }).catch(() => undefined)
+      return { directory: target, name, status: "failed", detail: error.message }
+    }
     return { directory: target, name, status: "unavailable", detail: "Connector could not be applied; installed content is retained" }
   }
 }

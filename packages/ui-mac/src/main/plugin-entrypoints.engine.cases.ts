@@ -5,6 +5,8 @@ import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { engineSandbox, assertEngineSandboxed } from "../../test-component/engine-sandbox"
+import { publishPluginDataHome } from "./plugin-package-data"
+import { pluginHostName } from "./plugin-package-install"
 import { entrypointsFetch, provenance, verifyEntrySamples } from "../../test-fixtures/plugin-helper/entrypoints/fixture"
 import type { Running } from "../../test-component/codepuppy-engine"
 import type { InstallOutcomeV1 } from "../shared/plugin-install"
@@ -12,6 +14,9 @@ import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import type { SourceSearchResultV1, PreparePluginSourceResultV1 } from "./plugin-sources"
 
 const sandbox = engineSandbox()
+// server.ts publishes the generation's engine data home before main installs anything (#1776 793de9eb96, plugin-package-data.ts);
+// these cases drive main's installer without server.ts, so they publish the sandbox engine's data home the same way.
+publishPluginDataHome(sandbox.data)
 const nativeFetch = globalThis.fetch
 const previousCwd = process.cwd()
 const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
@@ -249,7 +254,9 @@ async function verifyOpenCodeLifecycle(packageId: string, unsupported: { kind: s
   const instruction = await (await skillTool()).execute({ id: selected.id }, skillContext)
   expect(instruction.output.name).toBe(selected.name)
   expect(instruction.content).toContain(selected.content.trim())
-  expect(state.records.every(record => record.desiredState === "enabled")).toBe(true)
+  // AC-14 (docs/specs/local-plugin-install/plan.md r3): the content transaction returns disabled first and activation enables
+  // it one event turn later, so the enabled state is read after the skills became available, not from the post-install snapshot.
+  expect((await ledger()).records.every(record => record.desiredState === "enabled")).toBe(true)
   expect(nativeLoads).toBe(0)
   const exclusivePaths = state.records.flatMap(record => record.files ?? [])
   expect(exclusivePaths.length).toBeGreaterThan(0)
@@ -324,7 +331,9 @@ test("BC5 standalone official Registry GitHub uses main-owned credentials, runti
   scan(secretRoot)
   expect(tokenFiles.length).toBe(1)
   const { probe } = await import("../../test-component/codepuppy-engine")
-  const tools = async () => (await probe().ctx.tool.list()).filter((tool: { options?: { namespace?: string } }) => tool.options?.namespace === "github-mcp-server")
+  // c6197943ad: the Registry server's MCP is installed under the product's package-scoped host name, which is its tools' namespace.
+  const namespace = pluginHostName({ kind: "mcp", sourceName: "github-mcp-server", sourcePath: "" }, packageId, new Set(), () => true)
+  const tools = async () => (await probe().ctx.tool.list()).filter((tool: { options?: { namespace?: string } }) => tool.options?.namespace === namespace)
   try {
     await until(async () => (await tools()).length === 1, "Registry GitHub protocol fixture tool")
   } catch (error) {
@@ -346,25 +355,28 @@ test("BC5 standalone official Registry GitHub uses main-owned credentials, runti
 }, 90_000)
 
 test("BC5 Figma plugin and explicitly official MCP requests install only their verified recorded target", async () => {
+  // Judge only what this case installs: graphs another case left behind (e.g. after its own failure) are not this case's result.
+  const existing = new Set((await ledger()).packageGraphs.map(graph => graph.packageId))
+  const own = async () => (await ledger()).packageGraphs.filter(graph => !existing.has(graph.packageId))
   const plugin = await chatSearch(provenance.figma.queries[0]!)
   expect(plugin.candidates[0]).toMatchObject({ source: "claude-marketplace", name: "figma" })
   const pluginId = await chatInstall(plugin.candidates[0]!.id)
   expect(pluginId).toBe("claude:figma")
-  const state = await ledger()
-  expect(state.packageGraphs).toHaveLength(1)
-  expect(state.packageGraphs[0]!.source).toMatchObject({ kind: "marketplace", ecosystem: "claude", commit: provenance.figma.pluginCommit })
+  const installed = await own()
+  expect(installed).toHaveLength(1)
+  expect(installed[0]!.source).toMatchObject({ kind: "marketplace", ecosystem: "claude", commit: provenance.figma.pluginCommit })
   expect(await invoke("ext-uninstall-package", pluginId)).toMatchObject({ ok: true })
   const official = await invoke<SourceSearchResultV1>("ext-sources-search", provenance.figma.queries[1]!)
   expect(official.candidates).toHaveLength(1)
   expect(official.candidates[0]).toMatchObject({ source: "mcp-registry", name: "com.figma.mcp/mcp" })
   const packageId = await sourceInstall(official.candidates[0]!.id)
-  expect((await ledger()).packageGraphs).toMatchObject([{ packageId, source: { kind: "mcp-registry", serverName: "com.figma.mcp/mcp", version: "1.0.3" } }])
+  expect(await own()).toMatchObject([{ packageId, source: { kind: "mcp-registry", serverName: "com.figma.mcp/mcp", version: "1.0.3" } }])
   const { readMcpLeafStrict } = await import("./ext-config")
-  const graph = (await ledger()).packageGraphs[0]!
+  const graph = (await own())[0]!
   expect(readMcpLeafStrict(graph.root.name)).toMatchObject({ ok: true, value: { url: "https://mcp.figma.com/mcp" } })
   const account = await invoke<PackageAuthorizationResultV1>("ext-package-authorization", packageId)
   expect(account.ok && account.items.some(item => item.kind === "mcp-oauth" && !item.authenticated)).toBe(true)
   expect(await invoke("ext-uninstall-package", packageId)).toMatchObject({ ok: true })
-  expect((await ledger()).packageGraphs).toEqual([])
+  expect(await own()).toEqual([])
   unchangedProject()
 }, 90_000)

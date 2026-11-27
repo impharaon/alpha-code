@@ -527,3 +527,87 @@ function referenceConfig(file: string, references: Record<string, string>) {
 function title(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
+
+
+function configHookHandlers(beforeConfigChange: import("@opencode/plugin/codepuppy-package-runtime").PackageRuntimeHandlers["beforeConfigChange"]): import("@opencode/plugin/codepuppy-package-runtime").PackageRuntimeHandlers {
+  return { beforeConfigChange, hasElicitationHandlers: () => false, instructionsLoaded: async () => {}, beforeCompaction: async () => ({ proceed: true }), afterCompaction: async () => {}, beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer }
+}
+
+it.live("configuration hooks retain rejected file revisions across unrelated native rescans", () => Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(Effect.flatMap(tmp => Effect.gen(function* () {
+  const project = path.join(tmp.path, "project")
+  const rejected = path.join(project, "opencode.jsonc")
+  const other = path.join(project, "opencode.json")
+  yield* Effect.promise(() => Bun.write(rejected, JSON.stringify({ shell: "initial" })))
+  yield* Effect.gen(function* () {
+    const config = yield* Config.Service
+    expect(Config.latest(yield* config.entries(), "shell")).toBe("initial")
+    const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+    const seen: Parameters<ReturnType<typeof configHookHandlers>["beforeConfigChange"]>[0][] = []
+    let allow = false
+    const registration = runtime.registerPackageRuntime({ directory: project }, configHookHandlers(async input => { seen.push(input); return { apply: input.filePath !== rejected || allow } }))
+    yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+    yield* Effect.promise(() => Bun.write(rejected, JSON.stringify({ shell: "rejected" })))
+    yield* waitUntil(Effect.sync(() => seen.some(input => input.filePath === rejected)))
+    expect(Config.latest(yield* config.entries(), "shell")).toBe("initial")
+    expect(seen.find(input => input.filePath === rejected)?.source).toBe("project_settings")
+    yield* Effect.promise(() => Bun.write(other, JSON.stringify({ references: { fixture: "/rescan" } })))
+    yield* waitUntil(config.entries().pipe(Effect.map(entries => Config.latest(entries, "references")?.fixture === "/rescan")))
+    expect(Config.latest(yield* config.entries(), "shell")).toBe("initial")
+    expect(JSON.parse(yield* Effect.promise(() => Bun.file(rejected).text())).shell).toBe("rejected")
+    expect(new Set(seen.filter(input => input.filePath === rejected).map(input => input.occurrenceId)).size).toBe(1)
+    allow = true
+    yield* Effect.promise(() => Bun.write(other, JSON.stringify({ references: { fixture: "/allowed" } })))
+    yield* waitUntil(config.entries().pipe(Effect.map(entries => Config.latest(entries, "shell") === "rejected")))
+  }).pipe(Effect.provide(liveConfig(project)))
+}))))
+
+it.live("skill configuration hooks retain rejected bytes through config rescans then release them", () => Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(Effect.flatMap(tmp => Effect.gen(function* () {
+  const project = path.join(tmp.path, "project")
+  const file = path.join(project, "opencode.json")
+  const skill = path.join(project, ".opencode/skills/plugin-structure/SKILL.md")
+  // Native skill input from this module's existing upstream fixture; package source conversion is covered in ext.
+  const source = yield* Effect.promise(() => Bun.file(path.join(import.meta.dir, "fixture/skills/first-source/first/SKILL.md")).text())
+  yield* Effect.promise(async () => { await Bun.write(file, JSON.stringify({ shell: "initial" })); await Bun.write(skill, source) })
+  yield* Effect.gen(function* () {
+    const config = yield* Config.Service
+    const plugins = yield* Plugin.Service
+    const skills = yield* Skill.Service
+    yield* ConfigSkillPlugin.Plugin.effect(yield* PluginHost.make(plugins, "config-skill-hook"))
+    expect((yield* skills.list()).some(value => value.path === skill)).toBe(true)
+    const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+    const seen: Parameters<ReturnType<typeof configHookHandlers>["beforeConfigChange"]>[0][] = []
+    let allow = false
+    const registration = runtime.registerPackageRuntime({ directory: project }, configHookHandlers(async input => { seen.push(input); return { apply: input.source !== "skills" || allow } }))
+    yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+    yield* Effect.promise(() => Bun.write(skill, source + "\nchanged_skill_revision\n"))
+    yield* waitUntil(Effect.sync(() => seen.some(input => input.filePath === skill)))
+    expect((yield* skills.list()).find(value => value.path === skill)?.content).not.toContain("changed_skill_revision")
+    yield* Effect.promise(() => Bun.write(file, JSON.stringify({ shell: "rescan" })))
+    yield* waitUntil(config.entries().pipe(Effect.map(entries => Config.latest(entries, "shell") === "rescan")))
+    yield* waitUntil(Effect.sync(() => seen.filter(input => input.filePath === skill).length > 1))
+    expect((yield* skills.list()).find(value => value.path === skill)?.content).not.toContain("changed_skill_revision")
+    expect(new Set(seen.filter(input => input.filePath === skill).map(input => input.occurrenceId)).size).toBe(1)
+    expect(yield* Effect.promise(() => Bun.file(skill).text())).toContain("changed_skill_revision")
+    allow = true
+    yield* Effect.promise(() => Bun.write(file, JSON.stringify({ shell: "release" })))
+    yield* waitUntil(skills.list().pipe(Effect.map(values => !!values.find(value => value.path === skill)?.content.includes("changed_skill_revision"))))
+  }).pipe(Effect.provide(liveConfig(project)))
+}))))
+
+it.live("managed configuration changes are observed but package hooks cannot reject policy settings", () => Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(Effect.flatMap(tmp => Effect.gen(function* () {
+  const project = path.join(tmp.path, "project")
+  const policy = path.join(tmp.path, "managed")
+  const file = path.join(policy, "opencode.json")
+  yield* Effect.promise(async () => { await fs.mkdir(project, { recursive: true }); await Bun.write(file, JSON.stringify({ shell: "initial-policy" })) })
+  yield* Effect.gen(function* () {
+    const config = yield* Config.Service
+    expect(Config.latest(yield* config.entries(), "shell")).toBe("initial-policy")
+    const runtime = yield* Effect.promise(() => import("@opencode/plugin/codepuppy-package-runtime"))
+    const seen: string[] = []
+    const registration = runtime.registerPackageRuntime({ directory: project }, configHookHandlers(async input => { seen.push(input.source); return { apply: false } }))
+    yield* Effect.addFinalizer(() => Effect.sync(() => registration.dispose()))
+    yield* Effect.promise(() => Bun.write(file, JSON.stringify({ shell: "new-policy" })))
+    yield* waitUntil(config.entries().pipe(Effect.map(entries => Config.latest(entries, "shell") === "new-policy")))
+    expect(seen).toContain("policy_settings")
+  }).pipe(Effect.provide(liveConfig(project, undefined, { global: true, system: policy })))
+}))))

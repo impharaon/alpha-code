@@ -15,6 +15,7 @@ mock.module("./policy/index", () => ({
   registerPolicy: async () => {
     order.push("registerPolicy")
     return {
+      onPackagePermissionRequest: () => () => {},
       dispose: () => { order.push("disposePolicy") },
       videoToolFacts: async () => () => ({ kind: "builtin" }),
       seal: async () => {
@@ -35,10 +36,18 @@ function recordingContext(directory: string, label: () => string) {
       {
         get: (_target, method: string) => {
           if (name === "event" && method === "subscribe")
-            return () => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}), return: async () => ({ done: true, value: undefined }) }) })
+            return (options: { signal?: AbortSignal } = {}) => ({
+              [Symbol.asyncIterator]: () => ({
+                next: () => new Promise<IteratorResult<never>>(resolve => {
+                  if (options.signal?.aborted) { resolve({ done: true, value: undefined }); return }
+                  options.signal?.addEventListener("abort", () => resolve({ done: true, value: undefined }), { once: true })
+                }),
+                return: async () => ({ done: true, value: undefined }),
+              }),
+            })
           return async () => {
             order.push(`${label()}:${name}.${method}`)
-            return { dispose: async () => {} }
+            return name === "session" && method === "list" ? { data: [], cursor: {} } : { dispose: async () => {} }
           }
         },
       },

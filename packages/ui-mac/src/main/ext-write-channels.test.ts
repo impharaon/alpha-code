@@ -412,7 +412,7 @@ test("真实 catalog MCP 写通道结果只公开状态且不回显提交的 sec
   // 用词边界而非 toContain:`"11 pass"` 含 `"1 pass"`、`"10 fail"` 含 `"0 fail"`,
   // 子串匹配会在用例数增减时假绿。实际子用例覆盖目录/包读取、唯一安装入口、
   // main-owned 阶段、聊天 canary、授权只读、whole capture 和 renderer 边界；没有聊天确认阶段。
-  expect(output).toMatch(/\b26 pass\b/)
+  expect(output).toMatch(/\b27 pass\b/)
   expect(output).toMatch(/\b0 fail\b/)
 }, 120_000)
 

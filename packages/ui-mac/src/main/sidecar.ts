@@ -1,3 +1,4 @@
+import { publishPluginMcpProxies } from "@opencode/util/codepuppy-plugin-mcp"
 import * as fs from "node:fs"
 import { registerHooks } from "node:module"
 import * as http from "node:http"
@@ -112,14 +113,17 @@ type StartCommand = {
    * 坏了走与「darwin 缺围栏」同一条响亮失败路。
    */
   credentials: unknown
+  pluginMcpProxies?: unknown
 }
 
 type StopCommand = SidecarStopCommand
-type SidecarCommand = StartCommand | StopCommand | WorkspaceWriteProbeCommand | WorkspaceWriteGrantCommand | ProjectConfigViewRequest | CredentialsMessage
+type PluginMcpProxyUpdate = { type: "plugin-mcp-proxies"; revision: number; bindings: unknown }
+type SidecarCommand = PluginMcpProxyUpdate | StartCommand | StopCommand | WorkspaceWriteProbeCommand | WorkspaceWriteGrantCommand | ProjectConfigViewRequest | CredentialsMessage
 
 // #613:注入失败随 ready 上报(server.ts 持有同构镜像)——引擎照常起,但 main 必须知情。
 // ready 变体的形状与构造住在 sidecar-ready-message.ts(那里有真运行时闸门)。
 type SidecarMessage =
+  | { type: "plugin-mcp-proxies-ready"; revision: number }
   | SidecarReadyMessage
   | { type: "stopped" }
   | { type: "error"; error: { message: string; stack?: string } }
@@ -151,6 +155,13 @@ parentPort.on("message", (event) => {
   if (connectorLaunch?.receive(event.data)) return
   const command = parseCommand(event.data)
   if (!command) return
+  if (command.type === "plugin-mcp-proxies") {
+    try {
+      publishPluginMcpProxies(command.bindings)
+      parentPort.postMessage({ type: "plugin-mcp-proxies-ready", revision: command.revision })
+    } catch { console.warn("Malformed plugin MCP proxy bindings from main were dropped") }
+    return
+  }
   if (command.type === "credentials") {
     if ("id" in command) credentials.receive(command)
     else publishCodePuppyCredentials(command.credentials) // T2 续期推送
@@ -193,6 +204,7 @@ async function start(command: StartCommand) {
     fenceAddon = installProcessFence(command)
     // DESIGN-stored-credentials-fence §4.2 T1:在注入与 import 引擎之前发布主进程交来的整表,再装上「装载前拉取」的来源(P)。
     publishCodePuppyCredentials(parseCodePuppyCredentials(command.credentials))
+    publishPluginMcpProxies(command.pluginMcpProxies ?? {})
     installCodePuppyCredentialSource(() => credentials.pull())
     // `#1698`(§4.2 第 2 步):解析并发布启动文档 —— 之后本进程里的注入、ext 与引擎只从它读 main 的决定。
     const bootstrap = acceptCodePuppyBootstrap(command.bootstrap)
@@ -353,6 +365,7 @@ function useEnvProxy() {
 
 function parseCommand(value: unknown): SidecarCommand | undefined {
   if (!value || typeof value !== "object") return
+  if ("type" in value && value.type === "plugin-mcp-proxies" && "revision" in value && Number.isSafeInteger(value.revision) && "bindings" in value) return value as PluginMcpProxyUpdate
   const command = value as Partial<StartCommand | StopCommand | WorkspaceWriteProbeCommand | WorkspaceWriteGrantCommand | ProjectConfigViewRequest>
   if (command.type === "stop") return parseSidecarStopCommand(value)
   if (command.type === "write-probe") return parseWriteProbeCommand(value)
@@ -377,6 +390,7 @@ function parseCommand(value: unknown): SidecarCommand | undefined {
     packageManagerEnvironment: command.packageManagerEnvironment,
     bootstrap: command.bootstrap,
     credentials: command.credentials,
+    pluginMcpProxies: command.pluginMcpProxies,
   }
 }
 

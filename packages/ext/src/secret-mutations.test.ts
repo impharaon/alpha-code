@@ -86,7 +86,7 @@ for (const operation of ["write", "edit", "patch"] as const) test(`multiline rea
   expect(actual.includes(ProtectedFiles.REDACTED)).toBe(false)
 })
 
-for (const operation of ["write", "edit", "patch"] as const) test(`embedded URL password view restores through ${operation}`, async () => {
+for (const operation of ["write", "edit", "patch"] as const) for (const change of ["port", "host"] as const) test(`embedded URL password view restores through ${operation} (${change})`, async () => {
   const { projectEnvRows } = await import("./secret-read")
   const { roots } = await setup()
   const source = "DATABASE_URL=postgres://app:fixture-db-pass@db:5432/x\nPORT=3000\n"
@@ -94,16 +94,37 @@ for (const operation of ["write", "edit", "patch"] as const) test(`embedded URL 
   const rows = source.trimEnd().split("\n").map((text, index) => ({ number: index + 1, text }))
   const view = projectEnvRows([source], rows, (text) => text).join("\n")
   expect(view).toBe("DATABASE_URL=postgres://app:[REDACTED]@db:5432/x\nPORT=3000")
-  const input = operation === "write" ? { operation, path: ".env", content: view.replace("3000", "3001") + "\n" }
-    : operation === "edit" ? { operation, path: ".env", oldString: view, newString: view.replace("3000", "3001") }
-    : { operation, patchText: ["*** Begin Patch", "*** Update File: .env", "@@", ` ${view.split("\n")[0]}`, "-PORT=3000", "+PORT=3001", "*** End Patch"].join("\n") }
+  // The assistant may also edit the masked value itself: the host changes, the password stays.
+  const edit = (text: string) => change === "port" ? text.replace("3000", "3001") : text.replace("@db:5432", "@db2:5432")
+  const [url, port] = view.split("\n")
+  const input = operation === "write" ? { operation, path: ".env", content: edit(view) + "\n" }
+    : operation === "edit" ? { operation, path: ".env", oldString: view, newString: edit(view) }
+    : { operation, patchText: ["*** Begin Patch", "*** Update File: .env", "@@", ...(change === "port" ? [` ${url}`, `-${port}`, `+${edit(port)}`] : [`-${url}`, `+${edit(url)}`, ` ${port}`]), "*** End Patch"].join("\n") }
   const { mutation } = await restoreEnvMutation(input, roots)
   const actual = mutation.operation === "write" ? mutation.content : mutation.operation === "edit" ? source.replace(mutation.oldString, mutation.newString) : (() => {
     const parsed = Patch.parse(mutation.patchText)
     if (Result.isFailure(parsed) || parsed.success[0].type !== "update") throw new Error("invalid restored patch")
     return Patch.derive(".env", parsed.success[0].chunks, source).content
   })()
-  expect(actual === source.replace("3000", "3001")).toBe(true)
+  expect(actual === edit(source)).toBe(true)
+})
+
+for (const operation of ["edit", "patch"] as const) test(`longer embedded views keep later occurrence positions through ${operation}`, async () => {
+  const { roots } = await setup()
+  // The first masked value is much longer than the placeholder, before a second occurrence of the same key.
+  const source = `DATABASE_URL=postgres://app:fixture-first@db/${"x".repeat(80)}\nPORT=3000\nDATABASE_URL=postgres://b:fixture-second@h\nPORT=3000\n`
+  await writeFile(path.join(roots.directory, ".env"), source)
+  const second = "DATABASE_URL=postgres://b:[REDACTED]@h"
+  const input = operation === "edit" ? { operation, path: ".env", oldString: `${second}\nPORT=3000`, newString: `${second}\nPORT=3001` }
+    : { operation, patchText: ["*** Begin Patch", "*** Update File: .env", "@@", ` ${second}`, "-PORT=3000", "+PORT=3001", "*** End Patch"].join("\n") }
+  const { mutation } = await restoreEnvMutation(input, roots)
+  const actual = mutation.operation === "edit" ? source.replace(mutation.oldString, mutation.newString) : (() => {
+    if (mutation.operation !== "patch") throw new Error("wrong operation")
+    const parsed = Patch.parse(mutation.patchText)
+    if (Result.isFailure(parsed) || parsed.success[0].type !== "update") throw new Error("invalid restored patch")
+    return Patch.derive(".env", parsed.success[0].chunks, source).content
+  })()
+  expect(actual === `${source.slice(0, source.lastIndexOf("PORT=3000"))}PORT=3001\n`).toBe(true)
 })
 
 test("compact edits still replace every multiline assignment occurrence", async () => {

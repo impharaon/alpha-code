@@ -81,8 +81,26 @@ test("env files collect only credential-named values", () => {
 test("embedded URL passwords are credential fields in every format", () => {
   // Node dotenv assignment grammar and static YAML mapping syntax; fixture values only.
   const env: ProtectedFiles.ProtectedFile = { rule: "env", path: "/fixture/.env", profile: "env", format: "env", view: "variables" }
-  const source = "DATABASE_URL=postgres://app:fixture-db-pass@db:5432/x\nREDIS_URL='redis://:fixture-redis-pass@cache:6379/0'\nSITE_URL=https://example.com/path\nDB_HOST=db\n"
-  expect(strings(credentialValues(env, Buffer.from(source)))).toEqual(["fixture-db-pass", "fixture-redis-pass"])
+  const rows = [
+    ["DATABASE_URL=postgres://app:fixture-db-pass@db:5432/x", ["fixture-db-pass"]],
+    ["REDIS_URL='redis://:fixture-redis-pass@cache:6379/0'", ["fixture-redis-pass"]],
+    // Multi-host URLs (MongoDB replica set, libpq) and several URLs in one value.
+    ["MONGO_URL=mongodb://app:fixture-mongo-pass@h1:27017,h2:27017/db?replicaSet=rs0", ["fixture-mongo-pass"]],
+    ["PG_HOSTS=postgresql://app:fixture-pq-pass@h1:5432,h2:5432/db", ["fixture-pq-pass"]],
+    ["BOTH=postgres://a:fixture-p1@h1/x,postgres://b:fixture-p2@h2/y", ["fixture-p1", "fixture-p2"]],
+    ["AT_SIGN=postgres://app:fixture-p@ss@db/x", ["fixture-p@ss"]],
+    // The URL shape without an extractable password hides the whole value.
+    ["EMPTY_URL=postgres://app:@db/x", ["postgres://app:@db/x"]],
+    // Invalid UTF-8 percent escapes keep the written form instead of failing every refresh.
+    ["ENCODED=postgres://app:fixture%9Apass@db/x", ["fixture%9Apass"]],
+    // Credential-keyed segments inside a value: ADO/ODBC strings and query parameters.
+    ["CONN=Server=db;Database=app;User Id=svc;Password=fixture-ado-pass;", ["fixture-ado-pass"]],
+    ["ODBC=Driver={SQL};Pwd={fixture-odbc;pass};", ["fixture-odbc;pass"]],
+    ["API=https://api.example.com/v1?user=svc&password=fixture-query-pass&pwd=fixture-pwd#top", ["fixture-query-pass", "fixture-pwd"]],
+    ["SITE_URL=https://example.com/path?page=2", []],
+    ["DB_HOST=db", []],
+  ] as const
+  for (const [line, expected] of rows) expect(strings(credentialValues(env, Buffer.from(`${line}\n`))), line).toEqual([...expected])
   const document = "database:\n  url: postgres://svc:fixture-yaml-pass@db/app\n  host: db\n"
   expect(strings(credentialValues(file("credential-document", "assignments"), Buffer.from(document)))).toEqual(["fixture-yaml-pass"])
 })

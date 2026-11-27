@@ -256,6 +256,13 @@ test("public values preserve credential names", () => {
       "AUTH",
       "AUTHORIZATION",
       "PRIVATE",
+      // Concatenated names end with a credential word.
+      "PGPASSWORD",
+      "APIKEY",
+      "SECRETKEY",
+      "ACCESSTOKEN",
+      "oauth",
+      "Pwd",
     ]) {
       expect(ProtectedFiles.isPublicValue({ name, value }), name).toBe(false)
     }
@@ -287,6 +294,7 @@ test("public values preserve credential names", () => {
     expect(ProtectedFiles.isPublicValue({ name: "VALUE", value }), String(value)).toBe(false)
   }
   expect(ProtectedFiles.isPublicValue({ name: "KEYBOARD", value: "3000" })).toBe(true)
+  expect(ProtectedFiles.isPublicValue({ name: "PASSAGE_COUNT", value: "3000" })).toBe(true)
 })
 
 test("one published rule reaches all rule consumers", () => {

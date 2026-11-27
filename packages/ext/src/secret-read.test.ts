@@ -40,6 +40,8 @@ test("env read view keeps ordinary values visible", async () => {
 test("env read view masks only embedded URL passwords", async () => {
   const source = "DATABASE_URL=postgres://app:fixture-db-pass@db:5432/x\nDB_HOST=db\n"
   expect(project(source, await read(source)).output).toMatchObject({ content: "DATABASE_URL=postgres://app:[REDACTED]@db:5432/x\nDB_HOST=db\n" })
+  const forms = "MONGO_URL=mongodb://app:fixture-mongo-pass@h1:27017,h2:27017/db?replicaSet=rs0\nBOTH=postgres://a:fixture-p1@h1/x,postgres://b:fixture-p2@h2/y\nCONN='Server=db;User Id=svc;Password=fixture-ado-pass;'\nAPI=https://api.example.com/v1?user=svc&password=fixture-query-pass\n"
+  expect(project(forms, await read(forms)).output).toMatchObject({ content: "MONGO_URL=mongodb://app:[REDACTED]@h1:27017,h2:27017/db?replicaSet=rs0\nBOTH=postgres://a:[REDACTED]@h1/x,postgres://b:[REDACTED]@h2/y\nCONN='Server=db;User Id=svc;Password=[REDACTED];'\nAPI=https://api.example.com/v1?user=svc&password=[REDACTED]\n" })
   // A line truncated inside the password shows none of it.
   const long = `DATABASE_URL=postgres://app:${"p".repeat(4000)}@db/x\n`
   const truncated = project(long, await read(long))

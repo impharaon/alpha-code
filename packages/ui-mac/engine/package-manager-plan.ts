@@ -1,5 +1,5 @@
 import { basename, resolve } from "node:path"
-import { scanPackageManagerSource, resolvePackageManagerWord, shellName } from "virtual:codepuppy-shell-scan"
+import { scanPackageManagerSource, resolvePackageManagerWord, shellName, shellPs } from "virtual:codepuppy-shell-scan"
 import type { ShellPrivateInput } from "@opencode/plugin/codepuppy-package-manager"
 import type { PackageManagerSyntax } from "../src/shared/package-manager-syntax"
 
@@ -19,6 +19,8 @@ type Leaf = Exclude<PackageManagerSyntax, { kind: "separator" }>
 export function planPackageManagerExecution(input: {
   manager: "homebrew"; command: string; shell: string; cwd: string; env: Readonly<Record<string, string>>
 }): readonly PackageManagerCommand[] {
+  // PowerShell-class shells are not rewritten; the original spawn runs.
+  if (shellPs(input.shell)) return []
   const dialect = shellDialect(input.shell)
   const facts = scanPackageManagerSource(input.command, dialect)
   if (!facts) return []

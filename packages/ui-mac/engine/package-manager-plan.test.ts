@@ -45,6 +45,9 @@ test("H1 plans only executable brew words with source spans and deterministic va
   expect(plan("time brew --prefix")[0].wrapper).toBe("time")
   expect(plan("noglob exec brew --prefix", "/bin/zsh")[0].exec).toBe(true)
   expect(plan("/opt/homebrew/bin/brew --prefix")[0].program).toBe("/opt/homebrew/bin/brew")
+  // PowerShell-class shells (ShellSelect.ps) are not POSIX: no rewrite, the original spawn runs.
+  expect(plan("brew --prefix", "/usr/local/bin/pwsh")).toEqual([])
+  expect(plan("brew --prefix", "/opt/homebrew/bin/powershell")).toEqual([])
 })
 
 test("H1 follows successful cd and literal exports without taking skipped branches", () => {

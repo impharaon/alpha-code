@@ -12,6 +12,7 @@ interface ImportMeta {
 
 declare module "virtual:codepuppy-shell-scan" {
   export function shellName(file: string): string
+  export function shellPs(file: string): boolean
   export function scanPackageManagerSource(input: string, dialect: "bash" | "zsh" | "posix"): import("../shared/package-manager-syntax").PackageManagerSyntax[] | undefined
   export function resolvePackageManagerWord(input: string, environment: Readonly<Record<string, string | null>>, dialect: "bash" | "zsh" | "posix", kind: "word" | "assignment"): string | undefined
 }

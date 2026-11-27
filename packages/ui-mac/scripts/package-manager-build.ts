@@ -10,7 +10,10 @@ export function packageManagerScannerCode() {
   const select = readFileSync(resolve(dirname(PACKAGE_MANAGER_SCANNER_SOURCE), "select.ts"), "utf8")
   const name = /export function name\(file: string\) \{\n  if \(process.platform === "win32"\)[^\n]*\n(  return [^\n]+)\n\}/.exec(select)
   if (!name) throw new Error("ShellSelect.name POSIX projection moved")
-  return `import path from "node:path"\n${packageManagerScanSource(readFileSync(PACKAGE_MANAGER_SCANNER_SOURCE, "utf8"))}\nexport function shellName(file: string) {\n${name[1]}\n}`
+  // The permission authority's shell classes (ShellSelect META/ps), projected rather than restated.
+  const meta = /\nconst META: Record<string, \{[^}]*\}> = \{\n[\s\S]*?\n\}\n/.exec(select)
+  if (!meta || !select.includes("export function ps(file: string) {\n  return meta(file)?.ps === true\n}")) throw new Error("ShellSelect.ps projection moved")
+  return `import path from "node:path"\n${packageManagerScanSource(readFileSync(PACKAGE_MANAGER_SCANNER_SOURCE, "utf8"))}\nexport function shellName(file: string) {\n${name[1]}\n}${meta[0]}export function shellPs(file: string) {\n  return META[shellName(file)]?.ps === true\n}\n`
 }
 
 export function packageManagerScannerPlugin() {

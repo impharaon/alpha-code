@@ -81,7 +81,11 @@
               "type": "string"
             },
             "ecosystem": {
-              "enum": ["claude", "codex", "opencode"]
+              "enum": [
+                "claude",
+                "codex",
+                "opencode"
+              ]
             },
             "entryName": {
               "type": "string"
@@ -204,7 +208,8 @@
                   "instruction",
                   "invocation",
                   "display",
-                  "mcpDependencies"
+                  "mcpDependencies",
+                  "dependencies"
                 ],
                 "properties": {
                   "id": {
@@ -225,42 +230,7 @@
                     "type": "string"
                   },
                   "instruction": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "invocation": {
                     "type": "object",
@@ -270,7 +240,11 @@
                       "userInvocable",
                       "implicitInvocation",
                       "allowedTools",
-                      "deniedTools"
+                      "deniedTools",
+                      "arguments",
+                      "argumentSyntax",
+                      "paths",
+                      "preloadSkills"
                     ],
                     "properties": {
                       "argumentHint": {
@@ -373,16 +347,119 @@
                             }
                           }
                         }
+                      },
+                      "arguments": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "argumentSyntax": {
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "opencode",
+                          "literal"
+                        ]
+                      },
+                      "effort": {
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      },
+                      "paths": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "preloadSkills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "memory": {
+                        "enum": [
+                          "user",
+                          "project",
+                          "local"
+                        ]
+                      },
+                      "maxTurns": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "background": {
+                        "type": "boolean"
                       }
                     }
                   },
                   "display": {
-                    "type": "object"
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "displayName": {
+                        "type": "string"
+                      },
+                      "shortDescription": {
+                        "type": "string"
+                      },
+                      "iconSmall": {
+                        "type": "string"
+                      },
+                      "iconLarge": {
+                        "type": "string"
+                      },
+                      "brandColor": {
+                        "type": "string"
+                      },
+                      "defaultPrompt": {
+                        "type": "string"
+                      }
+                    }
                   },
                   "mcpDependencies": {
                     "type": "array",
                     "items": {
                       "type": "string"
+                    }
+                  },
+                  "dependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "value"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "mcp"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "transport": {
+                          "enum": [
+                            "stdio",
+                            "http",
+                            "sse"
+                          ]
+                        },
+                        "url": {
+                          "$ref": "#/$defs/Text"
+                        }
+                      }
                     }
                   }
                 }
@@ -414,42 +491,7 @@
                     "const": "command"
                   },
                   "instruction": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "invocation": {
                     "type": "object",
@@ -459,7 +501,11 @@
                       "userInvocable",
                       "implicitInvocation",
                       "allowedTools",
-                      "deniedTools"
+                      "deniedTools",
+                      "arguments",
+                      "argumentSyntax",
+                      "paths",
+                      "preloadSkills"
                     ],
                     "properties": {
                       "argumentHint": {
@@ -562,6 +608,56 @@
                             }
                           }
                         }
+                      },
+                      "arguments": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "argumentSyntax": {
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "opencode",
+                          "literal"
+                        ]
+                      },
+                      "effort": {
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      },
+                      "paths": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "preloadSkills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "memory": {
+                        "enum": [
+                          "user",
+                          "project",
+                          "local"
+                        ]
+                      },
+                      "maxTurns": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "background": {
+                        "type": "boolean"
                       }
                     }
                   }
@@ -594,42 +690,7 @@
                     "const": "agent"
                   },
                   "instruction": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "invocation": {
                     "type": "object",
@@ -639,7 +700,11 @@
                       "userInvocable",
                       "implicitInvocation",
                       "allowedTools",
-                      "deniedTools"
+                      "deniedTools",
+                      "arguments",
+                      "argumentSyntax",
+                      "paths",
+                      "preloadSkills"
                     ],
                     "properties": {
                       "argumentHint": {
@@ -742,6 +807,56 @@
                             }
                           }
                         }
+                      },
+                      "arguments": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "argumentSyntax": {
+                        "enum": [
+                          "claude",
+                          "codex",
+                          "opencode",
+                          "literal"
+                        ]
+                      },
+                      "effort": {
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
+                      },
+                      "paths": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "preloadSkills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "memory": {
+                        "enum": [
+                          "user",
+                          "project",
+                          "local"
+                        ]
+                      },
+                      "maxTurns": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "background": {
+                        "type": "boolean"
                       }
                     }
                   }
@@ -780,122 +895,17 @@
                   "command": {
                     "type": "array",
                     "items": {
-                      "type": "array",
-                      "items": {
-                        "oneOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "binding"
-                            ],
-                            "properties": {
-                              "binding": {
-                                "enum": [
-                                  "pluginRoot",
-                                  "skillDir",
-                                  "projectDir"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "secret"
-                            ],
-                            "properties": {
-                              "secret": {
-                                "type": "string"
-                              }
-                            }
-                          }
-                        ]
-                      }
+                      "$ref": "#/$defs/Text"
                     }
                   },
                   "environment": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "array",
-                      "items": {
-                        "oneOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "binding"
-                            ],
-                            "properties": {
-                              "binding": {
-                                "enum": [
-                                  "pluginRoot",
-                                  "skillDir",
-                                  "projectDir"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "secret"
-                            ],
-                            "properties": {
-                              "secret": {
-                                "type": "string"
-                              }
-                            }
-                          }
-                        ]
-                      }
+                      "$ref": "#/$defs/Text"
                     }
                   },
                   "cwd": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "timeoutMs": {
                     "type": "integer",
@@ -915,6 +925,46 @@
                       },
                       "token": {
                         "type": "string"
+                      }
+                    }
+                  },
+                  "timeouts": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "startupMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "catalogMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "executionMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "forwardEnvironment": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "source"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "enum": [
+                            "local",
+                            "remote"
+                          ]
+                        }
                       }
                     }
                   }
@@ -954,82 +1004,12 @@
                     ]
                   },
                   "url": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "binding"
-                          ],
-                          "properties": {
-                            "binding": {
-                              "enum": [
-                                "pluginRoot",
-                                "skillDir",
-                                "projectDir"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "required": [
-                            "secret"
-                          ],
-                          "properties": {
-                            "secret": {
-                              "type": "string"
-                            }
-                          }
-                        }
-                      ]
-                    }
+                    "$ref": "#/$defs/Text"
                   },
                   "headers": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "array",
-                      "items": {
-                        "oneOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "binding"
-                            ],
-                            "properties": {
-                              "binding": {
-                                "enum": [
-                                  "pluginRoot",
-                                  "skillDir",
-                                  "projectDir"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "secret"
-                            ],
-                            "properties": {
-                              "secret": {
-                                "type": "string"
-                              }
-                            }
-                          }
-                        ]
-                      }
+                      "$ref": "#/$defs/Text"
                     }
                   },
                   "timeoutMs": {
@@ -1080,42 +1060,7 @@
                                 "type": "string"
                               },
                               "clientSecret": {
-                                "type": "array",
-                                "items": {
-                                  "oneOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "object",
-                                      "additionalProperties": false,
-                                      "required": [
-                                        "binding"
-                                      ],
-                                      "properties": {
-                                        "binding": {
-                                          "enum": [
-                                            "pluginRoot",
-                                            "skillDir",
-                                            "projectDir"
-                                          ]
-                                        }
-                                      }
-                                    },
-                                    {
-                                      "type": "object",
-                                      "additionalProperties": false,
-                                      "required": [
-                                        "secret"
-                                      ],
-                                      "properties": {
-                                        "secret": {
-                                          "type": "string"
-                                        }
-                                      }
-                                    }
-                                  ]
-                                }
+                                "$ref": "#/$defs/Text"
                               },
                               "scopes": {
                                 "type": "array",
@@ -1134,6 +1079,24 @@
                         }
                       }
                     ]
+                  },
+                  "timeouts": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "startupMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "catalogMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "executionMs": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
                   }
                 }
               },
@@ -1163,132 +1126,337 @@
                     "const": "hook"
                   },
                   "hook": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": [
-                      "event",
-                      "command",
-                      "timeoutSeconds",
-                      "async",
-                      "asyncRewake",
-                      "onFailure",
-                      "order",
-                      "scope"
-                    ],
-                    "properties": {
-                      "event": {
-                        "enum": [
-                          "SessionStart",
-                          "UserPromptSubmit",
-                          "UserPromptExpansion",
-                          "PreToolUse",
-                          "PostToolUse",
-                          "PostToolUseFailure",
-                          "Stop",
-                          "StopFailure",
-                          "PermissionRequest"
-                        ]
-                      },
-                      "matcher": {
-                        "type": "string"
-                      },
-                      "if": {
-                        "type": "string"
-                      },
-                      "command": {
-                        "type": "array",
-                        "items": {
-                          "oneOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "object",
-                              "additionalProperties": false,
-                              "required": [
-                                "binding"
-                              ],
-                              "properties": {
-                                "binding": {
-                                  "enum": [
-                                    "pluginRoot",
-                                    "skillDir",
-                                    "projectDir"
-                                  ]
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "type",
+                          "event",
+                          "timeoutSeconds",
+                          "onFailure",
+                          "order",
+                          "scope",
+                          "command",
+                          "async",
+                          "asyncRewake"
+                        ],
+                        "properties": {
+                          "event": {
+                            "enum": [
+                              "SessionStart",
+                              "UserPromptSubmit",
+                              "UserPromptExpansion",
+                              "PreToolUse",
+                              "PostToolUse",
+                              "PostToolUseFailure",
+                              "Stop",
+                              "StopFailure",
+                              "PermissionRequest",
+                              "SessionEnd",
+                              "Notification",
+                              "PermissionDenied",
+                              "FileChanged",
+                              "CwdChanged",
+                              "ConfigChange",
+                              "InstructionsLoaded",
+                              "SubagentStart",
+                              "SubagentStop",
+                              "TaskCreated",
+                              "TaskCompleted",
+                              "TeammateIdle",
+                              "PreCompact",
+                              "PostCompact",
+                              "Elicitation",
+                              "ElicitationResult",
+                              "PostToolBatch"
+                            ]
+                          },
+                          "matcher": {
+                            "type": "string"
+                          },
+                          "if": {
+                            "type": "string"
+                          },
+                          "timeoutSeconds": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "onFailure": {
+                            "enum": [
+                              "continue",
+                              "block"
+                            ]
+                          },
+                          "order": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "scope": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "package"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind",
+                                  "entryId"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "skill",
+                                      "agent"
+                                    ]
+                                  },
+                                  "entryId": {
+                                    "type": "string"
+                                  }
                                 }
                               }
-                            },
-                            {
-                              "type": "object",
-                              "additionalProperties": false,
-                              "required": [
-                                "secret"
-                              ],
-                              "properties": {
-                                "secret": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          ]
-                        }
-                      },
-                      "timeoutSeconds": {
-                        "type": "number",
-                        "minimum": 0
-                      },
-                      "async": {
-                        "type": "boolean"
-                      },
-                      "asyncRewake": {
-                        "type": "boolean"
-                      },
-                      "onFailure": {
-                        "enum": [
-                          "continue",
-                          "block"
-                        ]
-                      },
-                      "order": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "scope": {
-                        "oneOf": [
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "kind"
-                            ],
-                            "properties": {
-                              "kind": {
-                                "const": "package"
-                              }
+                            ]
+                          },
+                          "type": {
+                            "const": "command"
+                          },
+                          "command": {
+                            "$ref": "#/$defs/Text"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/$defs/Text"
                             }
                           },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "kind",
-                              "entryId"
-                            ],
-                            "properties": {
-                              "kind": {
-                                "enum": [
-                                  "skill",
-                                  "agent"
-                                ]
-                              },
-                              "entryId": {
-                                "type": "string"
-                              }
-                            }
+                          "async": {
+                            "type": "boolean"
+                          },
+                          "asyncRewake": {
+                            "type": "boolean"
                           }
-                        ]
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "type",
+                          "event",
+                          "timeoutSeconds",
+                          "onFailure",
+                          "order",
+                          "scope",
+                          "prompt",
+                          "continueOnBlock"
+                        ],
+                        "properties": {
+                          "event": {
+                            "enum": [
+                              "SessionStart",
+                              "UserPromptSubmit",
+                              "UserPromptExpansion",
+                              "PreToolUse",
+                              "PostToolUse",
+                              "PostToolUseFailure",
+                              "Stop",
+                              "StopFailure",
+                              "PermissionRequest",
+                              "SessionEnd",
+                              "Notification",
+                              "PermissionDenied",
+                              "FileChanged",
+                              "CwdChanged",
+                              "ConfigChange",
+                              "InstructionsLoaded",
+                              "SubagentStart",
+                              "SubagentStop",
+                              "TaskCreated",
+                              "TaskCompleted",
+                              "TeammateIdle",
+                              "PreCompact",
+                              "PostCompact",
+                              "Elicitation",
+                              "ElicitationResult",
+                              "PostToolBatch"
+                            ]
+                          },
+                          "matcher": {
+                            "type": "string"
+                          },
+                          "if": {
+                            "type": "string"
+                          },
+                          "timeoutSeconds": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "onFailure": {
+                            "enum": [
+                              "continue",
+                              "block"
+                            ]
+                          },
+                          "order": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "scope": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "package"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind",
+                                  "entryId"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "skill",
+                                      "agent"
+                                    ]
+                                  },
+                                  "entryId": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "type": {
+                            "const": "prompt"
+                          },
+                          "prompt": {
+                            "$ref": "#/$defs/Text"
+                          },
+                          "model": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "alias"
+                                ],
+                                "properties": {
+                                  "alias": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "providerID",
+                                  "modelID"
+                                ],
+                                "properties": {
+                                  "providerID": {
+                                    "type": "string"
+                                  },
+                                  "modelID": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "continueOnBlock": {
+                            "type": "boolean"
+                          }
+                        }
                       }
-                    }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "id",
+                  "sourcePath",
+                  "sourceName",
+                  "command",
+                  "description",
+                  "when"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*\\u0000)[^/]+(?:/[^/]+)*$"
+                  },
+                  "sourceName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "monitor"
+                  },
+                  "command": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "when": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "always"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "sourceName"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "skill"
+                          },
+                          "sourceName": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
                   }
                 }
               }
@@ -1362,7 +1530,10 @@
                   "invalid-definition",
                   "missing-entry",
                   "unresolved-app-id",
-                  "native-js-plugin"
+                  "native-js-plugin",
+                  "unavailable-trigger",
+                  "unsupported-host-capability",
+                  "unsupported-setting"
                 ]
               },
               "sourceName": {
@@ -1371,6 +1542,58 @@
               "message": {
                 "type": "string"
               }
+            }
+          }
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "title",
+              "description",
+              "required",
+              "sensitive"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "sensitive": {
+                "type": "boolean"
+              },
+              "default": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "object"
+                ]
+              }
+            }
+          }
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "agent": {
+              "type": "string"
             }
           }
         }
@@ -1405,6 +1628,83 @@
             "pattern": "^https://"
           }
         }
+      }
+    }
+  },
+  "$defs": {
+    "Text": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "binding"
+            ],
+            "properties": {
+              "binding": {
+                "enum": [
+                  "pluginRoot",
+                  "skillDir",
+                  "projectDir",
+                  "pluginData"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "secret"
+            ],
+            "properties": {
+              "secret": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "option"
+            ],
+            "properties": {
+              "option": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "environment"
+            ],
+            "properties": {
+              "environment": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "default": {
+                    "$ref": "#/$defs/Text"
+                  }
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

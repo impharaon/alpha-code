@@ -835,3 +835,20 @@ describe("#933 legacy 会话 href 咽喉收口:反推默认拒绝 + 侧栏身份
     expect((landing as { id?: string }).id).toBe(runtime.NOTIFIED_SESSION_ID)
   })
 })
+
+test("leaving a real local Session waits for the main SessionEnd acknowledgement before router release", async () => {
+  await mountShell(runtime.CodePuppyShell)
+  runtime.navigateTo(hrefFor.session("sidecar", "ses_one"))
+  await settle()
+  const before = runtime.routerPath()
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  const calls: unknown[] = []
+  window.api.pluginSessionLeave = async input => { calls.push(input); await held }
+  runtime.navigateTo(homeHref())
+  await settle()
+  expect(runtime.routerPath()).toBe(before)
+  expect(calls).toEqual([{ sessionId: "ses_one", action: "leave", reason: "clear" }])
+  release()
+  await waitFor(() => runtime.routerPath() === homeHref(), "SessionEnd ack releases the actual router")
+})

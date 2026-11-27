@@ -288,3 +288,33 @@ OpenCode 共用服务、库与凭证。
 - ➖ 撤回一个带上游祖先的合并,要同时暂停每日同步,重新落地要 revert 那次 revert(基线 §6)。
 - ⚠️ Code Puppy 的库与数据目录仍与用户自装的 OpenCode 同路径;本 ADR 只保证不导入不属于 Code Puppy 的凭证;本票不搬目录(编排器已定,裁决书 R5),目录搬迁是一次独立的数据迁移,另行裁决。
 - 🔁 [[ADR-036]] 被本 ADR 取代(accepted 时把 ADR-036 的状态改为 superseded)。
+
+
+### #1776 S-12 增量：显式 MCP 传输（accepted，2026-11-26）
+
+依据 [DESIGN-local-plugin-install v3.1 §4.13/§10](https://github.com/impharaon/alpha-work/blob/3a0352e4e3306c0410e2bb680a07f6312d8bcf57/docs/specs/local-plugin-install/design.md) 与 #1776 r3 的实施续派，只登记该已冻结增量，不改变本 ADR 其余裁决。L0 transform 不能扩 schema 或替换私有 SDK transport；L1 现有文档转换不覆盖 schema 源码/解码/直接运行，L2 需另建这些入口的 apply/restore 管线，故沿 ADR-029 采用精确 L3。
+
+新接管只有 `packages/schema/src/mcp.ts` 的 `RemoteConfig.transport?: "http" | "sse"`；既有 `packages/core/src/mcp/client.ts` 只扩 SDK 选择、union 类型与 HTTP 专用收尾判别。不接管整个 schema 目录，不新增依赖/client/协议 fallback。维护归属为 MCP/runtime 车道，登记 id=`plugin-mcp-transport`；north-star 的 schema 单文件清单与现有打印/同步 parity 共用同一权威。
+
+缺席/显式 http 维持原 HTTP 行为，显式 sse 原 URL 经同一 authProvider/headers/受控 Fetch 打开 SSE，SSE 不做 HTTP codemode 探测或 sessionId/DELETE 收尾。判据在 schema mcp、ext engine-transforms、ui-mac install/truth 与 core codepuppy-mcp-runtime 既有测试；真实 SDK 流及代理证据随本片 plan 收据，不以配置复制代替。同步上游必须对该单文件与既有 client 做 takeover upgrade review。
+### #1776 S-01 调用 renderer 窄增量
+
+依据 DESIGN-local-plugin-install v3 §6/§10、r5 的 IMPLEMENT 派发及 orchestrator ruling 2026-11-27（Claude Opus 5.5）：只在已接管 `core/src/config/plugin/command.ts` 增加来源语法与 source/value 边界，原生和整包指令复用同一 shell/process 原语。自有 `@opencode/plugin/codepuppy-package-runtime` 是 Location 生命周期内的反向调用端口；PreparedInstruction.arguments 原样携带参数名顺序，未声明为 []，仍由 core 解析。源码识别在绑定值之前，绑定值/调用参数不成为新 shell 节点。唯一主权登记为 `plugin-invocation-semantics`，原 command-model-priority/项目信任决定保持；没有增加其他上游文件接管。
+
+S-01 r19（orchestrator ruling 2026-11-27 / Claude Opus 5.5）：PreparedInstruction 增可选 environment，携真实 Invocation Session 的 ENV_FILE export delta；既有 command.ts 合成 env 时以原绑定槽为优先，仍先编译 source 再插入值，不增 renderer、进程原语或上游接管文件。ext 在实际首个展开前 await 同一 SessionStart promise，native 附加 skills 先登记全部作用域，再展开；同一个 AppProcess source 保持变量归属、unset 与会话隔离。核心 inline-env 例、真实 command/attached-skill 首次/更新例为具名 proof；登记仍归 plugin-invocation-semantics，设计 §10 镜像由编排器持有。
+
+S-01 r22（orchestrator ruling 2026-11-27 / Claude Opus 5.5，B7）：promise command.execute 与 Hooks/ModelHooks callback 增调用级 InvocationContext.signal，唯一 Effect→Promise adapter 注入其真实执行 signal；ext 原样传给 ENV_FILE source，并与 runner 归属取消合并，既有 ToolContext.signal 继续复用。不增加 timeout、wire DTO、执行器或旁路释放。精确新增接管为 `packages/plugin/src/promise/adapter.ts`、`promise/command.ts`、`promise/registration.ts` 三文件的 callback signature/forwarding；L0 在旧回调拿不到该 signal，pre-admission source 不能靠 session execution 事件收尾，L1/L2 仍改同一 adapter 并增源码/产物同步，故沿已批准 r22 选择此窄 L3。原 host 的 SessionStart-written ENV_FILE command/attachment/expansion-hook 三例握住真实子 PID 与调用中断；registry id 仍为 plugin-invocation-semantics，north-star 仅同步这三个授权路径，算法不变。其余裁决不变，design §10 镜像由编排器持有。
+
+### #1776 S-04 / S-06 配置与压缩窄边界
+
+S-04 依据 DESIGN-local-plugin-install v3.1 §6/§10 与 orchestrator ruling 2026-11-27（r14）：既有 config.ts / config/plugin/skill.ts 的读取、watcher 与 rescan 在原生发布链调用同一个 beforeConfigChange；raw revision 仍经当前项目 trust/parser，拒绝不改用户文件，托管策略不可阻止。登记 `plugin-hook-config-change` 与原 `project-opencode-config-trust`，无额外接管文件或 DTO。
+
+S-06 依据同一冻结设计的 §10：精确新 L3 仅 `packages/core/src/session/compaction.ts`，在实际 compact 采用（含 held summary）前 await PreCompact，在 publish 成功持久化后 await PostCompact；后台预计算不触发。现有模型钩子不覆盖采用预计算结果，不能在 ext 事后还原这个决定点；L1/L2 仍改同一生命周期并另添源码/产物同步入口，故沿设计选择直接 L3。注册 `plugin-hook-compaction`，native summary/预算/重试算法不改，opaque native window 无可读 summary 时不造字段。north-star 精确单文件清单随该登记同步；没有扩大到 runner/step.ts。原模块 finite integration 与真实 host 用例覆盖手动/自动/溢出、持久化后通知及预计算采用，移除回调即红。
+
+S-05 的 r16 orchestrator ruling 2026-11-27 接受 `core/src/instruction-discovery.ts` 中 File/schema/codec 的可选来源字段增量（packageId/sourcePath/scope），原调用者无需改变。L0 transform 的额外字段会被原 constructor/codec 丢弃，另建来源表会复制权威；L1/L2 仍须补同一值边界并维护源码/产物同步，故登记此精确 L3 与原模块 proof `core/test/instruction-discovery.test.ts`，对应 `plugin-hook-instructions`。元数据只保留 producer 的事实，不从渲染后系统文字反推。
+
+同一 S-05 的冻结三个源/admission 边界 `config/plugin/instruction.ts`、`session/instruction-state.ts`、`session/instructions.ts` 在真实读取及持久发布后调用现有 Location runtime。原模块 `test/instruction-state.test.ts`、`test/session-instructions.test.ts` 是该精确增量的配套 proof；与既有 discovery proof 一起登记。新 helper 仅转发已入上下文的来源，不另存加载账本；直接 AGENTS 不冒充 Claude 事件，当前 native parser 没提供的 include/glob/compact 原因不编造。
+
+S-12 配套登记（#1776 r15）：`packages/schema/test/mcp.test.ts` 的 transport round-trip 反例和 `packages/client/src/promise/generated/types.ts` 两处由 schema 生成的可选 transport 字段随同原 S-12 权威登记。基线 1db6a3bbf5 不含这两处，提交 513e35a7c6 / 27595818cb 属本车道；r15 修正登记遗漏，不更改生成物、断言、协议值或守卫算法。它们是已批准 RemoteConfig 的配套 artifact/proof，不增加 runtime 接管点。
+
+S-07 依据 design v3.1 §6 与 r17 orchestrator ruling：既有 MCP index/client 接管的窄增量持有匹配 HTTP/SSE 的 Session 连接，复用 McpConnection 的创建、认证、fetch、重连与 stop；stdio 保持 Location 连接，从真实在途调用冻结归属至 Result，跨会话歧义只诊断并保留 native Form。同一 Location 反向回调把 SessionEnd 释放交回该 MCP authority；native archive/delete 与 Location scope 关闭沿同一生命周期收尾。L0 无 inbound elicitation/连接归属口，L1/L2 仍改同一点并增加同步入口；无新增上游 runtime 文件接管，登记 `plugin-hook-elicitation` 与原 MCP test proof。

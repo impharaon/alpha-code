@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test"
 import { and, asc, eq } from "drizzle-orm"
-import { Effect, Schema } from "effect"
+import { Deferred, Effect, Fiber, Schema } from "effect"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -22,6 +22,7 @@ import {
   SessionTable,
 } from "@opencode/core/session/sql"
 import { testEffect } from "./lib/effect"
+import { registerPackageRuntime, type PackageRuntimeHandlers } from "@opencode/plugin/codepuppy-package-runtime"
 
 const it = testEffect(
   AppNodeBuilder.build(LayerNode.group([Database.node, Bus.node, SessionProjector.node, InstructionDiscovery.node]), [
@@ -80,6 +81,74 @@ const preview = (db: Database.Interface["db"], sessionID: SessionSchema.ID, inst
   )
 
 describe("InstructionState", () => {
+  it.effect("notifies package instruction hooks once after each actual source admission", () =>
+    Effect.gen(function* () {
+      const sessionID = SessionSchema.ID.make("ses_instruction_package_source")
+      const { db, events } = yield* setup(sessionID)
+      const discovery = yield* InstructionDiscovery.Service
+      const initialNotification = yield* Deferred.make<void>()
+      const changedNotification = yield* Deferred.make<void>()
+      const calls: Array<Parameters<PackageRuntimeHandlers["instructionsLoaded"]>[0] & { committed: number }> = []
+      const runtime = registerPackageRuntime({ directory: "/project" }, {
+        hasElicitationHandlers: () => false,
+        beforeConfigChange: async () => ({ apply: true }),
+        instructionsLoaded: async input => { calls.push({ ...input, committed: (await Effect.runPromise(instructionEvents(db, sessionID))).length }); await Effect.runPromise(Deferred.succeed(calls.length === 1 ? initialNotification : changedNotification, undefined)) },
+        beforeCompaction: async () => ({ proceed: true }), afterCompaction: async () => {},
+        beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer,
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(() => runtime.dispose()))
+      yield* discovery.transform(editor => {
+        editor.add(new InstructionDiscovery.File({ path: "/project/CLAUDE.md", content: "project guidance", source: { sourcePath: "/project/CLAUDE.md", scope: "Project" } }))
+        editor.add(new InstructionDiscovery.File({ path: "/project/AGENTS.md", content: "native guidance" }))
+      })
+      yield* InstructionState.prepare(db, events, yield* discovery.load(), sessionID)
+      yield* InstructionState.prepare(db, events, yield* discovery.load(), sessionID)
+      yield* Deferred.await(initialNotification)
+      expect(calls).toEqual([expect.objectContaining({ sessionID, filePath: "/project/CLAUDE.md", memoryType: "Project", loadReason: "session_start", committed: 1 })])
+      yield* discovery.transform(editor => editor.add(new InstructionDiscovery.File({ path: "/project/.claude/rules/style.md", content: "style guidance", source: { sourcePath: "/project/.claude/rules/style.md", scope: "Project" } })))
+      yield* InstructionState.prepare(db, events, yield* discovery.load(), sessionID)
+      yield* Deferred.await(changedNotification)
+      expect(calls).toHaveLength(2)
+      expect(calls[1]).toMatchObject({ sessionID, filePath: "/project/.claude/rules/style.md", memoryType: "Project", loadReason: "nested_traversal", committed: 2 })
+      expect(calls[0]!.occurrenceId).not.toBe(calls[1]!.occurrenceId)
+    }),
+  )
+
+  it.effect("informational instruction hooks do not hold admission or serialize source notifications", () =>
+    Effect.gen(function* () {
+      const sessionID = SessionSchema.ID.make("ses_instruction_async_hooks")
+      const { db, events } = yield* setup(sessionID)
+      const discovery = yield* InstructionDiscovery.Service
+      const entered = yield* Deferred.make<void>()
+      let release = () => {}
+      const held = new Promise<void>(resolve => { release = resolve })
+      const calls: string[] = []
+      const runtime = registerPackageRuntime({ directory: "/project" }, {
+        hasElicitationHandlers: () => false, beforeConfigChange: async () => ({ apply: true }),
+        instructionsLoaded: async input => {
+          calls.push(input.filePath)
+          await Effect.runPromise(Deferred.succeed(entered, undefined))
+          await held
+        },
+        beforeCompaction: async () => ({ proceed: true }), afterCompaction: async () => {},
+        beforeElicitation: async () => ({ handled: false }), afterElicitationResult: async input => input.answer,
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(() => { release(); runtime.dispose() }))
+      yield* discovery.transform(editor => {
+        for (const name of ["CLAUDE.md", ".claude/rules/style.md"])
+          editor.add(new InstructionDiscovery.File({ path: "/project/" + name, content: "admitted guidance", source: { sourcePath: "/project/" + name, scope: "Project" } }))
+      })
+      const admission = yield* InstructionState.prepare(db, events, yield* discovery.load(), sessionID).pipe(Effect.forkScoped)
+      yield* Deferred.await(entered)
+      yield* Effect.yieldNow
+      expect(admission.pollUnsafe()).toBeDefined()
+      expect(calls.toSorted()).toEqual(["/project/.claude/rules/style.md", "/project/CLAUDE.md"].toSorted())
+      expect(yield* instructionEvents(db, sessionID)).toHaveLength(1)
+      release()
+      yield* Fiber.join(admission)
+    }),
+  )
+
   it.effect("observes each source once without publishing events or inserting blobs", () =>
     Effect.gen(function* () {
       const sessionID = SessionSchema.ID.make("ses_instruction_observe")

@@ -351,10 +351,11 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
         return id
       }
       const manifest = [".claude-plugin/marketplace.json", ".agents/plugins/marketplace.json"].find(path => capture.nodes.some(node => node.kind === "file" && node.path === path))
+      const plugin = ["plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json"].some(path => capture.nodes.some(node => node.kind === "file" && node.path === path))
       if (manifest) {
         const ecosystem = manifest.startsWith(".agents/") ? "codex" : "claude"
         const marketplace = readMarketplace(await capture.readFile(manifest), ecosystem)
-        return { kind: "marketplace", entries: marketplace.entries.flatMap(entry => {
+        const entries = marketplace.entries.flatMap(entry => {
           if (entry.source.kind === "unsupported") return []
           const source = entry.source
           const prefix = source.kind === "path" ? source.path.replace(/\/$/, "") : source.path ?? ""
@@ -372,7 +373,13 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
             return { source: provenance, nodes, readFile: path => capture.readFile(base + path) }
           })
           return [{ id, displayName: entry.name, description: entry.description, source: capture.source.kind === "folder" ? "local-folder" as const : ecosystem === "claude" ? "claude-marketplace" as const : "codex-marketplace" as const }]
-        }) }
+        })
+        if (plugin && !marketplace.entries.some(entry => entry.source.kind === "path" && entry.source.path === ".")) {
+          const id = issue(async () => capture)
+          const converted = await convertCandidate(id)
+          entries.push({ id, displayName: converted.ok ? converted.package.name : "plugin", description: "", source: capture.source.kind === "folder" ? "local-folder" : ecosystem === "claude" ? "claude-marketplace" : "codex-marketplace" })
+        }
+        return { kind: "marketplace", entries }
       }
       const candidateId = issue(async () => capture)
       const converted = await convertCandidate(candidateId)
@@ -751,4 +758,18 @@ function pax(bytes: Uint8Array): Record<string, string> {
     offset += size
   }
   return fields
+}
+
+
+/** A hint from the same metadata authority as source discovery; unavailable metadata never pins a command. */
+export async function suggestPluginVersion(entry: Extract<import("../shared/host-extension-package-contract/plugin-package").Entry, { kind: "mcp" }>, request: (url: string, init?: RequestInit) => Promise<Response> = fetch) {
+  if (entry.transport !== "stdio" || !entry.floatingVersion || entry.command[0]?.[0] !== "npx") return
+  const name = entry.floatingVersion.token.replace(/(?<!^)@[^@/]*$/, "")
+  if (!/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/i.test(name)) return
+  try {
+    const response = await request(NPM_REGISTRY + "/" + encodeURIComponent(name) + "/latest", { signal: AbortSignal.timeout(PLUGIN_SOURCE_DEADLINE_MS) })
+    if (!response.ok) return
+    const metadata: unknown = await response.json()
+    return metadata && typeof metadata === "object" && "name" in metadata && metadata.name === name && "version" in metadata && typeof metadata.version === "string" ? metadata.version : undefined
+  } catch { return }
 }

@@ -311,3 +311,14 @@ describe("package safe-view presentation", () => {
     ).toEqual([])
   })
 })
+
+test("unavailable hook events each display their concrete host reason", () => {
+  const events = ["PermissionDenied", "CwdChanged", "TaskCreated", "TaskCompleted", "TeammateIdle"]
+  const view = installedPackagePresentation({ origin: "catalog", notRunning: events.map(sourceName => ({ kind: "hook", sourceName, reason: "unavailable-trigger" })) })
+  expect(view.notRunning.map(row => row.sourceName)).toEqual(events)
+  expect(new Set(view.notRunning.map(row => row.reasonKey)).size).toBe(5)
+  for (const row of view.notRunning) {
+    expect(en[row.reasonKey as keyof typeof en]).toBeTruthy()
+    expect(zh[row.reasonKey as keyof typeof zh]).toBeTruthy()
+  }
+})

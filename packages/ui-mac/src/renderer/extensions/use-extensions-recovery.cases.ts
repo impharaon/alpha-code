@@ -122,6 +122,7 @@ beforeAll(async () => {
     packageManagerEnvironment: {},
     // `#1713` 契约 C:这套用例读的是一个已允许项目的 MCP 状态形状,信任本身由 project-config-commands.engine.cases.ts 判。
     projectTrust: (directory) => directory === realpathSync(projectDirectory),
+    packageManagerEnvironment: {},
   })
   engineUrl = engine.url
   // The 2.x engine boots a Location (and loads its MCP configuration) on the first request for that directory: wait for

@@ -1,3 +1,4 @@
+import { readInstalledPluginSettings, pluginDataDirectory, publicPluginOption } from "../../ui-mac/src/shared/installed-plugin-settings"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 import { INSTALLED_PLUGIN_PACKAGE_FILE, PLUGIN_TREE_DIRECTORY, validInstalledPluginPackage } from "../../ui-mac/src/shared/installed-plugin-package"
@@ -24,31 +25,36 @@ export function liveGenerationDir(root: string, key: string): string | undefined
   }
 }
 
-export function installedPluginSkills(root: string, key: string) {
+export function installedPluginPackage(root: string, key: string) {
   const live = PLUGIN_STORE_KEY.test(key) ? liveGenerationDir(root, key) : undefined
-  if (!live) return []
+  if (!live) return
   try {
     const metadata: unknown = JSON.parse(readFileSync(join(live, INSTALLED_PLUGIN_PACKAGE_FILE), "utf8"))
-    if (!validInstalledPluginPackage(metadata)) return []
-    const pluginRoot = join(live, PLUGIN_TREE_DIRECTORY)
-    return metadata.description.entries.flatMap((entry) => {
-      const name = metadata.hostNames[entry.id]
-      return entry.kind === "skill" && name
-        ? [
-            {
-              entry,
-              key: "skill--" + name,
-              name,
-              path: join(pluginRoot, entry.sourcePath),
-              directory: join(pluginRoot, entry.directory),
-              pluginRoot,
-            },
-          ]
-        : []
-    })
-  } catch {
-    return []
-  }
+    if (!validInstalledPluginPackage(metadata)) return
+    return { ...metadata, key, pluginRoot: join(live, PLUGIN_TREE_DIRECTORY), settings: readInstalledPluginSettings(root, key) }
+  } catch { return }
+}
+export function allInstalledPluginPackages(root: string) {
+  try { return readdirSync(join(root, "ext-store")).flatMap(key => { const installed = installedPluginPackage(root, key); return installed ? [installed] : [] }) }
+  catch { return [] }
+}
+export function allInstalledPluginInstructions(root: string) {
+  return allInstalledPluginPackages(root).flatMap(installed => installed.description.entries.flatMap(entry => {
+    const name = installed.hostNames[entry.id]
+    return name && (entry.kind === "skill" || entry.kind === "command" || entry.kind === "agent") ? [{ installed, entry, name }] : []
+  }))
+}
+export function installedPluginSkills(root: string, key: string) {
+  const installed = installedPluginPackage(root, key)
+  if (!installed) return []
+  return installed.description.entries.flatMap(entry => {
+    const name = installed.hostNames[entry.id]
+    return entry.kind === "skill" && name ? [{ entry, key: "skill--" + name, name,
+      path: join(installed.pluginRoot, entry.sourcePath), directory: join(installed.pluginRoot, entry.directory), pluginRoot: installed.pluginRoot,
+      pluginData: installed.settings ? pluginDataDirectory(installed.settings.dataHome, installed.settings.packageId) : undefined,
+      resolveOption: (key: string) => publicPluginOption(installed.description, installed.settings, key),
+    }] : []
+  })
 }
 
 export function installedPluginSkill(path: string, root: string) {

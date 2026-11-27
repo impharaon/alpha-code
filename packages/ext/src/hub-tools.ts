@@ -120,9 +120,9 @@ export function createHubTools(bridge: HubBridge, context: HubToolContext, askIn
       const authorization = await bridge.packageAuthorization(outcome.packageId)
       const items = authorization.ok ? authorization.items : []
       const login = items.find(item => item.kind === "mcp-oauth" && !item.authenticated && item.status === "needs_auth")
-      const token = items.find(item => item.kind === "secret" && !item.saved)
+      const token = items.find(item => (item.kind === "secret" && !item.saved || item.kind === "option" && item.required && !item.configured))
       const state = login ? "installed; needs login: " + login.serviceName
-        : token ? "installed; needs token: " + token.serviceName
+        : token ? (token.kind === "option" ? "installed; needs configuration: " : "installed; needs token: ") + token.serviceName
         : outcome.alreadyInstalled
         ? "already installed"
         : outcome.notRunning.length

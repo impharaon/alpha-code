@@ -176,7 +176,13 @@ export type HubInstallReply =
 export type PackageAuthorizationQuery = { type: "codepuppy.package.authorization.request"; id: number; packageId: string }
 export type PackageAuthorizationReply = { type: "codepuppy.package.authorization.reply"; id: number; result: PackageAuthorizationResultV1 }
 
+export type PackageLocationReadyMessage = { type: "codepuppy.package.location.ready"; directory: string }
+export function buildPackageLocationReady(directory: string): PackageLocationReadyMessage {
+  return { type: "codepuppy.package.location.ready", directory }
+}
+
 export type CodePuppySidecarInbound =
+  | PackageLocationReadyMessage
   | PackageManagerControlRequest
   | WriteScopeRequest
   | VideoBridgeRequest
@@ -241,6 +247,8 @@ export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarIn
   const video=parseVideoBridgeRequest(value)
   if(video)return video
   if (!isRecord(value)) return
+  if (value.type === "codepuppy.package.location.ready")
+    return isText(value.directory) && Object.keys(value).every(key => ["type", "directory"].includes(key)) ? buildPackageLocationReady(value.directory) : undefined
   if (value.type === "codepuppy.package-manager.request") return parsePackageManagerControlRequest(value)
   if (value.type === "codepuppy.write-scope.request") return parseWriteScopeRequest(value)
   if (value.type === "codepuppy.package.authorization.request")
@@ -695,7 +703,7 @@ export function buildPackageAuthorizationReply(id: number, result: PackageAuthor
   return { type: "codepuppy.package.authorization.reply", id, result: result.ok ? {
     ok: true, packageId: result.packageId, items: result.items.map(item => ({
       kind: item.kind, componentId: item.componentId, prerequisiteId: item.prerequisiteId, serviceName: item.serviceName, label: item.label,
-      ...(item.kind === "secret" ? { saved: item.saved } : item.kind === "mcp-oauth" ? { authenticated: item.authenticated, status: item.status } : { ready: item.ready }),
+      ...(item.kind === "mcp-version" ? { key: item.key, token: item.token, value: item.value, ...(item.suggestion ? { suggestion: item.suggestion } : {}) } : item.kind === "option" ? { key: item.key, type: item.type, description: item.description, required: item.required, sensitive: item.sensitive, configured: item.configured, ...(!item.sensitive && item.value !== undefined ? { value: item.value } : {}) } : item.kind === "secret" ? { saved: item.saved } : item.kind === "mcp-oauth" ? { authenticated: item.authenticated, status: item.status } : { ready: item.ready }),
     })) as Extract<PackageAuthorizationResultV1, { ok: true }>["items"],
   } : { ok: false, reason: result.reason } }
 }
@@ -709,7 +717,9 @@ export function parsePackageAuthorizationReply(value: unknown): PackageAuthoriza
   if (result.ok !== true || !isText(result.packageId) || !Array.isArray(result.items) || Object.keys(result).some(key => !["ok", "packageId", "items"].includes(key))) return
   for (const item of result.items) {
     if (!isRecord(item) || !["componentId", "prerequisiteId", "serviceName", "label"].every(key => typeof item[key] === "string")) return
-    const fields = item.kind === "secret" && typeof item.saved === "boolean" ? ["saved"]
+    const fields = item.kind === "mcp-version" && typeof item.key === "string" && typeof item.token === "string" && typeof item.value === "string" && (item.suggestion === undefined || typeof item.suggestion === "string") ? ["key", "token", "value", "suggestion"]
+      : item.kind === "option" && typeof item.key === "string" && ["string", "number", "boolean"].includes(String(item.type)) && typeof item.description === "string" && typeof item.required === "boolean" && typeof item.sensitive === "boolean" && typeof item.configured === "boolean" && (item.value === undefined || !item.sensitive && typeof item.value === item.type && (typeof item.value !== "number" || Number.isFinite(item.value))) ? ["key", "type", "description", "required", "sensitive", "configured", "value"]
+      : item.kind === "secret" && typeof item.saved === "boolean" ? ["saved"]
       : item.kind === "mcp-oauth" && typeof item.authenticated === "boolean" && typeof item.status === "string" ? ["authenticated", "status"]
       : item.kind === "connection" && typeof item.ready === "boolean" ? ["ready"] : undefined
     if (!fields || Object.keys(item).some(key => !["kind", "componentId", "prerequisiteId", "serviceName", "label", ...fields].includes(key))) return
@@ -770,6 +780,19 @@ export function parseToolPolicyWriteReply(value: unknown): ToolPolicyWriteReply 
   return buildToolPolicyWriteReply(value.id, { ok: true, ...(typeof value.backup === "string" ? { backup: value.backup } : {}) })
 }
 
+/** DESIGN-local-plugin-install v3.1 S-03: trusted main actions, private parentPort only. */
+export type PackageSessionMessage = { type: "codepuppy.plugin.session"; id: number; sessionId: string } & (
+  | { action: "leave"; reason: "clear" | "resume" | "logout" | "prompt_input_exit" | "other" }
+  | { action: "notification"; notification: { message: string; title?: string; notificationType: string; occurrenceId: string } }
+)
+export function parsePackageSessionMessage(value: unknown): PackageSessionMessage | undefined {
+  if (!isRecord(value) || value.type !== "codepuppy.plugin.session" || !Number.isSafeInteger(value.id) || !isText(value.sessionId)) return
+  if (value.action === "leave" && typeof value.reason === "string" && ["clear", "resume", "logout", "prompt_input_exit", "other"].includes(value.reason)) return value as PackageSessionMessage
+  if (value.action !== "notification" || !isRecord(value.notification)) return
+  const notification = value.notification
+  if (typeof notification.message !== "string" || (notification.title !== undefined && typeof notification.title !== "string") || typeof notification.notificationType !== "string" || !isText(notification.occurrenceId)) return
+  return value as PackageSessionMessage
+}
 
 export type WriteScopeRequest = { type: "codepuppy.write-scope.request"; id: number; access: "read" | "write"; targets: readonly DirectoryAccessTarget[] }
 /** `fixed`: writable because the target matched the R7-verified R3 fixed global-install/user-config table; `writable`: any other source (/tmp, caches, run-approved folders). */

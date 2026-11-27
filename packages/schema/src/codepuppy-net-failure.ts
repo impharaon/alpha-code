@@ -50,6 +50,8 @@ export type NetFailure = { layer: NetFailureLayer; code: string }
  * (`Proxy response (NNN) !== 200 when HTTP Tunneling`),所以**状态码本身**就得把层分开。
  * 策略拒绝仍是 403(不在此表,由代理的放行判定给出)。
  */
+export const PLUGIN_MCP_SERVICE_UNAVAILABLE = "Plugin MCP service-unavailable"
+
 export const EGRESS_DIAL_FAILURE_STATUS = { dns: 503, tcp: 502, timeout: 504 } as const
 
 const PROXY_STATUS_LAYER: Record<string, NetFailureLayer | undefined> = {
@@ -101,6 +103,8 @@ type ErrorNode = {
 function classifyNode(node: ErrorNode, path: NetFailurePath): NetFailure | undefined {
   const message = typeof node.message === "string" ? node.message : ""
   const code = typeof node.code === "string" ? node.code : ""
+  const attributed = parseFailureCode(message)
+  if (attributed && isNetFailureLayer(attributed.code)) return { layer: attributed.code, code: attributed.code }
 
   const proxy = PROXY_RESPONSE.exec(message)
   if (proxy) {

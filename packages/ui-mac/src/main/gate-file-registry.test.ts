@@ -167,6 +167,8 @@ function manifestRows(): Row[] {
 //     lifecycle,#649 未纳入 CI)—— 2.x 云工具接入由 packages/ext/src/plugin-host.test.ts「权威 · 云工具接入(M3)」承接;
 //   · opencode/test/tool/websearch.test.ts、opencode/test/plugin/trigger.test.ts —— 上游 v1 测试,从来不是本仓的闸门。
 const REFERENCED_BUT_UNREGISTERED: Record<string, string> = {
+  "packages/ui-mac/src/main/plugin-mcp-proxy.test.ts":
+    "#1776 S-12:plugin-mcp-proxy 模块自己的功能单测(能力绑定的保留、换代与撤销),照常随 ui-mac 测试运行。codepuppy-mcp-runtime.test.ts 的注释只是说明自己的 SSE 用例与它用同一个真实 legacy SDK 对端(同源),不是把判据委派给它;删掉它是这个模块少测了,不是某条仓库级保证消失。",
   "packages/core/test/tool-websearch.test.ts":
     "上游测试文件。codepuppy-websearch-sovereignty 的抬头只是说明自己的 harness 与它**同源**,不是把判据委派给它;packages/core 是上游包,该文件由 north-star 守卫保护。",
   "packages/core/test/tool-shell.test.ts":

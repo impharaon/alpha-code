@@ -1,3 +1,4 @@
+import { UNAVAILABLE_PLUGIN_HOOKS } from "../../shared/host-extension-package-contract/plugin-hook-events"
 import type { PluginSourceIdV1 } from "../../main/plugin-sources"
 import type {
   CatalogPackageActionKindV1,
@@ -17,7 +18,18 @@ const NOT_RUNNING_KEYS = {
   "native-js-plugin": "codepuppy.ext.packageNotRunningNative",
   "invalid-definition": "codepuppy.ext.packageNotRunningDefinition",
   "missing-entry": "codepuppy.ext.packageNotRunningMissing",
+  "unavailable-trigger": "codepuppy.ext.packageNotRunningTrigger",
+  "unsupported-host-capability": "codepuppy.ext.packageNotRunningCapability",
+  "unsupported-setting": "codepuppy.ext.packageNotRunningSetting",
 } as const satisfies Record<NotRunningReasonV1, string>
+
+const UNAVAILABLE_HOOK_KEYS = {
+  PermissionDenied: "codepuppy.ext.packageHookPermissionDenied",
+  CwdChanged: "codepuppy.ext.packageHookCwdChanged",
+  TaskCreated: "codepuppy.ext.packageHookTaskCreated",
+  TaskCompleted: "codepuppy.ext.packageHookTaskCompleted",
+  TeammateIdle: "codepuppy.ext.packageHookTeammateIdle",
+} as const satisfies Record<keyof typeof UNAVAILABLE_PLUGIN_HOOKS, string>
 
 export function pluginSourceLabelKey(source: PluginSourceIdV1 | "local-folder") {
   return ({
@@ -60,7 +72,7 @@ export function installedPackagePresentation(pack: Pick<InstalledPackageV1, "sou
             : undefined,
     notRunning: (pack.notRunning ?? []).map((item) => ({
       sourceName: item.sourceName,
-      reasonKey: NOT_RUNNING_KEYS[item.reason],
+      reasonKey: item.reason === "unavailable-trigger" && Object.hasOwn(UNAVAILABLE_HOOK_KEYS, item.sourceName) ? UNAVAILABLE_HOOK_KEYS[item.sourceName as keyof typeof UNAVAILABLE_HOOK_KEYS] : NOT_RUNNING_KEYS[item.reason],
     })),
   } as const
 }

@@ -11,10 +11,16 @@ export class File extends Schema.Class<File>("InstructionDiscovery.File")({
   // An absolute file path, or the URL of a configured remote instruction.
   path: Schema.String,
   content: Schema.String,
+  // codepuppy(S-05): retain the producer's provenance through the native admission codec.
+  source: Schema.optional(Schema.Struct({
+    packageId: Schema.optional(Schema.String),
+    sourcePath: Schema.String,
+    scope: Schema.Literals(["User", "Project", "Local", "Managed"]),
+  })),
 }) {}
 
 const Files = Schema.Array(File)
-const key = Instructions.Key.make("core/instructions")
+export const key = Instructions.Key.make("core/instructions")
 
 export const Event = {
   Updated: Bus.ephemeral({ type: "instruction-discovery.updated", schema: {} }),

@@ -49,6 +49,7 @@ import type { HubBridge, HubInstallSubject } from "../hub-bridge"
 import { denyHubMutationForAutomation, hubInstallAsk } from "../hub-tools"
 import { createExternalDirectoryRead } from "../external-directory-rule"
 import { createSecretMask } from "../secret-mask"
+import { credentialStores } from "../../../ui-mac/src/main/codepuppy-secret-files"
 import type { ProtectedFiles } from "../../../schema/src/codepuppy-protected-files"
 
 export interface PolicyRegistration {
@@ -99,6 +100,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   const env = process.env
   const externalRead = createExternalDirectoryRead()
   const home = os.homedir()
+  // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
+  const bootstrap = codepuppyBootstrap()
   const secrets = createSecretMask({
     platform: process.platform === "win32" ? "win32" : "darwin",
     project: String(context.location.project.id) === "global" ? context.location.directory : context.location.project.directory,
@@ -108,9 +111,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     localAppData: process.platform === "win32" ? env.LOCALAPPDATA ?? path.join(home, "AppData", "Local") : path.join(home, "Library"),
     // Node supplies strings; Schema reads only its published path-variable keys.
     pathVariables: env as ProtectedFiles.ProtectedRoots["pathVariables"],
-  })
-  // `#1698`:随包清单与 Office 清单的路径、云 MCP 定义、账户分区来自 sidecar 发布的启动文档(冻结,一代不变)
-  const bootstrap = codepuppyBootstrap()
+  }, credentialStores({ userDataPath: bootstrap.paths.userData }))
   const store = createToolPolicyStore({
     baseDir: defaultPolicyBaseDir(dataRoot(env)),
     // `#1698` G2:账户分区来自启动文档(main 按当刻登录态算的哈希),缺席 = anonymous

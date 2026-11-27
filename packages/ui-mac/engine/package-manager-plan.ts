@@ -221,7 +221,8 @@ export function packageManagerExecutionSource(input: {
   const printf = shellDialect(input.shell) === "posix" ? "command printf" : "builtin printf"
   const variable = (node: PackageManagerCommand) => `codepuppy_proof_${input.executionID.replaceAll("-", "")}_${node.start}`
   const options = `codepuppy_options_${input.executionID.replaceAll("-", "")}`
-  const prelude = `${options}=$-; { set +x; } 2>/dev/null; set +a; ${input.nodes.map((node) => `unset ${variable(node)}; IFS= read -r ${variable(node)} <&${input.privateInput.fd} || ${variable(node)}=;`).join(" ")} exec ${input.privateInput.fd}<&-; case $${options} in *a*) set -a;; esac; case $${options} in *x*) set -x;; esac;\n`
+  // Capture the options and turn tracing off inside one silenced group, so the prelude leaves no trace line.
+  const prelude = `{ ${options}=$-; set +x; } 2>/dev/null; set +a;${input.nodes.map((node) => `unset ${variable(node)}; IFS= read -r ${variable(node)} <&${input.privateInput.fd} || ${variable(node)}=;`).join(" ")} exec ${input.privateInput.fd}<&-; case $${options} in *a*) set -a;; esac; case $${options} in *x*) set -x;; esac;\n`
   const source = [...input.nodes].sort((a, b) => b.leafStart - a.leafStart).reduce((source, node) => {
     const args = [input.helper, "--service", input.helperService, "--execution", input.executionID, "--node", node.nodeID, "--proof-fd", "9", "--", node.program, ...node.argv].map(shellQuote).join(" ")
     const helper = `${node.prefix ? node.prefix + " " : ""}${args}`

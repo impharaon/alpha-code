@@ -135,6 +135,8 @@ test("H4 three real interpreters preserve leaf redirections, stdin and private p
       ;(child.stdio[3] as Writable).end(proof + "\n")
       const code = await exited
       expect(Buffer.concat(stderr).toString()).not.toContain(proof)
+      // The prelude leaves no trace line of its own under xtrace.
+      expect(Buffer.concat(stderr).toString(), shell).not.toContain("codepuppy_options_")
       if (source.includes("<&-")) expect(Buffer.concat(stderr).toString()).not.toContain("bad file descriptor")
       if (source.includes("missing")) {
         const original = spawnSync(shell, ["-ax", "-c", source], { cwd: root, env: { HOME: root, PATH: "/usr/bin:/bin" }, encoding: "utf8" })

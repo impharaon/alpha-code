@@ -67,6 +67,7 @@ const SECRET_WORDS = new Set([
   "AUTH",
   "AUTHORIZATION",
   "PRIVATE",
+  "PWD",
 ])
 const GCP_FIELDS = [
   ["**", "refresh_token"],
@@ -314,7 +315,8 @@ export function isCredentialName(name: string): boolean {
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
     .split(/[^a-zA-Z0-9]+/)
-    .some((word) => SECRET_WORDS.has(word.toUpperCase()))
+    // A token ending with a credential word counts too: PGPASSWORD, APIKEY, ACCESSTOKEN.
+    .some((word) => [...SECRET_WORDS].some((secret) => word.toUpperCase().endsWith(secret)))
 }
 
 export function isPublicValue(input: { name: string; value: string | number | boolean | null }): boolean {

@@ -128,7 +128,7 @@ export async function restoreEnvMutation(input: EnvMutation, roots: ProtectedFil
 function counts(records: ReturnType<typeof envAssignments>) {
   return new Map(records.map((item) => [item.name, item.occurrence]))
 }
-/** The value as the read view shows it when only embedded URL passwords are masked. */
+/** The value as the read view shows it when only embedded fields are masked. */
 function shown(record: ReturnType<typeof envAssignments>[number]) {
   const view = envView(record)
   return view.kind === "embedded" ? view.value : undefined
@@ -138,9 +138,15 @@ function restoreFields(text: string, current: ReturnType<typeof envAssignments>,
     if (!item.value.includes(ProtectedFiles.REDACTED)) return result
     const prior = current.find((entry) => entry.name === item.name && entry.occurrence === (base.get(item.name) ?? 0) + item.occurrence)
     if (!prior) return result
-    // A value shown with only its embedded password masked is the current value when the rest matches.
-    if (item.value !== ProtectedFiles.REDACTED)
-      return shown(prior) === item.value ? result.slice(0, item.valueStart) + prior.rhs + result.slice(item.valueEnd) : result
+    if (item.value !== ProtectedFiles.REDACTED) {
+      // Put each embedded mask back by position with the current field text; other edits to the value stay.
+      const view = envView(prior)
+      if (view.kind !== "embedded") return result
+      const fields = view.spans.map(([start, end]) => prior.rhs.slice(start, end))
+      let index = 0
+      const rhs = item.rhs.replaceAll(ProtectedFiles.REDACTED, (mask) => fields[index++] ?? mask)
+      return result.slice(0, item.valueStart) + rhs + result.slice(item.valueEnd)
+    }
     let end = item.valueEnd
     for (let line = 0; line < prior.rhs.split(/\r?\n/).length - 1; line++) {
       const continuation = result.slice(end).match(/^\r?\n\[REDACTED\](?=\r?\n|$)/)
@@ -168,7 +174,7 @@ function maskTemplate(text: string, names: ReadonlySet<string>, layout: "line-sl
         if (position === span.from) return span.valueStart
         if (position === span.to) return span.valueEnd
         if (position < span.to) throw new Error("Partial env placeholder")
-        delta += ProtectedFiles.REDACTED.length - span.valueEnd + span.valueStart
+        delta += span.to - span.from - span.valueEnd + span.valueStart
       }
       return position - delta
     },

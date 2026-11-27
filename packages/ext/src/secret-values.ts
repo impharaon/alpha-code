@@ -30,27 +30,63 @@ export function envAssignments(text: string) {
   )
 }
 
-/** A password inside a URL-shaped value is a credential field whatever its name (spec v5 BR-06); both written forms. */
-export function urlPasswords(value: unknown): string[] {
-  if (typeof value !== "string" || !/^[a-z][a-z0-9+.-]*:\/\/[^\s/?#@]*:[^\s/?#@]*@/i.test(value.trim())) return []
-  const password = URL.parse(value.trim())?.password
-  if (!password) return []
-  return [...new Set([password, /%(?![0-9a-f]{2})/i.test(password) ? password : decodeURIComponent(password)])]
+/**
+ * Credential fields embedded in one value, whatever its name (spec v5 BR-06): the userinfo password of every
+ * `scheme://user:password@` occurrence (the authority ends at `/ ? #` or whitespace; userinfo runs to its last `@`, so
+ * multi-host and unencoded `@` keep the whole password), and the value of each credential-keyed `key=value` segment
+ * (`Password=…;`, `?password=`, `&pwd=`). `whole` marks the URL credential shape without an extractable password.
+ */
+function embeddedFields(text: string) {
+  const spans: [number, number][] = []
+  let whole = false
+  for (const scheme of text.matchAll(/[a-z][a-z0-9+.-]*:\/\//gi)) {
+    const start = scheme.index + scheme[0].length
+    const authority = text.slice(start).match(/^[^\s/?#]*/)![0]
+    const at = authority.lastIndexOf("@")
+    const colon = at === -1 ? -1 : authority.slice(0, at).indexOf(":")
+    if (colon === -1) continue
+    if (colon + 1 === at) whole = true
+    else spans.push([start + colon + 1, start + at])
+  }
+  for (const segment of text.matchAll(/(?:^|[;&?\s])([A-Za-z][\w.-]*)[\t ]*=[\t ]*("[^"]*"|'[^']*'|\{[^}]*\}|[^;&\s#]*)/g)) {
+    if (!ProtectedFiles.isCredentialName(segment[1])) continue
+    const delimited = /^["'{]/.test(segment[2]) ? 1 : 0
+    const end = segment.index + segment[0].length - delimited
+    const start = end - segment[2].length + 2 * delimited
+    if (start < end) spans.push([start, end])
+  }
+  const merged = spans
+    .toSorted((left, right) => left[0] - right[0])
+    .reduce<[number, number][]>((result, span) => {
+      const last = result.at(-1)
+      if (last && span[0] <= last[1]) last[1] = Math.max(last[1], span[1])
+      else result.push([...span])
+      return result
+    }, [])
+  return { whole, spans: merged }
 }
 
-const embedded = (value: unknown) => urlPasswords(value).flatMap((password) => secretScalar("password", password))
+/** Each embedded field as written and percent-decoded; an invalid escape keeps only the written form. */
+function embeddedStrings(text: string) {
+  return [
+    ...new Set(
+      embeddedFields(text).spans.flatMap(([start, end]) => {
+        const written = text.slice(start, end)
+        try {
+          return [written, decodeURIComponent(written)]
+        } catch {
+          return [written]
+        }
+      }),
+    ),
+  ]
+}
 
-/** Sorted, merged spans of every occurrence of the given passwords. */
-function passwordSpans(text: string, passwords: readonly string[]) {
-  const spans = passwords
-    .flatMap((password) => [...text.matchAll(new RegExp(password.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))].map((match): [number, number] => [match.index, match.index + password.length]))
-    .sort((left, right) => left[0] - right[0])
-  return spans.reduce<[number, number][]>((merged, span) => {
-    const last = merged.at(-1)
-    if (last && span[0] <= last[1]) last[1] = Math.max(last[1], span[1])
-    else merged.push([...span])
-    return merged
-  }, [])
+/** Structured leaves and assignment lines: embedded fields, or the whole value for a credential shape without one. */
+function embedded(value: unknown): Uint8Array[] {
+  if (typeof value !== "string") return []
+  if (embeddedFields(value).whole) return secretScalar("password", value)
+  return embeddedStrings(value).flatMap((text) => secretScalar("password", text))
 }
 
 /** `text[from, to)` with every span that reaches into it shown as one placeholder. */
@@ -67,17 +103,21 @@ export function maskSpans(text: string, spans: readonly (readonly [number, numbe
 
 /**
  * How one env value is shown (spec v5 BR-06, the same credential-field rule as structured files): a credential name hides
- * the value; otherwise only embedded URL passwords are masked in place. A password the source does not show verbatim keeps
- * the whole value hidden.
+ * the value; otherwise only embedded fields are masked in place. A source whose quoting/escapes change those fields, or a
+ * credential shape without an extractable password, keeps the whole value hidden.
  */
 export function envView(record: { name: string; value: string; rhs: string }) {
   if (ProtectedFiles.isCredentialName(record.name)) return { kind: "secret" as const }
-  const passwords = urlPasswords(record.value)
-  if (!passwords.length) return { kind: "public" as const }
-  const value = passwordSpans(record.value, passwords)
-  const rhs = passwordSpans(record.rhs, passwords)
-  if (!value.length || !rhs.length) return { kind: "secret" as const }
-  return { kind: "embedded" as const, spans: rhs, value: maskSpans(record.value, value), rhs: maskSpans(record.rhs, rhs) }
+  const parsed = embeddedFields(record.value)
+  if (parsed.whole) return { kind: "secret" as const }
+  if (!parsed.spans.length) return { kind: "public" as const }
+  const quote = /^(["'`])[\s\S]*\1$/.test(record.rhs) ? 1 : 0
+  const inner = record.rhs.slice(quote, record.rhs.length - quote)
+  const written = embeddedFields(inner)
+  const texts = (text: string, spans: readonly [number, number][]) => JSON.stringify(spans.map(([start, end]) => text.slice(start, end)))
+  if (written.whole || texts(inner, written.spans) !== texts(record.value, parsed.spans)) return { kind: "secret" as const }
+  const spans = written.spans.map(([start, end]): [number, number] => [start + quote, end + quote])
+  return { kind: "embedded" as const, spans, value: maskSpans(record.value, parsed.spans), rhs: maskSpans(record.rhs, spans) }
 }
 
 export function envSecret(record: { name: string; value: string; rhs: string }) {
@@ -100,7 +140,11 @@ export function credentialValues(file: ProtectedFiles.ProtectedFile, bytes: Uint
   }
   const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
   if (file.profile === "env")
-    return envAssignments(text).flatMap((item) => [...(envSecret(item) ? secretScalar(item.name, item.value) : []), ...embedded(item.value)])
+    return envAssignments(text).flatMap((item) =>
+      envSecret(item)
+        ? [...secretScalar(item.name, item.value), ...embeddedStrings(item.value).flatMap((field) => secretScalar("password", field))]
+        : embedded(item.value),
+    )
   if (file.format === "json") return documentValues(file.profile, JSON.parse(text))
   if (file.format === "credential-url")
     return text

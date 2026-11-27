@@ -614,6 +614,8 @@ async function mountHarness(options?: {
           inventory: { skills: [], mcp: [], plugins: [] },
         }),
         onSessionGrantsEnded: () => () => {},
+        // preload 的 ext.onHubViewChanged(preload/types.ts);已安装包行订阅它重读授权状态,这里没有主进程推送。
+        onHubViewChanged: () => () => {},
       },
     },
   })

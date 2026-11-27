@@ -283,8 +283,10 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     }
     const scope = await classify(targets)
     if (!scope) return "not-offered"
+    // The card's folder is the one main resolved now, not the path text: a link re-pointed later (to HOME, say) cannot
+    // change what the card shows, merges on or grants. The raw path stays for main's re-check.
     const offered = new Map<string, (typeof targets)[number]>()
-    scope.forEach((target, index) => { if (target.outcome === "needs-approval" && !offered.has(target.realDirectory)) offered.set(target.realDirectory, targets[index]!) })
+    scope.forEach((target, index) => { if (target.outcome === "needs-approval" && !offered.has(target.realDirectory)) offered.set(target.realDirectory, { absolute: targets[index]!.absolute, directory: target.realDirectory }) })
     if (!offered.size) return "not-offered"
     const key = toolCallKey(call)
     const waiting = new Set<RefusedWriteCard>()

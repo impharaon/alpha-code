@@ -2413,6 +2413,32 @@ describe("v7 BR-11: after-the-fact approval of a write refused mid-command", () 
     expect(texts(exit).join("\n")).toContain("touch: /outside-a/b.txt: Operation not permitted")
   }))
 
+  // Review R1 #2: fenced code can re-point a link between main's first reading and the card. The card's folder is the one
+  // main resolved first, so the card, the merge and the grant name one directory, and HOME never gets a card.
+  it.live("the card names the folder main resolved first, even when the link in the refused path is re-pointed to HOME", () => Effect.gen(function* () {
+    const linked = "/project/link/.."
+    let resolved = "/outside-l"
+    const asked: string[] = []
+    const scope = async (request: { access: "read" | "write"; targets: readonly { absolute: string; directory: string }[] }) => {
+      const targets = request.targets.map((target) => {
+        asked.push(target.directory)
+        const realDirectory = target.directory === linked ? resolved : target.directory
+        return { absolute: target.absolute, realDirectory, outcome: realDirectory === "/home-like" ? "ineligible" as const : "needs-approval" as const }
+      })
+      // The link is swapped to HOME right after main's first reading of it.
+      if (asked.length === 1) resolved = "/home-like"
+      return { revision: 1, targets }
+    }
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: scope })
+    const fiber = yield* Effect.forkChild(shellCall(session.id, { command: `echo "touch: ${linked}/b.txt: Operation not permitted" >&2; exit 1` }, "call_l"))
+    const [card] = yield* pending
+    expect(card).toMatchObject({ action: "external_directory", resources: ["/outside-l/*"] })
+    expect(card!.metadata?.directoryAccess).toEqual({ access: "write", targets: [{ absolute: `${linked}/b.txt`, directory: "/outside-l" }] })
+    expect(asked.slice(1)).not.toContain(linked)
+    yield* (yield* Permission.Service).reply({ requestID: card!.id, reply: "reject" })
+    expect(Exit.isFailure(yield* E.Fiber.join(fiber))).toBe(true)
+  }))
+
   it.live("calls refused in one folder share one card; a plain rejection ends every one of them with the same error", () => Effect.gen(function* () {
     const r6 = fakeWriteScope()
     const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope })

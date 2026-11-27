@@ -186,9 +186,15 @@ test("H4 the proof writer is a shell builtin: an external printf first on PATH n
 test("production config bundling retains the scanner owner's original source directory", async () => {
   const { loadConfigFromFile } = await import("electron-vite")
   const loaded = await loadConfigFromFile({ command: "build", mode: "production" }, resolve(import.meta.dirname, "../electron.vite.config.ts"))
-  const config = loaded!.config as { main?: { plugins?: Array<{ name?: string; load?: (id: string) => string | undefined }> } }
+  const config = loaded!.config as { main?: { plugins?: Array<{ name?: string; resolveId?: (id: string) => string | undefined; load?: (id: string) => string | undefined }> } }
   const plugin = config.main!.plugins!.find((plugin) => plugin.name === "codepuppy:package-manager-scanner")!
-  const code = plugin.load!("\0codepuppy-shell-scan.ts")!
+  const code = plugin.load!(plugin.resolveId!("virtual:codepuppy-shell-scan")!)!
   expect(code).toContain("export function scanPackageManagerSource")
   expect(code).toContain("export function shellName")
+  // The production main build (vite/rollup) must compile the module's TypeScript, as electron-vite's main bundle does.
+  const entry = join(root, "scanner-entry.ts")
+  writeFileSync(entry, `import { shellName, shellPs } from "virtual:codepuppy-shell-scan"\nexport default [shellName("/bin/zsh"), shellPs("/usr/local/bin/pwsh")]\n`)
+  const { build } = await import("vite")
+  const output = await build({ configFile: false, logLevel: "silent", plugins: [plugin as never], build: { ssr: entry, write: false } }) as { output: Array<{ code?: string }> }
+  expect(output.output[0]!.code).toContain("function shellPs")
 })

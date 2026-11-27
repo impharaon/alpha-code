@@ -17,7 +17,8 @@ export function packageManagerScannerCode() {
 }
 
 export function packageManagerScannerPlugin() {
-  const module = "\0codepuppy-shell-scan.ts"
+  // No "\0" prefix: vite's TypeScript transform skips "\0" ids, and this module is the scanner's TypeScript source.
+  const module = "/virtual/codepuppy-shell-scan.ts"
   return {
     name: "codepuppy:package-manager-scanner",
     enforce: "pre" as const,

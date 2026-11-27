@@ -9,6 +9,7 @@
 // 唯一读环境的地方是无文档宿主的兼容入口 `codepuppyEngineSettings`(仓内 CLI 宿主、core 单测;sidecar 里文档先于引擎发布,到不了)。
 import path from "node:path"
 import { readFileSync } from "node:fs"
+import type { PinnedFiles } from "./codepuppy-pinned-files.js"
 
 export const CODEPUPPY_BOOTSTRAP_VERSION = 1
 
@@ -83,6 +84,22 @@ export type CodePuppyBootstrap = {
     ecosystemInherit: boolean
     extVerbose: boolean
   }
+  /** main 的本代 sidecar 代号(非负安全整数),各窄消息与回执按它认代;缺席 = 不是桌面宿主(仓内 CLI、单测) */
+  sidecarGeneration?: number
+  /** #1761 §4.8 的文档资源投影:main 从随包资源与已校验固定文件清单解析;缺席 = 本构建没有可用的文档资源 */
+  documents?: DocumentBootstrap
+}
+
+export type DocumentBootstrap = {
+  python: string
+  assets: string
+  templates: string
+  documentRuntimeRoot: string
+  verify: string
+  render: string
+  recalculate: string
+  /** 已校验清单中的 LibreOffice 条目,文档准备验证只认这些 pin */
+  libreoffice: PinnedFiles["files"]
 }
 
 /** 审批无人应答的期限缺省(ADR-038):300 s。 */
@@ -169,7 +186,7 @@ const slot = globalThis as unknown as Record<symbol, unknown>
 export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   const root = record(value, "")
   if (root.v !== CODEPUPPY_BOOTSTRAP_VERSION) throw new CodePuppyBootstrapError("version", "v")
-  only(root, ["v", "paths", "registryChannel", "engine", "platform", "cloudMcp", "webSearch", "skills", "policy", "permission", "network", "switches"], "")
+  only(root, ["v", "paths", "registryChannel", "engine", "platform", "cloudMcp", "webSearch", "skills", "policy", "permission", "network", "switches", "sidecarGeneration", "documents"], "")
   const paths = record(root.paths, "paths")
   only(paths, ["userData", "globalRoot", "userConfig", "initialDirectory", "database", "engineConfigDirectory", "extPlugin", "extBundledManifest", "officeMcpManifest"], "paths")
   const extPlugin = optional(paths, "extPlugin", "paths", absolute)
@@ -203,6 +220,8 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
   const askTimeoutMs = optional(permission, "askTimeoutMs", "permission", positiveSafeInteger)
   const switches = record(root.switches, "switches")
   only(switches, SWITCHES, "switches")
+  const sidecarGeneration = optional(root, "sidecarGeneration", "", nonNegativeSafeInteger)
+  const documents = optional(root, "documents", "", documentsOf)
   return deepFreeze({
     v: CODEPUPPY_BOOTSTRAP_VERSION,
     paths: {
@@ -232,6 +251,8 @@ export function parseCodePuppyBootstrap(value: unknown): CodePuppyBootstrap {
     permission: askTimeoutMs === undefined ? {} : { askTimeoutMs },
     network: egressProxy === undefined ? {} : { egressProxy },
     switches: Object.fromEntries(SWITCHES.map((name) => [name, bool(switches[name], `switches.${name}`)])) as CodePuppyBootstrap["switches"],
+    ...(sidecarGeneration === undefined ? {} : { sidecarGeneration }),
+    ...(documents === undefined ? {} : { documents }),
   })
 }
 
@@ -326,6 +347,36 @@ function cloudMcpOf(value: unknown, at: string): NonNullable<CodePuppyBootstrap[
   }
 }
 
+const DOCUMENT_PATHS = ["python", "assets", "templates", "documentRuntimeRoot", "verify", "render", "recalculate"] as const
+const PIN_KEYS = ["id", "family", "target", "version", "originUrl", "sha256", "bytes", "provenanceUrl"] as const
+
+function documentsOf(value: unknown, at: string): DocumentBootstrap {
+  const documents = record(value, at)
+  only(documents, [...DOCUMENT_PATHS, "libreoffice"], at)
+  if (!Array.isArray(documents.libreoffice)) throw new CodePuppyBootstrapError("invalid", join(at, "libreoffice"))
+  const libreoffice = documents.libreoffice.map((entry, index) => {
+    const pin = record(entry, join(at, `libreoffice.${index}`))
+    const field = (key: string) => join(at, `libreoffice.${index}.${key}`)
+    only(pin, PIN_KEYS, join(at, `libreoffice.${index}`))
+    if (pin.family !== "libreoffice") throw new CodePuppyBootstrapError("invalid", field("family"))
+    const target = matching(/^(?:darwin-arm64|win32-x64)$/)(pin.target, field("target")) as "darwin-arm64" | "win32-x64"
+    return {
+      id: matching(new RegExp(`^libreoffice/${target}/[^/]+$`))(pin.id, field("id")) as PinnedFiles["files"][number]["id"],
+      family: "libreoffice" as const,
+      target,
+      version: nonEmptyText(pin.version, field("version")),
+      originUrl: matching(/^https:\/\//)(pin.originUrl, field("originUrl")),
+      sha256: matching(/^[0-9a-f]{64}$/)(pin.sha256, field("sha256")),
+      bytes: positiveSafeInteger(pin.bytes, field("bytes")),
+      provenanceUrl: matching(/^https:\/\//)(pin.provenanceUrl, field("provenanceUrl")),
+    }
+  })
+  return {
+    ...(Object.fromEntries(DOCUMENT_PATHS.map((key) => [key, absolute(documents[key], join(at, key))])) as Omit<DocumentBootstrap, "libreoffice">),
+    libreoffice,
+  }
+}
+
 /** Request-boundary read only: an unavailable route leaves the original destination intact. */
 export function routePlatformUrl(url: string, preferredBase?: string, directBase?: string, routeRef?: string): string {
   if (!preferredBase || !directBase || !routeRef || !FILE_REF.test(routeRef)) return url
@@ -371,6 +422,11 @@ function text(value: unknown, at: string): string {
 
 function positiveSafeInteger(value: unknown, at: string): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) throw new CodePuppyBootstrapError("invalid", at)
+  return value
+}
+
+function nonNegativeSafeInteger(value: unknown, at: string): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) throw new CodePuppyBootstrapError("invalid", at)
   return value
 }
 

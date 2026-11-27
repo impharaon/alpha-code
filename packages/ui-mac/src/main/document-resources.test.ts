@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { DOCUMENT_ASSET_BUILD_DIR, OFFICE_RUNTIME_BUILD_DIR, documentResources, documentRuntimeResources, officePythonPath, readDocumentAssets } from "./document-resources"
+import { DOCUMENT_ASSET_BUILD_DIR, OFFICE_RUNTIME_BUILD_DIR, documentBootstrap, documentResources, documentRuntimeResources, officePythonPath, readDocumentAssets } from "./document-resources"
+import { readPinnedFiles } from "./pinned-files"
 import { checkOfficeRuntime } from "../../scripts/target-arch"
 
 const temporary: string[] = []
@@ -96,6 +97,25 @@ describe("document resources", () => {
   })
 
 
+})
+
+// Integration layer: the bootstrap projection ext registers with is the host's own resolution, not a second path convention.
+test("the document bootstrap projection carries the host's resolved paths and only the trusted LibreOffice pins", () => {
+  const input = fixture(true)
+  cpSync(join(import.meta.dir, "../../resources/document-runtime"), join(input.resourcesRoot, "document-runtime"), { recursive: true })
+  const manifest = readPinnedFiles()
+  const userData = realpathSync(mkdtempSync(join(tmpdir(), "document-bootstrap-user-"))); temporary.push(userData)
+  const projection = documentBootstrap({ ...input, userData, manifest })
+  const host = documentResources(input)
+  expect([projection.python, projection.templates]).toEqual([host.python, host.templates])
+  expect(projection.assets).toBe(join(input.resourcesRoot, "document-assets"))
+  expect(projection.verify).toBe(documentRuntimeResources(input.resourcesRoot).verify)
+  expect(projection.documentRuntimeRoot).toBe(join(userData, "document-runtime"))
+  expect(projection.libreoffice.map((file) => file.id).sort()).toEqual(manifest.files.filter((file) => file.family === "libreoffice").map((file) => file.id).sort())
+  expect(projection.libreoffice.length).toBeGreaterThan(0)
+  expect(() => documentBootstrap({ ...input, userData, manifest, platform: "linux" })).toThrow("no document resources")
+  rmSync(join(input.resourcesRoot, "document-runtime", "render_document.py"))
+  expect(() => documentBootstrap({ ...input, userData, manifest })).toThrow()
 })
 
 function fixture(packaged: boolean) {

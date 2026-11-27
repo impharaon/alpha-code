@@ -819,7 +819,7 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 ## 集成片｜#1759 合入后的生产装配（r10）
 
 - 依据：[SPEC v1](spec.md) @ `31cd182e09` 的 AC-01..10 / BR-01..11；[DESIGN v2.3](design.md) @ `55c6a80d25`（origin/alpha）§4.3–4.7、v2 §4.1–4.3、v2.1 §4、v2.2 §4、v2.3 §10；本文 r8「#1759 合入后的生产工作，接口已准确固定」、r9 准确剩余清单与 :289「未闭环」；#1759 R1/R2 沿 r8 接口表，只读复核到 #1759 分支 `39cbe494b0`，签名未变（planPackageManagerCaches 仍返回 env/cacheEnv/rules/locations/excluded；R2 五个函数同表）；#1761 [plan](../document-output-quality/plan.md) 切片八 pending 清单 @ `018312f60e`（:871–936）；Issue impharaon/alpha-code#1760。实施基线是编排器把 origin/alpha（含 #1759）合入本分支后的提交，首个实施提交记录该 SHA 并再核一次 R1/R2 原签名。
-- 核对：待编排器核对；实施的首个提交按恢复 brief 的 `Phase:` 行填写本行。
+- 核对：`9ebb66043c` · Claude Opus 5.5（orchestrator）· 通过。裁定：Q1/Q2/Q3 按推荐；Q4 不在 win32 伪造，缺的 win32 包管理器位置绑定记为 #1759 在 Windows 发布前的义务（AC-09 层），本片保留围栏代码今天的 win32 返回；规模接受，A 组先、B 组后，超 360 分钟以 PARTIAL 返回并留 B；R6 消费合入时 alpha 上 #1757 切片三的批准面。Phase: IMPLEMENT —— 先做不消费 #1759 代码的部分（R5 依赖谓词、文档宿主 main+ext 组合、Q1–Q3），红先、一项一提交，不改 #1759 所属文件、暂不接 R1/R2；#1759 合入后由主会话合并再续接。实施起始 2026-11-27T02:13:09Z。
 
 本片不重做 r1–r9 已接受的子链，只把它们接到运行中的应用：mandatory `bootstrap.launchers`、sidecar 发布完整 ConnectorLaunchHost、core index 构造 localLaunch、main 当前代 controller 与窄消息、文档宿主的生产调用者，以及 Host 必需但尚无 main 实现的 R5 依赖/联网归属、R6、R8 与密钥补充。正式包、干净账户、北京/香港、Windows 与打包后断网重启仍是发布层验收，下表逐条标明，不以本片的开发构建证据冒充。
 
@@ -902,4 +902,4 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 
 ### 偏离记录
 
-暂无。
+2026-11-27 · Q2/Q3（本提交）：bootstrap 新增可选 `sidecarGeneration` 与 `documents`；构建器入参类型要求代号，但对类型检查范围外仍不传代号的 harness（`native/codepuppy-fence/test/packaged-main.ts` 属 #1759、`test-live` 包测）输出不含该键的文档，避免改 #1759 所属文件。`shared/document-resources.ts` 把不依赖 Node 的部分提为 `documentAssetResources`，`documentResources` 改为组合它，原返回形状不变；这是投影复用同一解析的必要同链改动（#1761 所属共享文件，原用例覆盖）。

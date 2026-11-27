@@ -126,6 +126,7 @@ export function publishMainBootstrap(input: {
     factorySkillDirs: input.factorySkillDirs ?? [],
     env,
     log: () => {},
+    sidecarGeneration: 0,
   })
   publishCodePuppyBootstrap(document)
   return document

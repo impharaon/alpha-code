@@ -83,6 +83,8 @@ import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { receiveToolPolicyWrite } from "../../../ext/src/policy/store"
 import { createPinnedFileMainBridge, pinnedFileAuthority } from "./connector-launch-host"
+import { documentBootstrap } from "./document-resources"
+import { readPinnedFiles } from "./pinned-files"
 
 export type HealthCheck = { wait: Promise<void> }
 
@@ -385,6 +387,16 @@ function planProductionFence(input: ProductionFenceInput): ProcessFencePlan | un
   )
 }
 
+/** #1761 §4.8: a build without document resources still starts; the document tool then reports the missing projection. */
+function forkDocumentBootstrap(userDataPath: string) {
+  try {
+    return documentBootstrap({ userData: realpathSync(userDataPath), resourcesRoot: realpathSync(resourcesRoot()), packaged: electronNs.app.isPackaged, platform: process.platform, manifest: readPinnedFiles() })
+  } catch (error) {
+    getLogger()?.warn(`document resources unavailable for this generation: ${serializeError(error).message}`)
+    return undefined
+  }
+}
+
 export function getDefaultServerUrl(): string | null {
   const value = getStore().get(DEFAULT_SERVER_URL_KEY)
   const url = typeof value === "string" ? value : null
@@ -620,6 +632,8 @@ export async function spawnLocalServer(
     factorySkillDirs: factorySkillDirsForFork(),
     env: process.env,
     log: (line) => getLogger()?.warn(line),
+    sidecarGeneration: options.generation ?? 0,
+    documents: forkDocumentBootstrap(options.userDataPath),
   })
   publishVideoEnvironment(bootstrap) // #1775 consumes FIRST-PARTY-CACHE-v2.2; #1760 owns its producer.
 

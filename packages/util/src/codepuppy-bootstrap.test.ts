@@ -273,3 +273,22 @@ test("route URL reads the file on every call, confines the prefix, and tolerates
     expect(route()).toBe(original)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
+
+// Fast layer: the generation and document projection cross bundles through this one parser (#1760 Q2/Q3).
+test("the sidecar generation and the document projection parse strictly and stay optional for non-desktop hosts", () => {
+  const pin = { id: "libreoffice/darwin-arm64/26.8.3", family: "libreoffice", target: "darwin-arm64", version: "26.8.3", originUrl: "https://example.test/lo.dmg", sha256: "a".repeat(64), bytes: 42, provenanceUrl: "https://example.test/release" }
+  const documents = { python: "/app/office/bin/python3", assets: "/app/document-assets", templates: "/app/document-assets/templates", documentRuntimeRoot: "/u/data/document-runtime", verify: "/app/document-runtime/verify_runtime.py", render: "/app/document-runtime/render_document.py", recalculate: "/app/document-runtime/recalculate_document.py", libreoffice: [pin] }
+  const parsed = parseCodePuppyBootstrap({ ...valid(), sidecarGeneration: 0, documents })
+  expect(parsed.sidecarGeneration).toBe(0)
+  expect(parsed.documents).toEqual(documents as never)
+  expect(Object.isFrozen(parsed.documents?.libreoffice[0])).toBe(true)
+  expect(parseCodePuppyBootstrap(valid()).sidecarGeneration).toBeUndefined()
+  expect(parseCodePuppyBootstrap(valid()).documents).toBeUndefined()
+  expect(failure({ ...valid(), sidecarGeneration: -1 }).path).toBe("sidecarGeneration")
+  expect(failure({ ...valid(), sidecarGeneration: 1.5 }).path).toBe("sidecarGeneration")
+  expect(failure({ ...valid(), documents: { ...documents, python: "relative/python3" } }).path).toBe("documents.python")
+  expect(failure({ ...valid(), documents: { ...documents, extra: "/x" } }).path).toBe("documents.extra")
+  expect(failure({ ...valid(), documents: { ...documents, libreoffice: [{ ...pin, family: "python" }] } }).path).toBe("documents.libreoffice.0.family")
+  expect(failure({ ...valid(), documents: { ...documents, libreoffice: [{ ...pin, id: "libreoffice/win32-x64/26.8.3" }] } }).path).toBe("documents.libreoffice.0.id")
+  expect(failure({ ...valid(), documents: { ...documents, libreoffice: [{ ...pin, sha256: "A".repeat(64) }] } }).path).toBe("documents.libreoffice.0.sha256")
+})

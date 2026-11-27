@@ -6,7 +6,7 @@
 // 导出值当没设 —— 那个字段回到缺省 —— 并记一行 `bootstrap: <变量名> ignored (<原因>)`,不写值。什么算合格由文档定,不按旧代码的读法。
 import os from "node:os"
 import path from "node:path"
-import { exportedFlag, isCredentialFreeUrl, parseCodePuppyBootstrap, type CodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { exportedFlag, isCredentialFreeUrl, parseCodePuppyBootstrap, type CodePuppyBootstrap, type DocumentBootstrap } from "@opencode/util/codepuppy-bootstrap"
 import { materializeCloudMcpConfig } from "./cloud-sidecar-config"
 import { CLOUD_MCP_SERVER_NAME } from "./cloud-web-search"
 import { secretFileRef } from "./codepuppy-secret-files"
@@ -36,6 +36,10 @@ export type CodePuppyBootstrapInput = {
   env: Record<string, string | undefined>
   /** 不合格的导出值被忽略时记一行(只写变量名,不写值) */
   log: (line: string) => void
+  /** 这一代 sidecar 的代号(main 的唯一权威),各窄消息与回执按它认代 */
+  sidecarGeneration: number
+  /** #1761 §4.8 的文档资源投影;本构建没有可用的文档资源时缺席 */
+  documents?: DocumentBootstrap
 }
 
 /** 喂给文档路径字段的用户导出变量:引擎全局配置目录、会话库的数据根、初始目录。 */
@@ -116,6 +120,9 @@ export function buildCodePuppyBootstrap(input: CodePuppyBootstrapInput): CodePup
       ecosystemInherit: on(env.CODEPUPPY_ECOSYSTEM_INHERIT),
       extVerbose: on(env.CODEPUPPY_EXT_VERBOSE),
     },
+    // Typed callers always pass it; harnesses outside the typecheck that omit it build a non-desktop document.
+    ...(input.sidecarGeneration === undefined ? {} : { sidecarGeneration: input.sidecarGeneration }),
+    ...(input.documents ? { documents: input.documents } : {}),
   })
 }
 

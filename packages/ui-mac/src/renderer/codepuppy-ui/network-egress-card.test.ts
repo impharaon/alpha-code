@@ -23,16 +23,19 @@ afterEach(() => { disposers.splice(0).reverse().forEach((dispose) => dispose());
 afterAll(() => { rmSync(directory, { recursive: true, force: true }) })
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve() }
 
-async function fixture(failWrite = false) {
+async function fixture(failWrite = false, running = ["ses_a", "ses_b"]) {
   const activity = createNetworkEgressActivity()
   let ready: (() => void) | undefined
+  let seq = 0
   const post = (message: NetworkOutbound) => { if (message.type === "codepuppy.network.activity.reply") ready?.() }
   activity.attach(1, post, { session: async () => ({}), shell: async () => true })
   const session = (sessionID: string) => ({ generation: 1, sessionID, directory: "/project" })
-  await new Promise<void>((resolve) => {
+  const setActivities = (sessions: string[]) => new Promise<void>((resolve) => {
     ready = resolve
-    activity.receive({ type: "codepuppy.network.snapshot", id: 1, seq: 1, generation: 1, activities: ["ses_a", "ses_b"].map((sessionID) => ({ kind: "tool", invocationID: sessionID, ref: { ...session(sessionID), messageID: "msg_a", callID: sessionID }, tool: "shell" })) }, post)
+    seq++
+    activity.receive({ type: "codepuppy.network.snapshot", id: seq, seq, generation: 1, activities: sessions.map((sessionID) => ({ kind: "tool", invocationID: sessionID, ref: { ...session(sessionID), messageID: "msg_a", callID: sessionID }, tool: "shell" })) }, post)
   })
+  await setActivities(running)
   const records: EgressPass[] = []
   const passes = createEgressPassLog({ read: () => ({ passes: records, persistence: "ok" }), append: (record) => { records.push(record) } }, () => {})
   const service = createNetworkEgressApproval({ available: true, activity, passes, store: { read: () => ({ ok: true, absent: true, sites: [] }), write: () => { if (failWrite) throw new Error("io") } }, log: () => {} })
@@ -43,7 +46,7 @@ async function fixture(failWrite = false) {
     disposers.push(runtime.render(() => runtime.createComponent(runtime.NetworkEgressCards, { session: session(sessionID), api: service.api }), host))
     return host
   }
-  return { activity, service, mount, session }
+  return { activity, service, mount, session, setActivities }
 }
 
 test("通放记录展示随 main 设置通知聚合首次、最近时间与次数", async () => {
@@ -81,6 +84,41 @@ test("真实 main 批准在两个对话渲染同一未知来源卡片，拒绝�
   await flush()
   expect(a.querySelectorAll("[data-network-egress-request]")).toHaveLength(0)
   expect(b.querySelectorAll("[data-network-egress-request]")).toHaveLength(0)
+})
+
+test("收件人为空时卡片说明此时没有对话在运行工具；收件人出现后同一张卡改回无法确定发起方", async () => {
+  const f = await fixture(false, [])
+  const card = (destination: string) => [...host.querySelectorAll<HTMLElement>("[data-network-egress-request]")].find((node) => node.textContent?.includes(destination))
+  const viewed = "此时没有对话在运行工具，可能是连接器或语言服务在后台联网。"
+  const viewedExpired = "这次连接已失败；允许后，下一次连接直接通过。"
+  const first = new AbortController()
+  const background = f.service.request("background.example.com", 443, first.signal)
+  const host = f.mount("ses_a")
+  await flush()
+  const id = card("background.example.com")?.dataset.networkEgressRequest
+  expect(card("background.example.com")?.textContent).toContain(viewed)
+  expect(card("background.example.com")?.textContent).not.toContain("无法确定发起方")
+  await f.setActivities(["ses_b"])
+  await flush()
+  expect(card("background.example.com")?.dataset.networkEgressRequest).toBe(id)
+  expect(card("background.example.com")?.textContent).toContain("无法确定发起方")
+  expect(card("background.example.com")?.textContent).not.toContain(viewed)
+  first.abort()
+  expect(await background).toBe("approval-unavailable")
+  await flush()
+  expect(card("background.example.com")?.textContent).toContain("这次连接已失败；允许后请让助手重试。")
+  expect(card("background.example.com")?.textContent).not.toContain(viewedExpired)
+  await f.setActivities([])
+  const second = new AbortController()
+  const idle = f.service.request("idle.example.com", 443, second.signal)
+  await flush()
+  expect(card("idle.example.com")?.textContent).toContain(viewed)
+  second.abort()
+  expect(await idle).toBe("approval-unavailable")
+  await flush()
+  expect(card("idle.example.com")?.textContent).toContain(viewedExpired)
+  expect(card("idle.example.com")?.textContent).not.toContain("允许后请让助手重试")
+  expect(card("idle.example.com")?.querySelectorAll("[data-network-egress-decision]")).toHaveLength(3)
 })
 
 test("记住范围直接显示主域与端口语义，保存失败仍在已允许卡片明确显示", async () => {

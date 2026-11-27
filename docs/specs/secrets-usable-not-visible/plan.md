@@ -7,7 +7,7 @@ status: active
 spec: SPEC-secrets-usable-not-visible
 design: DESIGN-secrets-usable-not-visible
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # PLAN-secrets-usable-not-visible｜密钥文件程序可用、助手不可见 实施计划
@@ -811,3 +811,53 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 本轮共 **178 个不同用例 PASS**。`bun typecheck` 从 ext、ui-mac、schema 各自目录执行，均 exit 0（schema 145 files）；没有额外整层或整套测试。`affected-tests --list` exit 0：**`affected tests: 162 of 746 test files`**，只列范围。相对 origin/alpha 的 `git diff --check` exit 0，本计划文档合同检查通过。
 
 证据统一前缀 `/tmp/secrets-r15-`：install、inventory、write-ledger、build、sample、old-name、fixture-identity、fixture-consumers、ext-typecheck、ui-typecheck、schema-typecheck、affected.log；消费者原 JUnit 为 `fixture-consumers.xml`；`name-counts.json`、`name-deltas.json`、`count-intersection.json`、`receipt.json` 记录实测事实。无未解冲突、生产行为变更或新设计决定；没有修改 known-fails、门槛、.gate-tests，无 push/PR/merge PR。偏离仅为题述授权的合并、采样与失效登记同步；遗留去向 none；无新增 ARCH/OPTIONAL。
+
+## ⑥ 规格 v5：项目外读到的名单文件、env 只遮凭据字段
+
+- 依据：[规格 v5](spec.md) @ `5d56d0cae1`：BR-05、BR-06 的 v5 句与 AC-11、AC-12（来源 impharaon/alpha-work INT-safety U-43「intent 全部按照你的建议。」对 I-50、I-51 的批准）；[冻结设计](design.md) v3.3 §4.1、§4.3、§4.4、§4.5 的入口与契约不改签名；#1758。代码基线 `88c88edcee`（origin/alpha，含已合入的 `6a55937acd`）。继承 ①..⑤ 与 r9..r15 收据，不重审已定范围。
+- 核对：2026-11-27 编排器派单（Claude Opus 5.5）要求先改规格、写本节，再由同一会话先红后实施；规格 v5 与本节的编排器核对结果待回填。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/schema/src/codepuppy-protected-files.ts` | `match` 在既有定位规则之后，对项目外路径再用同一份项目规则判定（项目文件名规则；项目固定位置加 `**/` 前缀；同一示例排除与依赖树剪枝；以该路径的文件系统根为根），规则 ID 不变。`sources` 不含这一范围，即不扫描；`probe` 经 `match` 同时认它。`CredentialFields.env` 由 `assignments: "all"` 改为与 credential-document 相同的 `names: "credential"`。 |
+| `packages/schema/src/codepuppy-protected-files.test.ts` | 新增项目外判定表例（darwin/win32、示例与依赖排除、私钥与 rails 位置、sources 不选、probe 命中）；`published sources and probes share exclusions` 中编码旧行为的 `/fixture/project-copy/.env` 样本移入新表例；凭据字段表例的 env 断言改为 names。 |
+| `packages/ext/src/secret-files.ts`、`secret-files.test.ts` | `createSecretFiles` 增加 `track(file)`：读文件工具读过的名单文件此后每次 refresh 与来源一起 stat/采集，沿用同一版本缓存与缺失/不可读重试，不对其目录 readdir；dispose 清空。测试在现实 HOME 中加另一项目的 `.env`：未读前不采集且无关 stat/readdir 为 0；track 后采集到，其目录仍无 readdir。 |
+| `packages/ext/src/secret-values.ts`、`secret-values.test.ts` | 新增 `envSecret(record)`（`isCredentialName` 且非公开值，即 `CredentialFields.env` 的 names 选择）；env 采集只收凭据名变量的值。表例：`DB_HOST=db`、`PORT`、`API_KEY`、`PASSWORD=1234`。 |
+| `packages/ext/src/secret-read.ts`、`secret-read.test.ts` | `projectEnvRows` 用 `envSecret` 决定原样或遮盖（read 视图与 diff 投影共用）；表例 `DB_HOST=db` 原样、`API_KEY` 遮盖。 |
+| `packages/ext/src/secret-mask.ts`、`secret-mask.test.ts` | `read` 先 `track` 本次名单文件；错误中恢复 env 片段的判定改用 `envSecret`。测试里以非凭据名充当秘密的旧样本（`NEW=`）改为凭据名。 |
+| `packages/ext/src/policy/register-policy.test.ts` | 两条接线例：全部批准档读隔离 HOME 下另一项目的 `.env` 零询问、得安全视图，之后文件改写为新值，真 shell `cat` 与批准预览都遮盖；项目 `.env` 的 `DB_HOST=db` 与 `API_KEY` 经 read 与 shell 输出（含 `mongodb`）只遮后者。 |
+| `packages/ext/src/policy/risk.test.ts` | `protected path risk consumes the location roots` 中「项目外 `.env` 不标凭据路径」的旧断言改为标注，另以项目外普通文件保留未标注对照；条数不变。 |
+| `packages/ui-mac/src/main/composer-tier-matrix.engine.cases.ts`、`composer-tier-matrix.engine.scenario.test.ts`、`docs/architecture/codepuppy-authority-registry.json` | 场景层新增 AC-11、AC-12 两行真引擎；`protected files read` 行里以非凭据名充当秘密的长值/多行样本改为凭据名（该行原意是这两类秘密跨页不漏）；宿主标题与条数 48→50，登记册两处同名证明机械同步。 |
+| `scripts/gate-files.tsv` | register-policy 精确条数 97→99。 |
+| 本 `plan.md` | 本节、核对与收据。 |
+
+`secret-mutations.ts`、`secret-diff.ts` 不改：写回经 `resolveProtectedFile`，随 `match` 覆盖项目外 env；diff 经 `projectEnvRows`。
+
+### 顺序
+
+1. **I-50 红例提交**：Schema 表例、secret-files 现实 HOME 例、register-policy 项目外读例，在未修改的实现上各自 FAIL，记录输出。
+2. **I-50 修复提交**：Schema `match`、`track`、SecretMask.read 调用；同提交改编码旧行为的两处断言（Schema 排除表、risk 表）。结束时完整跑 Schema 测试文件、secret-files、secret-mask、register-policy、risk 各一次。
+3. **I-51 红例提交**：secret-values、secret-read、register-policy 的短值例，在未修改的实现上 FAIL。
+4. **I-51 修复提交**：`CredentialFields.env`、`envSecret` 及三处消费；同提交改编码「env 每个值都是秘密」的旧样本（secret-files 的 env helper、secret-mask 的 `NEW=`、Schema 凭据字段的 env 断言）。结束时完整跑 secret-values/read/diff/mutations/mask/files 与 register-policy。
+5. **场景提交**：两行真引擎、旧样本改名、计数与登记同步；经 `gate slot --` 只跑 `protected files` 各行一次；authority-registry 原文件一次。
+6. 返回前一次扩大相关集：按 grep 找 ProtectedFiles、classifyPermissionRequest、secret-values/secret-mask 的消费者与枚举者（ui-mac PermissionDialog、permission-risk，ext plugin-host 等）各跑一次；各包 `bun typecheck`、改动 TS 的 oxlint、`affected-tests --list`。移除臂（Schema 项目外判定、`track`、`envSecret` 三处）在工作树临时改写、跑对应具名例、`git restore` 恢复。
+
+### 风险
+
+- 项目外判定经 `match` 进入所有消费者：风险标注、结果里的 `file:` 引用、写回恢复，以及来源扫描在家目录等已有来源里遇到的同名文件。这是「同一规则」的应有结果；Schema 表例钉住 `sources` 不含该范围，现实 HOME 例钉住不发生全盘扫描。项目规则里的 `*.pem` 等也随之适用于项目外（例如读系统证书目录下的 `.pem` 只得到说明），与项目内一致，在返回中列出。
+- 档位：项目外 env 仍走原读工具的目录询问/拒绝（BR-05 v5 原文）；项目外的非 env 名单文件与家目录同类文件一样前置说明。不改权限规则。
+- I-51 使 `.env` 里名字不像凭据的变量的值可见，包括连接地址里嵌的密码（如 `DATABASE_URL`）。按 U-43 实施，不另加 URL 解析；作为意图回流项返回。
+- 场景行依赖嵌入式真引擎，较重，只在第 5 步经 slot 跑一次。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-11 | Schema `outside project files follow the published project rules`；secret-files `outside protected files are tracked without scanning a realistic home`；register-policy `outside project protected reads keep later outputs masked`；场景 `protected files outside project read shell and card` | fast；integration（受影响 PR 与夜间）；scenario（夜间，本次经 slot 一次） | 去掉项目外判定：read 返回原值，shell 与预览出现值；去掉 `track`：读后改写的新值在 shell 中出现；改成扫描实现：现实 HOME 的无关调用不为 0 |
+| AC-12 | secret-values `env files collect only credential-named values`；secret-read `env read view keeps ordinary values visible`；register-policy `env files mask only credential-named values`；场景 `protected files ordinary env values stay visible` | fast 性质的模块例与 integration；scenario（夜间，本次经 slot 一次） | 恢复「每个值都是秘密」：`db` 进入采集集合，read 视图与 shell 输出里的 `db`、`mongodb` 中的 db 变成遮盖符 |
+
+### 偏离记录
+
+2026-11-27 · 冻结设计 v3.3 有三处正文与规格 v5 不一致，需要设计方出 v3.4 增量（入口签名不变）：§4.1「match、sources、probe 消费相同范围」——v5 起 `match`/`probe` 另含项目外按项目规则的判定，`sources` 不含；§4.1 env 行与「env 保留每个值默认是秘密」「env 的其它非空值仍默认是秘密」——v5 起 env 只取凭据名字段；§4.3「按名单 profile 读取项目/主目录」——另含读文件工具读过的项目外名单文件。本节按规格 v5 实施，未改设计文档。

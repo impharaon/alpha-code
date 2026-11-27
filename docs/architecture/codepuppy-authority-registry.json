@@ -2828,6 +2828,28 @@
           "name": "explicit SSE keeps a session-owned stream until SessionEnd without closing its Location stream"
         }
       ]
+    },
+    {
+      "id": "tool-post-hook-settles-before-stop",
+      "decision": "U-45（owner 2026-11-27「允许改这一处（推荐）」）：停引擎时先让已经开始的工具收尾钩子链（execute.after）跑完再中断这一轮；中断若在钩子链期间到达，钩子返回的结果成为这次调用最后的快照，被中断的记录保留它（#1647 AC1 在负载下不再记成 running）。",
+      "lane": "#1804 U-45",
+      "takeovers": [
+        "packages/core/src/tool.ts"
+      ],
+      "mechanism": {
+        "file": "packages/core/src/tool.ts",
+        "ladder": "L2 (owner-approved U-45; codepuppy(#1804, U-45) blocks in Tool.executeTool and the snapshot root wrapper)"
+      },
+      "tests": [
+        {
+          "file": "packages/core/test/tool-registry.test.ts",
+          "name": "an interrupted call keeps its running post-hook chain's result as its last snapshot"
+        },
+        {
+          "file": "packages/ui-mac/src/main/engine-cases.test.ts",
+          "name": "#1647 AC1:等审批时停引擎 ⇒ 这一轮被释放、工具零执行(sidecar-stop-pending-approval.engine.cases.ts,3 条)"
+        }
+      ]
     }
   ]
 }

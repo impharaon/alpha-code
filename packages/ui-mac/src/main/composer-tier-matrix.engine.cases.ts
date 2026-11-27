@@ -654,7 +654,8 @@ describe("protected files", () => {
       const value = randomUUID()
       // Node's dotenv grammar (same source as secret-values.test.ts); generated RHS only.
       const multiline = randomUUID()
-      await protectedRow(tier, { ".env": `KEY=${value}\nPORT=3000\nLONG='${"x".repeat(2500)}'\nMULTI="${multiline}\ncontinued"\n` }, async (row) => {
+      // Long and multiline secrets carry credential names (spec v5 BR-06).
+      await protectedRow(tier, { ".env": `KEY=${value}\nPORT=3000\nLONG_SECRET='${"x".repeat(2500)}'\nMULTI_TOKEN="${multiline}\ncontinued"\n` }, async (row) => {
         expect(await row.call("read", { path: ".env", limit: 2 })).toEqual([])
         const first = await row.snapshot()
         hidden(first, [value, multiline])
@@ -665,8 +666,8 @@ describe("protected files", () => {
         expect(await row.call("read", { path: ".env", offset: 3, limit: 2 })).toEqual([])
         const page = await row.snapshot()
         hidden(page, [value, multiline, "x".repeat(50)])
-        expect(page.model.includes("LONG=")).toBe(true)
-        expect(page.model.includes("MULTI=")).toBe(true)
+        expect(page.model.includes("LONG_SECRET=")).toBe(true)
+        expect(page.model.includes("MULTI_TOKEN=")).toBe(true)
       })
     })
     test(`protected files ordinary outside read ${name}`, async () => {
@@ -706,6 +707,62 @@ describe("protected files", () => {
       const echoed = await row.snapshot()
       hidden(echoed, [value])
       expect(echoed.model.includes("PORT=3000")).toBe(true)
+    })
+  })
+
+  test("protected files outside project read shell and card", async () => {
+    const value = randomUUID()
+    const file = path.join(fs.mkdtempSync(path.join(sandbox.home, "other-project-")), ".env")
+    fs.writeFileSync(file, `KEY=${value}\nPORT=3000\n`)
+    await protectedRow(BUILD, {}, async (row) => {
+      await row.context.tool.transform((editor: import("@opencode/plugin/promise/tool").ToolEditor) => editor.add({
+        name: "echo_outside", description: "protected fixture", options: { codemode: false }, input: { type: "object", properties: {} },
+        execute: async (_input, context) => {
+          const content = fs.readFileSync(file, "utf8")
+          await row.context.permission.assert({ sessionID: context.sessionID, action: "edit", resources: [file], save: [], metadata: { file, diff: content } })
+          return { content }
+        },
+      }))
+      expect(await row.call("read", { path: file })).toEqual([])
+      const read = await row.snapshot()
+      hidden(read, [value])
+      for (const text of [read.model, read.records, read.cards]) {
+        expect(text.includes("KEY=[REDACTED]")).toBe(true)
+        expect(text.includes("PORT=3000")).toBe(true)
+      }
+      expect(await row.call("shell", { command: `cat ${quote(file)}` })).toEqual([])
+      const shell = await row.snapshot()
+      const disk = fs.readFileSync(row.captures[0]!.file, "utf8")
+      hidden({ ...shell, disk, card: row.card() }, [value])
+      expect(row.card()?.output.includes("KEY=[REDACTED]")).toBe(true)
+      await row.context.agent.transform((editor: import("@opencode/plugin/promise/agent").AgentEditor) => editor.update(BUILD as never, (draft) => {
+        draft.permissions.push({ action: "edit", resource: "*", effect: "ask" })
+      }))
+      const asked = await row.call("echo_outside", {}, true)
+      expect(asked.length).toBe(1)
+      hidden({ asked, ...(await row.snapshot()) }, [value])
+    })
+  })
+
+  test("protected files ordinary env values stay visible", async () => {
+    const value = randomUUID()
+    await protectedRow(BUILD, { ".env": `DB_HOST=db\nAPI_KEY=${value}\n` }, async (row) => {
+      expect(await row.call("read", { path: ".env" })).toEqual([])
+      const read = await row.snapshot()
+      hidden(read, [value])
+      for (const text of [read.model, read.records, read.cards]) {
+        expect(text.includes("DB_HOST=db")).toBe(true)
+        expect(text.includes("API_KEY=[REDACTED]")).toBe(true)
+      }
+      expect(await row.call("shell", { command: "cat .env; echo mongodb" })).toEqual([])
+      const shell = await row.snapshot()
+      const disk = fs.readFileSync(row.captures[0]!.file, "utf8")
+      hidden({ ...shell, disk, card: row.card() }, [value])
+      for (const text of [shell.model, disk, row.card()?.output ?? ""]) {
+        expect(text.includes("DB_HOST=db")).toBe(true)
+        expect(text.includes("API_KEY=[REDACTED]")).toBe(true)
+        expect(text.includes("mongodb")).toBe(true)
+      }
     })
   })
 

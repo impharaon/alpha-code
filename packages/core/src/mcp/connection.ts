@@ -10,7 +10,6 @@ import type { McpClient } from "./client.js"
 import { createConnectorLaunchAttempt, ConnectorPreparationProgress } from "./codepuppy-connector-diagnostic.js"
 import {
   isConnectorLaunchFailure,
-  type ConnectorLaunchDiagnostic,
   type ConnectorLaunchFailure,
   type ConnectorLaunchHost,
   type DeclaredFirstParty,
@@ -111,8 +110,6 @@ export interface Connection {
   /** Connects and lists tools; a failure is reported through `failed`. */
   readonly start: Effect.Effect<void>
   readonly stop: Effect.Effect<void>
-  /** Only the current attempt can disclose its diagnostic; callers never supply a path. */
-  readonly diagnostic: (identity: LaunchIdentity) => Effect.Effect<ConnectorLaunchDiagnostic | undefined, Error>
   /**
    * Runs a request against `client` and, if that request observed a session expiry, reconnects and
    * runs it once more against the replacement. Any other failure passes through.
@@ -391,15 +388,6 @@ export function make(input: Input): Connection {
     },
     start,
     stop,
-    diagnostic: (identity) =>
-      Effect.suspend(() =>
-        state.attempt &&
-        identity.directory === input.directory &&
-        identity.server === input.name &&
-        identity.attempt === state.attempt.identity.attempt
-          ? state.attempt.diagnostic
-          : Effect.succeed(undefined),
-      ),
     recovering,
     catalog: (client) =>
       recovering(client, (client) =>

@@ -96,8 +96,10 @@ export const layer = Layer.effect(
                         name: tool.name,
                         args: (input ?? {}) as Record<string, unknown>,
                         sessionID: context.sessionID,
-                        preparation: { callID: context.id, report: (update) => Effect.runPromiseWith(callContext)(context.progress({ preparation: update })) },
-                      }, (update) => Effect.runPromiseWith(callContext)(context.progress({ [VIDEO_PROGRESS_KEY]: update }))) // codepuppy(#1775): keep the callback outside request data
+                      },
+                      (update) => Effect.runPromiseWith(callContext)(context.progress({ [VIDEO_PROGRESS_KEY]: update })), // codepuppy(#1775): keep the callback outside request data
+                      { callID: context.id, report: (update) => Effect.runPromiseWith(callContext)(context.progress({ preparation: update })) }, // codepuppy(#1760): same, for pinned-file preparation
+                    )
                       .pipe(
                         Effect.catchTags({
                           "MCP.NotFoundError": (error) =>

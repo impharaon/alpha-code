@@ -36,7 +36,7 @@ import type {
   LauncherEnvironment,
   PreparedLaunch,
 } from "@opencode/util/codepuppy-connector-launch"
-import { isConnectorLaunchFailure } from "@opencode/util/codepuppy-connector-launch"
+import { connectorDiagnosticTranscript, isConnectorLaunchFailure } from "@opencode/util/codepuppy-connector-launch"
 import { Environment } from "@opencode/core/environment/index"
 import {
   installConnectorPython,
@@ -739,6 +739,11 @@ function launchConnection(input: {
     return { connection, closed, failures }
   })
 }
+/** The attempt's persisted diagnostic, at the one derivation main and the sidecar read (§4.6); no connection API exposes it. */
+function transcript(root: string, identity: LaunchSnapshot["identity"]) {
+  return JSON.parse(readFileSync(connectorDiagnosticTranscript(root, identity.attempt), "utf8"))
+}
+
 function connectionRoot() {
   const root = mkdtempSync(path.join(tmpdir(), "connector-attempt-"))
   roots.push(root)
@@ -794,14 +799,8 @@ test("connector preparation runs before permits and publishes progress before th
         expect(snapshots.map((row) => row.sequence)).toEqual([1, 2, 3, 4])
         expect(new Set(snapshots.map((row) => row.identity.attempt)).size).toBe(1)
         expect(spawns).toHaveLength(1)
-        const identity = snapshots[0].identity
-        expect(yield* current.connection.diagnostic({ ...identity, directory: tmpdir() })).toBeUndefined()
-        expect(yield* current.connection.diagnostic(identity)).toMatchObject({
-          identity,
-          requestedCommand: ["must-not-run-uvx"],
-          effectiveCommand: [process.execPath, expect.any(String)],
-          stage: "running",
-        })
+        // The prepared entry ran in place of the declared runner command.
+        expect(spawns[0]).toMatchObject({ command: process.execPath })
         yield* current.connection.stop
         expect(snapshots.at(-1)?.state.phase).toBe("disabled")
       }),
@@ -834,8 +833,8 @@ test("connector dependency and download failures do not spawn and preserve a sin
           expect(spawns).toHaveLength(0)
           expect(current.failures).toHaveLength(1)
           expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: failure } })
-          const diagnostic = yield* current.connection.diagnostic(snapshots[0].identity)
-          expect(diagnostic).toMatchObject({ exitCode: null, signal: null, effectiveCommand: [] })
+          const diagnostic = transcript(root, snapshots[0].identity)
+          expect(diagnostic).toMatchObject({ identity: snapshots[0].identity, exitCode: null, signal: null, effectiveCommand: [] })
           expect(JSON.stringify(snapshots)).not.toContain("current-secret")
         }),
       ).pipe(Effect.provide(hostEnvironmentLayer)),
@@ -901,7 +900,7 @@ test("connector production attempt records a crash after connection with complet
         yield* current.connection.client!.callTool({ name: "crash", args: {} }).pipe(Effect.ignore)
         yield* Deferred.await(current.closed)
         expect(snapshots.map((row) => row.state.phase)).toEqual(["connecting", "connected", "failed"])
-        const diagnostic = yield* current.connection.diagnostic(snapshots[0].identity)
+        const diagnostic = transcript(root, snapshots[0].identity)
         expect(diagnostic).toMatchObject({
           exitCode: 17,
           signal: null,
@@ -1062,7 +1061,7 @@ test("connector native spawn failure publishes the actual missing executable as 
         const current = yield* launchConnection({ root, snapshots, spawns, command: [program] })
         yield* current.connection.start
         expect(snapshots.at(-1)?.state).toMatchObject({ phase: "failed", failure: { kind: "dependency", program } })
-        expect(yield* current.connection.diagnostic(snapshots[0].identity)).toMatchObject({
+        expect(transcript(root, snapshots[0].identity)).toMatchObject({
           exitCode: null,
           effectiveCommand: [program],
         })

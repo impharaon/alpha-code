@@ -192,8 +192,7 @@ export interface Interface extends State.Transformable<Editor> {
     readonly name: string
     readonly args?: Record<string, unknown>
     readonly sessionID?: Session.ID
-    readonly preparation?: PinnedFilesCallPreparation
-  }, videoProgress?: (update: VideoProgress) => Promise<void>) => Effect.Effect<ToolResult, NotFoundError | ToolCallError>
+  }, videoProgress?: (update: VideoProgress) => Promise<void>, preparation?: PinnedFilesCallPreparation) => Effect.Effect<ToolResult, NotFoundError | ToolCallError> // codepuppy(#1775, #1760): callbacks stay outside request data
   readonly instructions: () => Effect.Effect<ServerInstructions[]>
   readonly prompts: () => Effect.Effect<Prompt[]>
   readonly prompt: (input: {
@@ -896,10 +895,10 @@ export const layer = (options?: Options) =>
             { concurrency: "unbounded", discard: true },
           )
         }),
-        callTool: Effect.fn("MCP.callTool")(function* (input, videoProgress) {
+        callTool: Effect.fn("MCP.callTool")(function* (input, videoProgress, preparation) {
           const server = ServerName.make(input.server)
           const call = (connection: McpClient.Connection) =>
-            connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID, preparation: input.preparation }, videoProgress) // codepuppy(#1775, #1760)
+            connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID, preparation }, videoProgress) // codepuppy(#1775, #1760)
           const failed = (owner: string) =>
             Effect.mapError(
               (error: Error) =>

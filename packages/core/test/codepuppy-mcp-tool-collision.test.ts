@@ -37,9 +37,9 @@ const mcp = Layer.succeed(
   Mcp.Service.of({
     ...emptyMcp,
     tools: () => Deferred.await(gate).pipe(Effect.as(CATALOG)),
-    callTool: (input, videoProgress) => Effect.promise(async () => {
+    callTool: (_input, videoProgress, preparation) => Effect.promise(async () => {
       await videoProgress?.({ phase: "transcribing", completed: 1000, total: 2000, unit: "ms" })
-      await input.preparation?.report({ id: "speech-model/any/owned-fixture", phase: "download", sequence: 1, receivedBytes: 10, totalBytes: 20 })
+      await preparation?.report({ id: "speech-model/any/owned-fixture", phase: "download", sequence: 1, receivedBytes: 10, totalBytes: 20 })
       return { isError: false, content: [{ type: "text" as const, text: "answer" }] }
     }),
   }),

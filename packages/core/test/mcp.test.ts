@@ -2852,7 +2852,6 @@ it.effect("forwards the invoking session through direct and Code Mode MCP tools"
       name: "lookup",
       args: {},
       sessionID: directSessionID,
-      preparation: { callID: Tool.CallID.make("call_mcp_direct"), report: expect.any(Function) },
     })
 
     const codeModeSessionID = Session.ID.make("ses_mcp_codemode")
@@ -2871,7 +2870,6 @@ it.effect("forwards the invoking session through direct and Code Mode MCP tools"
       name: "search",
       args: {},
       sessionID: codeModeSessionID,
-      preparation: { callID: expect.any(String), report: expect.any(Function) },
     })
   }),
 )

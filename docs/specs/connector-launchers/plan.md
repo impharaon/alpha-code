@@ -1026,3 +1026,27 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 本轮提交：`35e0873dd5`（V24-R1）与本节（V24-R2 证据行、R3/R4 对照、收据）。相关检查：core `bun typecheck` exit 0（2075 files）；core `codepuppy-connector-launch.test.ts` + `codepuppy-local-launch.test.ts` 68 PASS；ui-mac `bun typecheck` exit 0，相关 5 文件 88 PASS、源码扫描 2 文件 15 PASS（r12 同轮，本轮 ui-mac 未改）；`bash scripts/north-star-guard.sh` exit 0；`affected-tests --list` 见返回。r12 发布层清单中 AC-02、AC-04 两行的「①/②裁定之后」前提已满足，其余不变。遗留去向：shell 中直接运行 npm 的三行警告 → #1759 拥有者观察项；项目 `codepuppy.jsonc` 手写 cwd 无改写端 → 观察项。OPTIONAL：无。
 
 遗留去向：①#1759 R1 env 里 pnpm 的 `npm_config_store_dir/cache_dir/state_dir` 让 npm 11 每次打印「Unknown env config」三行，并出现在下载失败的详情开头 → #1759 拥有者（或呈现层只取末行）；②网络中断时一次下载失败约需 338 s 才定论（npm 自身重试 × 准备事务一次恢复）→ 意图项（是否在 BR-06/07 下接受）；③AC-02 中引擎首次起子进程时在 HOME 的引擎数据根建空目录 `opencode/shell/<hash>` → 验收方判定是否计入；④开发树未做启动器预构建时不写描述（打包产物必有）→ 无需处理，已记偏离。OPTIONAL：无。
+
+### r14 Codex 审查第 1 轮（9 项 Major）的修正
+
+依据：Codex r1（gpt-6.1-sol xhigh，只读，A/B 两部分，`a680a6223a`），编排器全部接受；SPEC v1、DESIGN v2.4；已核：Claude Opus 5.5。每项先红后绿，一因一提交（B1/B2 是同一函数的两个缺陷，合一提交）。
+
+| 项 | 提交 | 修正 | 红例（改前 FAIL） |
+| --- | --- | --- | --- |
+| A1 短密钥不遮 | `6cf886abad` | 本条目 environment 的全部非空值都进遮蔽集合，撤回「长度 ≥8」偏离 | core `codepuppy-local-launch.test.ts`：`API_KEY=abc123` 必须在 secrets 里 |
+| A4 npm 选项边界 | `d7e980519f` | 子命令按 npm 自身 definitions 的 nopt 规则找：已知非 Boolean 选项吃下一个 token | util `codepuppy-command-head.test.ts` 以真 `@npmcli/config` 解析为准逐例比对，`npm --registry <url> exec …` 改前判为非运行器 |
+| A5 归因读遮密文本 | `9e54aa1b6c` | 观察器从原始 stderr 只记 URL 的 host/port（无 userinfo/路径/查询），归因按它匹配；展示仍遮密 | core 事务 fixture `egress-masked`：registry 本身是遮蔽值，改前得 `unknown` |
+| B3 R8 来源 | `9e59108375` | 按完整身份解析生效来源（全局优先，否则该项目 `.codepuppy/codepuppy.jsonc`），项目来源在 Bundle 锁内经 `rebindProjectMcpCwdInLock` 只改 cwd | ui-mac `connector-workspace-binding.test.ts` 项目定义例与同名全局例 |
+| B1/B2 前检读远端、版本消失跳过前检 | `7b2b06ba8c` | 启动路径只读本地已验签缓存 + 随包快照（同步，不刷新）；已装版本卡片优先，本地都不再列出时用同一连接器的卡片 | ui-mac `connector-runtime-dependencies.test.ts` 改写（原 `:94` 把 undefined 当成功） |
+| B4 文档行诊断 | `b06d3d75b9` | 文档代为自己的失败行回答 diagnostic：原始错误写入该 attempt 的派生 transcript，main 按保留名路由 | ui-mac `document-generation.test.ts` 解包失败例（改前 `generation.diagnostic` 不存在） |
+| A2 HTTP 缓存存签名 URL | `1f2513baf3` | 远程 requirements 抓取不再用 make-fetch-happen 的 HTTP 缓存层，只留去密快照 | core 远程 requirements 例扫描缓存目录：改前索引里有 `?token=owned-first` |
+| A3 重启先联网 | `ef82c2c734` | uv 准备先用快照求 key，ready 命中即不联网；未命中才重新向来源取，内容变化仍换 key（`normalizeUvLaunchSnapshotFirst`） | 同一例：原声明不变、来源改回 403 的重启不得请求；命中零请求、未命中一次请求且 key 变化 |
+
+一次性真入口（`/tmp/r10-probe/realentry.test.ts`，真围栏，`gate slot --`，探针改用 `connectorCatalogs`）：
+- 冷启动 `PROBE_PHASE=connect` exit 0：五个官方全部 connected（filesystem 32.8 s、fetch 34.6 s、playwright 111.3 s、chrome-devtools 111.4 s、markitdown 113.6 s），出网只有 registry.npmjs.org、pypi.org、files.pythonhosted.org，旧工具未执行，HOME 只多出引擎数据根下的 `shell/<id>`（V24-R2 属应用数据）。
+- AC-10 `PROBE_PHASE=offline` exit 0（同一根、新进程、代理拒绝一切出网）：filesystem 1.2 s、fetch 3.1 s、playwright 4.2 s、chrome-devtools 4.3 s、markitdown 5.1 s 全部 connected，代理记录为空，HOME 无新增。
+- A4 `PROBE_PHASE=runner` exit 0：`npm --registry https://registry.npmjs.org exec --yes -- @modelcontextprotocol/server-filesystem@2026.1.14 <ws>` 判为运行器 → 1.1 s connected（与 npx 同一准备 key 命中）；对照臂把 command-head 临时换回 `d7e980519f^` 再跑同一入口 → 执行 PATH 里的记录用旧 npm，`exit 97` 失败；对照后 `git restore` 复原，工作区干净。
+
+相关检查：util/core/ui-mac/ext `bun typecheck` 均 exit 0；core 三文件 103 PASS（connector-launch、local-launch、mcp-runtime）；ui-mac 7 文件 125 PASS（workspace-binding、runtime-dependencies、launch-generation、document-generation、ipc census、old-name-scan、ext-config）与 4 文件 68 PASS（document-generation、server、sidecar-wiring、launch-sidecar）；util 2 文件 24 PASS；北极星守卫 exit 0；`affected-tests --list` exit 0：**affected tests: 434 of 764 test files**。
+
+偏离：B2 在本地目录都不再列出已装版本时取同一连接器的卡片——不是「已装版本自己的事实」本身；要逐字保留需在安装收据里记录依赖事实（账本 schema 改动），本轮未做。A4 让 util 静态引入 `@npmcli/config` 的 definitions；bun 打包后在 node 下实跑正确，Electron 主进程的正式打包未在本轮重建。遗留去向：上述两条 → 编排器决定是否另立；OPTIONAL：无。

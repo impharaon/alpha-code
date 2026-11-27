@@ -915,3 +915,23 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 2026-11-27 · index 的 localLaunch（本提交）：构造落在新 core 模块 `mcp/codepuppy-local-launch.ts` 的 `connectorLocalLaunch`，index.ts 只多一行调用并把同一 `declaredFirstPartyTools` 结果同时用于工具声明与 firstParty（不再算两遍）。只有本代 bootstrap 带 launchers 与 sidecarGeneration 时才给上下文；两类运行器的 packagePreparation 延迟加载 stdio 与准备模块后调用冻结的 prepareConnectorLaunch，原生命令只有依赖前检与诊断。遮蔽用的 secrets 取本条目显式 environment 中长度 ≥8 的值（core 看不到哪些值来自密钥引用；短开关值不参与遮蔽，以免把原文切碎）。在 main 写入 launchers 前该路径不触发。
 
 2026-11-27 · 启动器包目录（本提交）：实读发现开发运行时 `resources/connector-launchers` 并不存在——prebuild 产物在 `native/connector-launchers/build/<mac-arm64|win-x64>`，打包器从那里复制到 `connector-launchers/`。`describeLauncherEnvironment`/`createLauncherAssetAuthority` 的输入因此从 resources 根改为显式 `bundleDirectory`，由新的 `launcherBundleDirectory` 按打包与否给出（用例对照 electron-builder 的同一 copy 源/目的）；`hostLauncherPlatform` 是两种发行目标的唯一判定。属于本片计划内的资产 authority 同链修正，未改锁或包内容。
+
+### r10 独立部分实施收据（#1759 合入前）
+
+依据：本节计划 `9ebb66043c`（编排器 Claude Opus 5.5 通过，Q1–Q4 裁定见核对行）；已核：Claude Opus 5.5，结论 **PARTIAL**——不消费 #1759 代码的部分已完成，余项等合入后续接。提交：`0f47ece41b`（Q2/Q3 bootstrap）、`f169386a67`（R5 依赖谓词与安装预检）、`b8679f0f7c`（文档宿主 main+ext 组合、Q1 行、换代替换）、`fc07e036a6`（§4.7 其余窄消息两端）、`8207bf730c`（launchers 解析与类型化读取）、`1aa2c0de69`（index 的 localLaunch）、`00b1d8049e`（开发运行的启动器包目录）、`45c88ecf68`（未构建文档资源只记 info）。未改 #1759 所属文件，未接 R1/R2，未运行应用、窗口、gate run、bin/check 或全包/计时用例。
+
+| 项 / AC 子链 | 命名证据与结果 | 移除臂 |
+| --- | --- | --- |
+| Q2/Q3 bootstrap | util `codepuppy-bootstrap.test.ts` 22 PASS；ui-mac `codepuppy-bootstrap-build.test.ts` 19 PASS、`document-resources.test.ts` 投影例（同一解析、只带 LO pin）；`codepuppy-sidecar-wiring.test.ts` 真 spawnLocalServer 的 start 文档带 `sidecarGeneration: 5` | — |
+| AC-01 Git / F-02 预检（R5） | `connector-runtime-dependencies.test.ts` 5 PASS：shim 无开发者工具 → missing=[git] 且 marker 未执行；有工具 → 开发者目录的 git；Homebrew git 直接可用；运行器角色的 uv/Node 不缺；Windows 只认 git.exe；读端按已装卡片版本 | 去掉 shim 判定 → 3 FAIL |
+| 文档宿主（#1761 AC-01..03 前置）与 Q1 | `document-generation.test.ts` 1 PASS：真 runtime/host/main bridge 经配对端口应答真 ext 宿主桥，authorize 走本代写权，首个环境调用后出一行，连接被拒 → download 行，`api.retry` → 真 runtime.retry() → 验证 → connected；ext `plugin-host.test.ts -t document` 4 PASS（有投影即发布宿主并按 Location 登记 verify/ready，无投影不发布）；观察器保留名显示「文档制作环境」 | 去掉行投影、去掉绑定、去掉 ext 登记、去掉标签各自 FAIL |
+| 换代投影 | `connector-launch-state.test.ts` 4 PASS；新例在旧实现上红（`connector launch state already installed`）；wiring 例：子进程存活期间 not-current、退出后 unavailable | 退出不卸载 → FAIL |
+| AC-08 / BR-08 窄消息 | `connector-launch-sidecar.test.ts` 5 PASS：changed 进当前投影、旧代丢弃；resolveAssets 回包与描述不一致即拒；依赖事实与失败原文过桥；egress 证据只给已 begin 的 attempt；诊断只读该 attempt 的派生文件且身份一致；任一端停止都结清等待 | 去掉诊断身份/路径核对、去掉证据范围各自 FAIL |
+| AC-04/05/10 接线（休眠） | core `codepuppy-local-launch.test.ts` 7 PASS：仅桌面代给上下文；运行器经冻结 prepare（依赖门先拒绝、不起进程）；原生命令无准备；首方声明带 launchers | 去掉 packagePreparation → 4 FAIL |
+| 启动器包目录 | `connector-launchers.test.ts` 23 PASS（含对照打包器 copy 源/目的的新例） | — |
+
+更宽相关集一次：ui-mac 8 文件 76 PASS（document-generation/launch-state/sidecar-wiring/document-resources/document-runtime/document-host/locale-regression/zh-punctuation）、6 文件 75 PASS（sidecar-bootstrap-gate/ipc-channel-binding-census/connector-launch-presentation/old-name-scan/mac-target-arch/pinned-files）、`server.test.ts` 51 PASS（首跑 1 FAIL 为本轮新增 warn 行含路径句点命中 bad="." 探针，改 info 后通过，断言未改）、观察器两命名例 2 PASS；ext 文档三文件 27 PASS、策略三文件 120 PASS、identity+resolver 57 PASS；core `mcp.test.ts` 六命名例 7 PASS、runtime 七命名例 8 PASS、collision+attach 17 PASS、connector-launch 诊断 5 PASS。util/core/ext/ui-mac `bun typecheck` 均 exit 0（core 2073 files），ext `bun run build` exit 0。`affected-tests --list` exit 0：**affected tests: 420 of 747 test files**。本轮提交 `git diff --check` 无新增。
+
+**#1759 合入后续接（A 组余项）**：server 次序 fence → 同次绑定 env 建 createLauncherAssetAuthority（`launcherBundleDirectory`/`hostLauncherPlatform`）→ 产出 launchers 并改为必填；pinned 桥绑定 authority.ensureFile/ensureEntry；server 挂 `createConnectorLaunchMainBridge`（resolveAssets=authority、runtimeDependencies=reader+已装声明、diagnostic 动作走桥）；sidecar.ts 在引擎前 `createConnectorLaunchSidecarHost` + publishConnectorLaunchHost；文档 `node` 绑定 authority.resolveAssets；撤销 uvx/npx 的 300000 ms；一次性真入口证据（计划证明表）。**B 组**：R5 代理归属标记与证据推送、R6 reopen（消费合入时 #1757 的批准面）、R8 换文件夹、密钥补充。
+
+遗留去向：①`scripts/north-star-guard.sh` 对本分支 exit 1，点名 r5 `24f2809238` 改的上游 `core/src/mcp/pool.ts`（转发 diagnostic）与 r4 `22c41a6d06` 改的上游 `core/test/mcp.test.ts`（精确断言补 preparation）→ ship 前须处理（编排器裁定：撤回/改走自有文件或按北极星规则另立 ADR）；本轮诊断改由 sidecar 读派生文件，pool.ts 的转发可随之撤回。②`packages/util/src/codepuppy-hash.ts:20` 文件末多一空行（r3）→ 顺手可修。③文档行的「让助手排查」在 unknown 失败时诊断回 unavailable（文档准备没有进程 transcript）→ 意图项或随 B 组定。OPTIONAL：无。

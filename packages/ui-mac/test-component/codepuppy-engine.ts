@@ -15,12 +15,14 @@ import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
 import { writeEngineConfigForFork } from "../src/main/engine-explicit-config"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
 import { handOverCredentials, startCredentials } from "./credential-table"
-import { buildHubRequestReply, buildHubViewReply, buildPackageManagerControlReply, buildSourcesSearchReply } from "../src/main/codepuppy-sidecar-messages"
+import { buildHubRequestReply, buildHubViewReply, buildNativeFileSyncReply, buildPackageManagerControlReply, buildSourcesSearchReply, parseNativeFileSync } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
 import { engineProjectTrust } from "../src/main/engine-project-trust"
 import { projectTrustIdentity } from "../src/main/project-trust-truth"
 import { recordProjectTrustDecision } from "../src/main/project-trust-truth-write"
 import { reconcileSkillsDerivation, skillsEnabledPath } from "../src/main/ext-receipt-v2"
+import { createNativeSources } from "../src/main/native-sources"
+import { sidecarNativeSources } from "../src/main/sidecar-native-sources"
 import { installPreparedShellSeam } from "./prepared-shell-seam"
 
 installPreparedShellSeam()
@@ -103,7 +105,7 @@ function fakeMainPort() {
   const row = { id: "mcp:github", scope: null, name: "github", kind: "mcp", displayName: "GitHub", description: "repos", installed: false, enabled: false, state: "not-installed", authorization: "none" }
   holder.parentPort = {
     postMessage: (message: { type: string; id: number; directory?: string }) =>
-      queueMicrotask(() => {
+      queueMicrotask(async () => {
         fakeMainReceived.push(message)
         const reply =
           message.type === "codepuppy.hub.view.request"
@@ -115,11 +117,37 @@ function fakeMainPort() {
                 // As main answers a generation without the package-manager fence: the Shell keeps its original spawn at once.
                 : message.type === "codepuppy.package-manager.request"
                   ? buildPackageManagerControlReply(message.id, { ok: false, error: "unavailable" })
+                : message.type === "codepuppy.package.source"
+                  ? await nativeSyncReply(message)
                   : undefined
         if (reply) for (const listener of listeners) listener({ data: reply })
       }),
     on: (_event: string, listener: (event: { data: unknown }) => void) => void listeners.push(listener),
   }
+}
+
+/**
+ * D6:main 一侧本机文件条目的生产实现(ext-ipc 用同一个 createNativeSources:sync 落账、定制中心列表与动作),
+ * 账本在本代启动文档的全局根下;引擎列表 / 项目同意 / 重载出口在用例里由用例自己驱动。
+ */
+let testNative: ReturnType<typeof createNativeSources> | undefined
+export function testNativeMain() {
+  return (testNative ??= createNativeSources({
+    root: () => codepuppyBootstrap().paths.globalRoot,
+    home: process.env.HOME ?? "/",
+    descriptions: async () => ({ skills: [], agents: [], commands: [] }),
+    consent: (directory) => (engineProjectTrust(directory) ? "granted" : "awaiting-consent"),
+    pending: () => false,
+    defaultDirectory: () => "/",
+    requestReload: () => {},
+    log: () => {},
+  }))
+}
+async function nativeSyncReply(message: unknown) {
+  const sync = parseNativeFileSync(message)
+  if (!sync) return
+  const written = await testNativeMain().sync(sync.directory, sync.sources)
+  return buildNativeFileSyncReply(sync.id, written.ok ? { states: written.states } : { code: "write-failed", message: written.reason })
 }
 
 export type HostOptions = {
@@ -152,6 +180,8 @@ export type HostOptions = {
   switches?: TestBootstrapInput["switches"]
   /** `#1713` 契约 C 的信任钩子;默认是 sidecar 用的生产读法(没有记录 ⇒ 未允许)。要一个已允许的项目,用 allowProject 记一条。 */
   projectTrust?: (directory: string) => boolean
+  /** D6 / R-m:true ⇒ 像 sidecar 那样装上契约 C 的原生来源钩子(经真 ext 的进程级 hub bridge 问上面的假 main)。 */
+  nativeSources?: boolean
   /**
    * true ⇒ 像出货那样给 ext 一份随包工具清单(启动文档 paths.extBundledManifest,ext 走生产的 bundledPluginTools 核验):ext 自己的工具
    * 带上 ext 的来源与 codepuppy-bundled 授权,绑定摘要非空。清单照 ext 构建脚本的同一形状现写(工具名 = TOOL_TEXT 的键),模块摘要取
@@ -312,7 +342,14 @@ export function codepuppyEngine(options: HostOptions) {
         filewatcher: options.filewatcher ?? false,
         platform: process.platform,
       }),
-      { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), packageManagerEnvironment: {}, projectTrust: options.projectTrust ?? engineProjectTrust },
+      {
+        onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)),
+        packageManagerEnvironment: {},
+        projectTrust: options.projectTrust ?? engineProjectTrust,
+        ...(options.nativeSources
+          ? { nativeSources: sidecarNativeSources(import("../../ext/src/plugin")) }
+          : {}),
+      },
     )
     const send = async (method: string, route: string, body?: unknown) => {
       const response = await fetch!(

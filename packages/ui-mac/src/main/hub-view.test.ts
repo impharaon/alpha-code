@@ -5,7 +5,7 @@ import { buildPackageManagerControlRequest, parsePackageManagerControlReply } fr
 // 夹具:真盘账本(upsertRecordV2)+ 引擎在 HTTP 层的替身(只替换 fetch,SDK 客户端与 tool-policy 客户端都是生产的)。
 // 定制中心那一侧的调用**只带目录**(renderer 从不发送会话字段);agent 那一侧带 sessionID / agent。
 import { afterAll, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Wildcard } from "../../../core/src/util/wildcard"
@@ -435,6 +435,33 @@ describe("hub-view 三档状态(§2.5)", () => {
     expect(row(outside.rows, "skill:kit-skill").state).toBe("installed")
   })
 
+  test("a linked package whose printed directory is gone names the missing source; nothing is removed", async () => {
+    const w = world("linked-missing")
+    // Production-shaped linked install: the bundle root, its live generation (metadata + managed view) and the graph's pluginLink.
+    const printed = join(tmp, "linked-missing", "xcode-output")
+    const key = "bundle--plugin-xcode"
+    const generation = join(w.globalRoot, "ext-store", key, "generations", "gen-000001-abcdef01")
+    mkdirSync(join(generation, "tree"), { recursive: true })
+    writeFileSync(join(w.globalRoot, "ext-store", key, "current.json"), JSON.stringify({ v: 1, generation: "gen-000001-abcdef01", txId: "tx-linked-1", switchedAt: "2026-11-27T00:00:00.000Z" }))
+    const bindingId = `sha256:${"e".repeat(64)}`
+    const description = { schema: "codepuppy.plugin-package.v1", provider: "claude-code", name: "xcode", source: { kind: "marketplace", locator: printed, ecosystem: "claude", entryName: "xcode" },
+      materialization: "link", link: { bindingId, topLevel: [{ kind: "directory", path: "skills", mode: 0o755 }] }, entries: [], secrets: [], diagnostics: [] }
+    writeFileSync(join(generation, "plugin-package.json"), JSON.stringify({ description, hostNames: {}, view: [{ kind: "symlink", path: "skills", target: join(printed, "skills") }] }))
+    const digest = `sha256:${"f".repeat(64)}`
+    const root = { componentId: "bundle:xcode", kind: "bundle" as const, name: "plugin-xcode", required: true, manifestDigest: digest }
+    const graph = { packageId: "claude:xcode", envelopeDigest: digest, displayName: "xcode", root, children: [], pluginLink: { bindingId, storeKey: key } }
+    const applied = applyPackageMutation(w.globalRoot, {
+      transactionId: "tx-linked-1", operation: "install", graphBeforeDigest: null,
+      graphAfter: { ...graph, installedGraphDigest: computeInstalledGraphDigest(graph) },
+      childRecordMutations: [{ op: "upsert", input: { id: "user:plugin-xcode", name: "plugin-xcode", kind: "bundle", environment: "prod", scope: { kind: "global" }, version: "link.eeee", desiredState: "enabled", origin: "imported-claude", installedAt: "2026-11-27T00:00:00.000Z" } }],
+      claimMutations: [{ op: "acquire", kind: "bundle", name: "plugin-xcode", owner: bundleOwner("claude:xcode", digest) }],
+    })
+    if (!applied.ok) throw new Error(applied.reason)
+    expect(row((await w.service.view(w.projectDir)).rows, "claude:xcode")).toMatchObject({
+      installed: true, state: "installed", stateReason: { code: "not-loaded", detail: "Linked plugin source is missing: " + join(printed, "skills") },
+    })
+  })
+
   test("引擎读不出 ⇒ 不标可用(核不了 = 待重载 + 原因),停用条目照旧只看账本", async () => {
     const w = world("engine-down")
     const service = createHubViewService({
@@ -582,6 +609,45 @@ describe("I6:main 侧 alpha.* 分发只做只读查询与重载记录", () => {
     expect(sent[0]).toMatchObject({ type: "codepuppy.unattended.live", sessions: [] })
     host.receive({ type: "codepuppy.reload.report", generation, scope: "global", outcome: "waiting", directories: [], error: "1 session(s) busy" }, post)
     expect(w.coordinator.pendingFor("/any")).toEqual({ code: "reload-waiting", detail: "1 session(s) busy" })
+  })
+
+  test("language server states reach main's latest-value store and preview opens reach only the attached sidecar", () => {
+    const w = world("host-language")
+    const logs: string[] = []
+    let changes = 0
+    const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: createHubRequestStages({ log: () => {} }), searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => ({ ok: false, code: "unknown-id", detail: "unknown" }), reloads: w.coordinator, languageStatusChanged: () => { changes++ }, log: (line) => logs.push(line) })
+    const treeDigest = "sha256:" + "1".repeat(64)
+    const status = { type: "codepuppy.package.lsp.status", packageId: "claude:pyright-lsp", entryId: "lsp:.claude-plugin/plugin.json#pyright", sourceName: "pyright", treeDigest, state: "dependency-missing", detail: "pyright-langserver" }
+    expect(host.receive(status, () => {})).toBe(true)
+    expect(host.receive({ ...status, state: "running" }, () => {})).toBe(true)
+    expect(host.receive({ ...status, path: "/private/tree" }, () => {})).toBe(true)
+    expect(host.languageServers("claude:pyright-lsp", treeDigest)).toEqual([{ sourceName: "pyright", state: "dependency-missing", detail: "pyright-langserver" }])
+    expect(changes).toBe(1)
+    expect(logs.filter((line) => line.includes("dropped malformed"))).toHaveLength(2)
+    host.openLanguageFile(w.projectDir, "file:///before-attach.py")
+    const sent: CodePuppySidecarOutbound[] = []
+    const detach = host.attach((message) => void sent.push(message))
+    host.openLanguageFile(w.projectDir, "file:///project/typed.py")
+    detach("exit")
+    host.openLanguageFile(w.projectDir, "file:///after-detach.py")
+    expect(sent.filter((message) => message.type === "codepuppy.package.lsp.open")).toEqual([{ type: "codepuppy.package.lsp.open", projectRoot: w.projectDir, fileUri: "file:///project/typed.py" }])
+  })
+
+  test("language server states follow the package's installed tree and drop with it", () => {
+    const w = world("host-language-tree")
+    let changes = 0
+    const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: createHubRequestStages({ log: () => {} }), searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => ({ ok: false, code: "unknown-id", detail: "unknown" }), reloads: w.coordinator, languageStatusChanged: () => { changes++ }, log: () => {} } as never) as CodePuppySidecarHost & { languageServers(packageId: string, treeDigest: string | undefined): unknown[] }
+    const first = "sha256:" + "1".repeat(64)
+    const updated = "sha256:" + "2".repeat(64)
+    const status = { type: "codepuppy.package.lsp.status", packageId: "claude:pyright-lsp", entryId: "lsp:.claude-plugin/plugin.json#pyright", sourceName: "pyright", state: "dependency-missing", detail: "pyright-langserver", treeDigest: first }
+    host.receive(status, () => {})
+    expect(host.languageServers("claude:pyright-lsp", first)).toEqual([{ sourceName: "pyright", state: "dependency-missing", detail: "pyright-langserver" }])
+    // An update renamed the server: the old tree's state is no longer the package's state.
+    host.receive({ ...status, entryId: "lsp:.claude-plugin/plugin.json#renamed", sourceName: "renamed", state: "enabled", detail: undefined, treeDigest: updated }, () => {})
+    expect(host.languageServers("claude:pyright-lsp", updated)).toEqual([{ sourceName: "renamed", state: "enabled" }])
+    expect(host.languageServers("claude:pyright-lsp", first)).toEqual([])
+    expect(host.languageServers("claude:pyright-lsp", undefined)).toEqual([])
+    expect(changes).toBe(2)
   })
 
   test("应答发不出去(sidecar 已退出):记一行,不抛", () => {
@@ -782,4 +848,27 @@ test("video requests use the existing host channel with a correlated durable rec
  expect(seen).toHaveLength(1)
  const failure=Promise.withResolvers<CodePuppySidecarOutbound>();host.receive({type:"codepuppy.video.understand",id:7,call,action:"query",requestId:"durable-request"},value=>failure.resolve(value));expect(await failure.promise).toMatchObject({ok:false,error:"component_download_failed"})
  const old=host.attach(()=>{}),latest=host.attach(()=>{});old("old");expect(disconnected).toBe(0);latest("exit");expect(disconnected).toBe(1)
+})
+
+test("native source sync writes the ledger and returns states; write failure answers write-failed", async () => {
+  const { createHubRequestStages, createCodePuppySidecarHost } = await import("./hub-view")
+  const { syncNativeSourcesV2 } = await import("./ext-receipt-v2")
+  const w = world("native-sync")
+  const root = mkdtempSync(join(tmpdir(), "native-sync-"))
+  const logs: string[] = []
+  const deps = { installName: () => undefined, packageAuthorization: async () => ({ ok: false as const, reason: "not installed" }), view: w.service, requests: createHubRequestStages({ log: () => {} }), searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => ({ ok: false as const, code: "unknown-id" as const, detail: "unknown" }), reloads: w.coordinator, log: (line: string) => logs.push(line) }
+  const source = { file: join(root, "agents/a.md"), kind: "agent" as const, entry: "a", active: true }
+  const posted: unknown[] = []
+  const host = createCodePuppySidecarHost({ ...deps, nativeSources: async (_directory, sources) => syncNativeSourcesV2(root, sources) })
+  expect(host.receive({ type: "codepuppy.package.source", operation: "sync", id: 7, directory: root, sources: [source] }, (m) => void posted.push(m))).toBe(true)
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(posted).toEqual([{ id: 7, ok: true, states: [{ file: source.file, kind: "agent", entry: "a", desiredState: "enabled", removed: false }] }])
+  expect(JSON.parse(readFileSync(join(root, "installs.json"), "utf8")).nativeSources).toHaveLength(1)
+  const failing = createCodePuppySidecarHost({ ...deps, nativeSources: async () => ({ ok: false, reason: "disk full" }) })
+  failing.receive({ type: "codepuppy.package.source", operation: "sync", id: 8, directory: root, sources: [source] }, (m) => void posted.push(m))
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(posted.at(-1)).toEqual({ id: 8, ok: false, code: "write-failed", message: "native source bindings could not be written" })
+  createCodePuppySidecarHost(deps).receive({ type: "codepuppy.package.source", operation: "sync", id: 9, directory: root, sources: [] }, (m) => void posted.push(m))
+  expect(posted.at(-1)).toMatchObject({ id: 9, ok: false, code: "unavailable" })
+  rmSync(root, { recursive: true, force: true })
 })

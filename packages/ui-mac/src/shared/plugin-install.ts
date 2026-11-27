@@ -96,6 +96,17 @@ export function diagnosticNotRunning(
   }))
 }
 
+/**
+ * DESIGN-local-plugin-install §4.16 / BR-27: a marketplace source command's failure is the one `source-unreachable` detail written
+ * for the user (the sanitized command and its actual error); every other detail stays diagnostic text behind the localized sentence.
+ */
+export function sourceCommandFailure(command: string, reason: string): string {
+  return `Command "${command}" ${reason}`
+}
+export function isSourceCommandFailure(detail: string): boolean {
+  return detail.startsWith('Command "')
+}
+
 /** Wire projection of main's result; rejects invented fields and never transports private credentials. */
 export function isInstallOutcomeV1(input: unknown): input is InstallOutcomeV1 {
   if (!record(input) || typeof input.ok !== "boolean") return false

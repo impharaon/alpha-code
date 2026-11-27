@@ -65,8 +65,8 @@
   "groundTruth": "https://code.claude.com/docs/en/plugins-reference",
   "hostContract": {
     "artifactPath": "packages/ui-mac/src/shared/host-extension-package-contract",
-    "artifactSha256": "9eaf52305a08ccdf6cbba6131c6573228f304e6316671f510b952fc48c3668b7",
-    "commit": "b3eff85a6beff67ce1132da4bd68b788a9ac46f8",
+    "artifactSha256": "254dee98bd8480cb55de26d1bbf85a8eb17cfd2b1dc3736bedeaf67b171f23c9",
+    "commit": "e0c6e11f86e74fef82770b9b630a0f68d368b8a9",
     "repo": "jinjunnn/alpha-code"
   },
   "identity": {

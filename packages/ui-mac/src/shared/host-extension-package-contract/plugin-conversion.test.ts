@@ -244,12 +244,98 @@ test("recorded upstream bytes and reduced codeload archive match their provenanc
     expect(digest(new Uint8Array(await Bun.file(join(fixtureRoot, file.path)).arrayBuffer()))).toBe(`sha256:${file.sha256}`)
 })
 
-test("real Claude marketplace preserves path, pinned git-subdir and unsupported command sources", async () => {
-  const read = (await converter()).readMarketplace(new Uint8Array(await Bun.file(join(fixtureRoot, ".claude-plugin/marketplace.json")).arrayBuffer()), "claude")
+test("real Claude marketplace preserves path, pinned git-subdir and command sources", async () => {
+  const bytes = new Uint8Array(await Bun.file(join(fixtureRoot, ".claude-plugin/marketplace.json")).arrayBuffer())
+  const read = (await converter()).readMarketplace(bytes, "claude")
   expect(read.entries).toHaveLength(317)
   expect(read.entries.find((entry) => entry.name === "playwright")?.source).toEqual({ kind: "path", path: "external_plugins/playwright" })
   expect(read.entries.find((entry) => entry.name === "42crunch-api-security-testing")?.source).toEqual({ kind: "git", url: "https://github.com/42Crunch-AI/claude-plugins.git", commit: "faf5305385de8afed9468904e8639be737aff39e", ref: "v1.5.5", path: "plugins/api-security-testing" })
-  expect(read.entries.find((entry) => entry.name === "xcode")?.source.kind).toBe("unsupported")
+  // The recorded xcode entry is field-for-field the one pinned by AC-31 (claude-plugins-official@0fbfda5a).
+  expect(read.entries.find((entry) => entry.name === "xcode")?.source).toEqual({ kind: "command", command: "xcrun agent plugin path --plugin-format claude", timeoutSeconds: 60, mode: "link" })
+})
+
+test("marketplace command sources keep command, timeout and mode", async () => {
+  const document = JSON.parse(new TextDecoder().decode(await Bun.file(join(fixtureRoot, ".claude-plugin/marketplace.json")).arrayBuffer())) as { plugins: { name: string; source: Record<string, unknown> }[] }
+  const xcode = document.plugins.find(entry => entry.name === "xcode")!
+  // Controlled variants of the real entry: only its source fields change.
+  const variant = (source: Record<string, unknown>) => (async () => (await converter()).readMarketplace(new TextEncoder().encode(JSON.stringify({ plugins: [{ ...xcode, source: { ...xcode.source, ...source } }] })), "claude").entries[0]!.source)()
+  expect(await variant({ timeout: 120 })).toEqual({ kind: "command", command: "xcrun agent plugin path --plugin-format claude", timeoutSeconds: 120, mode: "link" })
+  expect(await variant({ timeout: 0, mode: undefined })).toEqual({ kind: "command", command: "xcrun agent plugin path --plugin-format claude", timeoutSeconds: 60, mode: "copy" })
+  expect(await variant({ mode: "symlink" })).toMatchObject({ kind: "unsupported" })
+  expect(await variant({ command: " " })).toMatchObject({ kind: "unsupported" })
+})
+
+test("a linked plugin reads only its control definitions and converts like its copy", async () => {
+  const { readdir, lstat, readlink, readFile } = await import("node:fs/promises")
+  const root = join(fixtureRoot, "standard", "claude-plugin-dev")
+  const list = async (path: string) => Promise.all((await readdir(join(root, path))).sort().map(async name => {
+    const child = path ? path + "/" + name : name
+    const info = await lstat(join(root, child))
+    return info.isSymbolicLink() ? { kind: "symlink" as const, path: child, mode: info.mode & 0o7777, target: await readlink(join(root, child)) }
+      : { kind: info.isDirectory() ? "directory" as const : "file" as const, path: child, mode: info.mode & 0o7777 }
+  }))
+  const read: string[] = []
+  const copied = (await (await converter()).convertPluginTree(await captureStandardFixture("claude:plugin-dev"))).package
+  const linked = (await (await converter()).convertPluginTree({
+    source: copied.source, materialization: "link", bindingId: `sha256:${"a".repeat(64)}`, topLevel: await list(""), readDirectory: list,
+    readFile: async path => { read.push(path); return new Uint8Array(await readFile(join(root, path))) },
+  })).package
+  expect(linked).toMatchObject({ materialization: "link", link: { bindingId: `sha256:${"a".repeat(64)}`, topLevel: await list("") } })
+  expect(linked).not.toHaveProperty("tree")
+  const byId = (entries: typeof copied.entries) => entries.toSorted((left, right) => left.id.localeCompare(right.id))
+  expect(byId(linked.entries)).toEqual(byId(copied.entries))
+  expect(linked.entries.map(entry => entry.kind).toSorted()).toEqual(expect.arrayContaining(["agent", "command", "skill"]))
+  // Ordinary resources (scripts, references, examples, README) stay reachable through links and are never read.
+  expect(read.length).toBeGreaterThan(0)
+  expect(read.every(path => /(?:^|\/)(?:SKILL\.md|plugin\.json|hooks\.json)$/.test(path) || /^(?:commands|agents)\/.+\.md$/.test(path))).toBe(true)
+  expect((await import("./plugin-package")).validPluginPackage(linked)).toBe(true)
+})
+
+test("a linked plugin discovers its language servers, output styles and settings default like its copy", async () => {
+  const { mkdtemp, mkdir, writeFile, readdir, lstat, readFile } = await import("node:fs/promises")
+  const { dirname } = await import("node:path")
+  const { convertPluginTree } = await converter()
+  const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes)
+  // Write the pinned sample (with its controlled variants) to a real directory, then capture that directory by link.
+  const both = async (name: string, changes: Record<string, string | null> = {}) => {
+    const capture = await captureStandardFixture(name, changes)
+    const root = await mkdtemp(join(tmpdir(), "plugin-linked-definitions-"))
+    for (const node of capture.nodes) if (node.kind === "file") {
+      await mkdir(dirname(join(root, node.path)), { recursive: true })
+      await writeFile(join(root, node.path), await capture.readFile(node.path))
+    }
+    const list = async (path: string) => Promise.all((await readdir(join(root, path))).sort().map(async child => {
+      const full = path ? path + "/" + child : child
+      return { kind: (await lstat(join(root, full))).isDirectory() ? "directory" as const : "file" as const, path: full, mode: 0o644 }
+    }))
+    const copied = (await convertPluginTree(capture)).package
+    const linked = (await convertPluginTree({
+      source: copied.source, materialization: "link", bindingId: `sha256:${"b".repeat(64)}`, topLevel: await list(""), readDirectory: list,
+      readFile: async path => new Uint8Array(await readFile(join(root, path))),
+    })).package
+    const byId = (entries: typeof copied.entries) => entries.toSorted((left, right) => left.id.localeCompare(right.id))
+    expect(byId(linked.entries)).toEqual(byId(copied.entries))
+    expect(linked.defaults).toEqual(copied.defaults)
+    return linked
+  }
+  const pyright = await captureStandardFixture("claude:pyright-lsp")
+  const manifest = JSON.parse(text(await pyright.readFile(".claude-plugin/plugin.json")))
+  // Root .lsp.json and a manifest-declared server file, both only reachable through the link.
+  const lsp = await both("claude:pyright-lsp", {
+    ".claude-plugin/plugin.json": JSON.stringify({ ...manifest, lspServers: ["./lsp/servers.json"] }),
+    ".lsp.json": JSON.stringify({ rooted: { command: "rooted-langserver", extensionToLanguage: { ".rt": "rooted" } } }),
+    "lsp/servers.json": JSON.stringify({ pyright: manifest.lspServers.pyright }),
+  })
+  expect(lsp.entries.filter(entry => entry.kind === "lsp").map(entry => [entry.sourceName, entry.sourcePath]).toSorted()).toEqual([["pyright", "lsp/servers.json"], ["rooted", ".lsp.json"]])
+  const styles = await both("claude:dominodatalab")
+  expect(styles.entries.filter(entry => entry.kind === "output-style").map(entry => entry.sourcePath)).toEqual(["output-styles/domino-learning.md", "output-styles/domino-mlops.md"])
+  const domino = await captureStandardFixture("claude:dominodatalab")
+  const replaced = await both("claude:dominodatalab", {
+    ".claude-plugin/plugin.json": JSON.stringify({ ...JSON.parse(text(await domino.readFile(".claude-plugin/plugin.json"))), outputStyles: "./styles/" }),
+    "styles/domino-learning.md": text(await domino.readFile("output-styles/domino-learning.md")),
+  })
+  expect(replaced.entries.filter(entry => entry.kind === "output-style").map(entry => entry.sourcePath)).toEqual(["styles/domino-learning.md"])
+  expect((await both("claude:agentforce-adlc")).defaults).toEqual({ agent: "agent:agents/adlc-orchestrator.md" })
 })
 
 test("real bare-map playwright becomes one stdio MCP with its floating token", async () => {
@@ -482,6 +568,77 @@ test("monitor declarations merge portable and provider manifests by source name"
   }
 })
 
+test("output styles and plugin settings normalize from their source declarations", async () => {
+  const { convertPluginTree } = await converter()
+  const { renderPluginText } = await import("./plugin-package")
+  const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes)
+  const domino = await captureStandardFixture("claude:dominodatalab")
+  const learning = text(await domino.readFile("output-styles/domino-learning.md"))
+  const mlops = text(await domino.readFile("output-styles/domino-mlops.md"))
+  const styles = (await convertPluginTree(domino)).package.entries.filter(entry => entry.kind === "output-style")
+  expect(styles).toMatchObject([
+    { id: "output-style:output-styles/domino-learning.md", sourceName: "Domino Learning", description: "Educational mode that explains Domino Data Lab concepts and best practices as you work", keepCodingInstructions: true },
+    { id: "output-style:output-styles/domino-mlops.md", sourceName: "Domino MLOps", keepCodingInstructions: true },
+  ])
+  expect(styles[0]?.kind === "output-style" && renderPluginText(styles[0].instruction, { pluginRoot: "/root", projectDir: "/project" })).toBe(learning)
+  // Controlled variants of the pinned styles: explicit false, absent field and name, broken frontmatter, and a manifest replacement path.
+  const manifest = JSON.parse(text(await domino.readFile(".claude-plugin/plugin.json")))
+  const variant = (await convertPluginTree(await captureStandardFixture("claude:dominodatalab", {
+    "output-styles/domino-learning.md": learning.replace("keep-coding-instructions: true", "keep-coding-instructions: false"),
+    "output-styles/domino-mlops.md": mlops.replace("name: Domino MLOps\n", "").replace("keep-coding-instructions: true\n", ""),
+    "output-styles/broken.md": "---\nname: [\n---\nbody\n",
+  }))).package
+  expect(variant.entries.filter(entry => entry.kind === "output-style")).toMatchObject([
+    { sourceName: "Domino Learning", keepCodingInstructions: false },
+    { sourceName: "domino-mlops", keepCodingInstructions: false },
+  ])
+  expect(variant.diagnostics).toContainEqual(expect.objectContaining({ path: "output-styles/broken.md", code: "invalid-definition" }))
+  const replaced = (await convertPluginTree(await captureStandardFixture("claude:dominodatalab", {
+    ".claude-plugin/plugin.json": JSON.stringify({ ...manifest, outputStyles: "./styles/" }),
+    "styles/domino-learning.md": learning,
+  }))).package
+  expect(replaced.entries.filter(entry => entry.kind === "output-style").map(entry => entry.sourcePath)).toEqual(["styles/domino-learning.md"])
+
+  const adlc = await captureStandardFixture("claude:agentforce-adlc")
+  expect(text(await adlc.readFile("settings.json"))).toContain('"agent": "agents/adlc-orchestrator.md"')
+  const settled = (await convertPluginTree(adlc)).package
+  expect(settled.defaults).toEqual({ agent: "agent:agents/adlc-orchestrator.md" })
+  expect(settled.diagnostics.filter(item => item.path === "settings.json")).toEqual([])
+  const settings = async (changes: Record<string, string | null>) => (await convertPluginTree(await captureStandardFixture("claude:agentforce-adlc", changes))).package
+  expect((await settings({ "settings.json": JSON.stringify({ agent: "adlc-qa" }) })).defaults).toEqual({ agent: "agent:agents/adlc-qa.md" })
+  const missing = await settings({ "settings.json": JSON.stringify({ agent: "agents/absent.md", statusLine: { type: "command" } }) })
+  expect(missing.defaults).toEqual({})
+  expect(missing.diagnostics.filter(item => item.path === "settings.json").map(item => [item.field, item.code])).toEqual([["/agent", "missing-entry"], ["/statusLine", "unsupported-setting"]])
+  const project = await settings({ "settings.json": null, ".claude/settings.json": JSON.stringify({ agent: "agents/adlc-qa.md" }) })
+  expect(project.defaults).toEqual({})
+  expect(project.diagnostics.filter(item => item.path.endsWith("settings.json"))).toEqual([])
+})
+
+
+test("language servers keep their source protocol fields and declaration order", async () => {
+  const convert = (await converter()).convertPluginTree
+  const pyright = (await convert(await captureStandardFixture("claude:pyright-lsp"))).package
+  expect(pyright.diagnostics).toEqual([])
+  expect(pyright.entries).toEqual([{ kind: "lsp", id: "lsp:.claude-plugin/plugin.json#pyright", sourcePath: ".claude-plugin/plugin.json", sourceName: "pyright", server: {
+    command: ["pyright-langserver"], args: [["--stdio"]], extensionToLanguage: { ".py": "python", ".pyi": "python" }, transport: "stdio", env: {}, restartOnCrash: true, diagnostics: true,
+  } }])
+  const original = await captureStandardFixture("claude:pyright-lsp")
+  const manifest = JSON.parse(new TextDecoder().decode(await original.readFile(".claude-plugin/plugin.json")))
+  // Controlled variants of the pinned pyright declaration: a root .lsp.json, a declared file, one option binding and one broken server.
+  const root = { pyright: { ...manifest.lspServers.pyright, command: "root-pyright" }, rooted: { command: "rooted-langserver", extensionToLanguage: { ".rt": "rooted" } } }
+  const declared = { pyright: { ...manifest.lspServers.pyright, env: { PYRIGHT_HOME: "${CLAUDE_PLUGIN_DATA}/home" }, settings: { python: { analysis: { typeCheckingMode: "${user_config.mode}", strict: "${user_config.strict}" } } }, shutdownTimeout: 1500, maxRestarts: 0, restartOnCrash: false }, broken: { command: "broken-langserver" } }
+  const variant = { ...manifest, userConfig: { mode: { type: "string", title: "Mode", default: "strict" }, strict: { type: "boolean", title: "Strict", default: false } }, lspServers: ["./lsp/servers.json"] }
+  const converted = (await convert(await captureStandardFixture("claude:pyright-lsp", { ".claude-plugin/plugin.json": JSON.stringify(variant), ".lsp.json": JSON.stringify(root), "lsp/servers.json": JSON.stringify(declared) }))).package
+  const servers = converted.entries.filter(entry => entry.kind === "lsp")
+  expect(servers.map(entry => [entry.sourceName, entry.sourcePath])).toEqual([["pyright", "lsp/servers.json"], ["rooted", ".lsp.json"]])
+  expect(servers[0]).toMatchObject({ server: { command: ["pyright-langserver"], env: { PYRIGHT_HOME: [{ binding: "pluginData" }, "/home"] }, shutdownTimeout: 1500, maxRestarts: 0, restartOnCrash: false,
+    settings: { value: { python: { analysis: { typeCheckingMode: "${user_config.mode}", strict: "${user_config.strict}" } } }, bindings: { "/python/analysis/typeCheckingMode": [{ option: "mode" }], "/python/analysis/strict": [{ option: "strict" }] } } } })
+  expect(converted.diagnostics).toEqual([expect.objectContaining({ path: "lsp/servers.json", field: "/broken", code: "invalid-definition" })])
+  const { validPluginPackage } = await import("./plugin-package")
+  expect(validPluginPackage(pyright) && validPluginPackage(converted)).toBe(true)
+  // The published decoder vector is this converter output, not a hand-written description.
+  expect(pyright).toEqual((await import("./testvectors/plugin-package-lsp-description.v1.json")).default as never)
+})
 
 test("real skill bodies retain shell environment expressions byte for byte except package bindings", async () => {
   const { renderPluginText } = await import("./plugin-package")

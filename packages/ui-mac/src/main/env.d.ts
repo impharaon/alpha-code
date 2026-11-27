@@ -28,6 +28,13 @@ declare module "virtual:opencode-server" {
   export function assertCodePuppyBootstrap(): void
   export function startEngine(
     options: import("./engine-server-options").EngineServerOptions,
-    hooks: { onDispatch?: (dispatch: (request: Request) => Promise<Response>) => void; projectTrust: (directory: string) => boolean; packageManagerEnvironment: Readonly<Record<string, string>>; refreshPackageManagerEnvironment?: () => Promise<Readonly<Record<string, string>>> },
+    hooks: {
+      onDispatch?: (dispatch: (request: Request) => Promise<Response>) => void
+      projectTrust: (directory: string) => boolean
+      packageManagerEnvironment: Readonly<Record<string, string>>
+      refreshPackageManagerEnvironment?: () => Promise<Readonly<Record<string, string>>>
+      /** 契约 C 增量(R-m):原生文件来源 sync;见 engine/engine-embed.ts。 */
+      nativeSources?: import("@opencode/schema/codepuppy-project-config").NativeSourceSync
+    },
   ): Promise<{ url: string; dispatch: (request: Request) => Promise<Response>; close: () => Promise<void> }>
 }

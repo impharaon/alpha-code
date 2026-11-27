@@ -11,7 +11,7 @@
 <div class="topbar">
   <div class="brand"><span class="m">α</span> 定制中心 · 活稿</div>
   <div class="spacer"></div>
-  <nav><a href="#hub-tabs">三页结构</a><a href="#lineage">与上一稿的关系</a><a href="#facts">契约与数据基线</a><a href="#vocab">词汇表</a><a href="#featured">推荐页</a><a href="#browse">浏览标识</a><a href="#detail">详情页</a><a href="#cloud-preflight">发送前预检</a><a href="#states">降级与失败态</a><a href="#policy">启用策略</a><a href="#localpkg">本地扩展包导入</a><a href="#import-preview">预览屏</a><a href="#installed-packs">已装扩展包</a><a href="#enable-flow">启用与生效</a><a href="#packrel">与整包事实的关系</a><a href="#review">评审点</a></nav>
+  <nav><a href="#hub-native">本机文件条目</a><a href="#hub-tabs">三页结构</a><a href="#lineage">与上一稿的关系</a><a href="#facts">契约与数据基线</a><a href="#vocab">词汇表</a><a href="#featured">推荐页</a><a href="#browse">浏览标识</a><a href="#detail">详情页</a><a href="#cloud-preflight">发送前预检</a><a href="#states">降级与失败态</a><a href="#policy">启用策略</a><a href="#localpkg">本地扩展包导入</a><a href="#import-preview">预览屏</a><a href="#installed-packs">已装扩展包</a><a href="#enable-flow">启用与生效</a><a href="#packrel">与整包事实的关系</a><a href="#review">评审点</a></nav>
   <div class="seg" id="themeSeg"><button data-t="light" class="on">浅色</button><button data-t="dark">深色</button></div>
 </div>
 
@@ -43,6 +43,45 @@
     <h3>定制中心 · 管理页 <code>#hub-manage</code></h3>
     <p>规格 v5 的三组：账户、权限、关于。行用名称 — 值排法，发丝线分隔；登录、更改各一个按钮；固定版本（选填）在关于里。</p>
     <div class="ux2-scroll"><iframe class="ux2-if" src="frames/hub-manage.html" style="height:940px" title="定制中心 · 管理页" loading="lazy"></iframe></div>
+  </div>
+  </section>
+
+  <!-- ========== 2026-11-27 本机文件条目(owner 2026-11-27 批准;增量稿 2026-11-27-1776-native-entries/ 已冻结) ========== -->
+  <section class="sec ux2-sec" id="hub-native">
+    <div class="sec-head">
+      <div class="sec-kicker">2026-11-27 · 本机文件条目 · owner 批准（「按稿做（推荐）」，经编排器转达）</div>
+      <h2>本机文件条目：和包同一行、同一菜单；移除后在「已移除」里重新加入</h2>
+      <p class="lede">引擎从本机目录读到的技能、命令、助手、连接器和插件，在三页里和装好的包一样一行一个：名称后写文件所在目录（灰色小字，悬停看完整路径），开关、管理、移除在同一个「…」菜单。移除只是不再加载，文件留在原处；行进收起的「已移除」组，点「+」重新加入并立即开启。项目里的条目在「本项目 · 项目名」组，项目没被允许前写「等待项目同意」（拒绝过写「项目同意已拒绝」），照旧不运行。版式与组件全部沿用上一节，不加确认、步骤或设置。增量稿（已冻结，含组件对照、放在哪一页与文案表）：<a href="../../2026-11-27-1776-native-entries/frame.html">2026-11-27-1776-native-entries/frame.html</a>。深色：在帧地址后加 <code>?theme=dark</code>。</p>
+    </div>
+  <div class="ux2-anchor" id="hub-native-skills">
+    <h3>技能页：已安装里的本机文件条目（开 / 关） <code>#hub-native-skills</code></h3>
+    <p>目录紧跟名称，用与「随应用提供」同一种灰色小字；关着时后面再跟「● 已关闭」。名称太长先截名称，目录和状态不截。命令在名称前加「/」。「已移除」平时收起，没有移除项时整组不出现。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/hub-native-skills.html" style="height:960px" title="技能页：本机文件条目（开 / 关）" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="hub-native-connectors">
+    <h3>连接器页：本机连接器、插件与未被允许的项目 <code>#hub-native-connectors</code></h3>
+    <p>「本项目 · 项目名」组只在打开了项目时出现。项目还没被允许时，组里的行写「等待项目同意」；拒绝过写「项目同意已拒绝」（黄点）。项目照旧在打开对话时询问，这里不加按钮。开关记的是你的选择，项目被允许后按开关生效。没有说明文字的连接器、插件，描述写类型。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/hub-native-connectors.html" style="height:960px" title="连接器页：本机连接器、插件与未被允许的项目" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="hub-native-menu">
+    <h3>「…」菜单：和包的菜单一样 <code>#hub-native-menu</code></h3>
+    <p>左：本机技能，开着。右：未被允许项目里的插件——开关照常可拨，状态仍写「等待项目同意」，项目被允许前不运行。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/hub-native-menu.html" style="height:360px" title="本机文件条目的「…」菜单" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="hub-native-removed">
+    <h3>移除之后：「已移除」组与「+」重新加入 <code>#hub-native-removed</code></h3>
+    <p>点「移除」后，这一行离开「已安装」，提示「已移除『名称』」并说明「文件仍在原处，可在「已移除」里重新加入。」「已移除」展开后每行一个「+」，悬停写「重新加入」，读屏「重新加入 {名称}」。不弹确认。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/hub-native-removed.html" style="height:960px" title="移除之后：「已移除」组与「+」重新加入" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="hub-native-rejoin">
+    <h3>重新加入之后 <code>#hub-native-rejoin</code></h3>
+    <p>点一次「+」：这一行回到原来的组并立即开启，生效前写「正在生效」，提示「已重新加入『名称』」。项目里的条目回到「本项目」，项目没被允许时仍写「等待项目同意」。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/hub-native-rejoin.html" style="height:390px" title="重新加入之后" loading="lazy"></iframe></div>
+  </div>
+  <div class="ux2-anchor" id="hub-native-manage">
+    <h3>管理页：来源写完整路径 <code>#hub-native-manage</code></h3>
+    <p>本机文件条目的管理页只有「关于」（连接器另有现有的「权限」）：包含、来源（本机文件 + 完整路径）、生效范围（全局目录写「我的所有项目」，项目目录写「仅当前项目」）。没有版本和账户。头部「…」和列表里是同一个菜单。</p>
+    <div class="ux2-scroll"><iframe class="ux2-if" src="frames/hub-native-manage.html" style="height:960px" title="管理页：来源写完整路径" loading="lazy"></iframe></div>
   </div>
   </section>
 

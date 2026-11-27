@@ -1,3 +1,4 @@
+import { pluginPackageStoreKey } from "./ext-package-ledger-v3"
 import { INSTALLED_PLUGIN_SETTINGS_FILE, validInstalledPluginSettings } from "../shared/installed-plugin-settings"
 // Extension Hub config writer (main process). Persists MCP servers to the user's global opencode
 // config so they survive restart — opencode reads config once and caches it, so the renderer's live
@@ -476,7 +477,7 @@ export function persistMcp(name: string, server: Record<string, unknown>, meta?:
   if (!server || typeof server !== "object") return { ok: false, reason: "invalid server config" }
   const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
   const record = state.ok ? state.records.find(record => record.kind === "mcp" && record.name === name) : undefined
-  const source = record && record.origin !== "created" && state.ok && state.packageGraphs.some(graph => graph.pluginTree && graph.children.some(node => node.kind === "mcp" && node.name === record.name && node.componentId === record.id)) ? "plugin" : "connector"
+  const source = record && record.origin !== "created" && state.ok && state.packageGraphs.some(graph => pluginPackageStoreKey(graph) && graph.children.some(node => node.kind === "mcp" && node.name === record.name && node.componentId === record.id)) ? "plugin" : "connector"
   const valid = validateServer(server, source)
   if (!valid.ok) return valid
   // `#1381`(基线 I1):远程 MCP 的记录住在围栏写不到的真源里(mcp-server-truth.ts);配置文件里的 `mcp.*` 远程条目对注入面与

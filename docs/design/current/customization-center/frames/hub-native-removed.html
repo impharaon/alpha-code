@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN" data-color-scheme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>定制中心 · 移除之后：「已移除」组与「+」重新加入</title>
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/base.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/button.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/input.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/tooltip.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/toast.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/dialog.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/key-value-list.css" />
+<link rel="stylesheet" href="../../../../../packages/ui-mac/src/renderer/codepuppy-ui/home.css" />
+<link rel="stylesheet" href="../../../system/direction.css" />
+<style>
+  /* 组合规则(只排版,无新组件、无新令牌):
+     ① Toast 视口在应用里 fixed 在窗口右下 16px,画框里改成相对窗口定位;画框不播入场动画(同 direction.css 对 .a-pop 的处理);
+     ② Tooltip 在应用里 Portal 到 body,默认放在触发按钮上方 6px、水平居中(Tooltip.tsx 的 top 放置),画框里静态摆位;
+     ③ 两列网格与代码一致用 minmax(0, 1fr)(extension-hub.css .codepuppy-ext-grid),长名称不撑宽列。 */
+  .fr .a-toast-viewport { position: absolute; right: 16px; bottom: 16px; }
+  .fr .a-toast { animation: none; }
+  .fr .tip-at { top: auto; bottom: calc(100% + 6px); left: 50%; translate: -50% 0; }
+  .fr .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+</style>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const q = new URLSearchParams(location.search)
+    const small = q.get("size") === "1280"
+    const dark = q.get("theme") === "dark"
+    document.body.classList.toggle("is-1280", small)
+    document.querySelectorAll(".fr").forEach((f) => f.classList.toggle("is-dark", dark))
+    document.querySelectorAll("[data-size]").forEach((a) => a.toggleAttribute("data-on", (a.dataset.size === "1280") === small))
+  })
+</script>
+</head>
+<body style="margin:0;padding:20px;background:var(--a-bg-subtle)">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M18.4 3.6a2 2 0 0 1 2.9 2.9L12.5 15.3 9 16l.7-3.5Z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><path d="M16.75 13.5v6.5M13.5 16.75H20"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/><path d="m9.5 14.5 1.8 1.8 3.4-3.4"/></symbol>
+<symbol id="i-panel-l" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></symbol>
+<symbol id="i-left" viewBox="0 0 24 24"><path d="m14.5 18-6-6 6-6"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="m9.5 18 6-6-6-6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2h7.2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></symbol>
+<symbol id="i-folder-open" viewBox="0 0 24 24"><path d="M3.5 17V7.5a2 2 0 0 1 2-2h3.8l2 2h6.2a2 2 0 0 1 2 2V11"/><path d="M3.5 17l2.3-5.2a1.5 1.5 0 0 1 1.4-.8h13a1 1 0 0 1 .9 1.4L19 17.6a1.5 1.5 0 0 1-1.4.9H5a1.5 1.5 0 0 1-1.5-1.5Z"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5"/></symbol>
+<symbol id="i-file-text" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5M8.5 13h7M8.5 16.5h4.5"/></symbol>
+<symbol id="i-file-search" viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5"/><circle cx="11.5" cy="14" r="2.5"/><path d="m13.4 15.9 1.8 1.8"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3.5V8M15 3.5V8M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0ZM12 17v3.5"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-branch" viewBox="0 0 24 24"><circle cx="7" cy="6" r="2.2"/><circle cx="7" cy="18" r="2.2"/><circle cx="17" cy="8" r="2.2"/><path d="M7 8.2v7.6M17 10.2c0 3.6-3.5 4.4-8.3 5.6"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6"/></symbol>
+<symbol id="i-window" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9h17"/><path d="M6.5 6.8h.01M9 6.8h.01"/></symbol>
+<symbol id="i-bug" viewBox="0 0 24 24"><rect x="7.5" y="7.5" width="9" height="12.5" rx="4.5"/><path d="M12 7.5V5M9.5 5.5 8 4M14.5 5.5 16 4M7.5 12.5H4M20 12.5h-3.5M7.5 16.5l-3 1.5M16.5 16.5l3 1.5"/></symbol>
+<symbol id="i-pkg" viewBox="0 0 24 24"><path d="M4.5 7.5 12 3.5l7.5 4v9L12 20.5l-7.5-4Z"/><path d="M8.3 5.5 15.7 9.6V13"/></symbol>
+<symbol id="i-loader" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5"/></symbol>
+<symbol id="i-term" viewBox="0 0 24 24"><path d="m5.5 8 4 4-4 4M12 16.5h6.5"/></symbol>
+<symbol id="i-table" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 4.5v15"/></symbol>
+<symbol id="i-slides" viewBox="0 0 24 24"><path d="M3.5 4.5h17"/><rect x="5" y="4.5" width="14" height="10.5" rx="1"/><path d="M12 15v4.5M8.5 19.5h7"/></symbol>
+</svg>
+<div class="dz-stage" id="hub-native-removed"><div class="fr a-ui">
+    <div class="tb">
+      <div class="tb-left"><span class="tl"><i></i><i></i><i></i></span><button class="tb-btn" aria-label="隐藏侧边栏"><svg class="a-ic"><use href="#i-panel-l"/></svg></button><button class="tb-btn" aria-label="后退"><svg class="a-ic"><use href="#i-left"/></svg></button><button class="tb-btn is-dim" aria-label="前进"><svg class="a-ic"><use href="#i-right"/></svg></button></div>
+      <div class="tb-title">定制中心</div>
+    </div>
+    <nav class="rail"><button class="rail-btn" aria-label="新对话"><svg class="a-ic ic-18"><use href="#i-pen"/></svg></button><button class="rail-btn" aria-label="搜索对话 ⌘K"><svg class="a-ic ic-18"><use href="#i-search"/></svg></button><button class="rail-btn is-on" aria-label="定制中心"><svg class="a-ic ic-18"><use href="#i-grid"/></svg></button><button class="rail-btn" aria-label="自动化"><svg class="a-ic ic-18"><use href="#i-cal"/></svg></button><span class="rail-grow"></span><button class="rail-avatar" aria-label="账户">A</button></nav>
+    <div class="box"><aside class="side">
+        <div class="side-brand"><img src="../../../../../packages/ui-mac/src/renderer/brand/brand-mark.png" alt="" /><b>Code Puppy</b></div>
+        <div class="side-sec">项目<span class="acts"><button class="tb-btn" aria-label="筛选项目和对话"><svg class="a-ic ic-14"><use href="#i-search"/></svg></button><button class="tb-btn" aria-label="打开项目"><svg class="a-ic ic-14"><use href="#i-plus"/></svg></button></span></div>
+        <div class="side-list"><div class="row"><svg class="a-ic"><use href="#i-folder-open"/></svg><span class="grow">orbit-web</span></div><div class="row conv"><span class="grow">修复登录页在窄屏下的错位</span></div><div class="row conv"><span class="grow">把定价表改成从配置读取</span></div><div class="row conv"><span class="grow">梳理项目目录结构并写进 README</span></div><div class="row more">显示更多</div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">pricing-api</span></div><div class="row"><svg class="a-ic"><use href="#i-folder"/></svg><span class="grow">design-notes</span></div></div>
+      </aside><div class="main"><div class="page"><div class="page-in">
+      <div class="phd"><div class="tabs"><span class="tab">连接器</span><span class="tab is-on">技能</span><span class="tab">助手</span></div><label class="a-field"><svg class="a-ic ic-14"><use href="#i-search"/></svg><span class="ph">搜索插件、技能或 MCP</span></label><button class="a-btn" data-variant="secondary">添加<svg class="a-ic ic-12"><use href="#i-down"/></svg></button></div>
+      <p class="ph-desc">可重复使用的任务流程。</p>
+      <div class="grp-h first"><svg class="a-ic ic-12"><use href="#i-down"/></svg>已安装<span class="n">5</span></div>
+      <div class="grid2">
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-plug"/></svg></span><div class="txt"><div class="nm"><span>插件助手</span><span class="st">随应用提供</span></div><div class="ds">查找并安装插件和 MCP</div></div><button class="iact" aria-label="管理 插件助手"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item"><span class="mono"><svg class="a-ic ic-18"><use href="#i-branch"/></svg></span><div class="txt"><div class="nm"><span>Git 提交说明助手</span></div><div class="ds">按约定格式编写提交说明</div></div><button class="iact" aria-label="管理 Git 提交说明助手"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item"><span class="mono">P</span><div class="txt"><div class="nm"><span>pdf-tables</span><span class="st">~/.config/opencode</span><span class="st"><i></i>已关闭</span></div><div class="ds">从 PDF 里提取表格并转成 CSV</div></div><button class="iact" aria-label="管理 pdf-tables"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item"><span class="mono">/</span><div class="txt"><div class="nm"><span>/release-notes</span><span class="st">~/.config/opencode</span></div><div class="ds">根据最近的提交整理发布说明</div></div><button class="iact" aria-label="管理 /release-notes"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+        <div class="item"><span class="mono">F</span><div class="txt"><div class="nm"><span>frontend-accessibility-audit-checklist</span><span class="st">~/.agents/skills</span><span class="st"><i></i>已关闭</span></div><div class="ds">检查页面的键盘操作、颜色对比度和读屏标签，并给出逐项修改建议</div></div><button class="iact" aria-label="管理 frontend-accessibility-audit-checklist"><svg class="a-ic"><use href="#i-more"/></svg></button></div>
+      </div>
+      <div class="grp-h" data-check="removed-open"><svg class="a-ic ic-12"><use href="#i-down"/></svg>已移除<span class="n">2</span></div>
+      <div class="grid2">
+        <div class="item is-hover" data-check="removed-row"><span class="mono">R</span><div class="txt"><div class="nm"><span>review-pr</span><span class="st">~/.claude/skills</span></div><div class="ds">审查拉取请求，按严重程度列出问题和修改建议</div></div>
+          <div style="position:relative"><button class="iact is-hover" aria-label="重新加入 review-pr"><svg class="a-ic"><use href="#i-plus"/></svg></button><div class="a-ui a-tip tip-at" role="tooltip">重新加入</div></div></div>
+        <div class="item"><span class="mono">/</span><div class="txt"><div class="nm"><span>/standup</span><span class="st">~/.config/opencode</span></div><div class="ds">汇总昨天的提交和今天的计划</div></div><button class="iact" aria-label="重新加入 /standup"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+      </div>
+      <div style="margin-top:28px"><span class="seg"><span class="on">推荐</span><span>系统</span></span></div>
+      <div class="grp-h" style="margin-top:18px"><svg class="a-ic ic-12"><use href="#i-down"/></svg>研发<span class="n">4</span></div>
+      <div class="grid2">
+        <div class="item"><span class="mono">技</span><div class="txt"><div class="nm"><span>技能创建助手</span></div><div class="ds">帮你创建、改进和测试技能</div></div><button class="iact" aria-label="安装 技能创建助手"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+        <div class="item"><span class="mono">同</span><div class="txt"><div class="nm"><span>同步上游更新并检查兼容性</span></div><div class="ds">把上游更新合入你的分支，并检查兼容性</div></div><button class="iact" aria-label="安装 同步上游更新并检查兼容性"><svg class="a-ic"><use href="#i-plus"/></svg></button></div>
+      </div>
+    </div></div></div></div>
+    <div class="a-toast-viewport a-ui"><div class="a-toast" data-kind="success" role="status"><span class="a-toast-ico" aria-hidden="true"></span><div class="a-toast-body"><b>已移除『review-pr』</b><small>文件仍在原处，可在「已移除」里重新加入。</small></div><button class="a-toast-x" aria-label="关闭">×</button></div></div>
+  </div></div>
+</body>
+</html>

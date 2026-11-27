@@ -22,6 +22,9 @@ packages/ext/src/plugin-package-hooks.ts	rmSync	directory	W11+W12
 packages/ext/src/plugin-package-hooks.ts	rmSync	environment.file	W11+W12
 packages/ext/src/plugin-package-hooks.ts	writeFileSync	file	W11+W12
 packages/ext/src/plugin-package-hooks.ts	writeFileSync	transcript	W11+W12
+# #1776 slice 7 的受控 LSP 夹具服务(plugin-package-language.server.ts):只由 plugin-package-language / plugin-host 测试经包语言服务起;
+# 设了 LSP_FIXTURE_RECORD 才写,路径是测试的 mkdtempSync(join(tmpdir(), …)) 临时目录 —— $TMPDIR(W12)或 /tmp(W11)。不新增可写根。
+packages/ext/src/plugin-package-language.server.ts	appendFileSync	recordFile	W11+W12
 # #1776 agent memory(plugin-package-invocation.ts 的 memory):project 档在 <项目>/.codepuppy/agent-memory(启动工作区 W1 或用户打开的项目 X1);
 # user / local 档在 pluginDataDirectory(<XDG_DATA_HOME>, …) = <XDG_DATA_HOME>/opencode/plugin-data/…(W4)。不新增可写根。
 packages/ext/src/plugin-package-invocation.ts	mkdirSync	root	W1+X1+W4

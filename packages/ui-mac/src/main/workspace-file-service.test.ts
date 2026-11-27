@@ -269,7 +269,7 @@ describe("honest actions go through the same guards", () => {
 
 describe("IPC wiring validates arguments and scopes sessions to the sender", () => {
   test("handlers exist and refuse malformed arguments fail-closed", async () => {
-    registerWorkspaceFileIpcHandlers()
+    registerWorkspaceFileIpcHandlers(() => {})
     const event = { sender: { id: 77, once: () => {} } }
     expect(await ipcHandlers.get("workspace-file-open-read")!(event, 5, "a.txt")).toEqual({
       ok: false,
@@ -300,6 +300,20 @@ describe("IPC wiring validates arguments and scopes sessions to the sender", () 
   })
 })
 
+test("a successful preview open notifies the package language runtime with only its project and file", async () => {
+  const opened: Array<[string, string]> = []
+  registerWorkspaceFileIpcHandlers((workspaceDir, file) => opened.push([workspaceDir, file]))
+  const event = { sender: { id: 79, once: () => {} } }
+  write("typed.py", "count: int = 1\n")
+  expect(await ipcHandlers.get("workspace-file-open-read")!(event, root, "../outside.py")).toEqual({ ok: false, code: "invalid-path" })
+  expect(await ipcHandlers.get("workspace-file-open-read")!(event, root, "missing.py")).toMatchObject({ ok: false })
+  expect(opened).toEqual([])
+  const result = (await ipcHandlers.get("workspace-file-open-read")!(event, root, "typed.py")) as { ok: boolean; readId: string }
+  expect(result.ok).toBe(true)
+  expect(opened).toEqual([[root, path.join(fs.realpathSync(root), "typed.py")]])
+  await ipcHandlers.get("workspace-file-close-read")!(event, result.readId)
+})
+
 describe("DESIGN-local-session-artifacts §4.5 stat:产物页本机产物行的状态与查看器同一个守卫", () => {
   test("同序同长;删掉文件后由 ok 变 not-found;symlink / 越根 / 非字符串照查看器的拒绝码;不开 fd", () => {
     write("out/report.docx", "12345")
@@ -319,7 +333,7 @@ describe("DESIGN-local-session-artifacts §4.5 stat:产物页本机产物行的�
   })
 
   test("IPC:dir 非字符串 → 每项 invalid-path;rels 非数组 → [];正常入参交给 statWorkspaceFiles", async () => {
-    registerWorkspaceFileIpcHandlers()
+    registerWorkspaceFileIpcHandlers(() => {})
     const stat = ipcHandlers.get("workspace-file-stat")!
     const event = { sender: { id: 78, once: () => {} } }
     write("a.md", "abc")

@@ -99,6 +99,7 @@ beforeAll(async () => {
     },
     requests: createHubRequestStages({ log: () => {} }),
     reloads: createReloadCoordinator({ log: () => {}, onChange: () => {} }),
+    languageStatusChanged: () => {},
     log: () => {},
   })
   // SDK 与协议用法来自 core/test/mcp.test.ts:220-254,服务脚本只写进测试沙箱。

@@ -24,7 +24,12 @@ export type TreeNode =
   | { kind: "directory"; path: RelPath; mode: number }
   | { kind: "file"; path: RelPath; mode: number; bytes: number; digest: Sha256 }
   | { kind: "symlink"; path: RelPath; target: string }
-export type Capture = { source: Source; nodes: readonly TreeNode[]; readFile(path: RelPath): Promise<Uint8Array> }
+/** A node of a link-mode directory; ordinary file contents are never read or hashed for it. */
+export type LinkedNode = { path: RelPath; mode: number } & ({ kind: "directory" | "file" } | { kind: "symlink"; target: string })
+export type Capture = { source: Source; readFile(path: RelPath): Promise<Uint8Array> } & (
+  | { materialization: "copy"; nodes: readonly TreeNode[] }
+  | { materialization: "link"; bindingId: Sha256; topLevel: readonly LinkedNode[]; readDirectory(path: RelPath): Promise<readonly LinkedNode[]> }
+)
 export type Text = readonly (string | { binding: "pluginRoot" | "skillDir" | "projectDir" | "pluginData" } | { secret: string } | { option: string } | { environment: { name: string; default?: Text } })[]
 export type PluginOption = { type: "string" | "number" | "boolean"; title: string; description: string; required: boolean; sensitive: boolean; default?: string | number | boolean | { secret: string } }
 export type EnvironmentForward = { name: string; source: "local" | "remote" }
@@ -88,6 +93,24 @@ export type Hook = {
   | { type: "command"; command: Text; args?: Text[]; async: boolean; asyncRewake: boolean }
   | { type: "prompt"; prompt: Text; model?: ModelHint; continueOnBlock: boolean }
 )
+/** Source JSON with RFC 6901 pointers to the string leaves that carry package values. */
+export type JsonTemplate = { value: Json; bindings: Record<string, Text> }
+export type LanguageServer = {
+  command: Text
+  args: Text[]
+  extensionToLanguage: Record<string, string>
+  transport: "stdio" | "socket"
+  env: Record<string, Text>
+  initializationOptions?: JsonTemplate
+  settings?: JsonTemplate
+  workspaceFolder?: Text
+  startupTimeout?: number
+  shutdownTimeout?: number
+  requestTimeout?: number
+  restartOnCrash: boolean
+  maxRestarts?: number
+  diagnostics: boolean
+}
 type EntryBase = { id: string; sourcePath: RelPath; sourceName: string }
 export type Entry = EntryBase &
   (
@@ -123,7 +146,11 @@ export type Entry = EntryBase &
       }
     | { kind: "hook"; hook: Hook }
     | { kind: "monitor"; command: Text; description: string; when: { kind: "always" } | { kind: "skill"; sourceName: string } }
+    | { kind: "lsp"; server: LanguageServer }
+    | { kind: "output-style"; instruction: Text; description?: string; keepCodingInstructions: boolean }
   )
+/** Normalized package defaults; `agent` is this package's agent entry.id. */
+export type PluginDefaults = { agent?: string }
 export type Diagnostic = {
   path: RelPath
   field?: string
@@ -138,14 +165,18 @@ export type PluginPackage = {
   version?: string
   description?: string
   source: Source
-  tree: TreeNode[]
-  treeDigest: Sha256
   entries: Entry[]
   secrets: SecretNeed[]
   options?: Record<string, PluginOption>
-  defaults?: { agent?: string }
+  defaults?: PluginDefaults
   diagnostics: Diagnostic[]
-}
+} & (
+  | { materialization: "copy"; tree: TreeNode[]; treeDigest: Sha256 }
+  | { materialization: "link"; link: { bindingId: Sha256; topLevel: LinkedNode[] } }
+)
+export type CopiedPluginPackage = Extract<PluginPackage, { materialization: "copy" }>
+/** A marketplace `source: command` entry: the command locates the plugin directory on this machine. */
+export type CommandPluginSource = { kind: "command"; command: string; timeoutSeconds: number; mode: "copy" | "link" }
 export type MarketplaceEntry = {
   name: string
   description: string
@@ -153,12 +184,14 @@ export type MarketplaceEntry = {
   source:
     | { kind: "path"; path: RelPath }
     | { kind: "git"; url: string; commit?: string; ref?: string; path?: RelPath }
+    | CommandPluginSource
     | { kind: "unsupported"; detail: string }
 }
 
+/** Public catalog payloads carry only re-captured copies; a local link binding never leaves the machine. */
 export type PluginPackagePayloadV1 = {
   schema: "codepuppy.host-extension-package.payload.plugin-package.v1"
-  description: PluginPackage
+  description: CopiedPluginPackage
   blobs: PackagePayloadRefV1[]
 }
 
@@ -231,6 +264,24 @@ export function validPluginTree(value: unknown): value is TreeNode[] {
   )
 }
 
+/** One link node as captured with lstat; symlinks keep their target text and are never followed. */
+export function validLinkedNode(value: unknown): value is LinkedNode {
+  if (!object(value) || !pluginRelativePath(value.path) || !Number.isInteger(value.mode) || Number(value.mode) < 0 || Number(value.mode) > 0o7777) return false
+  if (value.kind === "symlink") return keys(value, ["kind", "path", "mode", "target"]) && typeof value.target === "string" && !value.target.includes("\0")
+  return (value.kind === "directory" || value.kind === "file") && keys(value, ["kind", "path", "mode"])
+}
+
+function validPluginLink(value: unknown): value is { bindingId: Sha256; topLevel: LinkedNode[] } {
+  return (
+    object(value) &&
+    keys(value, ["bindingId", "topLevel"]) &&
+    digest(value.bindingId) &&
+    Array.isArray(value.topLevel) &&
+    value.topLevel.every((node) => validLinkedNode(node) && !node.path.includes("/")) &&
+    new Set(value.topLevel.map((node: LinkedNode) => node.path)).size === value.topLevel.length
+  )
+}
+
 export function validPluginPackage(value: unknown): value is PluginPackage {
   if (
     !object(value) ||
@@ -241,8 +292,10 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
       "version",
       "description",
       "source",
+      "materialization",
       "tree",
       "treeDigest",
+      "link",
       "entries",
       "secrets",
       "diagnostics",
@@ -252,6 +305,15 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
     value.schema !== "codepuppy.plugin-package.v1"
   )
     return false
+  const content =
+    value.materialization === "copy"
+      ? value.link === undefined && validPluginTree(value.tree) && value.treeDigest === pluginTreeDigest(value.tree)
+        ? new Set(value.tree.filter((node) => node.kind !== "directory").map((node) => node.path))
+        : undefined
+      : value.materialization === "link" && value.tree === undefined && value.treeDigest === undefined && validPluginLink(value.link)
+        ? new Set(value.link.topLevel.map((node) => node.path))
+        : undefined
+  if (!content) return false
   if (
     !["claude-code", "codex", "skill", "mcp-registry", "opencode"].includes(String(value.provider)) ||
     typeof value.name !== "string" ||
@@ -283,17 +345,16 @@ export function validPluginPackage(value: unknown): value is PluginPackage {
   if (value.source.ecosystem !== undefined && !["claude", "codex", "opencode"].includes(String(value.source.ecosystem)))
     return false
   if (
-    !validPluginTree(value.tree) ||
-    value.treeDigest !== pluginTreeDigest(value.tree) ||
     !Array.isArray(value.entries) ||
     !value.entries.every(validEntry) ||
     new Set(value.entries.map((entry) => entry.id)).size !== value.entries.length
   )
     return false
   if (value.options !== undefined && (!object(value.options) || !Object.values(value.options).every(validPluginOption))) return false
-  if (value.defaults !== undefined && (!object(value.defaults) || !keys(value.defaults, ["agent"]) || !optionalString(value.defaults.agent))) return false
-  const paths = new Set(value.tree.filter((node) => node.kind !== "directory").map((node) => node.path))
-  if (value.entries.some((entry) => !paths.has(entry.sourcePath))) return false
+  const defaults = value.defaults
+  if (defaults !== undefined && (!object(defaults) || !keys(defaults, ["agent"]) || !optionalString(defaults.agent) || defaults.agent !== undefined && !value.entries.some(entry => entry.kind === "agent" && entry.id === defaults.agent))) return false
+  // A linked package names its definitions inside the printed directory's top-level entries.
+  if (value.entries.some((entry) => !content.has(value.materialization === "copy" ? entry.sourcePath : entry.sourcePath.split("/")[0]!))) return false
   const entries = value.entries
   if (
     !Array.isArray(value.secrets) ||
@@ -414,7 +475,9 @@ function validEntry(value: unknown): value is Entry {
               optionalString(value.oauth.oauth.authorizationServerUrl)))))
     )
   }
+  if (value.kind === "output-style") return keys(value, [...base, "instruction", "description", "keepCodingInstructions"]) && text(value.instruction) && optionalString(value.description) && typeof value.keepCodingInstructions === "boolean"
   if (value.kind === "monitor") return keys(value, [...base, "command", "description", "when"]) && text(value.command) && typeof value.description === "string" && object(value.when) && (value.when.kind === "always" && keys(value.when, ["kind"]) || value.when.kind === "skill" && keys(value.when, ["kind", "sourceName"]) && typeof value.when.sourceName === "string")
+  if (value.kind === "lsp") return keys(value, [...base, "server"]) && languageServer(value.server)
   if (value.kind !== "hook" || !keys(value, [...base, "hook"]) || !object(value.hook)) return false
   const hook = value.hook
   return keys(hook, ["event", "matcher", "if", "type", "command", "args", "prompt", "model", "continueOnBlock", "timeoutSeconds", "async", "asyncRewake", "onFailure", "order", "scope"]) &&
@@ -424,6 +487,26 @@ function validEntry(value: unknown): value is Entry {
     object(hook.scope) && (hook.scope.kind === "package" && keys(hook.scope, ["kind"]) || ["skill", "agent"].includes(String(hook.scope.kind)) && keys(hook.scope, ["kind", "entryId"]) && typeof hook.scope.entryId === "string") &&
     (hook.type === "command" && text(hook.command) && (hook.args === undefined || Array.isArray(hook.args) && hook.args.every(text)) && typeof hook.async === "boolean" && typeof hook.asyncRewake === "boolean" && hook.prompt === undefined && hook.model === undefined && hook.continueOnBlock === undefined ||
      hook.type === "prompt" && text(hook.prompt) && (hook.model === undefined || modelHint(hook.model)) && typeof hook.continueOnBlock === "boolean" && hook.command === undefined && hook.args === undefined && hook.async === undefined && hook.asyncRewake === undefined)
+}
+function languageServer(value: unknown): value is LanguageServer {
+  const positive = (item: unknown) => item === undefined || Number.isSafeInteger(item) && Number(item) > 0
+  const template = (item: unknown) => item === undefined || object(item) && keys(item, ["value", "bindings"]) && json(item.value) && object(item.bindings) && Object.entries(item.bindings).every(([pointer, binding]) => pointer.startsWith("/") && text(binding))
+  return object(value) &&
+    keys(value, ["command", "args", "extensionToLanguage", "transport", "env", "initializationOptions", "settings", "workspaceFolder", "startupTimeout", "shutdownTimeout", "requestTimeout", "restartOnCrash", "maxRestarts", "diagnostics"]) &&
+    text(value.command) && value.command.length > 0 && Array.isArray(value.args) && value.args.every(text) &&
+    object(value.extensionToLanguage) && Object.keys(value.extensionToLanguage).length > 0 &&
+    Object.entries(value.extensionToLanguage).every(([extension, language]) => extension.length > 1 && extension.startsWith(".") && typeof language === "string" && !!language) &&
+    (value.transport === "stdio" || value.transport === "socket") && textMap(value.env) &&
+    template(value.initializationOptions) && template(value.settings) && (value.workspaceFolder === undefined || text(value.workspaceFolder)) &&
+    positive(value.startupTimeout) && positive(value.shutdownTimeout) && positive(value.requestTimeout) &&
+    typeof value.restartOnCrash === "boolean" && (value.maxRestarts === undefined || Number.isSafeInteger(value.maxRestarts) && Number(value.maxRestarts) >= 0) &&
+    typeof value.diagnostics === "boolean"
+}
+function json(value: unknown): value is Json {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true
+  if (typeof value === "number") return Number.isFinite(value)
+  if (Array.isArray(value)) return value.every(json)
+  return object(value) && Object.values(value).every(json)
 }
 function invocation(value: unknown): boolean {
   if (

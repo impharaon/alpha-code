@@ -27,6 +27,8 @@ export const GATED_WRITE_CHANNELS = {
   installPackage: "ext-install-package",
   installFromSource: "ext-install-from-source",
   setPackageState: "ext-set-package-state",
+  /** D6 片 6b:本机文件条目的开关 / 移除 / 重新加入(只写账本绑定,不碰来源文件)。 */
+  setNativeSourceState: "ext-set-native-source-state",
   savePackageSecrets: "ext-save-package-secrets",
   uninstallV2: "ext-uninstall-v2",
   /** `#698`:整包卸载。与 `uninstallV2` 分开是因为**意图形状不同** —— 这里传的是 packageId,
@@ -61,6 +63,8 @@ export const LOCAL_PACKAGE_READ_CHANNELS = {
   preparePluginSource: "ext-prepare-plugin-source",
   /** 列出本机已装的 V3 包图(安全投影)。 */
   listInstalledPackages: "ext-installed-packages",
+  /** D6 片 6b:本机文件条目行(账本绑定 + 本进程见过的来源 + 说明 + 项目同意)。 */
+  listNativeSources: "ext-native-sources",
 } as const
 
 export type WriteChannelRoots = {
@@ -80,6 +84,7 @@ export type WriteChannelBodies = {
   installPackage: (packageId: unknown) => Promise<unknown>
   installFromSource: (request: unknown) => Promise<unknown>
   setPackageState: (intent: unknown) => Promise<unknown>
+  setNativeSourceState: (intent: unknown) => Promise<unknown>
   savePackageSecrets: (intent: unknown) => Promise<unknown>
   installCatalog: (intent: unknown) => Promise<unknown>
   uninstallV2: (intent: unknown) => Promise<unknown>
@@ -104,6 +109,7 @@ export function buildGatedWriteChannels(deps: { gate: RecoveryGate; roots: Write
     installPackage: gatedWriteHandler(gate, roots.global, bodies.installPackage),
     installFromSource: gatedWriteHandler(gate, roots.global, bodies.installFromSource),
     setPackageState: gatedWriteHandler(gate, roots.global, bodies.setPackageState),
+    setNativeSourceState: gatedWriteHandler(gate, roots.global, bodies.setNativeSourceState),
     savePackageSecrets: gatedWriteHandler(gate, roots.global, bodies.savePackageSecrets),
     // REQ-136 C1:project recovery is itself a mutation, so verified-MCP admission must finish
     // before the gate may replay D. The body re-resolves facts for the actual transaction.

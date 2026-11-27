@@ -1,3 +1,4 @@
+import { isSourceCommandFailure } from "../../shared/plugin-install"
 import { UNAVAILABLE_PLUGIN_HOOKS } from "../../shared/host-extension-package-contract/plugin-hook-events"
 import type { PluginSourceIdV1 } from "../../main/plugin-sources"
 import type {
@@ -9,6 +10,7 @@ import type {
 } from "../../shared/catalog-package-view"
 import type { PackageComponentSkipReasonV1 } from "../../shared/host-extension-package-contract/decoder"
 import type { InstalledPackageV1 } from "../../preload/types"
+import type { LanguageServerStateV1 } from "../../main/codepuppy-sidecar-messages"
 import type { NotRunningReasonV1 } from "../../shared/package-admission"
 
 const NOT_RUNNING_KEYS = {
@@ -30,6 +32,15 @@ const UNAVAILABLE_HOOK_KEYS = {
   TaskCompleted: "codepuppy.ext.packageHookTaskCompleted",
   TeammateIdle: "codepuppy.ext.packageHookTeammateIdle",
 } as const satisfies Record<keyof typeof UNAVAILABLE_PLUGIN_HOOKS, string>
+
+/** Design v3.4 R-l: package row text for each language server state reported by its runtime. */
+const LANGUAGE_SERVER_KEYS = {
+  enabled: "codepuppy.ext.packageLanguageEnabled",
+  "dependency-missing": "codepuppy.ext.packageLanguageMissing",
+  "start-error": "codepuppy.ext.packageLanguageStartError",
+  "protocol-error": "codepuppy.ext.packageLanguageProtocolError",
+  "diagnostics-ready": "codepuppy.ext.packageLanguageReady",
+} as const satisfies Record<LanguageServerStateV1, string>
 
 export function pluginSourceLabelKey(source: PluginSourceIdV1 | "local-folder") {
   return ({
@@ -53,7 +64,7 @@ export function installSourceLabelKey(source: unknown) {
 }
 
 /** Display-only graph projection; package names and prefixes never establish provenance. */
-export function installedPackagePresentation(pack: Pick<InstalledPackageV1, "source" | "origin" | "notRunning">) {
+export function installedPackagePresentation(pack: Pick<InstalledPackageV1, "source" | "origin" | "notRunning" | "languageServers">) {
   const source = pack.source
   const sourceKey = source?.kind === "created" ? "codepuppy.ext.packageSourceMine"
     : !source ? pack.origin === "catalog" ? pluginSourceLabelKey("catalog") : "codepuppy.ext.packageSourceLocal"
@@ -73,6 +84,12 @@ export function installedPackagePresentation(pack: Pick<InstalledPackageV1, "sou
     notRunning: (pack.notRunning ?? []).map((item) => ({
       sourceName: item.sourceName,
       reasonKey: item.reason === "unavailable-trigger" && Object.hasOwn(UNAVAILABLE_HOOK_KEYS, item.sourceName) ? UNAVAILABLE_HOOK_KEYS[item.sourceName as keyof typeof UNAVAILABLE_HOOK_KEYS] : NOT_RUNNING_KEYS[item.reason],
+    })),
+    languageServers: (pack.languageServers ?? []).map((item) => ({
+      sourceName: item.sourceName,
+      reasonKey: LANGUAGE_SERVER_KEYS[item.state],
+      detail: item.detail ?? "",
+      failed: item.state === "dependency-missing" || item.state === "start-error" || item.state === "protocol-error",
     })),
   } as const
 }
@@ -179,6 +196,11 @@ export function pluginInstallFailureKey(code: Extract<import("../../shared/plugi
     "not-searched": "codepuppy.ext.sourceNotSearched",
     "transaction-failed": "codepuppy.ext.sourceInstallFailed",
   } as const)[code]
+}
+
+/** A failed marketplace source command also names the command and its actual error (BR-27); other details stay diagnostic text. */
+export function pluginInstallFailureDetail(outcome: Extract<import("../../shared/plugin-install").InstallOutcomeV1, { ok: false }>): string | undefined {
+  return outcome.code === "source-unreachable" && isSourceCommandFailure(outcome.detail) ? outcome.detail : undefined
 }
 
 export function pluginSourceFailureKey(reason: Extract<import("../../main/plugin-sources").SourceStatusV1, { status: "failed" }>["reason"]) {

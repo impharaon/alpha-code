@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { mkdtemp, rm, cp, readFile, stat } from "node:fs/promises"
+import { appendFileSync, cpSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import opencode from "../../test-fixtures/plugin-helper/opencode/provenance.json"
 import npm from "../../test-fixtures/plugin-helper/opencode/npm/provenance.json"
@@ -144,11 +145,21 @@ test("corrupt tar header is rejected before exposing a capture", async () => {
   expect(await sources.captureCandidate(searched.candidates[0]!.id)).toMatchObject({ ok: false, code: "source-unreachable" })
 })
 
-test("non-GitHub and command sources are counted but never minted as installable candidates", async () => {
-  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], fetch: fixtureFetch })
+test("command sources are installable candidates that search comparison never runs", async () => {
+  const fetched: string[] = []
+  // A same-name catalog row and installed package make search compare the marketplace candidate; comparing would capture it.
+  const sources = (await sourcesModule()).createPluginSources({
+    catalog: async () => [{ id: "xcode-catalog", source: "catalog", name: "xcode", displayName: "Xcode", description: "", kind: "plugin", upstream: {} }],
+    installed: () => [{ packageId: "claude:xcode", name: "xcode", enabled: true, runtimeIdentity: "installed-xcode" }],
+    fetch: (url) => { fetched.push(String(url)); return fixtureFetch(url) },
+  })
   const result = await sources.searchSources("xcode")
-  expect(result.candidates.some((candidate) => candidate.name === "xcode")).toBe(false)
-  expect(result.sources.find((source) => source.source === "claude-marketplace")).toMatchObject({ status: "ok", skipped: 1 })
+  const xcode = result.candidates.find((candidate) => candidate.source === "claude-marketplace" && candidate.name === "xcode")
+  expect(xcode).toMatchObject({ kind: "plugin", upstream: { repository: "https://github.com/anthropics/claude-plugins-official" } })
+  expect(xcode?.sameAs).toBeUndefined()
+  expect(xcode?.installed).toBeUndefined()
+  expect(fetched.filter((url) => url.includes("codeload.github.com"))).toEqual([])
+  expect(result.sources.find((source) => source.source === "claude-marketplace")).toMatchObject({ status: "ok", skipped: 0 })
 })
 
 test("Codex local entry captures only its pinned subtree and rechecks marketplace membership", async () => {
@@ -855,4 +866,73 @@ test("a connector version suggestion uses the real npm metadata and remains opti
   expect(await suggestPluginVersion(entry, async url => { urls.push(url); return Response.json(metadata) })).toBe(metadata.version)
   expect(urls).toEqual(["https://registry.npmjs.org/" + encodeURIComponent(metadata.name) + "/latest"])
   expect(await suggestPluginVersion(entry, async () => new Response("unavailable", { status: 503 }))).toBeUndefined()
+})
+
+test("link identity follows the printed path and top-level entries, not file contents", async () => {
+  const sandbox = realpathSync.native(await mkdtemp(join(tmpdir(), "plugin-linked-")))
+  const printed = join(sandbox, "linked-plugin-dev")
+  cpSync(join(fixtureRoot, "standard", "claude-plugin-dev"), printed, { recursive: true })
+  const source = { kind: "marketplace" as const, locator: printed, ecosystem: "claude" as const, entryName: "xcode" }
+  const { captureLinkedDirectory } = await sourcesModule()
+  // Unguarded reads: this case is about identity; credential-store guarding has its own cases below.
+  const files = { listable: () => true, readFile: (path: string) => new Uint8Array(readFileSync(path)) }
+  const first = await captureLinkedDirectory(printed, source, files)
+  expect(first.topLevel.map(node => node.path)).toEqual([".claude-plugin", "LICENSE", "README.md", "agents", "commands", "skills"])
+  appendFileSync(join(printed, "skills/hook-development/scripts/hook-linter.sh"), "\n# changed in place\n")
+  writeFileSync(join(printed, "README.md"), "rewritten")
+  expect((await captureLinkedDirectory(printed, source, files)).bindingId).toBe(first.bindingId)
+  writeFileSync(join(printed, "NOTICE"), "new top-level entry")
+  expect((await captureLinkedDirectory(printed, source, files)).bindingId).not.toBe(first.bindingId)
+  rmSync(join(printed, "NOTICE"))
+  const moved = join(sandbox, "linked-plugin-dev-elsewhere")
+  cpSync(printed, moved, { recursive: true })
+  expect((await captureLinkedDirectory(moved, { ...source, locator: moved }, files)).bindingId).not.toBe(first.bindingId)
+  await expect(first.readFile("../outside")).rejects.toThrow("outside the plugin directory")
+  await rm(sandbox, { recursive: true, force: true })
+})
+
+/** A printed plugin-dev copy (claude-plugins-official@0fbfda5a) behind the recorded xcode entry with only its command replaced. */
+async function linkedCommandSource(prepare: (printed: string, sandbox: string) => void) {
+  const { configureCommandSourceFence, locateCommandSource } = await import("./plugin-command-source")
+  const { locatedFiles } = await import("./plugin-command-fence")
+  const sandbox = realpathSync.native(await mkdtemp(join(tmpdir(), "plugin-linked-source-")))
+  const store = join(sandbox, "credentials", "store.json")
+  mkdirSync(join(sandbox, "credentials"))
+  // A stored credential shaped like a skill, so reading it would surface in a skill instruction.
+  writeFileSync(store, "---\nname: leaked-credential\ndescription: leaked\n---\ncredential-canary\n")
+  configureCommandSourceFence({ egressProxyPort: 47125, configFence: [], credentialStores: [{ kind: "literal", path: store }] })
+  const printed = join(sandbox, "printed")
+  cpSync(join(fixtureRoot, "standard", "claude-plugin-dev"), printed, { recursive: true })
+  prepare(printed, sandbox)
+  const document = JSON.parse(await marketplace()) as { plugins: { name: string; source: Record<string, unknown> }[] }
+  const xcode = document.plugins.find(entry => entry.name === "xcode")!
+  mkdirSync(join(sandbox, "market", ".claude-plugin"), { recursive: true })
+  writeFileSync(join(sandbox, "market", ".claude-plugin", "marketplace.json"), JSON.stringify({ name: "recorded", plugins: [{ ...xcode, source: { ...xcode.source, command: `printf '%s\\n' '${printed}'` } }] }))
+  const sources = (await sourcesModule()).createPluginSources({ catalog: async () => [], locateCommand: locateCommandSource, locatedFiles })
+  const prepared = await sources.prepareCapture(await sources.captureFolder(join(sandbox, "market")))
+  if (prepared.kind !== "marketplace") throw Error("expected marketplace entries")
+  const converted = await sources.convertCandidate(prepared.entries[0]!.id)
+  await rm(sandbox, { recursive: true, force: true })
+  if (!converted.ok) throw Error(converted.detail)
+  return { store, converted }
+}
+
+test("a linked definition that resolves into a credential store is never read by main", async () => {
+  // The fenced locator can plant links; main reads definitions unfenced, so a link into C1 must be a read failure.
+  const { converted } = await linkedCommandSource((printed, sandbox) => symlinkSync(join(sandbox, "credentials", "store.json"), join(printed, "SKILL.md")))
+  expect(JSON.stringify(converted.package).includes("credential-canary")).toBe(false)
+  expect(converted.package.entries.some(entry => entry.sourceName === "leaked-credential")).toBe(false)
+  expect(converted.package.entries.filter(entry => entry.kind === "skill")).toHaveLength(7)
+})
+
+test("a linked plugin follows a top-level component directory that links elsewhere", async () => {
+  // Xcode may link component directories into its own bundle; the stand-in is a sibling directory outside the printed one.
+  const { converted } = await linkedCommandSource((printed, sandbox) => {
+    renameSync(join(printed, "skills"), join(sandbox, "bundle-skills"))
+    symlinkSync(join(sandbox, "bundle-skills"), join(printed, "skills"))
+  })
+  expect(converted.package.entries.filter(entry => entry.kind === "skill").map(entry => entry.sourcePath).toSorted()).toEqual([
+    "skills/agent-development/SKILL.md", "skills/command-development/SKILL.md", "skills/hook-development/SKILL.md", "skills/mcp-integration/SKILL.md",
+    "skills/plugin-settings/SKILL.md", "skills/plugin-structure/SKILL.md", "skills/skill-development/SKILL.md",
+  ])
 })

@@ -3,7 +3,10 @@ import { posix, join } from "node:path"
 import { readdir, lstat, readFile, readlink } from "node:fs/promises"
 import { gunzip } from "node:zlib"
 import { readMarketplace, convertPluginTree, convertMcpServerDefinition } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
-import type { Capture, Json, MarketplaceEntry, Source, TreeNode, PluginPackage, Text } from "../shared/host-extension-package-contract/plugin-conversion"
+import type { Capture, CommandPluginSource, Json, LinkedNode, MarketplaceEntry, Source, TreeNode, PluginPackage, Text } from "../shared/host-extension-package-contract/plugin-conversion"
+import { canonicalPluginJson, pluginRelativePath } from "../shared/host-extension-package-contract/plugin-package"
+import type { CommandSourceBinding } from "../shared/installed-plugin-package"
+import { sourceCommandFailure } from "../shared/plugin-install"
 
 import type { PackageGraphAnnotationsV1 } from "../shared/plugin-install"
 import type { PackageAcceptedFactsV1 } from "./package-installability"
@@ -56,15 +59,24 @@ export type PreparePluginSourceInputV1 = { kind: "folder" } | { kind: "git"; url
 export type PreparePluginSourceResultV1 = { ok: true; prepared: PreparedPluginSourceV1 } | { ok: false; detail: string; canceled?: true }
 
 type SourceFailure = { ok: false; code: "unknown-id" | "source-unreachable" | "source-changed"; detail: string }
-type ConvertedCandidate = Awaited<ReturnType<typeof convertPluginTree>> & { ok: true; capture: Capture; runtimeIdentity: string | undefined; publisher?: CandidateV1["publisher"] }
+type ConvertedCandidate = Awaited<ReturnType<typeof convertPluginTree>> & { ok: true; capture: Capture; runtimeIdentity: string | undefined; publisher?: CandidateV1["publisher"]; commandSource?: Omit<CommandSourceBinding, "identity"> }
 type CatalogContents = Pick<PackageAcceptedFactsV1, "envelope"> & { components: readonly Pick<PackageAcceptedFactsV1["components"][number], "payload">[] }
 type CatalogComparison = { catalogId: string; packageId: string; version: string; runtimeIdentity: string }
 
 /** One instance per main-process run; only this owner mints candidate IDs and retains fetched bytes. */
-export function createPluginSources(deps: { catalog: () => Promise<readonly CandidateV1[]>; catalogPackage?: (id: string, version?: string) => Promise<CatalogContents | undefined>; installed?: () => readonly { packageId: string; name: string; enabled: boolean; runtimeIdentity?: string }[]; fetch?: (url: string, init?: RequestInit) => Promise<Response> }) {
+/** Main's guarded access to a located command-source directory (plugin-command-fence.ts): credential-store targets read as absent. */
+export type LocatedFiles = { listable(path: string): boolean; readFile(path: string): Uint8Array | undefined }
+
+/**
+ * `locateCommand` runs a marketplace `source: command` entry's declared command once (main's fenced locator,
+ * plugin-command-source.ts); its rejection message is the user-facing source error.
+ */
+export function createPluginSources(deps: { locateCommand?: (source: CommandPluginSource) => Promise<string>; locatedFiles?: () => LocatedFiles; catalog: () => Promise<readonly CandidateV1[]>; catalogPackage?: (id: string, version?: string) => Promise<CatalogContents | undefined>; installed?: () => readonly { packageId: string; name: string; enabled: boolean; runtimeIdentity?: string }[]; fetch?: (url: string, init?: RequestInit) => Promise<Response> }) {
   const searches = new Map<string, readonly SourceStatusV1[]>()
   const candidates = new Map<string, SourceCandidate>()
   const captures = new Map<string, Promise<Capture>>()
+  // A located command source's local receipt travels with its one capture (BR-27: one run per chosen entry).
+  const commandBindings = new WeakMap<Capture, Omit<CommandSourceBinding, "identity">>()
   const conversions = new Map<string, Promise<ConvertedCandidate | SourceFailure>>()
   const catalogRows = new Map<string, CandidateV1>()
   const catalogIdentities = new Map<string, Promise<CatalogComparison | undefined>>()
@@ -206,6 +218,36 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     npmQueries.set(query, pending)
     return pending
   }
+  const captureFolder = async (directory: string, read = async (path: string): Promise<Uint8Array> => new Uint8Array(await readFile(path))): Promise<Extract<Capture, { materialization: "copy" }>> => {
+    const members: Archive["members"] = new Map()
+    const visit = async (relative: string): Promise<void> => {
+      for (const name of (await readdir(join(directory, relative))).sort()) {
+        const path = relative ? relative + "/" + name : name
+        const stat = await lstat(join(directory, path))
+        if (stat.isSymbolicLink()) { members.set(path, { node: { kind: "symlink", path, target: await readlink(join(directory, path)) } }); continue }
+        if (stat.isDirectory()) { members.set(path, { node: { kind: "directory", path, mode: stat.mode & 0o7777 } }); await visit(path); continue }
+        if (!stat.isFile()) continue
+        const bytes = await read(join(directory, path))
+        members.set(path, { node: { kind: "file", path, mode: stat.mode & 0o7777, bytes: bytes.length, digest: ("sha256:" + createHash("sha256").update(bytes).digest("hex")) as `sha256:${string}` }, bytes })
+      }
+    }
+    await visit("")
+    return treeCapture({ kind: "folder", locator: directory }, members)
+  }
+  /** DESIGN §4.16: run the entry's locator once; copy snapshots the printed directory, link binds it in place. */
+  const captureCommand = async (source: CommandPluginSource, provenance: Omit<Source, "locator">): Promise<Capture> => {
+    const directory = await (deps.locateCommand ?? (() => Promise.reject(Error(sourceCommandFailure(source.command, "could not run: source commands are unavailable here")))))(source)
+      .catch((error: unknown) => { throw new SourceCommandFailed(error instanceof Error ? error.message : String(error)) })
+    const origin: Source = { ...provenance, locator: directory }
+    // The fenced locator wrote this directory; main reads it unfenced, so every read goes through the credential-store guard.
+    // Injected by the caller (plugin-command-fence.ts): importing the fence here would pull the process-fence graph into every
+    // type-only consumer of this module (preload/types, ext). Without it nothing located is readable, as with no fence.
+    const files = (deps.locatedFiles ?? (() => ({ listable: () => false, readFile: () => undefined })))()
+    const guardedRead = async (path: string) => files.readFile(path) ?? Promise.reject(Error("Located file is unreadable or resolves to a credential store"))
+    const capture = source.mode === "link" ? await captureLinkedDirectory(directory, origin, files) : { ...(await captureFolder(directory, guardedRead)), source: origin }
+    commandBindings.set(capture, { command: source.command, resolvedRoot: directory, mode: source.mode })
+    return capture
+  }
   const captureCandidate = async (candidateId: string): Promise<{ ok: true; capture: Capture } | SourceFailure> => {
     const selected = [...candidates.values()].find((entry) => entry.candidate.id === candidateId)
     if (!selected) return { ok: false, code: "unknown-id", detail: "Candidate is unknown in this application run" }
@@ -231,6 +273,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
           const bytes = new TextEncoder().encode(JSON.stringify(record.server))
           const capture: Capture = {
             source: { kind: "mcp-registry", locator, serverName: selected.serverName, version: selected.version },
+            materialization: "copy",
             nodes: [{ kind: "file", path: "server.json", mode: 0o644, bytes: bytes.length, digest: ("sha256:" + createHash("sha256").update(bytes).digest("hex")) as `sha256:${string}` }],
             readFile: async (path) => { if (path !== "server.json") throw new Error("Captured file is missing"); return bytes },
           }
@@ -238,14 +281,19 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
         }
         const source = selected.entry.source
         if (source.kind === "unsupported") throw new SourceError("format", "Source cannot be captured")
-        const repository = source.kind === "path" ? selected.market.repository : githubRepository(source.url)!
-        const archive = await loadArchive(repository, source.kind === "path" ? "refs/heads/main" : source.commit ?? source.ref ?? "refs/heads/main")
+        const repository = source.kind === "git" ? githubRepository(source.url)! : selected.market.repository
+        const archive = await loadArchive(repository, source.kind === "git" ? source.commit ?? source.ref ?? "refs/heads/main" : "refs/heads/main")
         if (source.kind === "git" && source.commit && archive.commit !== source.commit) throw new SourceChanged()
-        if (source.kind === "path") {
+        // The entry the user chose must still be the marketplace's declaration, including the command a command source runs.
+        if (source.kind === "path" || source.kind === "command") {
           const manifest = archive.members.get(selected.market.manifest)?.bytes
           if (!manifest) throw new SourceChanged()
           const entry = readMarketplace(manifest, selected.market.ecosystem).entries.find((entry) => entry.name === selected.entry.name)
           if (JSON.stringify(entry) !== JSON.stringify(selected.entry)) throw new SourceChanged()
+        }
+        if (source.kind === "command") {
+          selected.candidate.upstream.commit = archive.commit
+          return captureCommand(source, { kind: "marketplace", repository, commit: archive.commit, ecosystem: selected.market.ecosystem, entryName: selected.entry.name })
         }
         const path = source.kind === "path" ? source.path : source.path ?? ""
         const prefix = path ? path + "/" : ""
@@ -266,7 +314,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
         const source = selected.entry.source
         if (source.kind === "git") archives.delete(githubRepository(source.url)! + "@" + (source.commit ?? source.ref ?? "refs/heads/main"))
       }
-      const failure: SourceFailure = { ok: false, code: error instanceof SourceChanged ? "source-changed" : "source-unreachable", detail: error instanceof SourceChanged ? "Selected source changed; search again" : "Selected source could not be captured" }
+      const failure: SourceFailure = { ok: false, code: error instanceof SourceChanged ? "source-changed" : "source-unreachable", detail: error instanceof SourceChanged ? "Selected source changed; search again" : error instanceof SourceCommandFailed ? error.message : "Selected source could not be captured" }
       if (error instanceof SourceDeadline || error instanceof SourceSizeLimit) boundedFailures.set(failure, error instanceof SourceDeadline ? "network" : "format")
       return failure
     }
@@ -283,7 +331,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       const selected = [...candidates.values()].find((entry) => entry.candidate.id === candidateId)
       if (selected?.kind === "captured") selected.candidate.displayName = converted.package.name
       const publisher = selected && selected.kind !== "captured" ? selected.candidate.publisher : undefined
-      return { ok: true, capture: captured.capture, ...converted, runtimeIdentity: pluginRuntimeIdentity(converted.package), ...(publisher ? { publisher } : {}) }
+      const commandSource = commandBindings.get(captured.capture)
+      return { ok: true, capture: captured.capture, ...converted, runtimeIdentity: pluginRuntimeIdentity(converted.package), ...(publisher ? { publisher } : {}), ...(commandSource ? { commandSource } : {}) }
     })().catch((): SourceFailure => ({ ok: false, code: "source-unreachable", detail: "Selected source could not be converted" }))
     conversions.set(candidateId, pending)
     const result = await pending
@@ -318,7 +367,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
             const bytes = await get(file.url)
             const digest = createHash("sha256").update(bytes).digest("hex")
             if (digest !== file.sha256 || bytes.length !== file.bytes) throw new SourceError("format", "Catalog skill integrity does not match")
-            const converted = await convertPluginTree({ source: { kind: "listing", locator: file.url }, nodes: [{ kind: "file", path: SKILL_MD_PATH, mode: 0o644, bytes: bytes.length, digest: `sha256:${digest}` }], readFile: async () => bytes })
+            const converted = await convertPluginTree({ source: { kind: "listing", locator: file.url }, materialization: "copy", nodes: [{ kind: "file", path: SKILL_MD_PATH, mode: 0o644, bytes: bytes.length, digest: `sha256:${digest}` }], readFile: async () => bytes })
             const skill = converted.package.entries.find((entry) => entry.kind === "skill")
             if (!skill) throw new SourceError("format", "Catalog skill definition is invalid")
             skills.push(skill.sourceName)
@@ -344,7 +393,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
     },
     searchedSources(searchId: string) { return searches.get(searchId) },
     displayNameForId(id: string) { return [...candidates.values()].find(entry => entry.candidate.id === id)?.candidate.displayName ?? catalogRows.get(id)?.displayName },
-    async prepareCapture(capture: Capture): Promise<PreparedPluginSourceV1> {
+    async prepareCapture(capture: Extract<Capture, { materialization: "copy" }>): Promise<PreparedPluginSourceV1> {
       const issue = (getCapture: () => Promise<Capture>) => {
         const id = "cand_" + randomUUID()
         candidates.set("captured:" + id, { kind: "captured", candidate: { id }, capture: getCapture })
@@ -358,6 +407,13 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
         const entries = marketplace.entries.flatMap(entry => {
           if (entry.source.kind === "unsupported") return []
           const source = entry.source
+          const label = capture.source.kind === "folder" ? "local-folder" as const : ecosystem === "claude" ? "claude-marketplace" as const : "codex-marketplace" as const
+          if (source.kind === "command") {
+            const origin: Omit<Source, "locator"> = capture.source.kind === "folder"
+              ? { kind: "folder", ecosystem, entryName: entry.name }
+              : { kind: "marketplace", ...(capture.source.repository ? { repository: capture.source.repository } : {}), ...(capture.source.commit ? { commit: capture.source.commit } : {}), ecosystem, entryName: entry.name }
+            return [{ id: issue(() => captureCommand(source, origin)), displayName: entry.name, description: entry.description, source: label }]
+          }
           const prefix = source.kind === "path" ? source.path.replace(/\/$/, "") : source.path ?? ""
           const provenance: Source = capture.source.kind === "folder"
             ? { ...capture.source, ecosystem, entryName: entry.name }
@@ -370,9 +426,9 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
             const base = prefix && prefix !== "." ? prefix + "/" : ""
             const nodes = capture.nodes.filter(node => node.path.startsWith(base) && node.path !== prefix).map(node => ({ ...node, path: node.path.slice(base.length) }))
             if (!nodes.length) throw Error("Selected marketplace subtree is missing")
-            return { source: provenance, nodes, readFile: path => capture.readFile(base + path) }
+            return { source: provenance, materialization: "copy" as const, nodes, readFile: (path: string) => capture.readFile(base + path) }
           })
-          return [{ id, displayName: entry.name, description: entry.description, source: capture.source.kind === "folder" ? "local-folder" as const : ecosystem === "claude" ? "claude-marketplace" as const : "codex-marketplace" as const }]
+          return [{ id, displayName: entry.name, description: entry.description, source: label }]
         })
         if (plugin && !marketplace.entries.some(entry => entry.source.kind === "path" && entry.source.path === ".")) {
           const id = issue(async () => capture)
@@ -390,23 +446,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       if ([...candidates.values()].some((entry) => entry.candidate.id === id)) return { kind: "candidate", candidateId: id }
       if (catalogRows.has(id) || (await deps.catalog()).some((row) => row.id === id)) return { kind: "catalog", catalogId: id }
     },
-    async captureFolder(directory: string): Promise<Capture> {
-      const members: Archive["members"] = new Map()
-      const visit = async (relative: string): Promise<void> => {
-        for (const name of (await readdir(join(directory, relative))).sort()) {
-          const path = relative ? relative + "/" + name : name
-          const stat = await lstat(join(directory, path))
-          if (stat.isSymbolicLink()) { members.set(path, { node: { kind: "symlink", path, target: await readlink(join(directory, path)) } }); continue }
-          if (stat.isDirectory()) { members.set(path, { node: { kind: "directory", path, mode: stat.mode & 0o7777 } }); await visit(path); continue }
-          if (!stat.isFile()) continue
-          const bytes = new Uint8Array(await readFile(join(directory, path)))
-          members.set(path, { node: { kind: "file", path, mode: stat.mode & 0o7777, bytes: bytes.length, digest: ("sha256:" + createHash("sha256").update(bytes).digest("hex")) as `sha256:${string}` }, bytes })
-        }
-      }
-      await visit("")
-      return treeCapture({ kind: "folder", locator: directory }, members)
-    },
-    async captureGit(repository: string, revision: string, path = ""): Promise<Capture> {
+    captureFolder,
+    async captureGit(repository: string, revision: string, path = ""): Promise<Extract<Capture, { materialization: "copy" }>> {
       const canonical = githubRepository(repository)
       if (!canonical) throw new SourceError("format", "Git source is not a supported repository")
       if (path && !relativePath(path)) throw new SourceError("format", "Git source path is invalid")
@@ -429,6 +470,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
       }
       const convertedForSearch = async (candidate: CandidateV1) => {
         if (Date.now() >= expires) return
+        // BR-27: a command source runs only when the user chooses that entry, never to decorate a search.
+        if ([...candidates.values()].some(entry => entry.candidate.id === candidate.id && entry.kind === "marketplace" && entry.entry.source.kind === "command")) return
         if (groups.find(group => group.status.source === candidate.source)?.status.status === "failed") return
         try {
           const result = await withinSource(candidate.source, convertCandidate(candidate.id))
@@ -499,7 +542,7 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
                 const repository = entry.source.kind === "git" ? githubRepository(entry.source.url)! : market.repository
                 const candidate: CandidateV1 = {
                   id: "cand_" + randomUUID(), source: market.source, name: entry.name, displayName: entry.name, description: entry.description, kind: "plugin",
-                  upstream: { repository, ...(entry.source.kind === "path" ? { path: entry.source.path } : { ...(entry.source.path === undefined ? {} : { path: entry.source.path }), ...(entry.source.commit ? { commit: entry.source.commit } : {}) }) },
+                  upstream: { repository, ...(entry.source.kind === "path" ? { path: entry.source.path } : entry.source.kind === "git" ? { ...(entry.source.path === undefined ? {} : { path: entry.source.path }), ...(entry.source.commit ? { commit: entry.source.commit } : {}) } : {}) },
                 }
                 candidates.set(identity, { kind: "marketplace", entry, candidate, market })
                 return [candidate]
@@ -559,6 +602,8 @@ export function createPluginSources(deps: { catalog: () => Promise<readonly Cand
 class SourceError extends Error {
   constructor(readonly reason: "network" | "http" | "format", message: string) { super(message) }
 }
+/** The chosen entry's source command failed; its message names the command and the actual error (BR-27). */
+class SourceCommandFailed extends Error {}
 class SourceDeadline extends SourceError {
   constructor() { super("network", "Source deadline exceeded") }
 }
@@ -628,8 +673,33 @@ function stdioIdentity(command: readonly Text[]): string | undefined {
 
 function literal(text: Text): string | undefined { return text.every((part) => typeof part === "string") ? text.join("") : undefined }
 
-function treeCapture(source: Source, members: Archive["members"]): Capture {
-  return { source, nodes: [...members].map(([path, member]) => ({ ...member.node, path })), readFile: async (path) => {
+/**
+ * Link mode: the identity is the printed real path plus its top-level entry names and link targets — file contents are not read or
+ * hashed. Listing and reading stay inside the printed directory and never follow a link while listing.
+ */
+export async function captureLinkedDirectory(root: string, source: Source, files: LocatedFiles): Promise<Extract<Capture, { materialization: "link" }>> {
+  const inside = (path: string) => {
+    if (path && !pluginRelativePath(path)) throw new Error("Linked path is outside the plugin directory")
+    return join(root, path)
+  }
+  const readDirectory = async (path: string): Promise<LinkedNode[]> => {
+    const directory = inside(path)
+    if (!files.listable(directory)) throw new Error("Linked directory resolves to a credential store")
+    return Promise.all((await readdir(directory)).sort().map(async (name): Promise<LinkedNode> => {
+      const child = path ? path + "/" + name : name
+      const info = await lstat(join(directory, name))
+      const mode = info.mode & 0o7777
+      if (info.isSymbolicLink()) return { kind: "symlink", path: child, mode, target: await readlink(join(directory, name)) }
+      return { kind: info.isDirectory() ? "directory" : "file", path: child, mode }
+    }))
+  }
+  const topLevel = await readDirectory("")
+  const bindingId = `sha256:${createHash("sha256").update(canonicalPluginJson([root, topLevel.map(node => [node.path, node.kind, node.kind === "symlink" ? node.target : null])])).digest("hex")}` as const
+  return { source, materialization: "link", bindingId, topLevel, readDirectory, readFile: async path => files.readFile(inside(path)) ?? Promise.reject(Error("Linked file is unreadable or resolves to a credential store")) }
+}
+
+function treeCapture(source: Source, members: Archive["members"]): Extract<Capture, { materialization: "copy" }> {
+  return { source, materialization: "copy", nodes: [...members].map(([path, member]) => ({ ...member.node, path })), readFile: async (path) => {
     const visited = new Set<string>()
     const read = (name: string): Uint8Array => {
       if (visited.has(name)) throw new Error("Captured link cycle")

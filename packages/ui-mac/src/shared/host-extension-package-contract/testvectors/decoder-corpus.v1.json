@@ -48,6 +48,7 @@
                   "sourcePath": "skills/using-superpowers/SKILL.md"
                 }
               ],
+              "materialization": "copy",
               "name": "superpowers",
               "provider": "claude-code",
               "schema": "codepuppy.plugin-package.v1",
@@ -92,9 +93,9 @@
             "dependencies": [],
             "id": "plugin-package:plugin-package-real-superpowers-v1",
             "payloadRef": {
-              "bytes": 5832,
+              "bytes": 5863,
               "mediaType": "application/vnd.codepuppy.host-extension-package.plugin-package.v1+json",
-              "sha256": "0502378f2728f26515185d7cb34733cbc45ea4a7a9395a1cbb410ab6d4e8ec52",
+              "sha256": "3c31f019c0e95324d647a0afcab2742e3215da6e35b3d8e79c162c9da1a8d93e",
               "url": "https://example.invalid/packages/plugin-package/plugin-package-real-superpowers-v1.json"
             },
             "profileId": "plugin-package",
@@ -115,6 +116,113 @@
       },
       "expect": "accepted",
       "name": "plugin-package-real-superpowers-v1",
+      "skipped": []
+    },
+    {
+      "components": [
+        {
+          "id": "plugin-package:plugin-package-real-pyright-lsp-v1",
+          "payload": {
+            "blobs": [
+              {
+                "bytes": 441,
+                "mediaType": "application/octet-stream",
+                "sha256": "2cf083ce0ec6aa27c25ba7dd3b1cc37868f899f1bd77a9431949703e888c4c1d",
+                "url": "https://example.invalid/blobs/2cf083ce0ec6aa27c25ba7dd3b1cc37868f899f1bd77a9431949703e888c4c1d"
+              }
+            ],
+            "description": {
+              "defaults": {},
+              "description": "Python language server (Pyright) for type checking and code intelligence",
+              "diagnostics": [],
+              "entries": [
+                {
+                  "id": "lsp:.claude-plugin/plugin.json#pyright",
+                  "kind": "lsp",
+                  "server": {
+                    "args": [
+                      [
+                        "--stdio"
+                      ]
+                    ],
+                    "command": [
+                      "pyright-langserver"
+                    ],
+                    "diagnostics": true,
+                    "env": {},
+                    "extensionToLanguage": {
+                      ".py": "python",
+                      ".pyi": "python"
+                    },
+                    "restartOnCrash": true,
+                    "transport": "stdio"
+                  },
+                  "sourceName": "pyright",
+                  "sourcePath": ".claude-plugin/plugin.json"
+                }
+              ],
+              "materialization": "copy",
+              "name": "pyright-lsp",
+              "options": {},
+              "provider": "claude-code",
+              "schema": "codepuppy.plugin-package.v1",
+              "secrets": [],
+              "source": {
+                "commit": "0fbfda5a91f4adc311daca25acc99132f40f0b6e",
+                "ecosystem": "claude",
+                "entryName": "pyright-lsp",
+                "kind": "marketplace",
+                "locator": "https://github.com/anthropics/claude-plugins-official",
+                "pluginPath": "plugins/pyright-lsp",
+                "repository": "https://github.com/anthropics/claude-plugins-official"
+              },
+              "tree": [
+                {
+                  "bytes": 441,
+                  "digest": "sha256:2cf083ce0ec6aa27c25ba7dd3b1cc37868f899f1bd77a9431949703e888c4c1d",
+                  "kind": "file",
+                  "mode": 420,
+                  "path": ".claude-plugin/plugin.json"
+                }
+              ],
+              "treeDigest": "sha256:7c70284c1d59560a34fb8919fa34c90da19fddd4dad7907af7d7440b635751e7",
+              "version": "1.0.0"
+            },
+            "schema": "codepuppy.host-extension-package.payload.plugin-package.v1"
+          }
+        }
+      ],
+      "envelope": {
+        "capabilities": [],
+        "components": [
+          {
+            "capabilities": [],
+            "dependencies": [],
+            "id": "plugin-package:plugin-package-real-pyright-lsp-v1",
+            "payloadRef": {
+              "bytes": 2039,
+              "mediaType": "application/vnd.codepuppy.host-extension-package.plugin-package.v1+json",
+              "sha256": "512018d219ec2805a43bd9c161712642a638dff3dd59aa914fe2022b4d4efb5e",
+              "url": "https://example.invalid/packages/plugin-package/plugin-package-real-pyright-lsp-v1.json"
+            },
+            "profileId": "plugin-package",
+            "profileVersion": 1,
+            "required": true
+          }
+        ],
+        "prelude": {
+          "packageId": "package:plugin-package-real-pyright-lsp-v1",
+          "version": "1.0.0"
+        },
+        "presentation": {
+          "description": "Synthetic plugin-package-real-pyright-lsp-v1 decoder case",
+          "displayName": "plugin-package-real-pyright-lsp-v1"
+        },
+        "root": "plugin-package:plugin-package-real-pyright-lsp-v1",
+        "schema": "codepuppy.host-extension-package.v1"
+      },
+      "expect": "accepted",
+      "name": "plugin-package-real-pyright-lsp-v1",
       "skipped": []
     },
     {
@@ -912,9 +1020,9 @@
             "dependencies": [],
             "id": "plugin-package:plugin-package-real-superpowers-v1",
             "payloadRef": {
-              "bytes": 5832,
+              "bytes": 5863,
               "mediaType": "application/vnd.codepuppy.host-extension-package.plugin-package.v1+json",
-              "sha256": "0502378f2728f26515185d7cb34733cbc45ea4a7a9395a1cbb410ab6d4e8ec52",
+              "sha256": "3c31f019c0e95324d647a0afcab2742e3215da6e35b3d8e79c162c9da1a8d93e",
               "url": "https://example.invalid/packages/plugin-package/plugin-package-real-superpowers-v1.json"
             },
             "profileVersion": 1,

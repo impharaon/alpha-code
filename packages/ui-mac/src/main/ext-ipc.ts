@@ -1,6 +1,7 @@
 import { verifyVideoCall } from "./codepuppy-video-call"
 import { videoCacheRoot } from "./codepuppy-video-environment"
 import { engineClient } from "./engine-client"
+import { pluginPackageStoreKey } from "./ext-package-ledger-v3"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { projectExecutableRows } from "./codepuppy-ext-trust"
 import { isCloudMcpWithheld } from "./codepuppy-config-injection"
@@ -83,6 +84,8 @@ import { isHubRequestId, parseReloadScope, type ReloadItem } from "./codepuppy-s
 import { packageVersionFromRecordsV1 } from "./ext-package-lifecycle"
 import { tryAcquireBundleLock } from "./ext-bundle-lock"
 import { lookupForUninstall, migrateV1Ledger, parseUninstallLedgerKey, readLedgerV2, readPackageLedgerStateV1, removeRecordV2, projectScopeIdentity } from "./ext-receipt-v2"
+import { createNativeSources } from "./native-sources"
+import type { NativeSourceRowsResultV1 } from "../shared/native-source-view"
 import { commitTransactionLedger } from "./ext-package-ledger-commit"
 import { packagedSeedBrowseView, readPackagedSeed } from "./ext-seed"
 import { releaseCodePuppyConnectionBindingsV1 } from "./codepuppy-connection-store"
@@ -92,6 +95,8 @@ import { resolveVerifiedPackageV1, runCatalogInstallWithPackagePreflight } from 
 import { readPackageAuthorizationV1, savePackageSecretsV1, type PackageAdmissionDeps, createPackageAdmissionCoordinator } from "./package-admission"
 import { createPackageMcpOauthEngineV1 } from "./package-mcp-oauth"
 import { createPluginSources, installedPackageIdentity, suggestPluginVersion, type PreparePluginSourceResultV1 } from "./plugin-sources"
+import { locateCommandSource } from "./plugin-command-source"
+import { locatedFiles } from "./plugin-command-fence"
 import { createSourceInstaller, installCatalogFromSource } from "./install-from-source"
 import { createPackageDeclarationResolver } from "./package-declarations"
 import { createManagedMcpConvergence, managedMcpNamesOf } from "./package-mcp-activation"
@@ -175,13 +180,35 @@ export function registerExtIpcHandlers(
       if (!state.ok) return
       await convergeManagedMcp(state.packageGraphs.filter(graph => {
         const nodes = [graph.root, ...graph.children]
-        return nodes.some(node => node.kind === "mcp") && (graph.pluginTree || (phase === "reload" && (!items.length || items.some(item => item.id === graph.packageId || nodes.some(node => node.componentId === item.id)))))
+        return nodes.some(node => node.kind === "mcp") && (pluginPackageStoreKey(graph) || (phase === "reload" && (!items.length || items.some(item => item.id === graph.packageId || nodes.some(node => node.componentId === item.id)))))
       }).flatMap(graph => [graph.root, ...graph.children].filter(node => node.kind === "mcp").map(node => node.name)))
     },
     log: (line) => getLogger()?.log(line),
     onChange: notifyHubViewChanged,
   })
   const hubRequests = createHubRequestStages({ log: (line) => getLogger()?.warn(line), onChange: notifyHubViewChanged })
+  // D6 片 6b:本机文件条目(sync 落账、定制中心列表与开关 / 移除 / 重新加入)。项目同意沿 projectMcpState 的同一份 #1709 记录。
+  const nativeSources = createNativeSources({
+    root: codepuppyGlobalRoot,
+    home: homeDir,
+    descriptions: async (directory) => {
+      const client = engineClient(await awaitServer())
+      const location = { directory }
+      const [skills, agents, commands] = await Promise.all([client.skill.list({ location }), client.agent.list({ location }), client.command.list({ location })])
+      const records = (value: { data: readonly unknown[] }) => value.data.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+      return { skills: records(skills), agents: records(agents), commands: records(commands) }
+    },
+    consent: (projectDir) => {
+      const identity = projectTrustIdentity(projectDir)
+      const decision = identity ? readProjectTrustEntry(identity, (line) => getLogger().warn(line)) : undefined
+      if (!hasExtensionsDecision(decision)) return "awaiting-consent"
+      return extensionsGranted(decision) ? "granted" : "consent-denied"
+    },
+    pending: (directory) => reloads.pendingFor(directory ?? codepuppyUserWorkspaceDir()) !== undefined,
+    defaultDirectory: () => codepuppyUserWorkspaceDir(),
+    requestReload: (reason) => void reloads.request({ scope: "global", items: [], reason, force: true }),
+    log: (line) => getLogger()?.warn(line),
+  })
   /** 安装体提交成功之后:请 ext 重载,不再 dispose(基线 §2.6)。cloud 只动账本、没有重载环节。
    *  作用域:项目 MCP = 该项目目录;其余(含 package / seed / bundle)= global。 */
   const requestReloadAfterInstall = (intent: unknown, result: { kind: string; name: string }) => {
@@ -297,6 +324,17 @@ export function registerExtIpcHandlers(
   //
   // 返回值**按 wire 类型标注**(`#784`):main 的投影与 renderer 的读法是同一份契约,
   // 少一栏 / 改一个名字必须是一条类型错误,而不是「Hub 那边少画一个开关」这种静默退化。
+  ipcMain.handle(LOCAL_PACKAGE_READ_CHANNELS.listNativeSources, async (_event: IpcMainInvokeEvent, projectDir?: unknown): Promise<NativeSourceRowsResultV1> => {
+    await ledgerReady
+    const project = projectDir === undefined ? undefined : resolveProjectEntry(projectDir)
+    if (project && !project.ok) return { ok: false, reason: "unreadable" }
+    try {
+      return { ok: true, rows: await nativeSources.rows(project?.projectDir) }
+    } catch (error) {
+      getLogger().error(`[d6-native-sources] native source bindings unreadable: ${error instanceof Error ? error.message : String(error)}`)
+      return { ok: false, reason: "unreadable" }
+    }
+  })
   ipcMain.handle(LOCAL_PACKAGE_READ_CHANNELS.listInstalledPackages, async (): Promise<InstalledPackagesResultV1> => {
     await ledgerReady
     const state = readPackageLedgerStateV1(codepuppyGlobalRoot())
@@ -314,6 +352,11 @@ export function registerExtIpcHandlers(
     }
     const recordOf = (kind: string, name: string) =>
       state.records.find((record) => record.kind === kind && record.name === name)
+    // Design v3.4 R-l: the sidecar host keeps the latest state for this package's current tree only.
+    const languageServersOf = (graph: (typeof state.packageGraphs)[number]) => {
+      const languageServers = codepuppySidecarHost.languageServers(graph.packageId, graph.pluginTree?.treeDigest ?? graph.pluginLink?.bindingId)
+      return languageServers.length ? { languageServers } : {}
+    }
     return {
       ok: true as const,
       packages: state.packageGraphs.map((graph) => ({
@@ -330,6 +373,7 @@ export function registerExtIpcHandlers(
         ...(graph.source ? { source: graph.source } : {}),
         ...(graph.effect ? { effect: graph.effect } : {}),
         ...(graph.notRunning ? { notRunning: graph.notRunning } : {}),
+        ...languageServersOf(graph),
         components: [graph.root, ...graph.children].map((node) => ({
           componentId: node.componentId,
           kind: node.kind as string,
@@ -1078,6 +1122,8 @@ export function registerExtIpcHandlers(
     }
   }
   const pluginSources = createPluginSources({
+    locateCommand: locateCommandSource,
+    locatedFiles,
     installed: () => {
       const state = readPackageLedgerStateV1(codepuppyGlobalRoot(), { sideEffectFree: true })
       if (!state.ok) return []
@@ -1294,6 +1340,7 @@ export function registerExtIpcHandlers(
         const result = await sourceInstaller({ requestId: "hub_" + randomUUID(), source: { kind: "catalog", catalogId: packageId }, effect: { kind: "all-projects" }, via: "hub" })
         return result.ok ? result : { ok: false, reason: result.detail }
       },
+      setNativeSourceState: (intent) => nativeSources.setState(intent),
       setPackageState: async (intent) => {
         const result = await setPackageStateV1(intent, plannerDeps())
         if (!result.ok) return result
@@ -1477,6 +1524,7 @@ export function registerExtIpcHandlers(
   // I-11(design v9 §5「MCP 组件开关」第 3 步):凡可能发布过允许集的写,结束后(成功或失败)为涉及的名字请求一次收敛。
   const packageIdOf = (intent: unknown) =>
     intent && typeof intent === "object" && "packageId" in intent && typeof intent.packageId === "string" ? intent.packageId : undefined
+  ipcMain.handle(GATED_WRITE_CHANNELS.setNativeSourceState, barrier((intent: unknown) => gatedWrite.setNativeSourceState(intent)))
   ipcMain.handle(GATED_WRITE_CHANNELS.setPackageState, barrier(async (intent: unknown) => {
     const result = await gatedWrite.setPackageState(intent)
     const packageId = packageIdOf(intent)
@@ -1568,6 +1616,11 @@ export function registerExtIpcHandlers(
       return isInstallOutcomeV1(result) ? result : { ok: false, code: "transaction-failed", detail: "Installation recovery is incomplete" }
     },
     reloads,
+    languageStatusChanged: notifyHubViewChanged,
+    nativeSources: async (directory, sources) => {
+      await ledgerReady
+      return nativeSources.sync(directory, sources)
+    },
     log: (line) => getLogger()?.warn(line),
   })
   const codepuppySidecar = {

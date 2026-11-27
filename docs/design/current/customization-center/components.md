@@ -51,6 +51,7 @@ review_after: 2027-01-16
 | 已安装行「…」菜单(纯文字) | `#hub-row-menu`(活稿 `#direction-2026-11` 节) | [`2026-11-18-ui-refresh/`](../../2026-11-18-ui-refresh/frame.html) | 2026-11-18 | —(待开票) | — | `renderer/extensions/extension-hub.tsx`(`MoreMenu`) | 设计定稿 |
 | 技能页 | `#hub-skills`(活稿 `#direction-2026-11` 节) | [`2026-11-18-ui-refresh/`](../../2026-11-18-ui-refresh/frame.html) | 2026-11-18 | —(待开票) | — | `renderer/extensions/extension-hub.tsx` · `builtin-controls-panel.tsx` | 设计定稿 |
 | 管理页(账户 / 权限 / 关于) | `#hub-manage`(活稿 `#direction-2026-11` 节) | [`2026-11-18-ui-refresh/`](../../2026-11-18-ui-refresh/frame.html) | 2026-11-18 | —(待开票) | — | `renderer/extensions/extension-detail.tsx` | 设计定稿 |
+| 本机文件条目(名称后目录小字、与包同一「…」菜单、「本项目」组里的项目同意两态、收起的「已移除」组与「+」重新加入、移除 / 重新加入提示、管理页「来源」写完整路径);子锚 `#hub-native-skills` `#hub-native-connectors` `#hub-native-menu` `#hub-native-removed` `#hub-native-rejoin` `#hub-native-manage` | `#hub-native`(活稿 `#hub-native` 节) | [`2026-11-27-1776-native-entries/`](../../2026-11-27-1776-native-entries/frame.html) | 2026-11-27 | ac#1776(片 6b) | 2026-11-27 实现(#1776 片 6b 分支提交,待合并) | `packages/ui-mac/src/renderer/extensions/extension-hub.tsx`(`NativeRow` / `NativeStatus` / `NativeRemovedGroup` / `nativeMenu`,沿 `MoreMenu`、`Group`、`RowStatus`、`Tooltip`、`pushToast`)、`extension-detail.tsx`(`NativeSourceDetail`);数据 `packages/ui-mac/src/main/native-sources.ts`、`src/shared/native-source-view.ts` | 已实现 · 待合并(设计定稿 owner 2026-11-27「按稿做（推荐）」,经编排器转达;答的是收起的「已移除」组、名称后目录小字、移除提示多一句三处) |
 
 ## 登记时记下的两处现状 —— 已随本次实现闭合
 

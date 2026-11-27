@@ -337,7 +337,7 @@ export const layer = (options?: Options) =>
           ...projectSupplementary,
           ...content,
           ...managedSettings,
-        ]) // codepuppy(ADR-049)
+        ], [...explicit, ...content, ...managedSettings]) // codepuppy(ADR-049; D6: Code Puppy's own and system/MDM entries are not native sources)
       })
 
       const initial = yield* ConfigDiscovery.discover(options)

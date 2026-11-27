@@ -329,3 +329,22 @@ test("document runtime notifications validate phase, progress and generation wit
   expect(parseDocumentRuntimeMessage(value)).toEqual(value)
   for (const changed of [{ sidecarGeneration: -1 }, { sequence: 0.5 }, { state: { phase: "ready" } }, { state: { phase: "preparing", stage: "download", received: -1 } }]) expect(parseDocumentRuntimeMessage({ ...value, ...changed })).toBeUndefined()
 })
+
+test("native source sync round-trips and drops malformed shapes", async () => {
+  const { buildNativeFileSync, buildNativeFileSyncReply, parseNativeFileSync, parseNativeFileSyncReply, parseCodePuppySidecarInbound } = await import("./codepuppy-sidecar-messages")
+  const source = { file: "/p/.opencode/plugins/x.js", kind: "plugin" as const, entry: "x.js", target: "/p/.opencode/plugins/x.js", active: true }
+  const sync = buildNativeFileSync({ id: 3, directory: "/p", sources: [source] })
+  expect(sync).toEqual({ type: "codepuppy.package.source", operation: "sync", id: 3, directory: "/p", sources: [source] })
+  expect(parseCodePuppySidecarInbound(JSON.parse(JSON.stringify(sync)))).toEqual(sync)
+  expect(parseNativeFileSync({ ...sync, sources: [{ ...source, active: "yes" }] })).toBeUndefined()
+  expect(parseNativeFileSync({ ...sync, sources: [{ ...source, kind: "hook" }] })).toBeUndefined()
+  expect(parseNativeFileSync({ ...sync, operation: "add" })).toBeUndefined()
+  expect(parseNativeFileSync({ ...sync, extra: 1 })).toBeUndefined()
+  const state = { file: source.file, kind: source.kind, entry: source.entry, target: source.target, desiredState: "disabled" as const, removed: false }
+  const reply = buildNativeFileSyncReply(3, { states: [state] })
+  expect(reply).toEqual({ id: 3, ok: true, states: [state] })
+  expect(parseNativeFileSyncReply(JSON.parse(JSON.stringify(reply)))).toEqual(reply)
+  expect(parseNativeFileSyncReply(buildNativeFileSyncReply(3, { code: "write-failed", message: "no" }))).toEqual({ id: 3, ok: false, code: "write-failed", message: "no" })
+  expect(parseNativeFileSyncReply({ id: 3, ok: true, states: [{ ...state, removed: "no" }] })).toBeUndefined()
+  expect(parseNativeFileSyncReply({ id: 3, ok: false, code: "boom", message: "x" })).toBeUndefined()
+})

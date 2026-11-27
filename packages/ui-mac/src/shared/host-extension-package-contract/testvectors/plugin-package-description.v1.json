@@ -13,6 +13,7 @@
     "entryName": "superpowers",
     "ecosystem": "claude"
   },
+  "materialization": "copy",
   "tree": [
     {
       "kind": "file",

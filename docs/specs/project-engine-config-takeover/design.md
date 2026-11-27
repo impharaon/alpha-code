@@ -438,3 +438,7 @@ type ProjectConfigViewReply =
 | 已允许项目打开上游实验开关 | ADR-048 让上游实验保持关闭;未实测哪个开关会弄坏 Code Puppy 界面 | owner 要求「从不」只收实测会坏的 | 测出某个实验开关会弄坏界面 |
 | 未允许时拿掉 agent 的 `permissions`,写的是 deny 规则时 agent 反而回到默认权限 | 与 `.codepuppy` 未允许时的既有行为相同(REQ-236 P1) | 已批准的既有口径 | 出现依赖项目 deny 规则的真实 agent |
 | `#1709` 信任记录在 Windows 上引擎写得进 | `#1709` 已知限制 | 本设计不为 Windows 加代码 | Windows 正式发行前 |
+
+### 契约 C 增量（2026-11-27，alpha-work DESIGN-local-plugin-install v3.5 R-m）
+
+`startEngine` 的 hooks 增加一个**可选**异步钩子，供 #1776 片 6（原生文件按引用管理，D6）在每次配置装载（首次与每次 reload）结束前 await，取得原生来源绑定的开关状态；sidecar 的实现在 ext 预载完成后经现有 hub bridge 发同一个 sync、由 main 应答。未安装该钩子时闸门行为不变（A10 同理）；失败或超时沿用上一代状态，首次装载没有上一代时按原生声明处理并记一行日志。`projectTrust` 的必填语义与 A3 不变。确切签名由 #1776 片 6a 实施并记在 local-plugin-install plan.md。

@@ -37,3 +37,21 @@ export type ProjectConfigView = {
   /** 未允许时被暂缓的条目,按 kind、file、name 排序去重;trusted 时为 []。 */
   withheld: WithheldItem[]
 }
+
+// ── DESIGN-local-plugin-install §4.6(D6)/ R-m:原生文件来源的绑定状态 ─────────────────────────────────────────────────
+// 线上形状照 §4.6 的 sync 合同逐字;闸门(契约 C 的可选钩子)、sidecar、ext 的 hub bridge 与主进程共用这一份。
+export type NativeFileKind = "skill" | "agent" | "command" | "mcp" | "plugin"
+export type NativeFileRef = { file: string; kind: NativeFileKind; entry: string; target?: string }
+export type NativeFileSource = NativeFileRef & { active: boolean }
+export type NativeFileState = NativeFileRef & { desiredState: "enabled" | "disabled"; removed: boolean }
+/** 契约 C 增量(R-m):一次装载把本代发现的来源交给 main,拿回绑定状态;取不到 ⇒ undefined(闸门沿用上一代)。 */
+export type NativeSourceSync = (input: { directory: string; sources: NativeFileSource[] }) => Promise<readonly NativeFileState[] | undefined>
+export const NATIVE_FILE_KINDS: readonly NativeFileKind[] = ["skill", "agent", "command", "mcp", "plugin"]
+/** 一条绑定的身份:文件 + 种类 + 文件内入口 + 插件 target。 */
+export function nativeFileKey(ref: NativeFileRef): string {
+  return JSON.stringify([ref.file, ref.kind, ref.entry, ref.target ?? null])
+}
+/** 关闭或已移除 ⇒ 不加载。 */
+export function nativeFileBlocked(state: NativeFileState | undefined): boolean {
+  return state !== undefined && (state.removed || state.desiredState === "disabled")
+}

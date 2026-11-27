@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join } from "node:path"
 import { engineSandbox, assertEngineSandboxed } from "../../test-component/engine-sandbox"
 import { publishPluginDataHome } from "./plugin-package-data"
+import { pluginHostName } from "./plugin-package-install"
 import { entrypointsFetch, provenance, verifyEntrySamples } from "../../test-fixtures/plugin-helper/entrypoints/fixture"
 import type { Running } from "../../test-component/codepuppy-engine"
 import type { InstallOutcomeV1 } from "../shared/plugin-install"
@@ -326,7 +327,9 @@ test("BC5 standalone official Registry GitHub uses main-owned credentials, runti
   scan(secretRoot)
   expect(tokenFiles.length).toBe(1)
   const { probe } = await import("../../test-component/codepuppy-engine")
-  const tools = async () => (await probe().ctx.tool.list()).filter((tool: { options?: { namespace?: string } }) => tool.options?.namespace === "github-mcp-server")
+  // c6197943ad: the Registry server's MCP is installed under the product's package-scoped host name, which is its tools' namespace.
+  const namespace = pluginHostName({ kind: "mcp", sourceName: "github-mcp-server", sourcePath: "" }, packageId, new Set(), () => true)
+  const tools = async () => (await probe().ctx.tool.list()).filter((tool: { options?: { namespace?: string } }) => tool.options?.namespace === namespace)
   try {
     await until(async () => (await tools()).length === 1, "Registry GitHub protocol fixture tool")
   } catch (error) {

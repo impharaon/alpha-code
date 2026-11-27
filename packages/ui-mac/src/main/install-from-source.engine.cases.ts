@@ -15,6 +15,9 @@ const sandbox = engineSandbox()
 // these cases drive main's installer without server.ts, so they publish the sandbox engine's data home the same way.
 publishPluginDataHome(sandbox.data)
 import { createSourceInstaller } from "./install-from-source"
+import { pluginHostName } from "./plugin-package-install"
+// c6197943ad: a source tree's MCP is installed under the product's package-scoped host name, not its source name.
+const PLAYWRIGHT = pluginHostName({ kind: "mcp", sourceName: "playwright", sourcePath: "" }, "claude:playwright", new Set(), () => true)
 import { createPluginSources } from "./plugin-sources"
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
 import { makeRecoveryGate } from "./ext-recovery-gate"
@@ -85,7 +88,7 @@ export default { id:'test.slice-a-observer', setup:async(ctx)=>{
  const candidate=(await sources.searchSources('playwright')).candidates.find(row=>row.source==='claude-marketplace')!
  expect(await install({requestId:'engine_install_a2',source:{kind:'candidate',candidateId:candidate.id},effect:{kind:'all-projects'},via:'chat'})).toMatchObject({ok:true,packageId:'claude:playwright'})
  for(const end=Date.now()+60000;;await Bun.sleep(100)){
- const state=(await client.mcp.list()).data.find(s=>s.name==='playwright')
+ const state=(await client.mcp.list()).data.find(s=>s.name===PLAYWRIGHT)
  if(state?.status.status==='connected')break
  if(state&&state.status.status!=='pending')throw Error(JSON.stringify(state))
  if(Date.now()>end)throw Error('MCP connect timed out')
@@ -105,7 +108,7 @@ export default { id:'test.slice-a-observer', setup:async(ctx)=>{
 
  expect(result.content.some(part=>part.type==='text'&&part.text.length>0)).toBe(true)
  expect(reloads).toBe(0)
- const durable=readMcpLeafStrict('playwright')
+ const durable=readMcpLeafStrict(PLAYWRIGHT)
  expect(durable).toMatchObject({ok:true,value:{command:['npx','@playwright/mcp@latest']}})
  await engine.close()
  engine=await start()
@@ -119,7 +122,7 @@ export default { id:'test.slice-a-observer', setup:async(ctx)=>{
  if((await client.rpc.call({rpcID:'slice-a-observer',method:'tools'})).output.tools.some(t=>t.name==='browser_close'))break
  if(Date.now()>end)throw Error('persistent definition did not load after rebuild')
  }
- expect(readMcpLeafStrict('playwright')).toEqual(durable)
+ expect(readMcpLeafStrict(PLAYWRIGHT)).toEqual(durable)
  expect(await setPackageStateV1({packageId:'claude:playwright',state:'disabled'},rootDeps)).toMatchObject({ok:true})
  await deps.activateMcp('claude:playwright')
  for(const end=Date.now()+10000;;await Bun.sleep(100)){
@@ -127,14 +130,14 @@ export default { id:'test.slice-a-observer', setup:async(ctx)=>{
  if(stopped.tools.length===0)break
  if(Date.now()>end)throw Error('disconnect did not remove tools')
  }
- const failure=await createManagedMcpConvergence({root:()=>globalRoot,awaitServer:async()=>{throw Error('test engine unavailable')},directory:()=>slot.projectDirectory,userDataPath:()=>sandbox.root})(['playwright'])
- expect(failure).toMatchObject([{name:'playwright',status:'unavailable'}])
+ const failure=await createManagedMcpConvergence({root:()=>globalRoot,awaitServer:async()=>{throw Error('test engine unavailable')},directory:()=>slot.projectDirectory,userDataPath:()=>sandbox.root})([PLAYWRIGHT])
+ expect(failure).toMatchObject([{name:PLAYWRIGHT,status:'unavailable'}])
  expect(readPackageLedgerStateV1(globalRoot)).toMatchObject({ok:true,packageGraphs:[{packageId:'claude:playwright'}]})
  // Removal = the package leaves the ledger, then the one runtime entry converges the name away (ext-ipc's order).
  const kept={ok:true as const}
  expect(await uninstallPackageV1('claude:playwright',{globalRoot:()=>globalRoot,installers:{removeFsInstall:()=>({ok:true as const,files:[]}),removeMcpConfig:()=>kept,removeCommandConfig:()=>kept,removeMcpSecretsStrict:()=>kept,releaseCodePuppyConnectionBindings:()=>kept,removeInstallGrants:()=>({ok:true as const,removed:[]}),removePluginPath:()=>kept}})).toMatchObject({ok:true})
- await converge(['playwright'])
- expect((await client.mcp.list()).data.some(server=>server.name==='playwright')).toBe(false)
+ await converge([PLAYWRIGHT])
+ expect((await client.mcp.list()).data.some(server=>server.name===PLAYWRIGHT)).toBe(false)
  }finally{await engine.close();process.chdir(previous);rmSync(sockets,{recursive:true,force:true})}
 },180000)
 
@@ -163,12 +166,12 @@ test('A2 real engine startup failure keeps the enabled package and exposes faile
  const client=engineClient(await connect())
  let observed
  for(const end=Date.now()+15000;;await Bun.sleep(50)) {
- observed=(await client.mcp.list()).data.find(server=>server.name==='playwright')
+ observed=(await client.mcp.list()).data.find(server=>server.name===PLAYWRIGHT)
  if(observed&&observed.status.status!=='pending')break
  if(Date.now()>end)throw Error('failed MCP did not settle')
  }
  expect(observed?.status.status).toBe('failed')
  // Whole-tree installation owns a bundle root and its MCP, even when the runtime fails to start.
- expect(readPackageLedgerStateV1(root)).toMatchObject({ok:true,packageGraphs:[{packageId:'claude:playwright',root:{kind:'bundle'},children:[{kind:'mcp',name:'playwright'}]}],records:[{kind:'bundle',desiredState:'enabled'},{kind:'mcp',name:'playwright',desiredState:'enabled'}]})
+ expect(readPackageLedgerStateV1(root)).toMatchObject({ok:true,packageGraphs:[{packageId:'claude:playwright',root:{kind:'bundle'},children:[{kind:'mcp',name:PLAYWRIGHT}]}],records:[{kind:'bundle',desiredState:'enabled'},{kind:'mcp',name:PLAYWRIGHT,desiredState:'enabled'}]})
  } finally {await engine.close();process.chdir(previous)}
 },30000)

@@ -2179,6 +2179,15 @@ packageIt.live("a path-activated package skill renders once until the next user 
 })))
 
 packageIt.live("the real ralph-loop Stop hook continues the same task and stops at its completion promise", () => packageJourney(Effect.gen(function* () {
+  // setup-ralph-loop.sh writes `session_id: ${CLAUDE_CODE_SESSION_ID:-}` into its state file and the Stop hook only blocks
+  // for that session. Shells inherit this process's environment, so a value from the shell running the tests (a Claude
+  // Code session) would make the hook ignore the session under test; the case runs without it and restores it after.
+  const inheritedSessionID = process.env.CLAUDE_CODE_SESSION_ID
+  delete process.env.CLAUDE_CODE_SESSION_ID
+  yield* Effect.addFinalizer(() => Effect.sync(() => {
+    if (inheritedSessionID === undefined) delete process.env.CLAUDE_CODE_SESSION_ID
+    else process.env.CLAUDE_CODE_SESSION_ID = inheritedSessionID
+  }))
   const sample = yield* invocationSample("claude:ralph-loop")
   const membership = JSON.parse(readFileSync(join(sample.root, "skills-enabled.json"), "utf8"))
   writeFileSync(join(sample.root, "skills-enabled.json"), JSON.stringify({ ...membership, keys: [...membership.keys, sample.key] }))

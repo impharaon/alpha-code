@@ -5,8 +5,8 @@
 #
 #   1. bun install            —— 依赖(HUSKY=0:husky 的 prepare 会改**所有 worktree 共享**的
 #                                .git/config core.hooksPath,把本仓的 pre-push 门换成上游那份)
-#   2. Electron 二进制 + codepuppy-fence 原生 addon(darwin)—— scripts/native-prepare.sh,
-#      与 scripts/worktree-bootstrap.sh 共用同一份,不各抄一遍
+#   2. Electron 二进制 + codepuppy-fence 原生 addon(darwin)+ 连接器启动器预构建(darwin arm64,`#1760`)
+#      —— scripts/native-prepare.sh,与 scripts/worktree-bootstrap.sh 共用同一份,不各抄一遍
 #
 # 缺了第 2 步的现象:process-fence-wiring / process-fence-apply / network-egress-fence 三个文件定点恒红
 # ("process fence: native module missing")—— 看起来像自己改坏了。任何一步失败 ⇒ 非零退出并点名哪一步。
@@ -22,7 +22,7 @@ echo "▶ bun install --frozen-lockfile"
 # --frozen-lockfile:不改写受控的 bun.lock(否则本机 bun 重写 libc 字段会弄脏树，gate 拒跑;owner 2026-11-23 夜检在干净克隆上跑)。
 bun install --frozen-lockfile || { echo "✗ bin/setup 失败:bun install(依赖没装上 —— 别在这棵树上跑 typecheck/测试,那是成千上万条假红)" >&2; exit 1; }
 
-echo "▶ Electron + codepuppy-fence addon"
-bash scripts/native-prepare.sh "$TARGET" "$MAIN" || { echo "✗ bin/setup 失败:Electron 二进制 / codepuppy-fence addon(原因见上一行 ✗)" >&2; exit 1; }
+echo "▶ Electron + codepuppy-fence addon + connector launchers"
+bash scripts/native-prepare.sh "$TARGET" "$MAIN" || { echo "✗ bin/setup 失败:Electron 二进制 / codepuppy-fence addon / 连接器启动器(原因见上一行 ✗)" >&2; exit 1; }
 
 echo "✓ bin/setup 完成"

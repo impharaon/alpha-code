@@ -30,6 +30,13 @@ test("safe read consumes the original page and preserves line slots", async () =
   expect(text).toContain(ProtectedFiles.PROTECTED_FILE_TEXT)
 })
 
+test("env read view keeps ordinary values visible", async () => {
+  const source = "DB_HOST=db\nAPI_KEY=fixture-api-key\nREGION=us-east-1\n"
+  const result = project(source, await read(source))
+  expect(result.output).toMatchObject({ content: "DB_HOST=db\nAPI_KEY=[REDACTED]\nREGION=us-east-1\n" })
+  expect(JSON.stringify(result.content)).toContain("1: DB_HOST=db")
+})
+
 test("long-line secret prefixes and raw file references are removed", async () => {
   const source = `TOKEN=${"s".repeat(4000)}\nPORT=3000\n`
   const result = project(source, await read(source))

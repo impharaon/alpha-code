@@ -71,6 +71,13 @@ test("env records preserve every assignment occurrence", async () => {
   ])
 })
 
+test("env files collect only credential-named values", () => {
+  // Node dotenv assignment grammar (node-env.txt); fixture values only.
+  const env: ProtectedFiles.ProtectedFile = { rule: "env", path: "/fixture/.env", profile: "env", format: "env", view: "variables" }
+  const source = "DB_HOST=db\nAPI_KEY=fixture-api-key\nPORT=3000\nPASSWORD=1234\nexport authToken='fixture-auth'\nREGION=us-east-1\n"
+  expect(strings(credentialValues(env, Buffer.from(source)))).toEqual(["fixture-api-key", "1234", "fixture-auth"])
+})
+
 test("structured parse failures never become opaque values", async () => {
   const text = await fixture("gcp.json").text()
   expect(() => credentialValues(file("gcp-adc", "json"), Buffer.from(text.slice(0, -3)))).toThrow()

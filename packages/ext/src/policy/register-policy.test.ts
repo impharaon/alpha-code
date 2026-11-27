@@ -1830,6 +1830,21 @@ describe("safe file tools", () => {
     fs.rmSync(other, { recursive: true, force: true })
   }))
 
+  it.live("env files mask only credential-named values", () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const value = randomUUID()
+    fs.writeFileSync(path.join(location.directory, ".env"), `DB_HOST=db\nAPI_KEY=${value}\n`)
+    const { session } = yield* setup({ internal: [ReadTool.Plugin, ShellTool.Plugin], records: NEUTRAL })
+    const read = yield* callRaw(session.id, "read", { path: ".env" })
+    expect(Exit.isSuccess(read)).toBe(true)
+    expect(JSON.stringify(read).includes(value)).toBe(false)
+    expect(JSON.stringify(read)).toContain("DB_HOST=db")
+    expect(JSON.stringify(read)).toContain("API_KEY=[REDACTED]")
+    const shell = yield* callRaw(session.id, "shell", { command: "cat .env; echo mongodb" })
+    expect(Exit.isSuccess(shell)).toBe(true)
+    expect((shell as { value: { output: unknown } }).value.output).toMatchObject({ output: "DB_HOST=db\nAPI_KEY=[REDACTED]\nmongodb\n" })
+  }))
+
   it.live("foreign read tools retain their original path", () => Effect.gen(function* () {
     let rawReads = 0
     const { session } = yield* setup({ records: NEUTRAL, inside: async (ctx) => {

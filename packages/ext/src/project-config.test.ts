@@ -288,9 +288,13 @@ describe("project/root identity fail-closed", () => {
     const config = JSON.stringify({ agent: { retired: { prompt: "must not load" } } })
     writeFileSync(join(retired, "codepuppy.jsonc"), config)
     writeFileSync(join(retired, "prefs.json"), JSON.stringify({ extensionsConsent: { version: 1, granted: true } }))
+    // 项目插件的 execute.before 回调在模块顶层建好并挂到 globalThis:扇出 import 了它,下面就能按引用认出这条钩子
+    // (projectPluginContext 只代理 tool.transform,tool.hook 原样透传)。
+    const PROJECT_HOOK = "__codepuppyRetiredProjectHook"
+    delete (globalThis as Record<string, unknown>)[PROJECT_HOOK]
     writeFileSync(
       join(retired, "plugins", "retired.js"),
-      'export default { id: "retired", async setup(context) { await context.tool.hook("execute.before", () => {}) } }',
+      `const hook = () => {}; globalThis.${PROJECT_HOOK} = hook; export default { id: "retired", async setup(context) { await context.tool.hook("execute.before", hook) } }`,
     )
     writeFileSync(join(retired, "sentinel"), "untouched")
     symlinkSync(retired, join(project, PROJECT_HIDDEN_DIR), "dir")
@@ -311,8 +315,9 @@ describe("project/root identity fail-closed", () => {
           agents.set(id, current)
         } } as never)
       expect(agents.has("retired")).toBe(false)
-      // 项目插件扇出没跑:执行钩子只有 L4 策略的头、尾两条(registerPolicy / seal)与 ext 自己的一条;扇出跑了就是 4 条
-      expect(recorded.hooks["tool.execute.before"]).toHaveLength(3)
+      // 项目插件扇出没跑:注册的 execute.before 里没有项目插件的那条(按引用认;不数条数,ext 自己的钩子会随功能增减)
+      expect(recorded.hooks["tool.execute.before"]?.length).toBeGreaterThan(0)
+      expect(recorded.hooks["tool.execute.before"]).not.toContain((globalThis as Record<string, unknown>)[PROJECT_HOOK])
       const tools: Array<{ name: string; execute: (args: unknown, ctx: unknown) => Promise<{ metadata: { ok: boolean } }> }> = []
       // 工具编辑器按 2.x 的形状给全 add / list / update(L4 策略的 transform 读工具表、给执行包一层显示快照)
       const editor = {

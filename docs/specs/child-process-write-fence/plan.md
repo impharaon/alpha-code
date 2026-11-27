@@ -814,3 +814,11 @@ PLAN 阶段只提交本文件。下表和命令均为实施安排，不代表已
 - `#1572` AC4 真栈：由 ④ 修复，`gate slot -- bun test --max-concurrency 2 --timeout 90000 src/main/net-failure-real-stack.test.ts` **5 pass / 33 expect**（三个生产构建全部通过）。
 - 沙箱拒写 shell 行（基线已红，未在此修）：`gate slot -- bun test --max-concurrency 2 --timeout 300000 src/main/fence-write-denied.engine.test.ts` 在本分支 **3 pass / 1 fail**（shell 行 60 s 超时，"killed 1 dangling process"）；去掉夹具里的 H2 改写（ext 不委派）同样 3/1；把工作树临时切到 `b8255b4695`（stash 后 detach，跑完切回并 pop）运行同一宿主测试，同样 **3 pass / 1 fail**、同一行 60 s 超时。该失败属 alpha 自身，交编排者。
 - ⑤ 共享引擎夹具的假 main（`test-component/codepuppy-engine.ts`）原先只答 hub 视图/请求/检索；本分支使夹具引擎带 H2 接缝后，ext 对每个 shell 工具调用发出的 package-manager 授权请求无人应答，要等桥的 20 s 超时才退回原 spawn（上面基线对照之外的独立问题，日志中 "authorization failed" 行即由此而来）。假 main 现按生产 main 对无包管理器围栏代际的答复 `{ ok: false, error: "unavailable" }` 立即应答。
+
+### 合并 origin/alpha（c35c173062，`620db89286`）后的门修正（2026-11-27）
+
+- 现象：门日志中 `process-fence-engine.test.ts` 的 AC2 以 0.28 ms 失败，`Received` 为 shell 自己的报错行 `zsh:1: operation not permitted: …/esc/shelltool-fenced.txt`，即报错排在了 `done` 之后。0.28 ms 不是前置失败：AC2 只对上一用例（围栏臂）已捕获的工作负载做断言，同一用例里"围栏臂已跑成"与"报错点名界外文件"两条断言都已通过。上文合并 `d95580c825` 一节记为"时序不稳定、未改断言"的正是同一原因，此处更正为确定的缺陷并修复。
+- 原因：Shell 服务把 `handle.all` 写进输出文件（`core/src/shell.ts:428`），`all` 是两根管道按到达顺序的合流（`util/src/cross-spawn-spawner.ts:370`，`Stream.merge(stdout, stderr)`），不保留程序写出顺序；AC2 以"最后一行是 done"证明"命令跑到了最后一句"，依赖了两条流的交错。
+- 红（产品合流处）：用 `CrossSpawnSpawner.node` 的真实 spawner 按 AC2 的命令形状（界内写、只读目录写、`echo done`）在 `gate slot` 内 16 并发跑 400 次 zsh，读 `all`：两根管道 **343/400** 最后一行不是 `done`（样本 `done\nzsh:1: permission denied: …`）；命令前加 `exec 2>&1;` 后 **0/400**。整文件不改时在负载下（同一 `gate slot` 内 4 并发 × 3 轮）12 次均通过，竞争在完整引擎下概率低，因此红证取自产品合流处。
+- 修：工作负载命令以 `exec 2>&1;` 开头，shell 报错与 `done` 同在一条流、按程序顺序记录。AC2 的五条断言不变（报错点名界外文件、界内文件无报错、最后一行 `done`、退出码 0、无 `sandbox_apply`），对照臂仍断言输出恰为 `done`、无 not permitted；`exec 2>&1` 只是 fd 复制，不写文件，不改变围栏下的落盘结果。
+- 绿：`gate slot` 内两份并发 × 3 轮，`bun test --max-concurrency 2 --timeout 90000 src/main/process-fence-engine.test.ts` **6/6 次 7 pass / 0 fail / 41 expect**（与登记条数 7 一致）。

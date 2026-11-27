@@ -64,7 +64,7 @@ export default {id:"test.created-plugin",setup:async(ctx)=>{
   const previous = process.cwd()
   process.chdir(slot.projectDirectory)
   const { startEngine } = await import("../../engine/engine-embed")
-  const engine = await startEngine(buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password: "created-plugin-test", engineVersion: "test", databasePath: slot.databasePath, configDirectory: slot.configDirectory, config: { file: explicit, content: JSON.stringify({ plugins: [ext, observer] }) }, models: { fetch: false }, filewatcher: true, platform: process.platform }), { projectTrust: () => true })
+  const engine = await startEngine(buildEngineServerOptions({ hostname: "127.0.0.1", port: 0, password: "created-plugin-test", engineVersion: "test", databasePath: slot.databasePath, configDirectory: slot.configDirectory, config: { file: explicit, content: JSON.stringify({ plugins: [ext, observer] }) }, models: { fetch: false }, filewatcher: true, platform: process.platform }), { packageManagerEnvironment: {}, projectTrust: () => true })
   try {
     const client = engineClient({ url: engine.url, username: "opencode", password: "created-plugin-test" })
     const session = await client.session.create({ permissions: [{ action: "*", resource: "*", effect: "allow" }] })

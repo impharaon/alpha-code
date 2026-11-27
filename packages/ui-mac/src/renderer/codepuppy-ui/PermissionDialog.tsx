@@ -1,3 +1,6 @@
+import { workspaceReadonlyMessage } from "./workspace-writable"
+import { directoryAccessMetadata, type DirectoryAccessDescription } from "../../shared/directory-write-approval"
+import { prepareDirectoryWriteApproval } from "../../engine-adapter/contract/receipts"
 import type {
   PermissionV2Decision,
   PermissionV2DecisionCommand,
@@ -52,6 +55,8 @@ export function createPermissionDecisionCommand(
 
 export function PermissionDialog(props: {
   request: PermissionV2Request
+  directoryContext?: { server: string; origin: string }
+  onConflict?: () => void
   projectID?: string
   onSubmit: (command: PermissionV2DecisionCommand) => Promise<PermissionV2DecisionReceipt>
   onResolved?: (receipt: PermissionV2DecisionReceipt) => void
@@ -66,6 +71,17 @@ export function PermissionDialog(props: {
   const what = requestWhat(props.request, approval, facts)
   // `#1314`:分类缺失或不认识时是「风险未知」,每张卡都有标签。
   const risk = permissionRiskOf(props.request)
+  const external = directoryAccessMetadata(props.request.metadata)
+  const directoryWrite = external?.access === "write" && props.directoryContext
+  const [directoryDescription, setDirectoryDescription] = createSignal<DirectoryAccessDescription>()
+  const [directoryFailure, setDirectoryFailure] = createSignal(false)
+  const describeDirectory = async () => {
+    if (!directoryWrite || !external) return
+    setDirectoryFailure(false)
+    try {
+      setDirectoryDescription(await window.api.describeDirectoryAccess({ server: directoryWrite.server, sessionID: props.request.sessionID, requestID: props.request.id, requestFingerprint: props.request.fingerprint, targets: external.targets }))
+    } catch { setDirectoryFailure(true) }
+  }
   const [state, setState] = createStore<{
     /** 正在提交的那个按钮(「在此项目中始终允许」从写设置起就算在途)。 */
     busy?: PermissionV2Decision
@@ -81,18 +97,28 @@ export function PermissionDialog(props: {
     return typeof props.projectID === "string" && !!props.projectID.trim() && !!saved?.length
   }
 
-  const submit = (busy: PermissionV2Decision, command: PermissionV2DecisionCommand) => {
+  const submit = async (busy: PermissionV2Decision, command: PermissionV2DecisionCommand) => {
     setState({ busy, failed: undefined, saveFailed: false })
-    props.onSubmit(command).then(
-      (receipt) => {
-        setState("busy", undefined)
-        props.onResolved?.(receipt)
-      },
-      (error) => {
-        setState({ busy: undefined, failed: { command, error: permissionDecisionSubmitError(error) } })
-        queueMicrotask(() => errorSummary?.focus())
-      },
-    )
+    let forget: (() => void) | undefined
+    try {
+      if (command.decision !== "reject" && directoryWrite) {
+        const shown = directoryDescription()
+        if (!shown) throw new Error(t("codepuppy.permission.cannotVerify"))
+        forget = prepareDirectoryWriteApproval(directoryWrite.origin, props.request.id, command.decision, async () => {
+          const result = await window.api.approveDirectoryWrite({ server: directoryWrite.server, sessionID: props.request.sessionID, requestID: props.request.id, requestFingerprint: props.request.fingerprint, decisionID: command.decisionID, decision: command.decision as "once" | "always", snapshotID: shown.snapshotID })
+          if (result.outcome === "granted" || result.outcome === "no-fence") return
+          if (result.outcome === "failed") throw new Error(workspaceReadonlyMessage(result.reason) ?? t("codepuppy.permission.failedFallback"))
+          props.onConflict?.()
+          throw { status: 409, message: t("codepuppy.permission.conflictFallback") }
+        })
+      }
+      const receipt = await props.onSubmit(command)
+      setState("busy", undefined)
+      props.onResolved?.(receipt)
+    } catch (error) {
+      setState({ busy: undefined, failed: { command, error: permissionDecisionSubmitError(error) } })
+      queueMicrotask(() => errorSummary?.focus())
+    } finally { forget?.() }
   }
 
   // 身份轴(方案 §2.4):先把工具级「启用」连同当前 binding 写进设置,写成了才放行这一次;
@@ -131,6 +157,7 @@ export function PermissionDialog(props: {
   }
 
   onMount(() => {
+    if (facts.verified) void describeDirectory()
     if (!facts.verified) decide("reject")
   })
 
@@ -193,7 +220,7 @@ export function PermissionDialog(props: {
               <Button
                 type="button"
                 variant="secondary"
-                disabled={!!state.busy || !canAlways()}
+                disabled={!!state.busy || !canAlways() || (!!directoryWrite && !directoryDescription())}
                 title={
                   !facts.verified
                     ? t("codepuppy.permission.unverified")
@@ -215,7 +242,7 @@ export function PermissionDialog(props: {
               type="button"
               variant="primary"
               autofocus
-              disabled={!!state.busy || !facts.verified}
+              disabled={!!state.busy || !facts.verified || (!!directoryWrite && !directoryDescription())}
               title={!facts.verified ? t("codepuppy.permission.unverified") : undefined}
               onClick={() => decide("once")}
               data-permission-decision="once"
@@ -226,6 +253,8 @@ export function PermissionDialog(props: {
         </div>
       }
     >
+      <For each={directoryDescription()?.targets}>{(target) => <p data-permission-real-directory>{target.realDirectory}</p>}</For>
+      <Show when={directoryFailure()}><p role="alert">{t("codepuppy.permission.failedDetail")}</p><Button onClick={() => void describeDirectory()}>{t("codepuppy.permission.retryDecision", { label: t("codepuppy.permission.once") })}</Button></Show>
       {/* 「要做什么」一行人话 + 必要时一行工具 / 助手(批准稿帧 A–D);原始动作名、主体助手不上卡(#1617)。 */}
       <div class="a-permission-what" data-permission-fact="action">
         <Show

@@ -37,6 +37,10 @@ describe("createSidecarEnv — default-deny", () => {
 
   test("passes the system/proxy/node basics children legitimately need", () => {
     const env = createSidecarEnv({
+      GOENV: "off",
+      GOPATH: "/original/go",
+      GOBIN: "/original/bin",
+      BUN_INSTALL: "/original/bun",
       PATH: "/usr/bin",
       HOME: "/Users/u",
       SHELL: "/bin/zsh",
@@ -48,6 +52,10 @@ describe("createSidecarEnv — default-deny", () => {
       NODE_EXTRA_CA_CERTS: "/etc/ca.pem",
     })
     for (const key of [
+      "GOENV",
+      "GOPATH",
+      "GOBIN",
+      "BUN_INSTALL",
       "PATH",
       "HOME",
       "SHELL",

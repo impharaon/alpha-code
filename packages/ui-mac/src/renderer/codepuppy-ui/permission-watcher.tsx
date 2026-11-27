@@ -14,7 +14,7 @@ import { createPermissionV2Feed } from "./session-workspace/session-permission-f
 import type { AuthState } from "../../preload/types"
 import { subscribeAuthState } from "../auth-recovery"
 
-export function PermissionWatcher(props: PermissionSurfaceProps) {
+export function PermissionWatcher(props: PermissionSurfaceProps & { directoryContext?: { server: string; origin: string } }) {
   const feed = createPermissionV2Feed({
     list: () => props.client.list(),
     reply: (requestID, command) => props.client.reply(requestID, command),
@@ -45,6 +45,8 @@ export function PermissionWatcher(props: PermissionSurfaceProps) {
         return (
           <PermissionDialog
             request={raw}
+            directoryContext={props.directoryContext}
+            onConflict={() => void feed.load()}
             projectID={raw.scope?.kind === "project" ? raw.scope.projectID : props.projectID}
             onSubmit={(command) => feed.reply(raw.id, command)}
             onResolved={(receipt) => feed.apply({ type: "replied", receipt })}

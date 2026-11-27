@@ -52,7 +52,7 @@ export default { id:'test.slice-a-observer', setup:async(ctx)=>{
  const previous=process.cwd(); process.chdir(slot.projectDirectory)
  const {startEngine}=await import("../../engine/engine-embed")
  let reloads=0
- const start=()=>startEngine(buildEngineServerOptions({hostname:'127.0.0.1',port:0,password:'slice-a-probe',engineVersion:'test',databasePath:slot.databasePath,configDirectory:slot.configDirectory,config:{file:join(globalRoot,'codepuppy.jsonc'),content:JSON.stringify({plugins:[ext,observer]})},models:{fetch:false},filewatcher:false,platform:process.platform}),{projectTrust:()=>true,onDispatch:(dispatch)=>publishInProcessEngine(async(request)=>{if(request.method===reloadEndpoint.method && new URL(request.url).pathname===reloadEndpoint.path) reloads++;return dispatch(request)})})
+ const start=()=>startEngine(buildEngineServerOptions({hostname:'127.0.0.1',port:0,password:'slice-a-probe',engineVersion:'test',databasePath:slot.databasePath,configDirectory:slot.configDirectory,config:{file:join(globalRoot,'codepuppy.jsonc'),content:JSON.stringify({plugins:[ext,observer]})},models:{fetch:false},filewatcher:false,platform:process.platform}),{packageManagerEnvironment: {}, projectTrust:()=>true,onDispatch:(dispatch)=>publishInProcessEngine(async(request)=>{if(request.method===reloadEndpoint.method && new URL(request.url).pathname===reloadEndpoint.path) reloads++;return dispatch(request)})})
  let engine=await start()
  try {
  let client=engineClient({url:engine.url,username:'opencode',password:'slice-a-probe'})
@@ -146,7 +146,7 @@ test('A2 real engine startup failure keeps the enabled package and exposes faile
  const previous=process.cwd()
  process.chdir(slot.projectDirectory)
  const {startEngine}=await import('../../engine/engine-embed')
- const engine=await startEngine(buildEngineServerOptions({hostname:'127.0.0.1',port:0,password:'a2-failure',engineVersion:'test',databasePath:slot.databasePath,configDirectory:slot.configDirectory,config:{content:'{}'},models:{fetch:false},filewatcher:false,platform:process.platform}),{projectTrust:()=>true})
+ const engine=await startEngine(buildEngineServerOptions({hostname:'127.0.0.1',port:0,password:'a2-failure',engineVersion:'test',databasePath:slot.databasePath,configDirectory:slot.configDirectory,config:{content:'{}'},models:{fetch:false},filewatcher:false,platform:process.platform}),{packageManagerEnvironment: {}, projectTrust:()=>true})
  try {
  const original=await captureFixture('external_plugins/playwright')
  const definition=JSON.parse(new TextDecoder().decode(await original.readFile('.mcp.json')))

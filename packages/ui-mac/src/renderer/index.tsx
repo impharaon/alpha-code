@@ -527,7 +527,11 @@ render(() => {
     const surfaceComponents = createMemo<AppSurfaces>(() => ({
       permission: (props) => (
         <CodePuppyBoundary name="PermissionWatcher">
-          <PermissionWatcher {...props} />
+          <PermissionWatcher {...props} directoryContext={(() => {
+            const baseUrl = sidebarServer()?.baseUrl
+            const connection = servers().find((candidate) => candidate.http.url === baseUrl)
+            return connection?.type === "sidecar" && connection.variant === "base" ? { server: ServerConnection.key(connection), origin: connection.http.url } : undefined
+          })()} />
         </CodePuppyBoundary>
       ),
       [productionRoutes.home.surface]: productionRoutes.home.mount(codepuppyProjects, projectsServerKey),

@@ -8,10 +8,12 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync } from "node:fs"
+import { chmodSync, renameSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { readHomebrewInstallations, homebrewFenceLocations, resolveHomebrewExecutable } from "./homebrew-installation"
+import { planProtectedLocations } from "./process-fence-plan"
 import {
   COMPILE_BYTE_WALL,
   LOCAL_SIDECAR_SERVER_KEY,
@@ -24,6 +26,8 @@ import {
   processFenceRulesCover,
   processFenceWriteRules,
   renderProcessFenceProfile,
+  resolvePackageManagerLocations,
+  userConfigurationLocations,
   resolveEngineRoots,
   selectWorkspaceUnion,
   trimUntilCompiles,
@@ -66,8 +70,199 @@ const base: ProcessFenceProfileInput = {
   roots,
   egressProxyPort: 4443,
   configFence: CF,
-  credentialStores: C1,
+  homebrewFence: [], credentialStores: C1,
 }
+
+const locationInput = {
+  platform: "darwin" as const,
+  home: "/Users/puppy",
+  userDataPath: "/Users/puppy/Library/Application Support/Code Puppy",
+  configHome: "/Users/puppy/.config",
+  appData: "/Users/puppy/Library/Application Support",
+  localAppData: "/Users/puppy/Library/Caches",
+  goInstallBin: null, xdgCacheHome: null, bunInstall: null,
+}
+
+describe("package manager locations", () => {
+  test("Bun global locations follow the trusted user root before application XDG defaults", () => {
+    for (const [xdgCacheHome, bunInstall, root] of [
+      [null, null, `${locationInput.home}/.bun`],
+      ["/user/cache", null, "/user/cache/.bun"],
+      ["/user/cache", "/user/bun", "/user/bun"],
+    ] as const) {
+      const result = resolvePackageManagerLocations({ ...locationInput, xdgCacheHome, bunInstall })
+      expect(result.writable.filter((entry) => entry.manager === "bun" && entry.purpose === "global-install").map((entry) => entry.rule)).toEqual([
+        { kind: "subpath", value: `${root}/install/global` }, { kind: "subpath", value: `${root}/bin` },
+      ])
+      expect(result.env.BUN_INSTALL).toBe(bunInstall === null ? root : undefined)
+      expect(result.env.BUN_INSTALL_CACHE_DIR).toBe(`${locationInput.userDataPath}/package-managers/bun/install-cache`)
+    }
+  })
+
+  test("homebrew installation nodes stay protected while ordinary global bins remain writable", () => {
+    const root = realpathSync(mkdtempSync(join(import.meta.dir, "../../node_modules/.cache/homebrew-identity-")))
+    try {
+      // Filesystem-only markers at the launcher/Library paths from frozen H1's real Homebrew layout.
+      // Content is not parsed or executed; these are our probe files, not a replacement brew implementation.
+      const prefix = join(root, "prefix")
+      const repository = join(root, "repository")
+      mkdirSync(join(prefix, "bin"), { recursive: true })
+      mkdirSync(join(repository, "bin"), { recursive: true })
+      mkdirSync(join(repository, "Library/Homebrew"), { recursive: true })
+      writeFileSync(join(repository, "bin/brew"), "launcher marker")
+      writeFileSync(join(repository, "Library/Homebrew/brew.sh"), "library marker")
+      symlinkSync(join(repository, "bin/brew"), join(prefix, "bin/brew"))
+      const installs = readHomebrewInstallations([prefix], [])
+      expect(installs).toHaveLength(1)
+      expect(installs[0]!.launcher.realPath).toBe(join(repository, "bin/brew"))
+      expect(readHomebrewInstallations([prefix], [{ kind: "subpath", value: root }])).toEqual([])
+      chmodSync(join(repository, "bin/brew"), 0o755)
+      const selected = (program = "brew", path = `${prefix}/bin:/usr/bin:/bin`) => resolveHomebrewExecutable({ program, cwd: root, env: { PATH: path }, installations: installs })?.executable
+      expect(selected()).toBe(join(repository, "bin/brew"))
+      expect(selected(join(prefix, "bin/brew"))).toBe(join(repository, "bin/brew"))
+      const shadow = join(root, "shadow")
+      mkdirSync(shadow); writeFileSync(join(shadow, "brew"), "shadow", { mode: 0o755 })
+      expect(selected("brew", `${shadow}:${prefix}/bin`)).toBeUndefined()
+      renameSync(join(repository, "bin/brew"), join(repository, "bin/brew-old"))
+      writeFileSync(join(repository, "bin/brew"), "updated launcher", { mode: 0o755 })
+      expect(selected()).toBe(join(repository, "bin/brew"))
+      const deny = planProtectedLocations(homebrewFenceLocations(installs), undefined, { realpath: realpathSync.native }).configFence
+      const profile = renderProcessFenceProfile({ ...base, workspaces: [], homebrewFence: deny.filter((rule) => rule.kind !== "dat-files"), userWritableLocations: [{ kind: "subpath", value: join(prefix, "bin") }, { kind: "subpath", value: join(repository, "Library") }] })
+      const rules = processFenceWriteRules(profile)
+      expect(processFenceRulesCover(rules, join(prefix, "bin/npm-probe"), "file")).toBe(true)
+      if (process.platform === "darwin") {
+        const result = spawnSync("/usr/bin/sandbox-exec", ["-p", profile, "/usr/bin/python3", "-c", `import json, pathlib\nresult=[]\nfor p in ${JSON.stringify([join(repository, "bin/brew"), join(repository, "Library/Homebrew/brew.sh"), join(prefix, "bin/npm-probe")])}:\n try: pathlib.Path(p).write_text('probe'); result.append(True)\n except PermissionError: result.append(False)\nprint(json.dumps(result))`], { encoding: "utf8" })
+        expect(result.status, result.stderr).toBe(0)
+        expect(JSON.parse(result.stdout)).toEqual([false, false, true])
+      }
+      for (const path of [join(repository, "bin/brew"), join(repository, "Library/Homebrew/brew.sh"), repository]) expect(processFenceRulesCover(rules, path, "file"), path).toBe(false)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  test("fixed cache environment is separate from the real global install roots", () => {
+    const cache = `${locationInput.userDataPath}/package-managers`
+    const result = resolvePackageManagerLocations(locationInput)
+    expect(result.env).toEqual({
+      BUN_INSTALL: `${locationInput.home}/.bun`,
+      BUN_INSTALL_CACHE_DIR: `${cache}/bun/install-cache`,
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: `${cache}/bun/transpiler-cache`,
+      pnpm_config_store_dir: `${cache}/pnpm/store`, npm_config_store_dir: `${cache}/pnpm/store`,
+      pnpm_config_cache_dir: `${cache}/pnpm/cache`, npm_config_cache_dir: `${cache}/pnpm/cache`,
+      pnpm_config_state_dir: `${cache}/pnpm/state`, npm_config_state_dir: `${cache}/pnpm/state`,
+      PNPM_HOME: "/Users/puppy/Library/pnpm",
+      YARN_CACHE_FOLDER: `${cache}/yarn/cache`, YARN_GLOBAL_FOLDER: `${cache}/yarn/berry`,
+      npm_config_cache: `${cache}/npm/cache`, PIP_CACHE_DIR: `${cache}/pip/cache`,
+      UV_CACHE_DIR: `${cache}/uv/cache`, UV_PYTHON_INSTALL_DIR: `${cache}/uv/python`,
+      GOMODCACHE: `${cache}/go/mod`, GOCACHE: `${cache}/go/build`,
+      CARGO_INSTALL_ROOT: "/Users/puppy/.cargo",
+    })
+    expect([...new Set(result.writable.filter((entry) => entry.purpose === "cache").map((entry) => entry.manager))].sort()).toEqual(["bun", "cargo", "go", "npm", "pip", "pnpm", "uv", "yarn"])
+    expect(result.writable.filter((entry) => entry.purpose === "cache" && entry.manager !== "cargo").every((entry) => entry.rule.kind === "subpath" && entry.rule.value.startsWith(`${cache}/`))).toBe(true)
+    expect(result.writable.filter((entry) => entry.manager === "cargo" && entry.purpose === "cache").map((entry) => entry.rule)).toEqual([
+      ...["registry", "git"].map((name) => ({ kind: "subpath", value: `/Users/puppy/.cargo/${name}` })),
+      ...[".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-journal"].map((name) => ({ kind: "literal", value: `/Users/puppy/.cargo/${name}` })),
+    ])
+    expect(result.env.CARGO_HOME).toBeUndefined()
+    expect(result.writable.some((entry) => entry.purpose === "global-install" && entry.rule.value.startsWith(cache))).toBe(false)
+  })
+
+  test("Go cache GOPATH keeps the original queried install target and null stays unresolved", () => {
+    const target = "/Users/puppy/custom-go/bin"
+    const result = resolvePackageManagerLocations({ ...locationInput, goInstallBin: target })
+    expect(result.env.GOPATH).toBe(`${locationInput.userDataPath}/package-managers/go/gopath`)
+    expect(result.env.GOBIN).toBe(target)
+    expect(result.writable).toContainEqual({ manager: "go", purpose: "cache", rule: { kind: "subpath", value: result.env.GOPATH! } })
+    expect(result.writable.some((entry) => entry.purpose === "cache" && entry.rule.value === target)).toBe(false)
+    const absent = resolvePackageManagerLocations(locationInput)
+    expect(absent.env.GOPATH).toBeUndefined()
+    expect(absent.env.GOBIN).toBeUndefined()
+    expect(() => resolvePackageManagerLocations({ ...locationInput, goInstallBin: "relative" })).toThrow("absolute")
+  })
+  test("global subtrees and exact metadata do not grant the surrounding tool roots", () => {
+    const result = resolvePackageManagerLocations(locationInput)
+    for (const [manager, value] of [
+      ["bun", "/Users/puppy/.bun/install/global"], ["bun", "/Users/puppy/.bun/bin"],
+      ["pnpm", "/Users/puppy/Library/pnpm/global"], ["pnpm", "/Users/puppy/Library/pnpm/bin"], ["pnpm", "/Users/puppy/Library/pnpm/.tools"],
+      ["yarn", "/Users/puppy/.config/yarn/global"], ["yarn", "/Users/puppy/.yarn/bin"],
+      ["npm", "/opt/homebrew/lib/node_modules"], ["npm", "/usr/local/bin"], ["npm", "/Users/puppy/.npm-global/lib/node_modules"],
+      ["pip", "/Users/puppy/Library/Python"], ["pip", "/Users/puppy/.local/bin"],
+      ["uv", "/Users/puppy/.local/share/uv/tools"], ["uv", "/Users/puppy/.local/bin"],
+      ["go", "/Users/puppy/go/bin"], ["cargo", "/Users/puppy/.cargo/bin"],
+    ]) expect(result.writable).toContainEqual({ manager, purpose: "global-install", rule: { kind: "subpath", value } })
+    for (const name of [".crates.toml", ".crates2.json"])
+      expect(result.writable).toContainEqual({ manager: "cargo", purpose: "global-install", rule: { kind: "literal", value: `/Users/puppy/.cargo/${name}` } })
+    for (const value of ["/Users/puppy", "/opt/homebrew", "/usr/local", "/Users/puppy/.local", "/Users/puppy/.cargo", "/Users/puppy/go", "/Users/puppy/Library/pnpm", "/Users/puppy/.rustup"])
+      expect(result.writable.some((entry) => entry.rule.value === value), value).toBe(false)
+  })
+
+  test("pnpm root shims match one node, while stores remain outside the install rules", () => {
+    const rules = resolvePackageManagerLocations(locationInput).writable.filter((entry) => entry.manager === "pnpm" && entry.rule.kind === "regex")
+    expect(rules).toHaveLength(1)
+    const pattern = new RegExp(rules[0]!.rule.value)
+    expect(pattern.test("/Users/puppy/Library/pnpm/semver")).toBe(true)
+    for (const path of ["/Users/puppy/Library/pnpm", "/Users/puppy/Library/pnpm/store/cache", "/Users/puppy/Library/pnpm-other/semver"])
+      expect(pattern.test(path), path).toBe(false)
+  })
+
+  test("npm and Classic Yarn share version-manager templates without opening their roots", () => {
+    const result = resolvePackageManagerLocations(locationInput)
+    for (const manager of ["npm", "yarn"]) {
+      const patterns = result.writable.filter((entry) => entry.manager === manager && entry.rule.kind === "regex").map((entry) => new RegExp(entry.rule.value))
+      for (const root of [
+        "/Users/puppy/.nvm/versions/node/v23.1.0", "/Users/puppy/.config/nvm/versions/node/v99.0.0",
+        "/Users/puppy/Library/Application Support/fnm/node-versions/v23.1.0/installation",
+        "/Users/puppy/.local/share/fnm/node-versions/v99.0.0/installation", "/Users/puppy/.fnm/node-versions/v23.1.0/installation",
+        "/Users/puppy/.volta/tools/image/node/23.1.0", "/Users/puppy/.asdf/installs/nodejs/23.1.0",
+        "/Users/puppy/.local/share/mise/installs/node/23.1.0",
+      ]) {
+        for (const suffix of ["bin/example", "lib/node_modules/example/index.js"])
+          expect(patterns.some((pattern) => pattern.test(`${root}/${suffix}`)), `${manager}: ${root}/${suffix}`).toBe(true)
+        for (const suffix of ["", "/etc/config", "/lib/node_modules-other/package"])
+          expect(patterns.some((pattern) => pattern.test(`${root}${suffix}`)), `${manager}: ${root}${suffix}`).toBe(false)
+      }
+      for (const path of ["tools/image/packages", "tools/user/packages", "tools/user/bins", "tools/shared", "bin", "tmp", "log"])
+        expect(result.writable).toContainEqual({ manager, purpose: "global-install", rule: { kind: "subpath", value: `/Users/puppy/.volta/${path}` }, onlyIfExisting: true })
+    }
+  })
+
+  test("Linux locations and regex roots use the supplied paths literally", () => {
+    const input = { ...locationInput, platform: "linux" as const, home: "/home/a.b+[c]", configHome: "/settings/a.b+[c]" }
+    const result = resolvePackageManagerLocations(input)
+    expect(result.env.PNPM_HOME).toBe("/home/a.b+[c]/.local/share/pnpm")
+    const patterns = result.writable.filter((entry) => entry.rule.kind === "regex").map((entry) => new RegExp(entry.rule.value))
+    expect(patterns.some((pattern) => pattern.test("/home/a.b+[c]/.nvm/versions/node/v1/bin/tool"))).toBe(true)
+    expect(patterns.some((pattern) => pattern.test("/home/axbcccc/.nvm/versions/node/v1/bin/tool"))).toBe(false)
+    expect(patterns.some((pattern) => pattern.test("/home/a.b+[c]/.local/lib/python3.14/site-packages/a.py"))).toBe(true)
+    expect(patterns.some((pattern) => pattern.test("/home/a.b+[c]/.local/lib/other/a.py"))).toBe(false)
+  })
+
+  test("relative location inputs are rejected before producing any candidates", () => {
+    for (const key of ["home", "userDataPath", "configHome", "appData", "localAppData"])
+      expect(() => resolvePackageManagerLocations({ ...locationInput, [key]: "relative" }), key).toThrow("absolute")
+  })
+})
+
+describe("user configuration locations", () => {
+  test("ordinary files and Git locks are literal; only fish startup scripts have a directory rule", () => {
+    const result = userConfigurationLocations(locationInput)
+    for (const name of [".gitconfig", ".gitconfig.lock", ".zshenv", ".zprofile", ".zshrc", ".zlogin", ".zlogout", ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".profile", ".npmrc", ".yarnrc", ".yarnrc.yml", ".bunfig.toml", ".cargo/config", ".cargo/config.toml", ".pip/pip.conf"])
+      expect(result).toContainEqual({ kind: "literal", path: `/Users/puppy/${name}` })
+    for (const name of ["git/config", "git/config.lock", "fish/config.fish", "pip/pip.conf", "uv/uv.toml"])
+      expect(result).toContainEqual({ kind: "literal", path: `/Users/puppy/.config/${name}` })
+    expect(result).toContainEqual({ kind: "literal", path: "/Users/puppy/Library/Application Support/pip/pip.conf" })
+    expect(result).toContainEqual({ kind: "literal", path: "/Users/puppy/Library/Application Support/go/env" })
+    expect(result.filter((rule) => rule.kind !== "literal")).toEqual([{ kind: "subpath", path: "/Users/puppy/.config/fish/conf.d" }])
+    expect(result.every((rule) => rule.kind !== "dat-files")).toBe(true)
+    expect(result.some((rule) => rule.kind !== "dat-files" && /opencode|codepuppy|zsh_sessions|zcompdump/.test(rule.path))).toBe(false)
+  })
+
+  test("Linux uses configHome for Go, and validates the same absolute input contract", () => {
+    const result = userConfigurationLocations({ ...locationInput, platform: "linux" })
+    expect(result).toContainEqual({ kind: "literal", path: "/Users/puppy/.config/go/env" })
+    expect(result.some((rule) => rule.kind !== "dat-files" && rule.path.includes("Library"))).toBe(false)
+    expect(() => userConfigurationLocations({ ...locationInput, configHome: "relative" })).toThrow("absolute")
+  })
+})
 /** 一个受保护位置都没有的形状:只判别的行时用(空清单两块都不渲染)。 */
 const noFence = () => [] as string[]
 
@@ -138,15 +333,12 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       `(subpath "${HOME}/Library/Application Support/ai.opencode.desktop")`,
       `(subpath "${HOME}/.local/share/opencode")`,
       `(subpath "${HOME}/.cache/opencode")`,
-      `(subpath "${HOME}/.npm")`,
       `(regex #"^/Users/alpha/\\.zsh_history")`,
       `(subpath "/private/tmp")`,
       `(subpath "/private/var/folders")`,
       `(literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")`,
       `(literal "/dev/tty") (regex #"^/dev/fd/")`,
       `(literal "/dev/ptmx") (regex #"^/dev/ttys")`,
-      `(subpath "${HOME}/Library/Caches/bun")`,
-      `(subpath "${HOME}/.cache/bun")`,
       ")",
       '(allow file-write* (extension "app.codepuppy.workspace-write"))',
       '(deny file-issue-extension generic-issue-extension mach-issue-extension iokit-issue-extension ipc-posix-issue-extension (extension-class "app.codepuppy.workspace-write"))',
@@ -165,10 +357,10 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     expect(cf).toBe(n4 + 1)
     expect(lines.slice(cf)).toEqual([...CF_LINES, ...C1_LINES]) // C1 是全文最后的文件规则(stored-credentials-fence §4.5)
     expect(lines.slice(cf).some((l) => l.startsWith("(allow"))).toBe(false)
-    expect(tokens(renderProcessFenceProfile({ ...base, configFence: [], credentialStores: [] })).at(-1)).toBe(NETWORK_LINES(4443).at(-1))
+    expect(tokens(renderProcessFenceProfile({ ...base, configFence: [], homebrewFence: [], credentialStores: [] })).at(-1)).toBe(NETWORK_LINES(4443).at(-1))
     // C1 单独在场(受保护集为空)时也紧接在网络行之后;C1 为空 ⇒ 两块都不渲染
     expect(tokens(renderProcessFenceProfile({ ...base, configFence: [] })).slice(-C1_LINES.length)).toEqual(C1_LINES)
-    expect(tokens(renderProcessFenceProfile({ ...base, credentialStores: [] })).slice(-CF_LINES.length)).toEqual(CF_LINES)
+    expect(tokens(renderProcessFenceProfile({ ...base, homebrewFence: [], credentialStores: [] })).slice(-CF_LINES.length)).toEqual(CF_LINES)
     expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "literal", path: '/Users/alpha/"x' }] })).toThrow(/configFence\[0\]/)
     expect(() => renderProcessFenceProfile({ ...base, configFence: [{ kind: "dat-files", dir: "relative" }] })).toThrow(/configFence\[0\]/)
   })
@@ -178,7 +370,7 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
       { kind: "subpath" as const, path: "/r/cfg/opencode", via: ["/w/proj/link", "/w/proj"] },
       { kind: "literal" as const, path: "/w/other/x", via: ["/w/proj"] },
     ]
-    const profile = renderProcessFenceProfile({ ...base, configFence, credentialStores: [] })
+    const profile = renderProcessFenceProfile({ ...base, configFence, homebrewFence: [], credentialStores: [] })
     const ancestors = profile.split("\n").find((line) => line.includes("; CF 上级目录节点"))!
     expect(ancestors).toBe('(deny file-write* (literal "/r/cfg") (literal "/r") (literal "/w/proj/link") (literal "/w/proj") (literal "/w/other") (literal "/w"))      ; CF 上级目录节点')
     expect(processFenceWriteRules(profile).deny).toEqual([
@@ -212,7 +404,7 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
   test("`#1337` 网络行:Q1.2 四行逐字、顺序不变、deny 在前 allow 在后、N4 的端口就是传入的代理端口;只写加法(没有第二条 deny)", () => {
     // 受保护集两块渲染在 N4 之后(SPEC-engine-config-fence);网络行本身的形状在没有受保护集的形状上判,有受保护集时它们紧贴在两块之前
     expect(tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234 })).slice(-(CF_LINES.length + C1_LINES.length + 4), -(CF_LINES.length + C1_LINES.length))).toEqual(NETWORK_LINES(61234))
-    const out = tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234, configFence: [], credentialStores: [] }))
+    const out = tokens(renderProcessFenceProfile({ ...base, egressProxyPort: 61234, configFence: [], homebrewFence: [], credentialStores: [] }))
     expect(out.slice(-4)).toEqual(NETWORK_LINES(61234))
     expect(out.filter((l) => l.startsWith("(deny "))).toEqual([
       "(deny file-write*)",
@@ -235,14 +427,14 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
 
   test("每一行都带 §8.2 的 id 注释,且 id 集合 = WRITABLE_ROOT_IDS 的键(登记簿只能点名存在的行)", () => {
     const ids = new Set(
-      renderProcessFenceProfile(base)
+      renderProcessFenceProfile({ ...base, userWritableLocations: [{ kind: "literal", value: `${HOME}/.gitconfig` }], packageManagerCaches: [{ kind: "literal", value: `${HOME}/.cargo/.package-cache` }] })
         .split("\n")
         // X2 is a deny rule, not a writable root.
         .map((l) => /;\s*(W\d+|X1)\b/.exec(l)?.[1])
         .filter((x): x is string => !!x),
     )
     expect([...ids].sort()).toEqual(Object.keys(WRITABLE_ROOT_IDS).sort())
-    expect(Object.keys(WRITABLE_ROOT_IDS).sort()).toEqual(["W1", "W11", "W12", "W13", "W14", "W15", "W17", "W18", "W3", "W4", "W5", "W7", "W8", "X1"])
+    expect(Object.keys(WRITABLE_ROOT_IDS).sort()).toEqual(["W1", "W11", "W12", "W13", "W14", "W15", "W20", "W21", "W3", "W4", "W5", "W8", "X1"])
   })
 
   test("XDG 根跟着 env 走:用户导出 XDG_DATA_HOME 时 W4 指向它,不再是 ~/.local/share", () => {
@@ -282,7 +474,6 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
     { kind: "subpath", value: "/Users/alpha/Library/Application Support/ai.opencode.desktop" },
     { kind: "subpath", value: "/Users/alpha/.local/share/opencode" },
     { kind: "subpath", value: "/Users/alpha/.cache/opencode" },
-    { kind: "subpath", value: "/Users/alpha/.npm" },
     { kind: "regex", value: "^/Users/alpha/\\.zsh_history" },
     { kind: "subpath", value: "/private/tmp" },
     { kind: "subpath", value: "/private/var/folders" },
@@ -293,14 +484,12 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
     { kind: "regex", value: "^/dev/fd/" },
     { kind: "literal", value: "/dev/ptmx" },
     { kind: "regex", value: "^/dev/ttys" },
-    { kind: "subpath", value: "/Users/alpha/Library/Caches/bun" },
-    { kind: "subpath", value: "/Users/alpha/.cache/bun" },
   ]
 
   test("E9 往返:生产渲染(含受保护集)→ 解析 ⇒ allow 逐条还原写块(W13 一行三条、W14/W15 literal + regex),deny 与渲染输入(规则 + 上级目录)逐条相等;X1 扩展行不算规则", () => {
     expect(processFenceWriteRules(renderProcessFenceProfile(base))).toEqual({ allow: ALLOW, deny: [...CF_DENY, ...C1_RULES] })
-    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, credentialStores: [] }))).toEqual({ allow: ALLOW, deny: CF_DENY })
-    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, configFence: [], credentialStores: [] }))).toEqual({ allow: ALLOW, deny: [] })
+    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, homebrewFence: [], credentialStores: [] }))).toEqual({ allow: ALLOW, deny: CF_DENY })
+    expect(processFenceWriteRules(renderProcessFenceProfile({ ...base, configFence: [], homebrewFence: [], credentialStores: [] }))).toEqual({ allow: ALLOW, deny: [] })
     expect(processFenceWriteRules("(version 1)(allow default)(deny file-write*)")).toEqual({ allow: [], deny: [] })
   })
 
@@ -308,7 +497,7 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
   // 运行期放行的解析器认得这两种形状,deny 逐条等于两份输入(受保护集,再 C1)按出现顺序拼起来 —— C1 在场时新打开的项目照样签得出放行。
   test("E9 / D11 往返(受保护集 + C1,真渲染):deny 逐条等于两份输入按出现顺序拼起来;C1 的路径带引号即拒渲染", () => {
     expect(processFenceWriteRules(renderProcessFenceProfile(base))).toEqual({ allow: ALLOW, deny: [...CF_DENY, ...C1_RULES] })
-    expect(() => renderProcessFenceProfile({ ...base, credentialStores: [{ kind: "literal", path: '/x/"y' }] })).toThrow(/credentialStores\[0\]/)
+    expect(() => renderProcessFenceProfile({ ...base, homebrewFence: [], credentialStores: [{ kind: "literal", path: '/x/"y' }] })).toThrow(/credentialStores\[0\]/)
   })
 
   test("文法只认渲染点写出的形状:其余任何含 file-write 的表头、条目或行都抛(调用方按「本代不签发」处理)", () => {
@@ -723,7 +912,7 @@ describe("控制组:判据能测出已知的坏", () => {
     expect(rendered).not.toEqual(tokens(renderProcessFenceProfile(base)))
   })
   test("`#1337` 少 N3(inbound)或多一条减法 deny ⇒ 网络行判据红(老勘破 §5 那两行 / 减法组合正是 `#1334` 实测的两种坏)", () => {
-    const good = tokens(renderProcessFenceProfile({ ...base, configFence: [], credentialStores: [] })) // 网络行的形状在没有受保护集的形状上判(见上)
+    const good = tokens(renderProcessFenceProfile({ ...base, configFence: [], homebrewFence: [], credentialStores: [] })) // 网络行的形状在没有受保护集的形状上判(见上)
     expect(good.slice(-4)).toEqual(NETWORK_LINES(4443))
     const sec5 = good.filter((l) => !l.includes("network-inbound"))
     expect(sec5.slice(-4)).not.toEqual(NETWORK_LINES(4443))
@@ -739,4 +928,16 @@ describe("控制组:判据能测出已知的坏", () => {
     })
     expect(union.selected).not.toContain("/Users/alpha")
   })
+})
+
+
+test("file targets match literal and regex entries exactly while directory grant coverage stays conservative", () => {
+  for (const allow of [[{ kind: "literal" as const, value: "/parent" }], [{ kind: "regex" as const, value: "^/parent$" }]]) {
+    expect(processFenceRulesCover({ allow, deny: [] }, "/parent/child")).toBe(true)
+    expect(processFenceRulesCover({ allow, deny: [] }, "/parent/child", "file")).toBe(false)
+    expect(processFenceRulesCover({ allow, deny: [] }, "/parent", "file")).toBe(true)
+  }
+  const allow = [{ kind: "subpath" as const, value: "/parent" }]
+  expect(processFenceRulesCover({ allow, deny: [{ kind: "literal", value: "/parent" }] }, "/parent/child", "file")).toBe(true)
+  expect(processFenceRulesCover({ allow, deny: [{ kind: "literal", value: "/parent/child" }] }, "/parent/child", "file")).toBe(false)
 })

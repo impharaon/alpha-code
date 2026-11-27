@@ -15,12 +15,15 @@ import { injectCodePuppyConfig } from "../src/main/codepuppy-config-injection"
 import { writeEngineConfigForFork } from "../src/main/engine-explicit-config"
 import { secretFilePath, secretFileRef } from "../src/main/codepuppy-secret-files"
 import { handOverCredentials, startCredentials } from "./credential-table"
-import { buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../src/main/codepuppy-sidecar-messages"
+import { buildHubRequestReply, buildHubViewReply, buildPackageManagerControlReply, buildSourcesSearchReply } from "../src/main/codepuppy-sidecar-messages"
 import type { EngineFetch } from "../src/main/in-process-engine"
 import { engineProjectTrust } from "../src/main/engine-project-trust"
 import { projectTrustIdentity } from "../src/main/project-trust-truth"
 import { recordProjectTrustDecision } from "../src/main/project-trust-truth-write"
 import { reconcileSkillsDerivation, skillsEnabledPath } from "../src/main/ext-receipt-v2"
+import { installPreparedShellSeam } from "./prepared-shell-seam"
+
+installPreparedShellSeam()
 
 /** 真 stdio MCP 服务器(#1563 的夹具):列一个 `echo`,`CODEPUPPY_MCP_CALL_LOG` 记下每次 tools/call。 */
 export const MCP_FIXTURE = path.resolve(import.meta.dir, "../../core/test/fixture/codepuppy-mcp-startup-stdio.ts")
@@ -109,7 +112,10 @@ function fakeMainPort() {
               ? buildHubRequestReply(message.id, { record: null })
               : message.type === "codepuppy.sources.search.request"
                 ? buildSourcesSearchReply(message.id, { error: "no sources in this sandbox" })
-                : undefined
+                // As main answers a generation without the package-manager fence: the Shell keeps its original spawn at once.
+                : message.type === "codepuppy.package-manager.request"
+                  ? buildPackageManagerControlReply(message.id, { ok: false, error: "unavailable" })
+                  : undefined
         if (reply) for (const listener of listeners) listener({ data: reply })
       }),
     on: (_event: string, listener: (event: { data: unknown }) => void) => void listeners.push(listener),
@@ -306,7 +312,7 @@ export function codepuppyEngine(options: HostOptions) {
         filewatcher: options.filewatcher ?? false,
         platform: process.platform,
       }),
-      { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), projectTrust: options.projectTrust ?? engineProjectTrust },
+      { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), packageManagerEnvironment: {}, projectTrust: options.projectTrust ?? engineProjectTrust },
     )
     const send = async (method: string, route: string, body?: unknown) => {
       const response = await fetch!(

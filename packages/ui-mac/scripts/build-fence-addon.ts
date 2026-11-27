@@ -30,6 +30,7 @@ export const FENCE_ADDON_BASENAME = "codepuppy_fence.node"
 export const FENCE_ADDON_SOURCE = join(packageDir, "native", "codepuppy-fence", "codepuppy_fence.c")
 /** `#1571` 钥匙串改名函数的源文件,与围栏编进同一个 .node。 */
 export const FENCE_ADDON_KEYCHAIN_SOURCE = join(packageDir, "native", "codepuppy-fence", "keychain_rename.c")
+export const FENCE_ADDON_PACKAGE_MANAGER_SOURCE = join(packageDir, "native", "codepuppy-fence", "package_manager.c")
 export const FENCE_ADDON_BUILD_DIR = join(packageDir, "native", "codepuppy-fence", "build")
 export const FENCE_ADDON_OUT = join(FENCE_ADDON_BUILD_DIR, FENCE_ADDON_BASENAME)
 
@@ -89,6 +90,7 @@ export function buildFenceAddon(options: BuildFenceAddonOptions = {}): BuildFenc
     out,
     source,
     FENCE_ADDON_KEYCHAIN_SOURCE,
+    FENCE_ADDON_PACKAGE_MANAGER_SOURCE,
   ])
   if (clang.status !== 0 || !existsSync(out)) {
     rmSync(out, { force: true })

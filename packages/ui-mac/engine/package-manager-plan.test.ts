@@ -1,0 +1,200 @@
+import { afterAll, expect, test } from "bun:test"
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync, chmodSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join, resolve } from "node:path"
+import { spawn, spawnSync } from "node:child_process"
+import type { Writable } from "node:stream"
+import { ShellScan } from "../../core/src/shell/scan"
+import { PACKAGE_MANAGER_SCANNER, packageManagerScannerCode } from "../scripts/package-manager-build"
+import type { PackageManagerCommand } from "./package-manager-plan"
+
+const root = mkdtempSync(join(tmpdir(), "package-manager-plan-"))
+afterAll(() => rmSync(root, { recursive: true, force: true }))
+const build = await Bun.build({
+  entrypoints: [resolve(import.meta.dirname, "package-manager-plan.ts")], target: "bun", outdir: root,
+  plugins: [{ name: "actual-shell-scan", setup(build) {
+    build.onResolve({ filter: /^virtual:codepuppy-shell-scan$/ }, () => ({ path: PACKAGE_MANAGER_SCANNER, namespace: "scanner" }))
+    build.onLoad({ filter: /.*/, namespace: "scanner" }, () => ({ contents: packageManagerScannerCode(), loader: "ts" }))
+  } }],
+})
+if (!build.success) throw new AggregateError(build.logs, "package-manager plan build failed")
+const planner: typeof import("./package-manager-plan") = await import(build.outputs[0].path)
+const scanner = await import(`data:text/javascript;base64,${Buffer.from(new Bun.Transpiler({ loader: "ts" }).transformSync(packageManagerScannerCode())).toString("base64")}`)
+const plan = (command: string, shell = "/bin/bash") => planner.planPackageManagerExecution({ manager: "homebrew", command, shell, cwd: root, env: { HOME: root, PATH: "/usr/bin:/bin", VALUE: "hello world" } })
+
+test("H1 extends the actual scanner without changing its permission results", () => {
+  // Actual shell source, also used by the existing ShellScan owner tests; no external parser fixture.
+  for (const source of ["brew --prefix", "cd p && brew install jq", "echo brew; env PATH=/bin brew --prefix 9>out", "(brew x | cat); export A=y", "for i in a b; do brew x; done", "echo $(brew --prefix)"]) {
+    expect(scanner.scan(source, "bash")).toEqual(ShellScan.scan(source, "bash"))
+  }
+})
+
+test("H1 plans only executable brew words with source spans and deterministic values", () => {
+  const source = `echo brew; PATH=/bin env A=x command-not-brew; command 'brew' install "$VALUE" 2>log`
+  const nodes = plan(source)
+  expect(nodes).toHaveLength(1)
+  expect(source.slice(nodes[0].start, nodes[0].end)).toBe("'brew'")
+  expect(nodes[0].argv).toEqual(["install", "hello world"])
+  expect(nodes[0].redirects.map((span) => source.slice(span.start, span.end))).toEqual(["2>log"])
+  expect(plan("env -i brew --prefix")).toEqual([])
+  expect(plan("brew $(echo jq)")).toEqual([])
+  expect(plan("for i in a b; do brew install jq; done")).toEqual([])
+  expect(plan("echo $(brew --prefix)")).toEqual([])
+  expect(plan("python nonbrew.py && false && brew --prefix")).toHaveLength(1)
+  expect(plan("export PATH=$(echo hidden); brew --prefix")).toEqual([])
+  expect(plan("time brew --prefix")[0].wrapper).toBe("time")
+  expect(plan("noglob exec brew --prefix", "/bin/zsh")[0].exec).toBe(true)
+  expect(plan("/opt/homebrew/bin/brew --prefix")[0].program).toBe("/opt/homebrew/bin/brew")
+  // PowerShell-class shells (ShellSelect.ps) are not POSIX: no rewrite, the original spawn runs.
+  expect(plan("brew --prefix", "/usr/local/bin/pwsh")).toEqual([])
+  expect(plan("brew --prefix", "/opt/homebrew/bin/powershell")).toEqual([])
+})
+
+test("H1 follows successful cd and literal exports without taking skipped branches", () => {
+  expect(plan("cd p && brew --prefix")[0].cwd).toBe(join(root, "p"))
+  expect(plan("cd p; brew --prefix")).toEqual([])
+  // The command's own assignments; the shell's own exported PWD is pinned by the H3 oracle below.
+  const own = (command: string) => plan(command)[0].assignments.filter((entry) => entry.name !== "PWD" && entry.name !== "OLDPWD")
+  expect(own("false && export PATH=/wrong; brew --prefix")).toEqual([])
+  expect(own("false || export PATH=/right; brew --prefix")).toMatchObject([{ name: "PATH", value: "/right", origin: "export" }])
+  expect(own("unknown && export A=x; brew '$VALUE'")).toEqual([])
+  expect(plan("export A=x; brew \"$A\"")[0].argv).toEqual(["x"])
+  expect(plan("(cd p && brew --prefix); brew --prefix").map((node) => node.cwd)).toEqual([join(root, "p"), root])
+})
+
+test("H3 environment carries only exported variables and the leaf's own prefix assignments, as the real shell does", () => {
+  const snapshot = { HOME: root, PATH: "/usr/bin:/bin", VALUE: "hello world" }
+  const planned = (command: string, shell: string) => ({ ...snapshot, ...Object.fromEntries(plan(command, shell)[0].assignments.map((entry) => [entry.name, entry.value])) }) as Record<string, string>
+  expect(planned("X=1; brew --prefix", "/bin/bash").X).toBeUndefined()
+  expect(planned("export X=1; brew --prefix", "/bin/bash").X).toBe("1")
+  expect(planned("X=1 brew --prefix", "/bin/bash").X).toBe("1")
+  expect(plan("X=jq; brew install \"$X\"")[0].argv).toEqual(["install", "jq"])
+  // Oracle: the same source in each real interpreter with /usr/bin/env in the brew position. The shells report a
+  // physical PWD, so the planner gets the real path of the same directory.
+  const physical = realpathSync(root)
+  mkdirSync(join(physical, "p"), { recursive: true })
+  // As main spawns brew: the snapshot minus the planned `unset` names, then the planned assignments.
+  const plannedAt = (command: string, shell: string, start: Record<string, string>) => {
+    const node = planner.planPackageManagerExecution({ manager: "homebrew", command, shell, cwd: physical, env: start })[0]
+    const env: Record<string, string> = { ...start }
+    for (const name of node.unset) delete env[name]
+    return { ...env, ...Object.fromEntries(node.assignments.map((entry) => [entry.name, entry.value])) } as Record<string, string>
+  }
+  const sources = ["X=1; brew --prefix", "export X=1; brew --prefix", "X=1 brew --prefix", "X=1; export X; brew --prefix", "export X; X=1; brew --prefix", "set -a; X=1; brew --prefix", "set -a; set +a; X=1; brew --prefix", "PATH=/bin:/usr/bin; brew --prefix", "VALUE=changed; brew --prefix",
+    "brew --prefix", "cd p && brew --prefix", "pushd p >/dev/null && brew --prefix", "cd p && cd - >/dev/null && brew --prefix", "export X=1; unset X; brew --prefix",
+    "unset VALUE; brew --prefix", "unset VALUE; VALUE=again; brew --prefix", "unset VALUE; export VALUE=again; brew --prefix", "VALUE=x brew --prefix; unset VALUE",
+    // A branch-only unset is not certain; quoted operands and `--` are ordinary shell words.
+    "[ -n \"\" ] && unset VALUE; brew --prefix", "unset \"VALUE\"; brew --prefix", "unset 'VALUE'; brew --prefix", "unset -- VALUE; brew --prefix"]
+  // A snapshot with an inherited OLDPWD/PWD: bash and sh drop OLDPWD at startup, every shell replaces PWD.
+  for (const start of [snapshot, { ...snapshot, OLDPWD: "/inherited/old", PWD: "/inherited/pwd" }]) for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) for (const source of sources) {
+    const real = spawnSync(shell, ["-c", source.replace("brew --prefix", "/usr/bin/env")], { cwd: physical, env: start, encoding: "utf8" })
+    expect(real.status).toBe(0)
+    const actual = Object.fromEntries(real.stdout.trim().split("\n").map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]))
+    const expected = plannedAt(source, shell, start)
+    for (const name of ["X", "PATH", "VALUE", "PWD", "OLDPWD"]) expect(`${shell} ${source} ${name}=${expected[name]}`).toBe(`${shell} ${source} ${name}=${actual[name]}`)
+  }
+  // An unset operand that cannot be determined leaves the rest of the command unplanned.
+  expect(planner.planPackageManagerExecution({ manager: "homebrew", command: "unset $NOT_IN_SNAPSHOT; brew --prefix", shell: "/bin/bash", cwd: physical, env: snapshot })).toEqual([])
+})
+
+test("H1 a planned leaf's argv and cwd match the real shell; undeterminable words stay unplanned", () => {
+  const physical = realpathSync(root), recorder = join(physical, "argv-recorder"), snapshot = { HOME: physical, PATH: "/usr/bin:/bin" }
+  mkdirSync(join(physical, "p"), { recursive: true })
+  writeFileSync(recorder, `#!/bin/sh\nprintf '%s\\n' "$#"\nfor a in "$@"; do printf '[%s]\\n' "$a"; done\n/bin/pwd -P\n`)
+  chmodSync(recorder, 0o755)
+  const at = (command: string, shell: string) => planner.planPackageManagerExecution({ manager: "homebrew", command, shell, cwd: physical, env: snapshot })
+  // Names outside the snapshot are unknown; a brace list in a POSIX shell is unknown.
+  expect(at("brew install $NOT_IN_SNAPSHOT", "/bin/bash")).toEqual([])
+  expect(at("brew install {jq,wget}", "/bin/sh")).toEqual([])
+  expect(at("brew install {jq,wget}", "/bin/zsh")[0].argv).toEqual(["install", "jq", "wget"])
+  expect(at("X=; brew install $X jq", "/bin/bash")[0]?.argv).toEqual(["install", "jq"])
+  const sources = ["X=; brew install $X jq", "X=; brew install \"$X\" jq", "brew install {jq,wget}", "brew install pre{a,b}post", "cd p && brew --prefix", "pushd p >/dev/null && brew --prefix",
+    "cd p && cd - >/dev/null && brew --prefix", "export X=1; unset X; brew install \"$X\"", "brew install \"$PWD\"", "cd p && brew install \"$OLDPWD\" \"$PWD\""]
+  for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) for (const source of sources) {
+    const nodes = at(source, shell)
+    if (!nodes.length) continue
+    const real = spawnSync(shell, ["-c", source.replace("brew", recorder)], { cwd: physical, env: snapshot, encoding: "utf8" })
+    expect(real.status).toBe(0)
+    expect(`${shell} ${source}\n${nodes[0].argv.length}\n${nodes[0].argv.map((arg) => `[${arg}]\n`).join("")}${nodes[0].cwd}\n`).toBe(`${shell} ${source}\n${real.stdout}`)
+  }
+})
+
+test("H4 three real interpreters preserve leaf redirections, stdin and private proof under tracing", async () => {
+  const proof = "a1".repeat(32)
+  const helper = join(root, "helper")
+  writeFileSync(helper, `#!/bin/sh\nIFS= read -r proof <&9 || exit 126\nexec 9<&-\n[ "$proof" = '${proof}' ] || exit 126\n/usr/bin/env > '${root}/helper-env'\nprintf 'helper stderr\\n' >&2\nif true 2>/dev/null 8<&0; then /bin/cat; fi\n`)
+  chmodSync(helper, 0o755)
+  writeFileSync(join(root, "in"), "file input\n")
+  for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) {
+    for (const source of [
+      "brew --prefix 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- <in",
+      "exec 9>log; brew --prefix 2>&9 <in",
+      "brew --prefix 9>out <in",
+      "printf 'pipe input\\n' | brew --prefix",
+      "brew --prefix <&-",
+      "exec 0<&-; brew --prefix",
+      "brew --prefix <missing",
+    ]) {
+      const nodes = plan(source, shell)
+      expect(nodes.length).toBe(1)
+      const rewritten = planner.packageManagerExecutionSource({ command: source, shell, nodes, executionID: "test-id", helperService: "test.service", helper, privateInput: { fd: 3, data: Buffer.from(proof + "\n") } })
+      expect(rewritten).not.toContain(proof)
+      const child = spawn(shell, ["-ax", "-c", rewritten], { cwd: root, env: { HOME: root, PATH: "/usr/bin:/bin" }, stdio: ["ignore", "pipe", "pipe", "pipe"] })
+      const stdout: Buffer[] = [], stderr: Buffer[] = []
+      child.stdout!.on("data", (data) => stdout.push(data))
+      child.stderr!.on("data", (data) => stderr.push(data))
+      const exited = new Promise<number | null>((resolve, reject) => { child.once("close", resolve); child.once("error", reject) })
+      ;(child.stdio[3] as Writable).end(proof + "\n")
+      const code = await exited
+      expect(Buffer.concat(stderr).toString()).not.toContain(proof)
+      // The prelude leaves no trace line of its own under xtrace.
+      expect(Buffer.concat(stderr).toString(), shell).not.toContain("codepuppy_options_")
+      if (source.includes("<&-")) expect(Buffer.concat(stderr).toString()).not.toContain("bad file descriptor")
+      if (source.includes("missing")) {
+        const original = spawnSync(shell, ["-ax", "-c", source], { cwd: root, env: { HOME: root, PATH: "/usr/bin:/bin" }, encoding: "utf8" })
+        expect(code).toBe(original.status)
+        expect(Buffer.concat(stdout).length).toBe(0)
+        continue
+      }
+      expect({ code, shell, source, stderr: Buffer.concat(stderr).toString() }).toMatchObject({ code: 0 })
+      expect(readFileSync(join(root, "helper-env"), "utf8")).not.toContain(proof)
+      expect(Buffer.concat(stdout).toString()).toBe(source.includes("<in") ? "file input\n" : source.includes("pipe input") ? "pipe input\n" : "")
+      if (source.includes("2>&9")) expect(readFileSync(join(root, "log"), "utf8")).toContain("helper stderr")
+      if (source.includes("9>out")) expect(readFileSync(join(root, "out"), "utf8")).toBe("")
+    }
+  }
+})
+
+test("H4 the proof writer is a shell builtin: an external printf first on PATH never runs", async () => {
+  const proof = "b".repeat(64), fake = join(root, "fake-bin"), recorded = join(root, "external-printf-argv"), helper = join(root, "builtin-helper")
+  mkdirSync(fake, { recursive: true })
+  // A same-user process can read any external program's argv; the proof must never be one.
+  writeFileSync(join(fake, "printf"), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${recorded}'\nexec /usr/bin/printf "$@"\n`)
+  writeFileSync(helper, `#!/bin/sh\nIFS= read -r proof <&9 || exit 126\n[ "$proof" = '${proof}' ] || exit 126\n`)
+  for (const file of [join(fake, "printf"), helper]) chmodSync(file, 0o755)
+  for (const shell of ["/bin/bash", "/bin/zsh", "/bin/sh"]) {
+    const source = "brew --prefix"
+    const rewritten = planner.packageManagerExecutionSource({ command: source, shell, nodes: plan(source, shell), executionID: "test-id", helperService: "test.service", helper, privateInput: { fd: 3, data: Buffer.from(proof + "\n") } })
+    const child = spawn(shell, ["-c", rewritten], { cwd: root, env: { HOME: root, PATH: `${fake}:/usr/bin:/bin` }, stdio: ["ignore", "pipe", "pipe", "pipe"] })
+    const exited = new Promise<number | null>((resolve, reject) => { child.once("close", resolve); child.once("error", reject) })
+    ;(child.stdio[3] as Writable).end(proof + "\n")
+    expect({ shell, code: await exited }).toEqual({ shell, code: 0 })
+    expect(existsSync(recorded) ? readFileSync(recorded, "utf8") : "", shell).toBe("")
+  }
+})
+
+test("production config bundling retains the scanner owner's original source directory", async () => {
+  const { loadConfigFromFile } = await import("electron-vite")
+  const loaded = await loadConfigFromFile({ command: "build", mode: "production" }, resolve(import.meta.dirname, "../electron.vite.config.ts"))
+  const config = loaded!.config as { main?: { plugins?: Array<{ name?: string; resolveId?: (id: string) => string | undefined; load?: (id: string) => string | undefined }> } }
+  const plugin = config.main!.plugins!.find((plugin) => plugin.name === "codepuppy:package-manager-scanner")!
+  const code = plugin.load!(plugin.resolveId!("virtual:codepuppy-shell-scan")!)!
+  expect(code).toContain("export function scanPackageManagerSource")
+  expect(code).toContain("export function shellName")
+  // The production main build (vite/rollup) must compile the module's TypeScript, as electron-vite's main bundle does.
+  const entry = join(root, "scanner-entry.ts")
+  writeFileSync(entry, `import { shellName, shellPs } from "virtual:codepuppy-shell-scan"\nexport default [shellName("/bin/zsh"), shellPs("/usr/local/bin/pwsh")]\n`)
+  const { build } = await import("vite")
+  const output = await build({ configFile: false, logLevel: "silent", plugins: [plugin as never], build: { ssr: entry, write: false } }) as { output: Array<{ code?: string }> }
+  expect(output.output[0]!.code).toContain("function shellPs")
+})

@@ -78,7 +78,7 @@ const profileFor = (stateRoot: string, env: "prod" | "dev", over: Partial<Proces
     roots: { home: HOME, dataHome: `${HOME}/.local/share`, cacheHome: `${HOME}/.cache`, configHome: `${HOME}/.config` },
     egressProxyPort: 4443,
     configFence: [],
-    credentialStores: [],
+    homebrewFence: [], credentialStores: [],
     ...over,
   })
 
@@ -110,7 +110,7 @@ describe("真源位置(I3):<casBaseRoot>/egress-grants/<env>.json 不在可写�
     ] as const) {
       for (const stateHome of [USER_DATA, `${HOME}/.local/state`]) {
         const rules = fileWriteRules(profileFor(stateRoot, env, { stateHome })).filter((r) => r.id !== "W1")
-        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBeGreaterThanOrEqual(15)
+        expect(rules.length, `${stateRoot}/${env}/${stateHome}`).toBe(stateHome === USER_DATA ? 13 : 14)
         const truth = egressGrantTruthPath(stateRoot, env)
         const dir = join(stateRoot, "egress-grants")
         expect(rules.filter((r) => covers(r, truth)).map(describeRule), `truth file ${truth}`).toEqual([])

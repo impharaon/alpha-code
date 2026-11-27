@@ -246,7 +246,7 @@ async function machine(arm: Arm) {
         egressProxyPort: Number(new URL(model.baseURL).port),
         carriedWorkspaces: [],
         engineConfigDirectory: configDir,
-        credentialStores: credentialStores({ userDataPath: userData }),
+        homebrewFence: [], credentialStores: credentialStores({ userDataPath: userData }),
       },
       {
         homeDir: () => home,

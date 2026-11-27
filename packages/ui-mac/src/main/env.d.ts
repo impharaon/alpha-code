@@ -10,6 +10,13 @@ interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
+declare module "virtual:codepuppy-shell-scan" {
+  export function shellName(file: string): string
+  export function shellPs(file: string): boolean
+  export function scanPackageManagerSource(input: string, dialect: "bash" | "zsh" | "posix"): import("../shared/package-manager-syntax").PackageManagerSyntax[] | undefined
+  export function resolvePackageManagerWord(input: string, environment: Readonly<Record<string, string | null>>, dialect: "bash" | "zsh" | "posix", kind: "word" | "assignment"): string | undefined
+}
+
 // `#1667`(#1662 L5):electron-vite 把它解析到 scripts/build-engine.ts 用上游 Node 构建配置打出的 OpenCode 2 引擎包,
 // 包的入口是 `packages/ui-mac/engine/engine-embed.ts`(electron.vite.config.ts 的 opencode:virtual-server-module)。
 // 这里手写的是 Code Puppy 这一侧的调用面,不 import 上游类型(那会把整个引擎拉进 ui-mac 的类型检查程序);
@@ -21,6 +28,6 @@ declare module "virtual:opencode-server" {
   export function assertCodePuppyBootstrap(): void
   export function startEngine(
     options: import("./engine-server-options").EngineServerOptions,
-    hooks: { onDispatch?: (dispatch: (request: Request) => Promise<Response>) => void; projectTrust: (directory: string) => boolean },
+    hooks: { onDispatch?: (dispatch: (request: Request) => Promise<Response>) => void; projectTrust: (directory: string) => boolean; packageManagerEnvironment: Readonly<Record<string, string>>; refreshPackageManagerEnvironment?: () => Promise<Readonly<Record<string, string>>> },
   ): Promise<{ url: string; dispatch: (request: Request) => Promise<Response>; close: () => Promise<void> }>
 }

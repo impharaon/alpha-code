@@ -69,7 +69,7 @@ async function startOn(slot: ReturnType<typeof engineSlot>) {
       filewatcher: false,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-legacy")), projectTrust: engineProjectTrust },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, "cp-l5-legacy")), packageManagerEnvironment: {}, projectTrust: engineProjectTrust },
   )
   const credentials = async () => {
     const response = await fetch!(new Request("http://codepuppy-sidecar.invalid/api/credential", { headers: { "x-opencode-directory": encodeURIComponent(slot.projectDirectory) } }))

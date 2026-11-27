@@ -1,3 +1,7 @@
+import sample from "../engine-adapter/fixtures/permission-asked.json"
+import { toV1PermissionRequest } from "../engine-adapter/opencode2/v1-shapes"
+import { permissionV1Fingerprint } from "../../../codepuppy-app/src/context/permission-v1-adapter"
+import { createDirectoryWriteApproval } from "./directory-write-approval"
 // Same production handlers / truth tracker / spawnLocalServer listener. Electron UI and native
 // issuance are the narrow substitutes; actual kernel issuance is independently measured by G0/V2.
 import { afterEach, beforeEach, expect, mock, test, vi } from "bun:test"
@@ -107,7 +111,10 @@ beforeEach(async () => {
     onWritableChanged: (change) => { changed.push(change) },
   })
   await spawnGeneration()
-  registerIpcHandlers({ fenceWorkspaces: tracker, probeWorkspaceWrite: probe, grantWorkspaceWrite: async (input) => { await tracker.grantWrite(input, listener) },
+  registerIpcHandlers({ isAppRenderer: (id) => id === 1, directoryWrites: createDirectoryWriteApproval({
+    eligibility: { homeDir: join(run, "home"), appStateRoot: join(run, "state"), configFenceRoots: () => [], realpath: realpathSync.native, isDirectory: () => true }, tracker, sidecar: () => listener,
+    current: async () => toV1PermissionRequest({ ...sample.frame.data, action: "external_directory", resources: [join(run,"B/*")], save: [join(run,"B/*")], metadata: { directoryAccess: { access: "write", targets: [{ absolute: join(run,"B/a"), directory: join(run,"B") }] } } }),
+  }), fenceWorkspaces: tracker, probeWorkspaceWrite: probe, grantWorkspaceWrite: async (input) => { await tracker.grantWrite(input, listener) },
     updater: { subscribe: () => () => {} },
   } as unknown as Parameters<typeof registerIpcHandlers>[0])
 })
@@ -340,3 +347,22 @@ test("grant request book timeout is failed; no live sidecar is failed rather tha
   register()
   expect(await tracker.probeWrite(request(), null)).toMatchObject({ outcome: "unknown", grant: "failed", reason: "grant-failed" })
 }, 10_000)
+
+
+test("directory approval IPC accepts only the presenting app frame and never turns description or sidecar messages into a grant", async () => {
+  const frame = {}, sender = Object.assign(new EventEmitter(), { id: 1, mainFrame: frame })
+  const event = { sender, senderFrame: frame }
+  const input = { server: "sidecar", sessionID: sample.frame.data.sessionID, requestID: sample.frame.data.id, requestFingerprint: permissionV1Fingerprint(sample.frame.data.id), targets: [{ absolute: join(run, "B/a"), directory: join(run, "B") }] }
+  const description = await handlers.get("directory-access-describe")!(event, input) as { snapshotID: string }
+  expect(issues).toHaveLength(0)
+  expect(tracker.userOpened.has("sidecar", join(run,"B"))).toBe(false)
+  const approval = { ...input, targets: undefined, decisionID: "human", decision: "once", snapshotID: description.snapshotID }
+  delete approval.targets
+  expect(await handlers.get("directory-write-approve")!({ ...event, senderFrame: {} }, approval)).toEqual({ outcome: "conflict" })
+  expect(await handlers.get("directory-write-approve")!(event, { ...approval, decision: "reject" })).toEqual({ outcome: "conflict" })
+  child.emit("message", { type: "directory-write-approve", ...approval })
+  expect(issues).toHaveLength(0)
+  expect(await handlers.get("directory-write-approve")!(event, approval)).toEqual({ outcome: "granted" })
+  expect(issues).toHaveLength(1)
+  expect(consumed.has(join(run,"B"))).toBe(true)
+})

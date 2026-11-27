@@ -136,7 +136,7 @@ export async function startProbeEngine(options: { global?: Json; explicit?: Json
       filewatcher: toggles.filewatcher,
       platform: process.platform,
     }),
-    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), projectTrust: () => true },
+    { onDispatch: (dispatch) => (fetch = withEngineAuthorization(dispatch, password)), projectTrust: () => true, packageManagerEnvironment: {} },
   )
 
   /** One request through the in-process dispatch app; `directory` picks the Location. */

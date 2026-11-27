@@ -66,7 +66,7 @@ test.skipIf(process.platform !== "darwin")("官方连接器运行期目录:没�
         egressProxyPort: 59999,
         carriedWorkspaces: [],
         engineConfigDirectory: join(home, ".config", "opencode"),
-        credentialStores: stores,
+        homebrewFence: [], credentialStores: stores,
       },
       {
         homeDir: () => home,

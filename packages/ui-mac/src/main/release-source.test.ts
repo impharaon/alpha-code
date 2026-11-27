@@ -23,7 +23,7 @@ function fixture() {
   git(dir, "clone", path.join(dir, "origin.git"), "work")
   const cwd = path.join(dir, "work")
   git(cwd, "switch", "-c", "alpha")
-  for (const file of ["electron-builder.config.ts", "scripts/target-arch.ts", "scripts/release-source.ts", "scripts/build-identity.ts", "src/shared/route-manifest.ts", "src/main/release-sbom.ts", "src/main/document-resources.ts", "src/shared/document-resources.ts", "scripts/build-package-manager-helper.ts", "scripts/build-fence-addon.ts", "src/main/package-manager-helper.ts", "src/main/process-fence-apply.ts"]) {
+  for (const file of ["electron-builder.config.ts", "scripts/target-arch.ts", "scripts/release-source.ts", "scripts/build-identity.ts", "src/shared/route-manifest.ts", "src/main/release-sbom.ts", "src/main/document-resources.ts", "src/shared/document-resources.ts", "scripts/build-package-manager-helper.ts", "scripts/build-fence-addon.ts", "src/main/package-manager-helper.ts", "src/main/process-fence-apply.ts", "src/main/connector-launcher-paths.ts"]) {
     fs.mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true })
     fs.copyFileSync(path.join(packageDir, file), path.join(cwd, file))
   }

@@ -19,7 +19,8 @@ import {
 import { DOCUMENT_ASSET_BUILD_DIR, readDocumentAssets } from "./src/main/document-resources"
 import { assertReleaseSource } from "./scripts/release-source"
 import { isReleaseBuild } from "./scripts/build-identity"
-import { CONNECTOR_LAUNCHER_BUILD_DIR, checkLauncherBundle, connectorNodeSigningOptions, finalizeLauncherSignatures } from "./src/main/connector-launchers"
+// The launcher authority is loaded inside the hooks that use it (as the video runtime is): the config stays light at load.
+import { CONNECTOR_LAUNCHER_BUILD_DIR } from "./src/main/connector-launcher-paths"
 import { signPackageManagerHelper } from "./scripts/build-package-manager-helper"
 import { PACKAGE_MANAGER_HELPER } from "./src/main/package-manager-helper"
 
@@ -249,6 +250,7 @@ const getBase = (appId: string): Configuration => ({
     identity: shouldSign ? (process.env.CODEPUPPY_SIGN_IDENTITY ?? undefined) : "-",
     sign: async (options) => {
       const { finalizeVideoSignatures } = await import("./scripts/video-runtime-artifacts")
+      const { connectorNodeSigningOptions, finalizeLauncherSignatures } = await import("./src/main/connector-launchers")
       // Resolve through the declared electron-builder dependency; retain its
       // signer, identity, entitlements, retry policy and child-before-parent order.
       const require = createRequire(import.meta.url)
@@ -290,6 +292,7 @@ const getBase = (appId: string): Configuration => ({
     if (context.electronPlatformName !== "darwin" && context.electronPlatformName !== "win32") return
     readDocumentAssets(path.join(packageDir, DOCUMENT_ASSET_BUILD_DIR))
     const target = context.electronPlatformName === "darwin" ? "darwin-arm64" : "win32-x64"
+    const { checkLauncherBundle } = await import("./src/main/connector-launchers")
     await checkLauncherBundle(path.join(packageDir, CONNECTOR_LAUNCHER_BUILD_DIR, target === "darwin-arm64" ? "mac-arm64" : "win-x64"), target)
     if (Arch[context.arch] !== (target === "darwin-arm64" ? "arm64" : "x64"))
       throw new Error("Unsupported video runtime target")
@@ -306,6 +309,7 @@ const getBase = (appId: string): Configuration => ({
       ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources")
       : path.join(context.appOutDir, "resources")
     readDocumentAssets(path.join(resourcesDir, "document-assets"))
+    const { checkLauncherBundle } = await import("./src/main/connector-launchers")
     await checkLauncherBundle(path.join(resourcesDir, "connector-launchers"), mac ? "darwin-arm64" : "win32-x64")
     if (mac) assertPackagedEngineAssets({ resourcesDir, packingArch: Arch[context.arch] })
     const { checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
@@ -331,6 +335,7 @@ const getBase = (appId: string): Configuration => ({
       ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents/Resources")
       : path.join(context.appOutDir, "resources")
     const { finalizeVideoSignatures, checkVideoRuntime } = await import("./scripts/video-runtime-artifacts")
+    const { checkLauncherBundle, finalizeLauncherSignatures } = await import("./src/main/connector-launchers")
     if (!mac) {
       finalizeLauncherSignatures(resources)
       finalizeVideoSignatures(resources)

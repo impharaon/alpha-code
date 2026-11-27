@@ -16,7 +16,8 @@ import { videoBinaryTarget } from "../../scripts/video-runtime-artifacts"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 const execute = promisify(execFile)
-export const CONNECTOR_LAUNCHER_BUILD_DIR = "native/connector-launchers/build"
+import { CONNECTOR_LAUNCHER_BUILD_DIR } from "./connector-launcher-paths"
+export { CONNECTOR_LAUNCHER_BUILD_DIR }
 export const launcherPinSet = createHash("sha256").update(JSON.stringify(lock)).digest("hex")
 export type LauncherBundle = { schemaVersion: 1; platform: LauncherPlatform; pinSet: string; form: "expanded" | "archives"; files: Record<string, string>; preparedFiles?: Record<string, string> }
 

@@ -91,7 +91,8 @@ export default {id:"test.created-plugin",setup:async(ctx)=>{
         { path: "skills/report/summarize.mjs", text: "import {readFileSync} from 'node:fs';const totals=new Map();for(const row of JSON.parse(readFileSync(process.argv[2],'utf8')).rows)totals.set(row.name,(totals.get(row.name)||0)+row.count);console.log([...totals].map(([name,count])=>name+'='+count).join('|'));\n" },
       ],
     } } })).toMatchObject({ ok: true, packageId: "mine:own-report", source: { kind: "created" } })
-    expect(reloaded).toEqual(["mine:own-report"])
+    // AC-14 (docs/specs/local-plugin-install/plan.md r3): the content transaction returns first; activation and the skill reload run one event turn later.
+    expect(await until(async () => [...reloaded], (ids) => ids.length > 0)).toEqual(["mine:own-report"])
     const skills = await until(() => rpc("skills"), (items) => items.some((skill) => skill.name === "report"))
     const report = skills.find((skill) => skill.name === "report")
     const result = await rpc("run", { id: report.id, sessionID: session.id, file: input })

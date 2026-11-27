@@ -249,7 +249,9 @@ async function verifyOpenCodeLifecycle(packageId: string, unsupported: { kind: s
   const instruction = await (await skillTool()).execute({ id: selected.id }, skillContext)
   expect(instruction.output.name).toBe(selected.name)
   expect(instruction.content).toContain(selected.content.trim())
-  expect(state.records.every(record => record.desiredState === "enabled")).toBe(true)
+  // AC-14 (docs/specs/local-plugin-install/plan.md r3): the content transaction returns disabled first and activation enables
+  // it one event turn later, so the enabled state is read after the skills became available, not from the post-install snapshot.
+  expect((await ledger()).records.every(record => record.desiredState === "enabled")).toBe(true)
   expect(nativeLoads).toBe(0)
   const exclusivePaths = state.records.flatMap(record => record.files ?? [])
   expect(exclusivePaths.length).toBeGreaterThan(0)

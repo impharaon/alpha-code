@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { engineSandbox, assertEngineSandboxed, engineSlot } from "../../test-component/engine-sandbox"
+import { publishPluginDataHome } from "./plugin-package-data"
 import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"
 import { skillGenerationLiveDirs } from "../../../ext/src/gen-skill-paths"
@@ -17,6 +18,9 @@ import { uninstallPackageV1 } from "./ext-package-uninstall"
 import { removeInstallGrants } from "./ext-install-planner"
 
 const sandbox = engineSandbox()
+// server.ts publishes the generation's engine data home before main installs anything (#1776 793de9eb96, plugin-package-data.ts);
+// these cases drive main's installer without server.ts, so they publish the sandbox engine's data home the same way.
+publishPluginDataHome(sandbox.data)
 const repo = join(import.meta.dir, "../../../..")
 async function until<T>(read: () => Promise<T>, done: (value: T) => boolean) {
   for (const end = Date.now() + 20000;; await Bun.sleep(20)) {

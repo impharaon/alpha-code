@@ -5,6 +5,7 @@ import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { engineSandbox, assertEngineSandboxed } from "../../test-component/engine-sandbox"
+import { publishPluginDataHome } from "./plugin-package-data"
 import { entrypointsFetch, provenance, verifyEntrySamples } from "../../test-fixtures/plugin-helper/entrypoints/fixture"
 import type { Running } from "../../test-component/codepuppy-engine"
 import type { InstallOutcomeV1 } from "../shared/plugin-install"
@@ -12,6 +13,9 @@ import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import type { SourceSearchResultV1, PreparePluginSourceResultV1 } from "./plugin-sources"
 
 const sandbox = engineSandbox()
+// server.ts publishes the generation's engine data home before main installs anything (#1776 793de9eb96, plugin-package-data.ts);
+// these cases drive main's installer without server.ts, so they publish the sandbox engine's data home the same way.
+publishPluginDataHome(sandbox.data)
 const nativeFetch = globalThis.fetch
 const previousCwd = process.cwd()
 const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()

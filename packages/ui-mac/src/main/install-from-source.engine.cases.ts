@@ -3,6 +3,7 @@ import { test, expect } from 'bun:test'
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { engineSandbox, assertEngineSandboxed, engineSlot } from "../../test-component/engine-sandbox"
+import { publishPluginDataHome } from "./plugin-package-data"
 import { buildEngineServerOptions } from "./engine-server-options"
 import { engineClient } from "./engine-client"
 import { publishTestBootstrap } from "../../test-component/codepuppy-bootstrap-fixture"
@@ -10,6 +11,9 @@ import { publishInProcessEngine } from "./in-process-engine"
 const repo = join(import.meta.dir, "../../../..")
 const reloadEndpoint = ClientApi.groups["server.location"].endpoints["location.reload"]
 const sandbox = engineSandbox()
+// server.ts publishes the generation's engine data home before main installs anything (#1776 793de9eb96, plugin-package-data.ts);
+// these cases drive main's installer without server.ts, so they publish the sandbox engine's data home the same way.
+publishPluginDataHome(sandbox.data)
 import { createSourceInstaller } from "./install-from-source"
 import { createPluginSources } from "./plugin-sources"
 import { fixtureFetch } from "../../test-fixtures/plugin-helper/source-fetch"

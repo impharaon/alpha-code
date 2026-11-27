@@ -1871,6 +1871,39 @@ describe("safe file tools", () => {
     expect(JSON.stringify(read)).toContain("PORT=3000")
   }))
 
+  // Spec v6 BR-05: another project's protected file that a command names literally (relative to the command's working
+  // directory) is registered before the command's output is released, so a first contact by command is masked from its
+  // first live chunk, never read by the read tool.
+  for (const form of ["path relative to the project", "working directory under ~"] as const) it.live(`outside project protected files a command names are masked from its first output (${form})`, () => Effect.gen(function* () {
+    const location = yield* Location.Service
+    const name = `other-${randomUUID()}`
+    const other = path.join(os.homedir(), "work", name)
+    fs.mkdirSync(other, { recursive: true })
+    const value = randomUUID()
+    fs.writeFileSync(path.join(other, ".env"), `TOKEN=${value}\nPORT=3000\n`)
+    const live: string[] = []
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, rules: [ALLOW_ALL, { action: "external_directory", resource: "*", effect: "allow" }], after: promisePlugin("observe-live-capture", async (ctx) => {
+      await ctx.shell.hook("capture", async (event) => {
+        if (event.phase === "chunk") live.push(await fs.promises.readFile(event.file, "utf8"))
+      })
+    }) })
+    // This host points the engine's home (OPENCODE_TEST_HOME) away from os.homedir(), which the policy's roots use; in
+    // production the engine's `~` is os.homedir() too, so the engine resolves this workdir there for the call.
+    const engineHome = process.env.OPENCODE_TEST_HOME
+    if (form === "working directory under ~") process.env.OPENCODE_TEST_HOME = os.homedir()
+    const shell = yield* callRaw(session.id, "shell", form === "path relative to the project"
+      ? { command: `cat ${JSON.stringify(path.relative(location.directory, path.join(other, ".env")))}` }
+      : { command: "cat .env", workdir: `~/work/${name}` }).pipe(Effect.ensuring(Effect.sync(() => { process.env.OPENCODE_TEST_HOME = engineHome })))
+    fs.rmSync(other, { recursive: true, force: true })
+    if (Exit.isFailure(shell)) throw new Error(String(failure(shell)?.message ?? Cause.pretty(shell.cause)))
+    expect(live.length).toBeGreaterThan(0)
+    expect(live.some((text) => text.includes(value))).toBe(false)
+    expect(live.join("\n")).toContain("PORT=3000")
+    expect(JSON.stringify(shell).includes(value)).toBe(false)
+    expect(JSON.stringify(shell)).toContain("TOKEN=[REDACTED]")
+    expect(JSON.stringify(shell)).toContain("PORT=3000")
+  }))
+
   it.live("env files mask only credential-named values", () => Effect.gen(function* () {
     const location = yield* Location.Service
     const value = randomUUID()

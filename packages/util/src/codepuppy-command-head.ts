@@ -1,4 +1,6 @@
 import path from "node:path"
+// @ts-expect-error npm does not publish types for this internal config API.
+import npmDefinitions from "@npmcli/config/lib/definitions/index.js"
 
 export const WIN_EXEC_EXTENSIONS = /\.(exe|cmd|bat)$/i
 
@@ -22,6 +24,34 @@ export function connectorPackageRunner(command: readonly unknown[], platform: No
   if (name === "uvx") return "uv-tool"
   if (name === "npx") return "npm-exec"
   if (name === "uv") return args.some((argument, index) => argument === "tool" && args[index + 1] === "run") ? "uv-tool" : undefined
-  if (name === "npm") return ["exec", "x"].includes(args.find((argument) => !argument.startsWith("-")) ?? "") ? "npm-exec" : undefined
+  if (name === "npm") return ["exec", "x"].includes(npmSubcommand(args) ?? "") ? "npm-exec" : undefined
+  return undefined
+}
+
+/** npm's own option boundaries (nopt over npm's definitions): a known non-Boolean option takes the next token as its value. */
+function npmSubcommand(args: readonly string[]): string | undefined {
+  const { definitions, shorthands } = npmDefinitions as { definitions: Record<string, { type: unknown }>; shorthands: Record<string, string[]> }
+  const boolean = (key: string) => {
+    const type = definitions[key]?.type
+    return type === undefined || type === Boolean || (Array.isArray(type) && type.includes(Boolean))
+  }
+  for (let index = 0; index < args.length; index++) {
+    const token = args[index]!
+    if (token === "--") return undefined
+    if (!token.startsWith("-") || token === "-") return token
+    const name = token.replace(/^-+/, "")
+    const expanded = token.startsWith("--")
+      ? [token]
+      : (shorthands[name] ?? (name.split("").every((letter) => shorthands[letter]) ? name.split("").flatMap((letter) => shorthands[letter]!) : [`--${name}`]))
+    const last = expanded.at(-1)!
+    if (!last.startsWith("--") || last.includes("=")) continue
+    const key = last.slice(2)
+    const next = args[index + 1]
+    if (boolean(key)) {
+      if (next === "true" || next === "false") index++
+      continue
+    }
+    if (next !== undefined && !/^-{2,}$/.test(next)) index++
+  }
   return undefined
 }

@@ -255,14 +255,16 @@ export function createHubBridge(
 
 export async function delegatePackageManagerShell(shell: { delegatePreparedShell(handler: (input: PreparedShellExecution) => Promise<PreparedShellDelegate | undefined>): Promise<void> }, bridge: HubBridge) {
   await shell.delegatePreparedShell(async (input) => {
-    const lease = await bridge.authorizePackageManagerExecution(input)
-    if (lease.nodes.length === 0) return
+    // No lease (main unavailable, bridge failure): the original spawn runs unchanged.
+    const lease = await bridge.authorizePackageManagerExecution(input).catch(() => undefined)
+    if (!lease || lease.nodes.length === 0) return
     return {
       executionSource: lease.executionSource,
       privateInput: lease.shellPrivateInput,
       bindProcess: (input) => bridge.bindPackageManagerShell({ executionID: lease.executionID, ...input }),
-      cancel: (reason) => bridge.cancelPackageManagerExecution({ executionID: lease.executionID, reason }),
-      finish: () => bridge.finishPackageManagerExecution({ executionID: lease.executionID }),
+      // Notifications to main: a failure must not stop the Shell's own timeout kill, removal or completion.
+      cancel: (reason) => bridge.cancelPackageManagerExecution({ executionID: lease.executionID, reason }).catch(() => {}),
+      finish: () => bridge.finishPackageManagerExecution({ executionID: lease.executionID }).catch(() => {}),
     }
   })
 }

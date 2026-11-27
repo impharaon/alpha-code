@@ -64,6 +64,25 @@ test("prepared Shell delegation uses the same host request ledger and binds clea
   expect(wire.sent.slice(1).map((message) => (message as { request: unknown }).request)).toEqual([{ op: "bind", executionID: "execution", pid: 42 }, { op: "cancel", executionID: "execution", reason: "timeout" }, { op: "finish", executionID: "execution" }])
 })
 
+test("a failed authorization keeps the original spawn; failed cancel/finish never fail the Shell's own timeout or cleanup", async () => {
+  const wire = fakePort(), bridge = createHubBridge(wire.port, { log: () => {} })
+  let handler: (input: PreparedShellExecution) => Promise<PreparedShellDelegate | undefined>
+  await delegatePackageManagerShell({ delegatePreparedShell: async (callback) => { handler = callback } }, bridge)
+  const input = { shellID: "sh_1", sessionID: "ses_1", messageID: "msg_1", callID: "call_1", command: "brew --prefix", cwd: "/project", shell: "/bin/sh" }
+  const refused = handler!(input)
+  wire.deliver(buildPackageManagerControlReply(1, { ok: false, error: "unavailable" }))
+  expect(await refused).toBeUndefined()
+  const pending = handler!(input)
+  wire.deliver(buildPackageManagerControlReply(2, { ok: true, lease: { executionID: "execution", nodes: [{ nodeID: "node" }], helperService: "service", executionSource: "source", shellPrivateInput: { fd: 3, data: new Uint8Array([10]) } } }))
+  const delegate = (await pending)!
+  const cancel = delegate.cancel("timeout")
+  wire.deliver(buildPackageManagerControlReply(3, { ok: false, error: "unavailable" }))
+  await expect(cancel).resolves.toBeUndefined()
+  const finish = delegate.finish()
+  wire.deliver(buildPackageManagerControlReply(4, { ok: false, error: "unavailable" }))
+  await expect(finish).resolves.toBeUndefined()
+})
+
 const view: HubView = { directory: "/work/a", rows: [], warnings: [] }
 
 describe("hub-bridge", () => {

@@ -28,6 +28,8 @@ export type TestBootstrapInput = Partial<Paths> &
     factoryDirs?: string[]
     askTimeoutMs?: number
     switches?: Partial<CodePuppyBootstrap["switches"]>
+    sidecarGeneration?: number
+    documents?: CodePuppyBootstrap["documents"]
   }
 
 /** 八个开关全关(没有任何运维导出时 main 写的那一份)。 */
@@ -49,7 +51,7 @@ export const NO_SWITCHES: CodePuppyBootstrap["switches"] = {
  * 引擎开关取桌面缺省(不拉 models.dev、文件监听开),没有出厂技能目录,审批期限缺省,八个开关全关。
  */
 export function testBootstrap(input: TestBootstrapInput): CodePuppyBootstrap {
-  const { registryChannel, platform, cloudMcp, killSwitch, policyAccount, egressProxy, engine, factoryDirs, askTimeoutMs, switches, ...paths } = input
+  const { registryChannel, platform, cloudMcp, killSwitch, policyAccount, egressProxy, engine, factoryDirs, askTimeoutMs, switches, sidecarGeneration, documents, ...paths } = input
   const userData = paths.userData ?? path.join(input.globalRoot, "test-userdata")
   return parseCodePuppyBootstrap({
     v: 1,
@@ -72,6 +74,8 @@ export function testBootstrap(input: TestBootstrapInput): CodePuppyBootstrap {
     permission: askTimeoutMs === undefined ? {} : { askTimeoutMs },
     network: egressProxy ? { egressProxy } : {},
     switches: { ...NO_SWITCHES, ...switches },
+    ...(sidecarGeneration === undefined ? {} : { sidecarGeneration }),
+    ...(documents ? { documents } : {}),
   })
 }
 
@@ -126,6 +130,7 @@ export function publishMainBootstrap(input: {
     factorySkillDirs: input.factorySkillDirs ?? [],
     env,
     log: () => {},
+    sidecarGeneration: 0,
   })
   publishCodePuppyBootstrap(document)
   return document

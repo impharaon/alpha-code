@@ -26,6 +26,8 @@ import { withEngineAuthorization } from "./engine-authorization"
 import { assertExtPluginActive } from "./sidecar-ext-ready"
 import { acceptCodePuppyBootstrap, assertEngineReadsBootstrap } from "./sidecar-bootstrap-gate"
 import { createPackageManagerEnvironmentRequester, parsePackageManagerEnvironment, type PackageManagerEnvironmentRequest } from "../shared/package-manager-environment"
+import { publishConnectorLaunchHost, type ConnectorLaunchSidecarMessage, type PinnedFileCancel, type PinnedFileRequest } from "../../../util/src/codepuppy-connector-launch"
+import { createConnectorLaunchSidecarHost } from "./connector-launch-sidecar"
 // `#1713` 契约 C:引擎配置闸门问「这个项目文件夹用户允许过没有」,读法是 #1709 的同一个。
 import { answerProjectConfigView } from "./sidecar-project-config-view"
 import { parseProjectConfigViewRequest, type ProjectConfigViewRequest, type ProjectConfigViewReply } from "./project-config-view-message"
@@ -132,6 +134,9 @@ type SidecarMessage =
   | CredentialsRequest
   | PackageManagerEnvironmentRequest
   | CredentialsUnavailable
+  | ConnectorLaunchSidecarMessage
+  | PinnedFileRequest
+  | PinnedFileCancel
 
 type ParentPort = {
   postMessage(message: SidecarMessage): void
@@ -140,6 +145,7 @@ type ParentPort = {
 
 const parentPort = getParentPort()
 let packageManagerRequester: ReturnType<typeof createPackageManagerEnvironmentRequester> | undefined
+let connectorLaunch: ReturnType<typeof createConnectorLaunchSidecarHost> | undefined
 let engine: StoppableEngine | undefined
 let fenceAddon: FenceAddon | undefined
 let readProjectConfigView: typeof import("virtual:opencode-server")["projectConfigView"] | undefined
@@ -147,6 +153,7 @@ const credentials = createCredentialRequester((message) => parentPort.postMessag
 
 parentPort.on("message", (event) => {
   if (packageManagerRequester?.receive(event.data)) return
+  if (connectorLaunch?.receive(event.data)) return
   const command = parseCommand(event.data)
   if (!command) return
   if (command.type === "plugin-mcp-proxies") {
@@ -164,6 +171,7 @@ parentPort.on("message", (event) => {
   if (command.type === "stop") {
     credentials.close("sidecar stopping")
     packageManagerRequester?.close()
+    connectorLaunch?.close()
     void stop()
     return
   }
@@ -203,6 +211,11 @@ async function start(command: StartCommand) {
     const bootstrap = acceptCodePuppyBootstrap(command.bootstrap)
     const packageManagerEnvironment = parsePackageManagerEnvironment(command.packageManagerEnvironment)
     packageManagerRequester = createPackageManagerEnvironmentRequester((message) => parentPort.postMessage(message), packageManagerEnvironment)
+    // #1760 §4.7: this generation's ConnectorLaunchHost, published once before the engine is imported; only data crosses the port.
+    if (bootstrap.launchers && bootstrap.sidecarGeneration !== undefined) {
+      connectorLaunch = createConnectorLaunchSidecarHost({ sidecarGeneration: String(bootstrap.sidecarGeneration), launchers: bootstrap.launchers, post: (message) => parentPort.postMessage(message) })
+      publishConnectorLaunchHost(connectorLaunch.host)
+    }
     // #613:注入结果必须捕获并随 ready 上报 —— 注入失败 = 引擎起来了但整份 alpha 配置丢失
     // (模型全灰),不上报则 main/renderer 无从与「引擎未就绪」区分。`#1667`:注入不再经环境变量交给引擎
     // (H1 下引擎核心不读 `OPENCODE_CONFIG_CONTENT` 一类变量),结果里带着要放进 `start()` 选项的配置。

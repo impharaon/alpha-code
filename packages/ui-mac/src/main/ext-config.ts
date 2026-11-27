@@ -884,6 +884,26 @@ export function removeProjectMcpConfigInLock(projectRoot: string, name: string):
   return removed.ok ? { ok: true } : removed
 }
 
+/** R8 (#1760): rewrite only `mcp.<name>.cwd` of an existing local project definition. The caller owns this root's
+ *  Bundle lock; the same root identity check, plugin seal and atomic commit as the project removal primitive apply. */
+export function rebindProjectMcpCwdInLock(projectRoot: string, name: string, cwd: string): ConfigResult {
+  if (!isExtensionName(name)) return { ok: false, reason: "invalid server name" }
+  const target = path.join(projectRoot, "codepuppy.jsonc")
+  let text: string
+  try {
+    assertProjectMcpTransactionRootIdentity(projectRoot)
+    text = fs.readFileSync(target, "utf8")
+  } catch {
+    return { ok: false, reason: "project MCP config cannot be confirmed — working directory not changed" }
+  }
+  const errors: ParseError[] = []
+  const leaf = (parse(text, errors, { allowTrailingComma: true }) as { mcp?: Record<string, unknown> } | undefined)?.mcp?.[name]
+  if (errors.length > 0 || !leaf || typeof leaf !== "object" || Array.isArray(leaf) || (leaf as Record<string, unknown>).type === "remote")
+    return { ok: false, reason: `project mcp.${name} is not a local definition — working directory not changed` }
+  const result = applyEdits(text, modify(text, ["mcp", name, "cwd"], cwd, { formattingOptions: { tabSize: 2, insertSpaces: true } }))
+  return writeProjectConfigTextAtomic(target, text, result)
+}
+
 /** REQ-136 C2/C3/C6:validate every existing endpoint the project MCP transaction algebra may
  * mutate or trust. The root itself, config, ledger, journal/lock/staging tree, and capability store
  * must be real filesystem objects beneath D; a symlink or non-regular leaf fails closed. */

@@ -1,3 +1,4 @@
+import type { LauncherEnvironment } from "../../../util/src/codepuppy-connector-launch"
 import type { DocumentPythonEnvironment } from "../../../util/src/codepuppy-document"
 // Code Puppy tool identity on OpenCode 2 (ADR-041): who registered a tool, which authority vouches for it, where it
 // runs. Replaces the v1 takeovers of tool/registry.ts, plugin/index.ts and mcp/index.ts that stamped identity at
@@ -30,7 +31,7 @@ import { resolve } from "node:path"
 import { governedMcpEvidence, type GovernedCloudMcp } from "../../../plugin/src/alpha-cloud-authority"
 import type { ToolAuthority, ToolIdentity, ToolLocation } from "../../../schema/src/tool-identity"
 import { registeredByMcpLayer } from "../../../schema/src/codepuppy-tool-policy"
-import { declaredFirstPartyTools } from "../../../core/src/mcp/codepuppy-first-party-mcp"
+import { declaredFirstPartyBinding } from "../../../core/src/mcp/codepuppy-first-party-mcp"
 import { bundledPluginTools, type BundledPluginTools } from "./bundled-plugin"
 import { canonicalJsonDigest } from "./store"
 import { mcpBindingDigest, type McpEntry } from "./resolver"
@@ -116,6 +117,7 @@ export interface IdentityInput {
   readonly cloudMcp?: GovernedCloudMcp
   /** 启动文档的 `paths.officeMcpManifest`(`#1698`);缺席 = 不给第一方 MCP 声明。 */
   readonly documentPythonEnvironment?: DocumentPythonEnvironment
+  readonly launchers?: LauncherEnvironment
   readonly officeMcpManifest?: string
 }
 
@@ -133,8 +135,8 @@ export function mcpTransportFact(entry: McpEntry | undefined): ToolTransportFact
 }
 
 /** `officeMcpManifest` = 启动文档的 `paths.officeMcpManifest`(`#1698`)。 */
-export function authorityForMcp(name: string, entry: McpEntry, cloudMcp: GovernedCloudMcp | undefined, officeMcpManifest: string | undefined, pythonEnvironment?: DocumentPythonEnvironment): ToolAuthority {
-  return mcpAuthority(name, entry, cloudMcp, officeMcpManifest, pythonEnvironment).authority
+export function authorityForMcp(name: string, entry: McpEntry, cloudMcp: GovernedCloudMcp | undefined, officeMcpManifest: string | undefined, pythonEnvironment?: DocumentPythonEnvironment, launchers?: LauncherEnvironment): ToolAuthority {
+  return mcpAuthority(name, entry, cloudMcp, officeMcpManifest, pythonEnvironment, launchers).authority
 }
 
 /** The server's authority and, for a server bound to the bundled manifest, the tool names that manifest declares. */
@@ -144,7 +146,8 @@ function mcpAuthority(
   cloudMcp: GovernedCloudMcp | undefined,
   officeMcpManifest: string | undefined,
   pythonEnvironment?: DocumentPythonEnvironment,
-): { authority: ToolAuthority; declared?: ReadonlySet<string> } {
+  launchers?: LauncherEnvironment,
+): { authority: ToolAuthority; declared?: ReadonlySet<string>; bindingDigest?: string } {
   const evidence = governedMcpEvidence(name, entry, cloudMcp)
   if (evidence)
     return {
@@ -154,15 +157,17 @@ function mcpAuthority(
         evidenceDigest: `sha256:${createHash("sha256").update(evidence).digest("hex")}`,
       },
     }
-  const declared = declaredFirstPartyTools(name, entry, officeMcpManifest, readFileSync, pythonEnvironment)
+  const matched = declaredFirstPartyBinding(name, entry, officeMcpManifest, readFileSync, pythonEnvironment, launchers)
+  const declared = matched?.declaration
   if (!declared || entry.type !== "local") return { authority: { kind: "not-asserted" } }
   return {
     authority: {
       kind: "codepuppy-bundled",
       bindingId: `mcp:${encodeURIComponent(name)}`,
-      evidenceDigest: canonicalJsonDigest({ kind: "codepuppy-bundled-mcp", name, command: entry.command, ...(pythonEnvironment ? { environment: "environment" in entry ? entry.environment : undefined } : {}), tools: declared }),
+      evidenceDigest: canonicalJsonDigest({ kind: "codepuppy-bundled-mcp", name, command: entry.command, environment: entry.environment ?? {}, cwd: entry.cwd ?? null, tools: declared.tools, declarationSha256: declared.declarationSha256, recipeSha256: declared.recipeSha256 }),
     },
-    declared: new Set(declared.map((tool) => (tool as { name?: unknown } | null)?.name).filter((tool): tool is string => typeof tool === "string")),
+    ...(matched?.binding ? { bindingDigest: canonicalJsonDigest({ kind: "codepuppy-bundled-mcp-binding", name, ...matched.binding }) } : {}),
+    declared: new Set(declared.tools.map((tool) => (tool as { name?: unknown } | null)?.name).filter((tool): tool is string => typeof tool === "string")),
   }
 }
 
@@ -184,7 +189,7 @@ export function toolFacts(tool: RegisteredTool, input: IdentityInput): ToolFacts
         borrowed = true
         continue
       }
-      const { authority, declared } = mcpAuthority(server, entry, input.cloudMcp, input.officeMcpManifest, input.documentPythonEnvironment)
+      const { authority, declared, bindingDigest } = mcpAuthority(server, entry, input.cloudMcp, input.officeMcpManifest, input.documentPythonEnvironment, input.launchers)
       // slice E (ADR-041): not one of the tools the bundled server's MCP layer registers ⇒ not that server's tool.
       if (declared && !declared.has(tool.name)) {
         borrowed = true
@@ -195,7 +200,7 @@ export function toolFacts(tool: RegisteredTool, input: IdentityInput): ToolFacts
         permission,
         identity: { source: "mcp", origin: server, name: tool.name },
         authority,
-        bindingDigest: mcpBindingDigest(server, entry),
+        bindingDigest: bindingDigest ?? mcpBindingDigest(server, entry),
         location: mcpLocation(entry),
         transport: mcpTransportFact(entry),
       }

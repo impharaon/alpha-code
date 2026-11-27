@@ -1,6 +1,7 @@
 // `#1698`(DESIGN-upgrade-bootstrap-config,计划段 0):一次代表性启动里,main 交给 sidecar / ext / 引擎的决定,经**真启动装配**被它们
 // 观察到的样子。决定记录钉在同目录的 `bootstrap-launch-parity.record.json`(由改动前的代码实跑一次产出);启动配置迁移的每一段只许改
 // 下面「sidecar 这一步」的接法,记录文件一字不改 —— 评审看那份文件在各段之间的 diff 为零,就是「用户看到的行为不变」的证据。
+// 产品改动另记出处:注入里的 `codepuppy-video`(随包 Node 启动的首方视频连接器)由 #1760 产出启动器描述后出现(编排器接受)。
 //
 // 供数方全是生产的:main 的 `preferAppEnv` + `spawnLocalServer`(假 fork 记下交给 sidecar 的 env 与 start 消息;围栏计划与出网代理端口
 // 由测试给定,同 server.test.ts)→「sidecar 这一步」(sidecar.ts 顶层取 parentPort,结构上不能 import;这里照它 `start()` 的顺序做:
@@ -306,6 +307,9 @@ function normalize(record: unknown): unknown {
 
 describe("#1698 段 0:代表性启动的决定记录", () => {
   test("真 fork → sidecar 这一步 → 注入 → 引擎 + 真 ext:记录与 bootstrap-launch-parity.record.json 逐项相同", async () => {
+    // #1760: a representative launch carries this build's connector launchers (packaged builds always do), so the record's
+    // injection includes the first-party video connector on the bundled Node. The dev tree must have run the launcher prebuild.
+    expect(fs.existsSync(path.join(REPO, "packages/ui-mac/native/connector-launchers/build/mac-arm64/runtime.json")), "run bin/setup (scripts/native-prepare.sh prebuilds the connector launchers)").toBe(true)
     const launched = await launch()
     const inputs = sidecarStep(launched)
     // design §10 R31:共用模块的「快照 → 已发布文档 → 环境」里,环境这一支在生产启动里到不了 —— fork 给 sidecar 的 env 里没有这个键

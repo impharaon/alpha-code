@@ -44,7 +44,10 @@ import { McpPool } from "./pool.js"
 import { readFileSync } from "node:fs"
 import { withFailureCode } from "@opencode/schema/codepuppy-net-failure"
 import { tryCodePuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
-import { declaredListedTools, listsDeclaration, sameTool, type DeclaredTool } from "./codepuppy-first-party-mcp.js"
+import { declaredFirstPartyTools, listedFirstPartyTools, listsDeclaration, sameTool, type DeclaredTool } from "./codepuppy-first-party-mcp.js"
+import { connectorLocalLaunch } from "./codepuppy-local-launch.js" // codepuppy(#1760)
+import { publishedConnectorLaunchHost } from "@opencode/util/codepuppy-connector-launch"
+import type { PinnedFilesCallPreparation } from "@opencode/util/codepuppy-connector-launch"
 import { reconnectDelay, type StartFailure } from "./codepuppy-startup.js"
 import { packageRuntime, registerPackageMcpRuntime } from "@opencode/plugin/codepuppy-package-runtime" // codepuppy(S-07)
 import { SessionEvent } from "../session/event.js"
@@ -191,7 +194,7 @@ export interface Interface extends State.Transformable<Editor> {
     readonly name: string
     readonly args?: Record<string, unknown>
     readonly sessionID?: Session.ID
-  }, videoProgress?: (update: VideoProgress) => Promise<void>) => Effect.Effect<ToolResult, NotFoundError | ToolCallError>
+  }, videoProgress?: (update: VideoProgress) => Promise<void>, preparation?: PinnedFilesCallPreparation) => Effect.Effect<ToolResult, NotFoundError | ToolCallError> // codepuppy(#1775, #1760): callbacks stay outside request data
   readonly instructions: () => Effect.Effect<ServerInstructions[]>
   readonly prompts: () => Effect.Effect<Prompt[]>
   readonly prompt: (input: {
@@ -530,6 +533,9 @@ export const layer = (options?: Options) =>
       // codepuppy ── end
 
       const makeEntry = (name: ServerName, config: Mcp.ServerConfig, started: number): ServerEntry => {
+        // codepuppy(#1565, #1760) ── one verified declaration feeds both the eager tool list and the trusted launch context.
+        const bootstrap = tryCodePuppyBootstrap()
+        const firstParty = declaredFirstPartyTools(name, config, bootstrap?.paths.officeMcpManifest, readFileSync, documentPythonEnvironmentFor(location), bootstrap?.launchers)
         // Local servers run on this Location's execution plane, so only Locations on the host share them.
         const pooled =
           config.pool === true &&
@@ -556,7 +562,7 @@ export const layer = (options?: Options) =>
           })
         const entry: ServerEntry = {
           config,
-          declared: declaredListedTools(name, config, tryCodePuppyBootstrap()?.paths.officeMcpManifest, readFileSync, documentPythonEnvironmentFor(location)), // codepuppy(#1565)
+          declared: listedFirstPartyTools(firstParty), // codepuppy(#1565)
           status: { status: "pending" },
           startup: Latch.makeUnsafe(),
           attempt: { started, settled: Latch.makeUnsafe() },
@@ -576,6 +582,7 @@ export const layer = (options?: Options) =>
             lock: locks.withLock(name),
             callbacks,
             fork,
+            localLaunch: connectorLocalLaunch({ config, directory: location.directory, bootstrap, declared: firstParty, host: publishedConnectorLaunchHost }), // codepuppy(#1760)
             events: {
               connecting: Effect.gen(function* () {
                 // A server still pending from creation keeps the window that started with its entry.
@@ -1003,10 +1010,10 @@ export const layer = (options?: Options) =>
             { concurrency: "unbounded", discard: true },
           )
         }),
-        callTool: Effect.fn("MCP.callTool")(function* (input, videoProgress) {
+        callTool: Effect.fn("MCP.callTool")(function* (input, videoProgress, preparation) {
           const server = ServerName.make(input.server)
           const call = (connection: McpClient.Connection) =>
-            connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID }, videoProgress) // codepuppy(#1775)
+            connection.callTool({ name: input.name, args: input.args, sessionID: input.sessionID, preparation }, videoProgress) // codepuppy(#1775, #1760)
           const failed = (owner: string) =>
             Effect.mapError(
               (error: Error) =>

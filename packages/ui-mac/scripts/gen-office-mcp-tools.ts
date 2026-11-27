@@ -7,7 +7,7 @@ import { officeRuntimeDir } from "./build-office-runtime"
 // server.py 的 tools_for()。本脚本以模块方式载入 server.py(它的 `__main__` 守卫不让 stdio 循环跑起来;`-B` 不写
 // 字节码,server.py 所在目录一个字节都不动),逐格式取 tools_for(),连同每个格式的随包命令模板
 // (office-advisories.ts 的 codepuppyOfficeInstallCommand,`{codepuppyResources}` 槽原样保留)与 server.py 的 sha256 写成
-// `{serverSha256, formats}`,入库。引擎只对命令与模板逐 token 相等、且随包 server.py 摘要仍与清单一致的条目使用它
+// `{formats}`,入库。引擎只对命令与模板逐 token 相等、且随包 server.py 摘要仍与清单一致的条目使用它
 // (packages/opencode/src/mcp/codepuppy-first-party-mcp.ts)。
 //
 // 改了 server.py 的工具 schema 或命令模板之后重跑:`bun scripts/gen-office-mcp-tools.ts`。
@@ -57,9 +57,8 @@ export function renderOfficeMcpTools(
     throw new Error(`gen-office-mcp-tools: ${python} exited ${run.exitCode}: ${run.stderr.toString()}`)
   const tools = JSON.parse(run.stdout.toString()) as Record<string, unknown[]>
   const manifest = {
-    serverSha256: createHash("sha256").update(readFileSync(server)).digest("hex"),
     formats: Object.fromEntries([
-      ...formats.map((format) => [format, { command: codepuppyOfficeInstallCommand(format), tools: tools[format] }]),
+      ...formats.map((format) => [format, { command: codepuppyOfficeInstallCommand(format), environment: {}, cwd: null, codeSha256: { "office-mcp/server.py": createHash("sha256").update(readFileSync(server)).digest("hex") }, tools: tools[format] }]),
       [
         VIDEO_DECLARATION_ID,
         {

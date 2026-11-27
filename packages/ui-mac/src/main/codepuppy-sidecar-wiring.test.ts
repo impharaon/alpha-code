@@ -106,7 +106,7 @@ test("alpha.* 进 codepuppySidecar、应答回同一子进程;ready 之后才 at
   }
   creditDanglingSweepForSpawn()
   const result = await spawnLocalServer("127.0.0.1", 4391, "password", {
-    userDataPath,
+    userDataPath: join(userDataPath, "first-launch"),
     healthCheck: async () => true,
     fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
     egressProxy: async () => ({ port: 4433 }),
@@ -123,6 +123,12 @@ test("alpha.* 进 codepuppySidecar、应答回同一子进程;ready 之后才 at
 
   expect((await result.listener.probeWrite("/ws")).outcome).toBe("writable")
   expect(await result.listener.projectConfigView("/ws")).toMatchObject({ directory: "/ws", complete: true })
+  expect(received).toHaveLength(1)
+
+  // The launcher namespace is consumed before the generic hub dispatch, with an ID-only terminal reply.
+  child.emit("message", { type: "codepuppy.pinned-file.ensure", id: 99, sidecarGeneration: "0", fileId: "python/any/not-in-manifest" })
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  expect(child.wire.at(-1)).toMatchObject({ type: "codepuppy.pinned-file.result", id: 99, sidecarGeneration: "0", delivery: { result: { ok: false, error: "unknown-file" } } })
   expect(received).toHaveLength(1)
 
   await result.listener.stop()
@@ -209,11 +215,35 @@ test("#1565 / #1698: fork 的启动文档带 paths.officeMcpManifest,引擎据�
   for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
     const server: Record<string, unknown> = { type: "local", command: ["placeholder"] }
     expect(applyMcpWritePolicy(connector.name, server).ok).toBe(true)
-    const declared = declaredFirstPartyTools(connector.name, server, manifest, readFileSync) as Array<{ name: string }> | undefined
+    const declared = declaredFirstPartyTools(connector.name, server, manifest, readFileSync)
     const extension = connector.extension.slice(1)
-    expect(declared?.map((tool) => tool.name).sort()).toEqual(connector.format === "excel" ? ["excel_edit", "excel_inspect", "excel_objects", "excel_recalculate", "read_xlsx"] : [`read_${extension}`])
+    expect(declared?.tools.map((tool) => (tool as { name: string }).name).sort()).toEqual(connector.format === "excel" ? ["excel_edit", "excel_inspect", "excel_objects", "excel_recalculate", "read_xlsx"] : [`read_${extension}`])
   }
   await result.listener.stop()
+})
+
+// #1760 Q2 + launch state: the fork's document carries main's own generation, and this generation's connector-launch projection is
+// installed for exactly the child's lifetime (renderer reads go to it, not to a stale one). A build without document assets still forks.
+test("#1760: the fork carries this generation; its launch projection lives exactly as long as the child", async () => {
+  const { connectorLaunchApi } = await import("./connector-launch-state")
+  const identity = { directory: userDataPath, server: "git", attempt: "a1" }
+  const child = new RecordingChild()
+  creditDanglingSweepForSpawn()
+  const result = await spawnLocalServer("127.0.0.1", 4394, "password", {
+    userDataPath,
+    generation: 5,
+    healthCheck: async () => true,
+    fork: (() => child) as unknown as typeof import("electron").utilityProcess.fork,
+    egressProxy: async () => ({ port: 4433 }),
+    planFence: () => ({ profile: "(version 1)\n(allow default)\n(deny file-write*)\n", addonPath: "/x/codepuppy_fence.node" }),
+  })
+  await result.health.wait
+  const start = child.wire.find((message) => (message as { type?: unknown }).type === "start") as { bootstrap: { sidecarGeneration?: number; documents?: unknown } }
+  expect(start.bootstrap.sidecarGeneration).toBe(5)
+  expect(start.bootstrap.documents).toBeUndefined()
+  expect(await connectorLaunchApi.retry(identity)).toEqual({ ok: false, error: "not-current" })
+  await result.listener.stop()
+  expect(await connectorLaunchApi.retry(identity)).toEqual({ ok: false, error: "unavailable" })
 })
 
 // REQ-236 `#1575` AC4:生产 spawnLocalServer 在 fork 时按**当刻的登录账户**写启动文档的 policy.account(ext 据它选工具策略

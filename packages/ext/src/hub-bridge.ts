@@ -167,6 +167,8 @@ export function createHubBridge(
       return entry.settle(message)
     }
     const type = (message as { type: string }).type
+    // #1760: the sidecar's launcher lane (its ConnectorLaunchHost) shares this parentPort; those messages are not the hub's.
+    if (type.startsWith("codepuppy.connector-launch.") || type.startsWith("codepuppy.pinned-file.")) return
     if (type === "codepuppy.plugin.session") {
       const parsed = parsePackageSessionMessage(message)
       if (!parsed) return log("runtime-failed: malformed package session message")

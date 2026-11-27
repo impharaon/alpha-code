@@ -490,6 +490,46 @@
       "bytes": 23953704,
       "sha256": "d22e8b186b10814b43a637095e0f3643057dc709fe58ce23759604f7742f2cae",
       "provenanceUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/video-ffmpeg-9.1-openh264-2.7.0-dav1d-1.5.3-win32-x64-source.tar.gz"
+    },
+    {
+      "id": "python/darwin-arm64/3.12.16-20261124",
+      "family": "python",
+      "target": "darwin-arm64",
+      "version": "3.12.16",
+      "originUrl": "https://github.com/astral-sh/python-build-standalone/releases/download/20261124/cpython-3.12.16%2B20261124-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "sha256": "9d6d9d0d85feda3f9cb4eb3e048f0fed21ed280feda087927eaa4fbc7124826f",
+      "bytes": 25270084,
+      "provenanceUrl": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261124"
+    },
+    {
+      "id": "python/win32-x64/3.12.16-20261124",
+      "family": "python",
+      "target": "win32-x64",
+      "version": "3.12.16",
+      "originUrl": "https://github.com/astral-sh/python-build-standalone/releases/download/20261124/cpython-3.12.16%2B20261124-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "96694b50dcfde13d56e40346ddaa552a9cd650290e9b933cecf83c1d82226960",
+      "bytes": 22388338,
+      "provenanceUrl": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261124"
+    },
+    {
+      "id": "libreoffice/darwin-arm64/26.8.3",
+      "family": "libreoffice",
+      "target": "darwin-arm64",
+      "version": "26.8.3",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/LibreOffice_26.8.3_MacOS_aarch64.dmg",
+      "bytes": 299927705,
+      "sha256": "de943203795e5057785f65515063e2db5eb60b0bb6d8e2534fec59e5cc5fb988",
+      "provenanceUrl": "https://download.documentfoundation.org/libreoffice/stable/26.8.3/mac/aarch64/LibreOffice_26.8.3_MacOS_aarch64.dmg"
+    },
+    {
+      "id": "libreoffice/win32-x64/26.8.3",
+      "family": "libreoffice",
+      "target": "win32-x64",
+      "version": "26.8.3",
+      "originUrl": "https://github.com/impharaon/alpha-code/releases/download/v0.2.8/LibreOffice_26.8.3_Win_x86-64.msi",
+      "bytes": 376311808,
+      "sha256": "0e6918c273eabbdbbd800ee0dacbbf130a14c13c2e4cec861b06dd59e015bf94",
+      "provenanceUrl": "https://download.documentfoundation.org/libreoffice/stable/26.8.3/win/x86_64/LibreOffice_26.8.3_Win_x86-64.msi"
     }
   ]
 }

@@ -147,7 +147,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
 
   const allFacts = async (): Promise<ToolFacts[]> => {
     const tools = (await context.tool.list()) as readonly RegisteredTool[]
-    const input = { documentPythonEnvironment: documentPythonEnvironmentFor(context.location), early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, cloudMcp: bootstrap.cloudMcp, officeMcpManifest: bootstrap.paths.officeMcpManifest }
+    const input = { documentPythonEnvironment: documentPythonEnvironmentFor(context.location), early, earlyAmbiguous: await earlyAmbiguous(), mcp, bundled, extOrigin, cloudMcp: bootstrap.cloudMcp, launchers: bootstrap.launchers, officeMcpManifest: bootstrap.paths.officeMcpManifest }
     return tools.map((tool) => toolFacts(tool, input))
   }
 
@@ -537,7 +537,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
           bundled,
           extOrigin,
           cloudMcp: bootstrap.cloudMcp,
-          officeMcpManifest: bootstrap.paths.officeMcpManifest,
+          launchers: bootstrap.launchers, officeMcpManifest: bootstrap.paths.officeMcpManifest,
         })
     },
 

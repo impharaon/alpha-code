@@ -1,3 +1,4 @@
+import type { ConnectorLaunchApi } from "../../../util/src/codepuppy-connector-launch"
 import type { DirectoryAccessDescriptionInput, DirectoryAccessDescription, DirectoryWriteApproval, DirectoryWriteApprovalResult } from "../shared/directory-write-approval"
 import type { NetworkEgressApi } from "../shared/network-egress-wire"
 import type { SourceSearchResultV1, PreparePluginSourceInputV1, PreparePluginSourceResultV1 } from "../main/plugin-sources"
@@ -684,6 +685,7 @@ export type {
 export type { CodePuppyEnvironmentInfo }
 
 export type ElectronAPI = {
+  connectorLaunch: ConnectorLaunchApi
   networkEgress: NetworkEgressApi
   killSidecar: () => Promise<void>
   sidecarGeneration: {
@@ -853,7 +855,8 @@ export type ElectronAPI = {
       /** `#1381`:远程地址被拒时带类别(与自定义节点同一套),renderer 据此用用户的语言说原因。 */
     ) => Promise<{ ok: true } | { ok: false; reason: string; code?: ProviderAddressRejection }>
     removeMcp: (name: string) => Promise<{ ok: true } | { ok: false; reason: string }>
-    checkRuntime: (tool: string) => Promise<{ ok: boolean }>
+    /** `command` is the entry's declared command: a package runner's own uv/Node come from the bundled launchers. */
+    checkRuntime: (tool: string, command?: string[]) => Promise<{ ok: boolean }>
     /** #1564:随包 Office 运行时是否就绪(四个第一方 Office 条目的准备检查只读它)。 */
     officeRuntime: () => Promise<OfficeRuntimeReadiness>
     // B11/B23:全局配置健康(broken=引擎会整份忽略用户配置)

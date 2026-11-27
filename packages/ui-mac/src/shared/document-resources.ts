@@ -64,12 +64,15 @@ export function readDocumentAssets(root: string): DocumentAssets {
 }
 
 /** Node is supplied only after the launcher resolves its trusted assets. No Node path is derived here. */
-export function documentResources(input: {
-  resourcesRoot: string
-  packaged: boolean
-  platform: "darwin" | "win32"
-  node: string
-}) {
+export function documentResources(input: Parameters<typeof documentAssetResources>[0] & { node: string }) {
+  if (!isAbsolute(input.node)) throw new Error("launcher must provide an absolute Node entry")
+  accessSync(input.node, constants.X_OK)
+  const { assets, ...resources } = documentAssetResources(input)
+  return { ...resources, node: input.node }
+}
+
+/** The bundled document resources that do not depend on the launcher; the same projection feeds the bootstrap. */
+export function documentAssetResources(input: { resourcesRoot: string; packaged: boolean; platform: "darwin" | "win32" }) {
   const assets = input.packaged
     ? join(input.resourcesRoot, "document-assets")
     : join(input.resourcesRoot, "..", DOCUMENT_ASSET_BUILD_DIR)
@@ -78,12 +81,10 @@ export function documentResources(input: {
     : join(input.resourcesRoot, "..", OFFICE_RUNTIME_BUILD_DIR, input.platform === "darwin" ? "arm64" : "win32-x64")
   const manifest = readDocumentAssets(assets)
   const python = realpathSync(officePythonPath(runtime, input.platform))
-  if (!isAbsolute(input.node)) throw new Error("launcher must provide an absolute Node entry")
-  accessSync(input.node, constants.X_OK)
   accessSync(python, constants.X_OK)
   return {
+    assets: realpathSync(assets),
     python,
-    node: input.node,
     nodeModules: realpathSync(join(assets, "node_modules")),
     skills: realpathSync(join(input.resourcesRoot, "factory-skills", "office-docs")),
     fonts: realpathSync(join(assets, "fonts")),

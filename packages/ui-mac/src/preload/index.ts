@@ -30,6 +30,18 @@ const updaterHandler = (_: unknown, state: UpdaterState) => {
 }
 
 const api: ElectronAPI = {
+  connectorLaunch: {
+    list: (directory) => ipcRenderer.invoke("connector-launch-list", directory),
+    retry: (identity) => ipcRenderer.invoke("connector-launch-retry", identity),
+    diagnostic: (identity) => ipcRenderer.invoke("connector-launch-diagnostic", identity),
+    openNetworkApproval: (identity) => ipcRenderer.invoke("connector-launch-network", identity),
+    chooseWorkspace: (identity) => ipcRenderer.invoke("connector-launch-workspace", identity),
+    subscribe: (listener) => {
+      const handler = (_event: unknown, snapshot: Parameters<typeof listener>[0]) => listener(snapshot)
+      ipcRenderer.on("connector-launch-changed", handler)
+      return () => { ipcRenderer.removeListener("connector-launch-changed", handler) }
+    },
+  },
   networkEgress: {
     setTier: (input) => ipcRenderer.invoke("network-egress-set-tier", input),
     listApprovals: (input) => ipcRenderer.invoke("network-egress-list-approvals", input),
@@ -255,7 +267,7 @@ const api: ElectronAPI = {
   ext: {
     persistMcp: (name, server, secretVars) => ipcRenderer.invoke("ext-persist-mcp", name, server, secretVars),
     removeMcp: (name) => ipcRenderer.invoke("ext-remove-mcp", name),
-    checkRuntime: (tool) => ipcRenderer.invoke("ext-check-runtime", tool),
+    checkRuntime: (tool, command) => ipcRenderer.invoke("ext-check-runtime", tool, command),
     officeRuntime: () => ipcRenderer.invoke("ext-office-runtime"),
     configHealth: () => ipcRenderer.invoke("ext-config-health"),
     cloudWithheld: () => ipcRenderer.invoke("ext-cloud-withheld"),

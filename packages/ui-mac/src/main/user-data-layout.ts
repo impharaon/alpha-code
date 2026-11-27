@@ -2,6 +2,10 @@
 // 读写这些文件的模块都从这里取名;升级迁移(naming-migration.ts)按本表逐项把旧名改成这里的新名。
 // 零依赖:迁移模块的 import 闭包不得因为取一个文件名而拖进解密或钥匙串代码(AC8)。
 export const USER_DATA_LAYOUT = {
+  pinnedFiles: "pinned-files",
+  connectorLaunchers: "connector-launchers",
+  connectorRuntime: "connector-runtime",
+  firstPartyCache: "first-party-cache",
   documentRuntime: "document-runtime",
   auth: "codepuppy-auth.json",
   pkce: "codepuppy-pkce.json",

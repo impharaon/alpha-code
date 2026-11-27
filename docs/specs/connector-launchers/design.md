@@ -4,7 +4,7 @@ title: 连接器启动器与失败处理 技术设计
 summary: 统一连接器启动器与固定文件准备；v2 接纳两平台文档 Node 读取及受管第一方 MCP 的运行期按 ID 准备，核验声明身份与逐调用进度归属。
 kind: tech-design
 status: frozen
-version: "2.3"
+version: "2.4"
 spec: SPEC-connector-launchers
 spec_version: 1
 review:
@@ -879,3 +879,13 @@ K1/K2 不变；未新增包、下载器、包管理器、运行上下文 RPC 或
 **作者回执**：Claude Opus 5.5（designer 车道）；依据为编排器 r4/r6 派发原文与 #1760 plan.md 的车道证据。本次只记录已作裁决，无新设计决定，无待 owner 决策。实际缺工具 Mac 上的运行、真实 `uv python install` 在受限 PATH 下产出可用 3.12.16、重锚后 enabled 保持及改参仍重问，均由 #1760 实施的红先行用例证明，本文不冒称已通过。
 
 **本轮验证回执**：v1/v2/v2.1/v2.2 正文只改上述三处句子，其余逐字保留；`python3 scripts/check-doc-links.py docs/specs/connector-launchers/design.md` exit 0（3 个相对链接），`git diff --check` exit 0；文档检查函数（仅 alpha-code profile，`--changed-since origin/alpha`）对本文 0 finding，删去 kind 的负例被检出，仓级另有 56 errors / 251 warnings，均在本轮未改范围，未顺修。按指令仅改 design.md，未改索引、实现或消费者产物。
+
+### v2.4 编排器裁决（2026-11-27，#1760 集成片实施回报）
+
+| 裁决 | 内容 | 依据 |
+| --- | --- | --- |
+| V24-R1｜AC-04 | §4.3 第 2 条的准备命令去掉 `--ignore-scripts`：与官方 npx/npm exec 一样运行依赖的 install 脚本，仍在写入围栏与联网批准之内执行。 | 实测 `better-sqlite3@12.11.1`（二进制靠 install 脚本取得）在 `--ignore-scripts` 下 `Could not locate the bindings file`；官方 npx 会运行这些脚本，用户直接运行同一连接器也会执行包代码，去掉该参数不扩大信任面，只恢复官方行为。只支持预编译包是新增限制，未获授权，不采用。 |
+| V24-R2｜AC-02 | 「应用数据目录」包括 bootstrap 导出的引擎数据根（`<XDG_DATA_HOME>/opencode`，会话库、计划、工具策略同在此处）。引擎首个子进程在其下建的 `shell/<项目id>` 属应用数据，不计入 AC-02 的主目录新增；不改代码。 | 该根是 Code Puppy 引擎既有的数据根（engine-config-fence W4/D13/CF-11），整体搬迁会移动会话历史，属本规格范围外的架构变更；接管上游 shell.ts 的路径无收益。 |
+| V24-R3｜V2-R5 载体 | 每次工具调用的 `preparation` 作为 `Mcp.Service.callTool` 的第三个参数传递（与视频进度回调同层），不放进请求对象；归属与语义不变。 | 让上游 `core/src/mcp/pool.ts`、`core/test/mcp.test.ts` 与 alpha 逐字相同（north-star 守卫）。 |
+| V24-R4｜BR-08 重开批准 | 「打开批准卡片」即重启这次连接尝试，不另设 `reopenUserEgressGrant`；§4（:62、:363）相应句子按此理解。 | #1757 v3 后批准面不再记住拒绝，每次连接都会重新询问（`network-egress-grants.ts:94`）。 |
+

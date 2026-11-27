@@ -1,5 +1,7 @@
 import { verifyVideoCall } from "./codepuppy-video-call"
 import { videoCacheRoot } from "./codepuppy-video-environment"
+import { checkConnectorRuntimeDependencies, hostProgramEnvironment } from "./connector-runtime-dependencies"
+import { connectorPackageRunner } from "@opencode/util/codepuppy-command-head"
 import { engineClient } from "./engine-client"
 import { pluginPackageStoreKey } from "./ext-package-ledger-v3"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
@@ -14,12 +16,9 @@ import { removeOfficialConnector, releaseOfficialConnectorResources } from "./of
 
 import { listAdvisoryBlockedFacts, makeAdvisoryGate } from "./ext-advisory-gate"
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from "electron"
-import { execFile } from "node:child_process"
 import * as fs from "node:fs"
 import { homedir } from "node:os"
 import * as path from "node:path"
-import { toolProbe } from "./platform"
-import { commandOnPath } from "./shell-env"
 import { extensionsGranted, hasExtensionsDecision, listProjectExecutables } from "./codepuppy-ext-trust"
 import { readProjectPrefs, writeProjectPrefs } from "./codepuppy-workdir"
 import { projectTrustIdentity, readProjectTrustEntry } from "./project-trust-truth"
@@ -46,7 +45,7 @@ import { extensionHealthProbeRouter } from "./ext-health-probe-router"
 import { randomUUID } from "node:crypto"
 import { pickedFiles } from "./ipc"
 import { factorySkillIds } from "./factory-skills"
-import { downloadRemoteAsset, refreshRemoteCatalog, registerPackageCatalogReadIpcHandlers } from "./remote-catalog"
+import { downloadRemoteAsset, readCachedCatalog, refreshRemoteCatalog, registerPackageCatalogReadIpcHandlers } from "./remote-catalog"
 import { applyBuiltinPolicy, normalizeBuiltinPolicy, protectionInfo, readBuiltinPolicy, resetBuiltinPolicy } from "./codepuppy-builtin-policy"
 import { factoryDeniedSkills } from "../../../ext/src/factory-deny"
 import {
@@ -79,6 +78,7 @@ import { buildGatedWriteChannels, buildJournalAdminChannels, GATED_WRITE_CHANNEL
 // REQ-234 `#1529`:三档状态的唯一权威 + 重载请求方/记录方 + parentPort `codepuppy.*` 分发(基线 §2.2 / §2.5 / §2.6)。
 import { createCodePuppySidecarHost, createHubRequestStages, createHubViewService, type CodePuppySidecarHost } from "./hub-view"
 import { createReloadCoordinator } from "./reload-coordinator"
+import { bindConnectorWorkspace } from "./connector-workspace-binding"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import { isHubRequestId, parseReloadScope, type ReloadItem } from "./codepuppy-sidecar-messages"
 import { packageVersionFromRecordsV1 } from "./ext-package-lifecycle"
@@ -107,25 +107,11 @@ import type { PackageAcceptedFactsV1 } from "./package-installability"
 import { evaluatePackageForHost, validateCatalogPackageShape } from "./package-installability"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
-// REQ-076 T2(阻断②):原实现硬编码 `which` + `:` 拼接的 unix PATH,Windows 上恒报「未安装」
-// (MCP 安装预检全线误报)。改经 platform seam:posix = which + 补包管理器目录(原 mac 行为
-// 逐字保留,GUI 启动 PATH 不全);win32 = where + 原样 PATH(ADR-026)。
-function checkRuntime(tool: string): Promise<{ ok: boolean }> {
-  return new Promise((resolve) => {
-    if (!/^[a-zA-Z0-9._-]+$/.test(tool)) {
-      resolve({ ok: false })
-      return
-    }
-    const probe = toolProbe()
-    // posix: a `which` found on a fence-writable PATH directory would run outside the fence; look it up without running anything.
-    if (probe.cmd === "which") {
-      resolve({ ok: commandOnPath(tool, probe.probePath) !== undefined })
-      return
-    }
-    execFile(probe.cmd, [tool], { env: { ...process.env, PATH: probe.probePath } }, (err, stdout) => {
-      resolve({ ok: !err && Boolean(stdout && stdout.trim()) })
-    })
-  })
+// REQ-076 T2 的探测 PATH(posix 补包管理器目录,GUI 启动 PATH 不全;win32 原样)不变。#1760 R5(design F-02):判定改用启动前
+// 同一个谓词 —— 两类运行器的 uv/Node 由随包启动器提供,git 不再以 /usr/bin 下的开发者工具 shim 存在为可用,且从不执行被判定的程序。
+function checkRuntime(tool: unknown, command: unknown): Promise<{ ok: boolean }> {
+  if (typeof tool !== "string") return Promise.resolve({ ok: false })
+  return checkConnectorRuntimeDependencies({ runtimeDep: [tool], runner: Array.isArray(command) ? connectorPackageRunner(command) : undefined, environment: hostProgramEnvironment() }).then((facts) => ({ ok: facts.missing.length === 0 }))
 }
 
 const hiddenDirConflictsShown = new Set<string>()
@@ -254,7 +240,7 @@ export function registerExtIpcHandlers(
   ipcMain.handle("ext-config-health", () => configHealth())
   // `#1687`:云服务是否被 kill-switch 扣下 —— 只读最近一次注入写配置时的判决,不另算。
   ipcMain.handle("ext-cloud-withheld", () => isCloudMcpWithheld())
-  ipcMain.handle("ext-check-runtime", (_event: IpcMainInvokeEvent, tool: string) => checkRuntime(tool))
+  ipcMain.handle("ext-check-runtime", (_event: IpcMainInvokeEvent, tool: unknown, command?: unknown) => checkRuntime(tool, command))
   // #1564 AC3:四个第一方 Office 条目的准备检查读这条随包运行时事实,不读卡片 runtimeDep(uv)。
   ipcMain.handle("ext-office-runtime", () => officeRuntimeReadiness())
   // REQ-036:创建表单已移除(创建走技能:skill-creator/agent-creator 出厂注入),原
@@ -1643,5 +1629,14 @@ export function registerExtIpcHandlers(
   // #390:同时交出恢复-gate 包装的 global 技能安装器,供 ecosystem gate 走事务安装(不绕恢复准入)。
   // REQ-234 `#1529`:codepuppySidecar 交给 composition root —— spawnLocalServer 在 `child.on("message")` 旁挂它的 receive,
   // ready 时 attach;onViewChanged 接 `ext-hub-view-changed` 推送。
-  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1 }
+  // #1760: the pre-spawn dependency read resolves installed declarations from this same effective catalog;
+  // R8 rebinds an explicit connector cwd through the existing writer and this coordinator's reload.
+  const connectorWorkspace = (identity: { directory: string; server: string }, folder: string) => bindConnectorWorkspace({ identity, folder }, reloads.request)
+  // Connector starts read dependency facts from local catalogs only (signed cache, bundled snapshot), never refreshing.
+  const connectorCatalogs = () => {
+    const cached = readCachedCatalog(userDataPath)
+    const bundled = bundledCatalogJson as unknown as BundledCatalogSnapshotV1
+    return [...(cached ? [{ entries: (cached.catalog as Catalog).entries ?? [], version: cached.version }] : []), { entries: bundled.entries, version: bundled.version }]
+  }
+  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1, resolveEffectiveCatalog, connectorWorkspace, connectorCatalogs }
 }

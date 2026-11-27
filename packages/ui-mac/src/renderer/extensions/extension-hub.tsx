@@ -1,3 +1,7 @@
+import { useConnectorLaunchSnapshots } from "./connector-launch-client"
+import { connectorLaunchPresentation } from "./connector-launch-presentation"
+import { runConnectorLaunchAction } from "./connector-launch-actions"
+import { loadDefaultWorkspaceDir } from "../codepuppy-ui/default-workspace"
 // The Extension Hub (定制中心) — a full PAGE (not a modal) covering the content area, rendered as a
 // sibling of <CodePuppySidebar> inside AppInterface (renderer/index.tsx) via a dedicated Portal host on
 // #root. Only mounted while open, so it can never intercept background clicks. Browsable items come
@@ -162,6 +166,8 @@ export function ExtensionHub(props: {
       return active?.sessionID === id ? active.directory : undefined
     })
   })
+  const [defaultDirectory] = createResource(() => props.open(), loadDefaultWorkspaceDir)
+  const connectorLaunch = useConnectorLaunchSnapshots(() => props.open() ? projectDir() ?? defaultDirectory() : undefined, props.server)
   const ext = useExtensions(props.server, props.open, projectDir, props.directories)
   const section = hubSection
   // REQ-103(#195):governance 只读视图(逐扩展五维所有权 + availability/activation/health 三态)。
@@ -2017,7 +2023,7 @@ export function ExtensionHub(props: {
           name: row.name,
           currentlyOn: desiredOn(),
           liveUnreceipted: row.receipt.installedAt === "",
-          mcpConnected: !!row.mcp?.connected,
+          mcpConnected: row.receipt.installedAt === "" ? isOn() : !!row.mcp?.connected,
         })
       } finally {
         stateBusy[1](false)
@@ -2059,10 +2065,34 @@ export function ExtensionHub(props: {
       (row.type === "mcp" || row.type === "agent" || row.type === "plugin" || row.type === "skill") &&
       row.receipt.scope !== "project" &&
       !rowSessionGrant()
-    const isOn = () => (row.type === "mcp" && row.receipt.installedAt === "" ? !!row.mcp?.connected : desiredOn())
+    const isOn = () => (row.type === "mcp" && row.receipt.installedAt === "" ? (launch() ? launch()!.state.phase !== "disabled" : !!row.mcp?.connected) : desiredOn())
 
+    const launch = () => row.type === "mcp" && (row.receipt.scope === "project" || nameOnlyLiveMcpIsUnambiguousGlobal(row.name, ext.store.projectReceipts))
+      ? connectorLaunch().find((snapshot) => snapshot.identity.server === row.name)
+      : undefined
+    const launchPresentation = () => { const snapshot = launch(); return snapshot && connectorLaunchPresentation(snapshot.state) }
+    const [launchDetails, setLaunchDetails] = createSignal<string>()
+    createEffect(() => { launch()?.identity.attempt; setLaunchDetails(undefined) })
+    const readLaunchDetails = async () => {
+      const snapshot = launch()
+      if (!snapshot) return
+      const result = await window.api.connectorLaunch.diagnostic(snapshot.identity)
+      const current = launch()
+      if (!current || current.identity.directory !== snapshot.identity.directory || current.identity.server !== snapshot.identity.server || current.identity.attempt !== snapshot.identity.attempt || current.sidecarGeneration !== snapshot.sidecarGeneration) return
+      if (!result.ok) { setLaunchDetails(t("codepuppy.connectorLaunch.detailsUnavailable")); return }
+      setLaunchDetails(JSON.stringify(result.value, null, 2))
+    }
+    const launchAction = async () => {
+      const snapshot = launch()
+      const action = launchPresentation()?.action
+      if (!snapshot || !action) return
+      try { await runConnectorLaunchAction(snapshot, action.kind, (name) => ext.authenticateMcp(name)) }
+      catch (error) { flash(error instanceof Error ? error.message : String(error), "error") }
+    }
     // 一行状态:取最要紧的那一件。
     const line = (): { text: string; err?: boolean; hub?: string; detail?: string } => {
+      const presentation = launchPresentation()
+      if (presentation) return { text: launch()?.state.phase === "preparing" && presentation.detail ? `${presentation.reason} · ${presentation.detail}` : presentation.reason, err: presentation.problem, detail: presentation.detail }
       if (row.type === "mcp" && row.mcp?.error && !row.mcp.pending)
         return { text: row.mcp.repair === "reinstall-app" ? t("codepuppy.ext.officeRuntimeMissing") : mcpFailureReason(row.mcp.code, row.mcp.error), err: true, detail: row.mcp.error }
       // `#733`:`needs_auth` 不是「未连接」——它是一个用户能自己修好的状态。
@@ -2087,7 +2117,7 @@ export function ExtensionHub(props: {
       return { text: hs ? t(hs.textKey) : activationText(), hub: hs?.state }
     }
     const attention = (): "auth" | "session" | "enable" | "reload" | "update" | undefined => {
-      if (row.type === "mcp" && row.mcp?.needsAuth) return "auth"
+      if (!launch() && row.type === "mcp" && row.mcp?.needsAuth) return "auth"
       if (row.type === "mcp" && row.receipt.scope !== "project" && rowSessionGrant()) return "session"
       if (hubState()?.reloadNow) return "reload"
       if (hasToggle() && !isOn()) return "enable"
@@ -2115,13 +2145,13 @@ export function ExtensionHub(props: {
         <div class="codepuppy-ext-kit-body">
           <div class="codepuppy-ext-kit-ttl">
             <b title={row.name}>{row.displayName}</b>
-            <Show when={!projectMcpView() && line().err}>
+            <Show when={!projectMcpView() && !launchPresentation() && line().err}>
               <RowStatus tone="err" text={t("codepuppy.ext.statusFailed")} />
             </Show>
           </div>
           {/* REQ-136:项目行的状态只消费 main 给的项目范围判定(name-only 的全局实时状态不许串进来)。 */}
           <Show
-            when={projectMcpView()}
+            when={!launchPresentation() && projectMcpView()}
             fallback={
               <div class="codepuppy-ext-kit-desc" data-err={line().err ? "" : undefined} data-hub-state={line().hub} title={row.type === "cloud" ? undefined : line().detail}>
                 {line().text}
@@ -2133,6 +2163,12 @@ export function ExtensionHub(props: {
                 {t(project().textKey)}
               </div>
             )}
+          </Show>
+          <Show when={launch()?.state.phase === "failed"}>
+            <details class="codepuppy-ext-dprompt" onClick={(event) => event.stopPropagation()} onToggle={(event) => { if (event.currentTarget.open) void readLaunchDetails().catch(() => setLaunchDetails(t("codepuppy.connectorLaunch.detailsUnavailable"))) }}>
+              <summary>{t("codepuppy.timeline.devDetails")}</summary>
+              <pre>{launchDetails() ?? launchPresentation()?.detail}</pre>
+            </details>
           </Show>
           <Show when={row.type === "cloud" && hubState()?.detail}>
             {(detail) => (
@@ -2168,7 +2204,10 @@ export function ExtensionHub(props: {
             )}
           </Show>
         </div>
-        <Show when={attention()}>
+        <Show when={launchPresentation()?.action}>
+          {(action) => <button class="codepuppy-ext-updbtn" onClick={(event) => { event.stopPropagation(); void launchAction() }}>{action().label}</button>}
+        </Show>
+        <Show when={!launchPresentation()?.action && attention()}>
           {(kind) => (
             <>
               {/* `#733`:MCP 走 OAuth 且当前没令牌 ⇒ 一颗能点的「去授权」,与状态「需要重新登录」是同一个事实的两半。 */}

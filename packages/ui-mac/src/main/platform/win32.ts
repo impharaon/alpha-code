@@ -17,4 +17,4 @@ export const WIN_EDITOR_CLI: Record<string, string> = {
 }
 
 /** win32 命令 head 的可剥可执行后缀(白名单比对前归一:npx.cmd → npx) */
-export const WIN_EXEC_EXTENSIONS = /\.(exe|cmd|bat)$/i
+export { WIN_EXEC_EXTENSIONS } from "@opencode/util/codepuppy-command-head"

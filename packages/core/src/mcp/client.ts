@@ -1,5 +1,14 @@
 import { withVideoProgress } from "./codepuppy-video-progress.js" // codepuppy(#1775)
 import type { VideoProgress } from "@opencode/schema/codepuppy-video-progress"
+import {
+  connectorLaunchHost,
+  isConnectorLaunchFailure,
+  type ManagedFirstPartyBinding,
+  type DeclaredFirstParty,
+  type PinnedFilesCallPreparation,
+  type PreparedLaunch,
+} from "@opencode/util/codepuppy-connector-launch"
+import { registerPinnedFilesHandler } from "./codepuppy-pinned-files.js"
 export * as McpClient from "./client.js"
 
 import { readCodePuppyCredential } from "@opencode/util/codepuppy-credentials" // codepuppy(#1562, I-20)
@@ -31,6 +40,8 @@ import {
   type VersionNegotiationOptions,
 } from "@modelcontextprotocol/client"
 import { Cause, Clock, Duration, Effect, Exit, PlatformError, Schedule, Schema } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { Environment } from "../environment/index.js"
 import { ConfigMCP } from "@opencode/schema/config/mcp"
 import type { Session } from "@opencode/schema/session"
 import { isRecord } from "@opencode/util/record"
@@ -126,6 +137,7 @@ export class ConnectError extends Schema.TaggedError<ConnectError>()("MCP.Connec
   // codepuppy(#1563): the named cause (codepuppy-startup.ts) and whether a background reconnect may change it.
   code: Schema.optional(Schema.declare(isCodepuppyFailureCode)),
   reconnect: Schema.optional(Schema.Boolean),
+  failure: Schema.optional(Schema.declare(isConnectorLaunchFailure)),
 }) {}
 
 /** A legacy Streamable HTTP server no longer recognizes this connection's session; the lifecycle reconnects. */
@@ -173,6 +185,7 @@ export interface ElicitationHandler {
 
 /** For a request that can come back asking for input: tool calls, prompts and resource reads. */
 export interface PerRequest {
+  readonly preparation?: PinnedFilesCallPreparation
   readonly sessionID?: Session.ID
   /**
    * Answers the elicitations this request causes instead of the connection's handler, for a connection
@@ -236,6 +249,10 @@ export interface ConnectOptions {
   readonly clientInfo?: Implementation
   /** False declares no roots and leaves `roots/list` unanswered, for a connection no one directory owns. */
   readonly roots?: boolean
+  /** Constructed from the protected declaration before inherited environment/cwd are applied. */
+  readonly managedFirstParty?: { binding: ManagedFirstPartyBinding; declaration: DeclaredFirstParty }
+  /** Host-private result of package preparation, completed before connection startup begins. */
+  readonly prepared?: PreparedLaunch
 }
 
 /**
@@ -254,6 +271,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   // Attached clients run ordinary SDK servers over the initialize handshake.
   const protocol = config.type === "attached" ? "legacy" : config.protocol
   const changed = { tools: () => {}, prompts: () => {}, resources: () => {} }
+  const pinnedClients = new WeakMap<Client, ReturnType<typeof registerPinnedFilesHandler>>()
   const listChanged = (key: keyof typeof changed) => ({
     autoRefresh: false,
     debounceMs: 0,
@@ -282,7 +300,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
       : safeDescription(error)
 
   // Two more attempts, 250 ms and 1 s later, while the failure is transient and the deadline has not passed.
-  const retrying = <A, E>(what: string, effect: Effect.Effect<A, E>, deadline = Infinity) =>
+  const retrying = <A, E, R>(what: string, effect: Effect.Effect<A, E, R>, deadline = Infinity) =>
     Effect.retry(
       effect,
       Schedule.max([Schedule.exponential("250 millis", 4), Schedule.recurs(2)]).pipe(
@@ -303,6 +321,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     const runPromise = Effect.runPromiseWith(context)
     const client = new Client(options.clientInfo ?? { name: "opencode", version: "unknown" }, {
       capabilities: {
+        ...(options.managedFirstParty?.declaration.recipe?.length ? { experimental: { "codepuppy/pinned-files": {} } } : {}),
         ...(elicitation ? { elicitation: { form: {}, url: {} } } : {}),
         // Legacy era only: roots are deprecated as of 2026-07-28 and modern servers cannot request them.
         // Some legacy servers refuse to run without one (https://github.com/anomalyco/opencode/issues/2308).
@@ -315,6 +334,11 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         resources: listChanged("resources"),
       },
     })
+    if (options.managedFirstParty?.declaration.recipe?.length) {
+      const pinned = registerPinnedFilesHandler(client, options.managedFirstParty, (input, signal, progress) => connectorLaunchHost().prepareFiles(input, signal, progress))
+      pinnedClients.set(client, pinned)
+      yield* Effect.addFinalizer(() => Effect.sync(() => pinned.close()))
+    }
     // Background work such as the standalone SSE stream reports failures only here; aborts come from close.
     client.onerror = (error) => {
       if (error.name === "AbortError") return
@@ -384,17 +408,37 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
   const exit = yield* Effect.gen(function* () {
     if (config.type === "attached") return yield* initialize(config.transport)
     if (config.type === "local") {
-      const [command, ...args] = config.command
+      const prepared = options.prepared
+      const [command, ...args] = prepared?.command ?? config.command
+      const environment = yield* Environment.Service
       const transport = yield* McpStdio.make({
         server,
         command,
         args,
-        cwd: McpStdio.resolveCwd(options.directory, config.cwd),
-        environment: {
+        cwd: prepared?.cwd ?? McpStdio.resolveCwd(options.directory, config.cwd),
+        environment: prepared?.environment ?? {
           ...(command === "opencode" ? { BUN_BE_BUN: "1" } : {}),
           ...config.environment,
         },
-      })
+      }).pipe(
+        // Stdio retains its upstream inherited-env behavior for native commands. A prepared
+        // runner already has its complete controlled environment; do not resurrect removed controls.
+        Effect.provideService(
+          Environment.Service,
+          prepared
+            ? Environment.Service.of({
+                ...environment,
+                spawner: ChildProcessSpawner.make((child) =>
+                  environment.spawner.spawn(
+                    child._tag === "StandardCommand"
+                      ? ChildProcess.make(child.command, child.args, { ...child.options, extendEnv: false })
+                      : child,
+                  ),
+                ),
+              })
+            : environment,
+        ),
+      )
       return yield* initialize(transport)
     }
     const { McpOAuth } = yield* Effect.promise(() => import("./oauth.js"))
@@ -530,6 +574,7 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
                     },
                   ]
                 })
+                pinnedClients.get(client)?.listed(tools)
                 listed.clear()
                 for (const tool of tools) listed.set(tool.name, tool)
                 return Effect.forEach(
@@ -573,15 +618,15 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
         ),
       callTool: (input, videoProgress) => {
         const call = Effect.tryPromise({
-          try: (signal) =>
-            withVideoProgress(signal, videoProgress, (onprogress) => client.callTool(
+          try: (signal) => {
+            const run = (meta: Record<string, string | number>, callSignal: AbortSignal) => withVideoProgress(callSignal, videoProgress, (onprogress) => client.callTool(
               {
                 name: input.name,
                 arguments: input.args ?? {},
-                ...(input.sessionID === undefined ? {} : { _meta: { "ai.opencode/sessionID": input.sessionID } }),
+                _meta: { ...meta, ...(input.sessionID === undefined ? {} : { "ai.opencode/sessionID": input.sessionID }) },
               },
               {
-                signal: claim(signal, input),
+                signal: claim(callSignal, input),
                 timeout: execution,
                 // Only asks for a progress token: progress on the response stream can keep proxies from closing it.
                 // The SDK timeout does not reset on progress; execution is the hard wall.
@@ -594,7 +639,10 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
                   inputSchema: { type: "object" },
                 }) as CallToolRequestOptions["toolDefinition"],
               },
-            )),
+            ))
+            const pinned = pinnedClients.get(client)
+            return pinned ? pinned.withCall({ preparation: input.preparation, signal, deadline: Date.now() + execution, run }) : run({}, signal)
+          },
           catch: (error) => error,
         })
         // A modern server rejects headers mirrored from a stale definition before running the tool,
@@ -645,13 +693,13 @@ export const connect = Effect.fnUntraced(function* (options: ConnectOptions) {
     server,
     message: safeExplain(error), // codepuppy(#1645): body-free, it becomes the failed status
     answered: !repeats(error),
-    ...startFailure(error, options.config), // codepuppy(#1563)
+    ...startFailure(error, config.type === "local" && options.prepared ? { ...config, command: options.prepared.command } : config), // codepuppy(#1563)
   })
 })
 
 // codepuppy(#1563, #1645) ── the SDK-specific facts the Code Puppy classifier cannot see on its own. Also names a failed
 // listing (connection.ts), whose SDK error arrives as the cause of the client's own Error.
-export function startFailure(error: unknown, config: { readonly type: string; readonly url?: string }) {
+export function startFailure(error: unknown, config: { readonly type: string; readonly url?: string; readonly command?: readonly string[] }) {
   const listed = !(error instanceof SdkError) && error instanceof Error && (error.cause instanceof SdkError || error.cause instanceof SdkHttpError) ? error.cause : error
   const cause = listed instanceof SdkError && listed.code === SdkErrorCode.EraNegotiationFailed && listed.cause !== undefined ? listed.cause : listed
   const proxyFailure = pluginProxyDialFailure(cause)

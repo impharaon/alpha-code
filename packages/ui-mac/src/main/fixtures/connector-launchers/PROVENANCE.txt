@@ -1,0 +1,4 @@
+Actual source samples for launcher inventory tests, captured 2026-11-26.
+Six .header.b64 files encode the first 4096 original bytes of uv/uvx/Node from the two target archives in resources/connector-launchers/lock.json. Decode base64 to recover the exact original header bytes. Their full originals matched that lock before extraction. Headers test architecture and digest validation; they are not executable runtime fixtures.
+npm/package.sample (renamed from package.json) and bin/*.js are unchanged bytes from the locked Node darwin archive (npm 11.20.0). The fixture suffix avoids treating captured metadata as a workspace manifest. Node-LICENSE-prefix is the first 4096 bytes of its LICENSE, only opaque test data; the real build ships the entire LICENSE. UV LICENSE-MIT/APACHE are full files from the lock URLs.
+Archive construction tests use the actual system tar on these real captured members and controlled link mutations, never handwritten tar/zip bytes.

@@ -1,3 +1,4 @@
+import type { LaunchSnapshot } from "../../../../util/src/codepuppy-connector-launch"
 // `#1687` SPEC-error-message-lifetime v2 AC-01 / AC-05 / AC-06:连不上的工具服务只进「未恢复问题」入口,不弹提示。
 // 真挂生产 BackgroundProblemWatcher + ToastViewport + ProblemsEntry(vite 构建同 toast-lifetime.test.ts);
 // 状态来源是替身 fetch:`GET /mcp` 回当前状态表,`GET /global/event` 是可推送的 SSE 流 —— 走的是
@@ -271,4 +272,77 @@ test("production wiring: index.tsx mounts the connector watcher inside the app",
   const watcher = source.indexOf("<BackgroundProblemWatcher server={sidebarServer} />")
   expect(watcher).toBeGreaterThan(source.indexOf("<AppInterface"))
   expect(watcher).toBeLessThan(source.indexOf("</AppInterface>"))
+})
+
+// Functional component proof; no clock advance or timing assertion.
+test("launcher snapshots suppress preparing problems and use the row projection for reasons and retry", async () => {
+  const source = engine({ sample: { status: "failed", error: "stale generic failure" } })
+  let snapshot: LaunchSnapshot = { identity: { directory: "/project", server: "sample", attempt: "one" }, sidecarGeneration: "7", sequence: 0, state: { phase: "preparing", stage: "python", progress: { unit: "bytes", completed: 10, total: 100 } } }
+  let changed: ((value: LaunchSnapshot) => void) | undefined
+  let retries = 0
+  ;(window as unknown as { api: unknown }).api = {
+    workspaceDefaultDir: async () => "/project",
+    awaitInitialization: async () => ({ url: source.server().baseUrl }),
+    sidecarGeneration: { subscribe: () => () => {} },
+    connectorLaunch: { list: async () => [snapshot], subscribe: (listener: typeof changed) => { changed = listener; return () => { changed = undefined } }, retry: async (identity: unknown) => { expect(identity).toEqual(snapshot.identity); retries++; return { ok: true } } },
+  }
+  mount(source)
+  await settle()
+  expect(entry()).toBeNull()
+  expect(toasts()).toHaveLength(0)
+  // A Location-only connector need not appear in the SDK default-directory table.
+  source.set({})
+  source.emit()
+  await settle()
+  snapshot = { ...snapshot, sequence: 1, state: { phase: "failed", failure: { kind: "download", detail: "connection interrupted" }, diagnostic: "one" } }
+  changed?.(snapshot)
+  await settle()
+  await openList()
+  expect(items()[0]?.textContent).toContain("下载没有完成")
+  expect(items()[0]?.textContent).toContain("connection interrupted")
+  const action = items()[0]!.querySelector<HTMLButtonElement>(".codepuppy-problems-act")!
+  expect(action.textContent).toBe("重试")
+  action.click()
+  await settle()
+  expect(retries).toBe(1)
+  expect(entryLabel()).toBe(countLabel(1))
+  for (const [failure, reason, label] of [[{ kind: "secret", fields: ["API_KEY"], packageId: "owned-package" }, "需要填写密钥", "去填写"], [{ kind: "workspace", reason: "not-git" }, "这个文件夹不是 Git 仓库", "换文件夹"]] as const) {
+    snapshot = { ...snapshot, sequence: snapshot.sequence + 1, state: { phase: "failed", failure: failure.kind === "secret" ? { ...failure, fields: [...failure.fields] } : failure, diagnostic: "one" } }
+    changed?.(snapshot)
+    await settle()
+    if (items().length === 0) await openList()
+    expect(items()[0]?.textContent).toContain(reason)
+    expect(items()[0]?.querySelector(".codepuppy-problems-act")?.textContent).toBe(label)
+    if (failure.kind === "secret") {
+      items()[0]!.querySelector<HTMLButtonElement>(".codepuppy-problems-act")!.click()
+      await settle()
+      expect(runtime.takePackageManagementTarget()).toBe(failure.packageId)
+      runtime.setExtHubOpen(false)
+    }
+  }
+  snapshot = { ...snapshot, sequence: snapshot.sequence + 1, state: { phase: "connected" } }
+  changed?.(snapshot)
+  await settle()
+  expect(entry()).toBeNull()
+})
+
+// #1760 Q1, functional component proof: the document runtime row uses its reserved name; the entry shows the localized label and
+// the shared download reason/action, never the raw reserved identifier.
+test("the document runtime's failed preparation row appears under its own label with the shared retry", async () => {
+  const { DOCUMENT_RUNTIME_LAUNCH_SERVER } = await import("../../../../util/src/codepuppy-document")
+  const source = engine({})
+  const snapshot: LaunchSnapshot = { identity: { directory: "/project", server: DOCUMENT_RUNTIME_LAUNCH_SERVER, attempt: "document-runtime:7" }, sidecarGeneration: "7", sequence: 3, state: { phase: "failed", failure: { kind: "download", detail: "ECONNREFUSED relay" }, diagnostic: "document-runtime:7" } }
+  ;(window as unknown as { api: unknown }).api = {
+    workspaceDefaultDir: async () => "/project",
+    awaitInitialization: async () => ({ url: source.server().baseUrl }),
+    sidecarGeneration: { subscribe: () => () => {} },
+    connectorLaunch: { list: async () => [snapshot], subscribe: () => () => {}, retry: async () => ({ ok: true }) },
+  }
+  mount(source)
+  await settle()
+  await openList()
+  expect(items()[0]?.textContent).toContain("文档制作环境")
+  expect(items()[0]?.textContent).toContain("下载没有完成")
+  expect(items()[0]?.textContent).not.toContain(DOCUMENT_RUNTIME_LAUNCH_SERVER)
+  expect(items()[0]?.querySelector(".codepuppy-problems-act")?.textContent).toBe("重试")
 })

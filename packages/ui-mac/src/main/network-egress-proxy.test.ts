@@ -831,3 +831,34 @@ test("系统代理名称 lookup 指回策略监听端口时拒绝循环", async 
     expect(lookup).toHaveBeenCalledWith("local-proxy.egress.test", { all: true })
   } finally { lookup.mockRestore() }
 })
+
+// Integration layer, #1760 R5: the real proxy hands each decided CONNECT's Proxy-Authorization to the attribution registry, which
+// names only the attempt that began with that mark; the header never reaches the structured log. No upstream is dialed.
+test("a marked CONNECT's decision is attributed to its attempt only, and the mark never appears in the proxy log", async () => {
+  const { beginConnectorEgressAttempt, endConnectorEgressAttempt, attributeConnectorEgress, isConnectorAttributionHeader } = await import("./connector-egress-attribution")
+  const evidence: unknown[] = []
+  const identity = { directory: "/w", server: "git", attempt: "a1" }
+  let decision: "user-denied" | "not-asked" = "user-denied"
+  const { proxy, logs } = await startProxy({ dial: testEgressDial(() => new net.Socket()), requestGrant: async () => decision, attribute: attributeConnectorEgress, attributionHeader: isConnectorAttributionHeader })
+  const begun = beginConnectorEgressAttempt({ identity, proxyPort: proxy.port, report: (value) => void evidence.push(value) })
+  const mark = new URL(begun.proxyEnvironment.HTTPS_PROXY).username
+  expect(new URL(begun.proxyEnvironment.HTTPS_PROXY).port).toBe(String(proxy.port))
+  const marked = (header: string) => rawRequest(proxy.port, `CONNECT registry.example:443 HTTP/1.1\r\nHost: registry.example:443\r\nProxy-Authorization: ${header}\r\n\r\n`)
+  expect((await marked(`Basic ${Buffer.from(`${mark}:attempt`).toString("base64")}`)).status).toBe(403)
+  expect(evidence).toEqual([{ identity, host: "registry.example", port: 443, outcome: "refused" }])
+  decision = "not-asked"
+  await marked(`Basic ${Buffer.from(`${mark}:attempt`).toString("base64")}`)
+  await marked(`Basic ${Buffer.from("someone-else:attempt").toString("base64")}`)
+  await rawRequest(proxy.port, "CONNECT registry.example:443 HTTP/1.1\r\nHost: registry.example:443\r\n\r\n")
+  expect(evidence).toHaveLength(2)
+  expect(evidence[1]).toMatchObject({ outcome: "not-asked" })
+  endConnectorEgressAttempt(identity)
+  // An ended mark is still not a plugin MCP capability: the ordinary policy decides it exactly like an unmarked CONNECT.
+  const unmarked = await rawRequest(proxy.port, "CONNECT registry.example:443 HTTP/1.1\r\nHost: registry.example:443\r\n\r\n")
+  expect((await marked(`Basic ${Buffer.from(`${mark}:attempt`).toString("base64")}`)).status).toBe(unmarked.status)
+  expect(evidence).toHaveLength(2)
+  // A header of any other shape is no attribution mark: the plugin MCP capability rule refuses it before policy.
+  expect((await marked("Bearer " + "0".repeat(64))).status).toBe(403)
+  expect(evidence).toHaveLength(2)
+  expect(JSON.stringify(logs)).not.toContain(mark)
+})

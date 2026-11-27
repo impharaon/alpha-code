@@ -15,8 +15,19 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
 import { Server } from "@modelcontextprotocol/server"
 import { ElicitResultSchema } from "@modelcontextprotocol/core"
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio"
+import { fromJsonSchema } from "@modelcontextprotocol/client"
 
 const env = process.env
+if (env.CODEPUPPY_MCP_LAUNCH_FILE)
+  writeFileSync(
+    env.CODEPUPPY_MCP_LAUNCH_FILE,
+    JSON.stringify({
+      argv: process.argv.slice(2),
+      cwd: process.cwd(),
+      key: env.CONNECTOR_CURRENT_KEY,
+      homePresent: env.HOME !== undefined,
+    }),
+  )
 const mark = (value: string) => {
   if (env.CODEPUPPY_MCP_STARTUP_LOG) appendFileSync(env.CODEPUPPY_MCP_STARTUP_LOG, value)
 }
@@ -46,8 +57,16 @@ server.setRequestHandler("tools/list", async () => {
 })
 const elicitationPeers: (() => void)[] = []
 server.setRequestHandler("tools/call", async (request, context) => {
+  if (request.params.name === "crash" && env.CODEPUPPY_MCP_CRASH_STDERR) {
+    process.stderr.write(env.CODEPUPPY_MCP_CRASH_STDERR + "\n")
+    process.exit(17)
+  }
   if (env.CODEPUPPY_MCP_CALL_LOG) appendFileSync(env.CODEPUPPY_MCP_CALL_LOG, `${request.params.name}\n`)
   const args = (request.params.arguments ?? {}) as Record<string, unknown>
+  if (typeof args.ensure_pin === "string") {
+    const result = await server.request({ method: "codepuppy/pinned-files.ensure", params: { ids: [args.ensure_pin], _meta: context.mcpReq._meta } }, fromJsonSchema({ type: "object" }))
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }] }
+  }
   if (request.params.name === "video_progress") {
     const token = context.mcpReq._meta?.progressToken
     if (typeof token === "string" || typeof token === "number") {

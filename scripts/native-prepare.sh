@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 #
-# native-prepare.sh — 一棵已经 `bun install` 过的 checkout 还缺的两样原生件(`#1512`):
+# native-prepare.sh — 一棵已经 `bun install` 过的 checkout 还缺的原生件(`#1512`):
 #   1. Electron 二进制:bare `bun install` 不下载它。先从主 checkout 复制同版本的(秒级),
 #      主 checkout 没有再跑 electron/install.js;
-#   2. codepuppy-fence 原生 addon:bare `bun install` 不编译它(darwin only)。
-# 两样都已就绪时什么都不做(幂等,重跑不复制、不编译)。
+#   2. codepuppy-fence 原生 addon:bare `bun install` 不编译它(darwin only);
+#   3. 连接器启动器(`#1760`,darwin arm64):随包 uv + Node 的开发树预构建。main 据它把启动器描述交给引擎,
+#      代表性启动的 parity 用例要它。主 checkout 有同一 lock 的产物就复制,否则按 lock 构建。
+# 都已就绪时什么都不做(幂等,重跑不复制、不编译)。
 #
 #   bash scripts/native-prepare.sh <target-checkout> <main-checkout>
 #
@@ -57,4 +59,21 @@ if [ ! -f packages/ui-mac/native/codepuppy-fence/build/codepuppy_fence.node ]; t
     echo "✗ codepuppy-fence 原生 addon 编译失败" >&2
     exit 1
   }
+fi
+LAUNCHERS=packages/ui-mac/native/connector-launchers/build/mac-arm64
+LAUNCHER_LOCK=packages/ui-mac/resources/connector-launchers/lock.json
+if [ "$(uname -m)" = arm64 ] && [ -f packages/ui-mac/scripts/build-connector-launchers.ts ] && [ ! -f "$LAUNCHERS/runtime.json" ]; then
+  rm -rf "$LAUNCHERS"
+  if [ "$MAIN" != "$TARGET" ] && [ -f "$MAIN/$LAUNCHERS/runtime.json" ] && cmp -s "$LAUNCHER_LOCK" "$MAIN/$LAUNCHER_LOCK"; then
+    echo "▶ 从主 checkout 复制连接器启动器(同一 lock)"
+    mkdir -p "$(dirname "$LAUNCHERS")" && { cp -Rc "$MAIN/$LAUNCHERS" "$LAUNCHERS" 2>/dev/null || { rm -rf "$LAUNCHERS"; cp -R "$MAIN/$LAUNCHERS" "$LAUNCHERS"; }; }
+  else
+    echo "▶ 按 lock 预构建连接器启动器(uv + Node)"
+    (cd packages/ui-mac && bun ./scripts/build-connector-launchers.ts)
+  fi
+  if [ ! -f "$LAUNCHERS/runtime.json" ]; then
+    rm -rf "$LAUNCHERS"
+    echo "✗ 连接器启动器预构建失败" >&2
+    exit 1
+  fi
 fi

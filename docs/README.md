@@ -138,6 +138,7 @@ status.
 | `ARCH-alpha-code-2026-09-24-cloud-vision-client-seam` | [architecture/2026-09-24-cloud-vision-client-seam.md](architecture/2026-09-24-cloud-vision-client-seam.md) | 云端识图的客户端半场:凭据从哪来、图走哪条钩子、看不了图的模型怎么被喂(REQ-228 `#1419`) | active |
 | `ARCH-alpha-code-2026-09-24-exa-mcp-failure-signal-recon` | [architecture/2026-09-24-exa-mcp-failure-signal-recon.md](architecture/2026-09-24-exa-mcp-failure-signal-recon.md) | Exa MCP 的失败信号 —— 实读(2026-09-24) | active |
 | `ARCH-alpha-code-2026-09-27-exa-entry-shape-fail-open-recon` | [architecture/2026-09-27-exa-entry-shape-fail-open-recon.md](architecture/2026-09-27-exa-entry-shape-fail-open-recon.md) | Exa 条目形状 × fail-open —— 认得出才说一句,认不出一律放行(2026-09-27) | active |
+| `PLAN-connector-launchers` | [specs/connector-launchers/plan.md](specs/connector-launchers/plan.md) | 固定文件下载、随包运行时、持久准备、连接器呈现和受管调用的分片计划与实施证据。 | active |
 | `⚠️ 缺 id` | [architecture/2026-11-09-1662-l1-engine-host-spike.md](architecture/2026-11-09-1662-l1-engine-host-spike.md) | ⚠️ 缺 summary | ? |
 | `⚠️ 缺 id` | [architecture/2026-11-09-1662-permission-reply-measurements.md](architecture/2026-11-09-1662-permission-reply-measurements.md) | ⚠️ 缺 summary | active |
 | `⚠️ 缺 id` | [architecture/2026-11-12-1662-takeover-candidates.md](architecture/2026-11-12-1662-takeover-candidates.md) | ⚠️ 缺 summary | ? |

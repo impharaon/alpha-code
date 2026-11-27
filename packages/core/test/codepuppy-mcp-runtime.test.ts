@@ -24,8 +24,16 @@
 //        extension substitutes the folder both get the declaration; the real python server lists exactly it (#1666 Unit E)
 //
 // HOME, XDG_*, TMPDIR and the database are isolated by the shared test preload (bunfig.toml, I-08) before any module loads.
-import { afterAll, beforeAll, describe, expect } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { Client, InMemoryTransport, fromJsonSchema, type MetaObject } from "@modelcontextprotocol/client"
+import { Server } from "@modelcontextprotocol/server"
+import { registerPinnedFilesHandler } from "@opencode/core/mcp/codepuppy-pinned-files"
+import type { ConnectorLaunchHost, LaunchSnapshot, PinnedPreparationProgress } from "@opencode/util/codepuppy-connector-launch"
+import { publishConnectorLaunchHost } from "@opencode/util/codepuppy-connector-launch"
+import { Tool } from "@opencode/schema/tool"
 import { createHash } from "node:crypto"
+import type { LauncherEnvironment } from "@opencode/util/codepuppy-connector-launch"
+import { canonicalJsonDigest } from "@opencode/util/codepuppy-hash"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -45,8 +53,11 @@ const { Integration } = await import("@opencode/core/integration")
 const { Location } = await import("@opencode/core/location")
 const { Mcp } = await import("@opencode/core/mcp/index")
 const { McpClient } = await import("@opencode/core/mcp/client")
+const { McpConnection } = await import("@opencode/core/mcp/connection")
+const { Environment } = await import("@opencode/core/environment/index")
+const { classifyStartFailure } = await import("@opencode/core/mcp/codepuppy-startup")
 const { McpPool } = await import("@opencode/core/mcp/pool")
-const { declaredListedTools, listsDeclaration } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
+const { declaredListedTools, declaredFirstPartyTools, expandFirstPartyCommand, commandMatchesTemplate, listsDeclaration } = await import("@opencode/core/mcp/codepuppy-first-party-mcp")
 const { __resetCodePuppyBootstrapForTests, parseCodePuppyBootstrap, publishCodePuppyBootstrap, tryCodePuppyBootstrap } = await import("@opencode/util/codepuppy-bootstrap")
 const { parseFailureCode } = await import("@opencode/schema/codepuppy-net-failure")
 const { Server: McpServer, WebStandardStreamableHTTPServerTransport } = await import("@modelcontextprotocol/server")
@@ -312,18 +323,18 @@ describe("#1565: bundled declarations while a first-party server starts", () => 
   fs.writeFileSync(
     manifest,
     JSON.stringify({
-      serverSha256: createHash("sha256").update("# bundled server\n").digest("hex"),
       // Only entries with the bundled command (here: an extra `--office` token) are first-party.
-      formats: { docx: { command: [process.execPath, FIXTURE, "--office"], tools: [declaredTool] } },
+      formats: { docx: { command: [process.execPath, FIXTURE, "--office"], environment: {}, cwd: null, codeSha256: { "office-mcp/server.py": createHash("sha256").update("# bundled server\n").digest("hex") }, tools: [declaredTool] } },
     }),
   )
   publishOfficeManifest(manifest)
-  const office = (tools: unknown[]) =>
-    new ConfigMCP.Local({
-      type: "local",
-      command: [process.execPath, FIXTURE, "--office"],
-      environment: { CODEPUPPY_MCP_INIT_DELAY_MS: "1500", CODEPUPPY_MCP_TOOLS_FILE: toolsFile(tools) },
-    } as never)
+  const office = (tools: unknown[]) => {
+    const environment = { CODEPUPPY_MCP_INIT_DELAY_MS: "1500", CODEPUPPY_MCP_TOOLS_FILE: toolsFile(tools) }
+    const document = JSON.parse(fs.readFileSync(manifest, "utf8"))
+    document.formats[`docx-${Object.keys(document.formats).length}`] = { ...document.formats.docx, environment }
+    fs.writeFileSync(manifest, JSON.stringify(document))
+    return new ConfigMCP.Local({ type: "local", command: [process.execPath, FIXTURE, "--office"], environment } as never)
+  }
   const thirdParty = local({ CODEPUPPY_MCP_INIT_DELAY_MS: "1500", CODEPUPPY_MCP_TOOLS_FILE: toolsFile([declaredTool]) }, { cwd: ROOT })
 
   testEffect(mcpLayer({ office: office([declaredTool]), other: thirdParty })).live("offered while starting; the third party is not; the listing replaces it once connected", () =>
@@ -640,6 +651,48 @@ describe("#1565: the shipped Office manifest and server", () => {
     expect(declaredListedTools("codepuppy-word", entry, manifest, fs.readFileSync)).toBeUndefined()
     expect(declaredListedTools("codepuppy-word", { ...entry, environment: { CODEPUPPY_DOCUMENT_HOST: "/foreign/host.json" } }, manifest, fs.readFileSync, expected)).toBeUndefined()
     expect(declaredListedTools("codepuppy-word", { type: "local", command: afterExtension }, manifest, fs.readFileSync, expected)).toBeUndefined()
+  }))
+
+  // Integration layer: own manifest format, derived from the shipped declaration and protected server bytes.
+  testEffect(Layer.empty).effect("bundled slots bind only the host Node and stable declaration cache root before assets exist", () => Effect.sync(() => {
+    const native = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word
+    const declaration = { ...native, command: ["{codepuppyNode}", "{codepuppyResources}/office-mcp/server.py", "{workspace}", "{codepuppyCacheRoot}"] }
+    const slotManifest = path.join(resources, "office-mcp", "slots.json")
+    fs.writeFileSync(slotManifest, JSON.stringify({ formats: { stable: declaration } }))
+    for (const node of [path.join(resources, "connector-launchers/node/bin/node"), path.join(ROOT, "not-expanded/pin/node/bin/node")]) {
+      const launchers: LauncherEnvironment = { platform: "darwin-arm64", pinSet: "a".repeat(64), uv: "/runtime/uv", uvx: "/runtime/uvx", node, npmCli: "/runtime/npm.js", npxCli: "/runtime/npx.js", runtimeRoot: path.join(ROOT, "runtime"), pythonFileId: "python/darwin-arm64/3.12.16-20261124", packageManagerEnv: {}, environment: {}, firstPartyCacheRoots: { stable: path.join(ROOT, "first-party-cache/stable") } }
+      const command = expandFirstPartyCommand(declaration.command, resources, launchers, "stable")
+      expect(command).toEqual([node, path.join(resources, "office-mcp/server.py"), "{workspace}", launchers.firstPartyCacheRoots.stable])
+      expect(commandMatchesTemplate(declaration.command, command, resources, launchers, "stable")).toBe(true)
+      const entry = { type: "local", command }
+      const declared = declaredFirstPartyTools("user-renamed-server", entry, slotManifest, fs.readFileSync, undefined, launchers)
+      expect(declared?.tools).toEqual(native.tools)
+      expect(declaredFirstPartyTools("stable", entry, slotManifest, fs.readFileSync)).toBeUndefined()
+      expect(declaredFirstPartyTools("stable", { ...entry, command: ["/usr/local/bin/node", ...command.slice(1)] }, slotManifest, fs.readFileSync, undefined, launchers)).toBeUndefined()
+      expect(declaredFirstPartyTools("stable", { ...entry, command: [...command.slice(0, 3), "/foreign/cache"] }, slotManifest, fs.readFileSync, undefined, launchers)).toBeUndefined()
+      expect(declaredFirstPartyTools("stable", entry, slotManifest, fs.readFileSync, undefined, { ...launchers, firstPartyCacheRoots: { "user-renamed-server": launchers.firstPartyCacheRoots.stable! } })).toBeUndefined()
+      const recipeSha256 = canonicalJsonDigest({ kind: "codepuppy-pinned-entry-recipe", recipe: [] }).slice(7)
+      expect(declared?.recipeSha256).toBe(recipeSha256)
+      expect(declared?.declarationSha256).toBe(canonicalJsonDigest({ kind: "codepuppy-bundled-mcp-declaration", command: declaration.command, environment: {}, cwd: null, codeSha256: declaration.codeSha256, tools: native.tools, recipeSha256 }).slice(7))
+      for (const bad of [["{workspace}"], ["{codepuppyNode}/suffix"], ["/node", "{codepuppyNode}"], ["{codepuppyCacheRoot}"], ["/node", "{codepuppyCacheRoot}/suffix"]]) {
+        expect(() => expandFirstPartyCommand(bad, resources, launchers, "stable")).toThrow()
+        expect(commandMatchesTemplate(bad, bad, resources, launchers, "stable")).toBe(false)
+      }
+    }
+  }))
+
+  testEffect(Layer.empty).effect("bundled declarations reject extra environment cwd malformed recipes and escaped code", () => Effect.sync(() => {
+    const entry = { type: "local", command: afterExtension }
+    for (const environment of [{ NODE_OPTIONS: "--inspect" }, { PYTHONPATH: ROOT }, { EXTRA: "value" }, []]) expect(declaredFirstPartyTools("word", { ...entry, environment }, manifest, fs.readFileSync)).toBeUndefined()
+    expect(declaredFirstPartyTools("word", { ...entry, cwd: ROOT }, manifest, fs.readFileSync)).toBeUndefined()
+    const original = JSON.parse(fs.readFileSync(manifest, "utf8")).formats.word
+    const file = path.join(resources, "office-mcp", "invalid.json")
+    for (const change of [{ codeSha256: {} }, { codeSha256: { "../escape": "a".repeat(64) } }, { codeSha256: { "office-mcp/server.py": "0".repeat(64) } }, { recipe: [{ id: "python/darwin-arm64/3.12.16-20261124", archive: "tar.gz", entry: "../escape", required: ["../escape"] }] }]) {
+      fs.writeFileSync(file, JSON.stringify({ formats: { word: { ...original, ...change } } }))
+      expect(declaredFirstPartyTools("word", entry, file, fs.readFileSync)).toBeUndefined()
+    }
+    const expected = { CODEPUPPY_DOCUMENT_HOST: "/private/python-host/7/registration/host.json" }
+    expect(declaredFirstPartyTools("word", { ...entry, environment: { ...expected, NODE_OPTIONS: "--inspect" } }, manifest, fs.readFileSync, expected)).toBeUndefined()
   }))
 
   let previous: string | undefined
@@ -972,4 +1025,183 @@ describe("video progress", () => {
       expect(second).toEqual([{ phase: "decoding", completed: 2000, total: 10000, unit: "ms" }, { phase: "transcribing", completed: 2000, total: 10000, unit: "ms" }])
     }),
   )
+})
+
+// Integration layer, pure source classification: a coarse network code must never imply retry.
+testEffect(Layer.empty).effect("launcher download classification uses final transport facts and preserves deterministic failures", () => Effect.sync(() => {
+  for (const failure of [{ kind: "connect", detail: "refused" }, { kind: "timeout", detail: "idle" }, { kind: "http", status: 503, detail: "upstream" }, { kind: "http", status: 429, detail: "busy" }] as const) {
+    expect(classifyStartFailure(undefined, { type: "local" }, { download: { result: { ok: false, error: "network" }, failure } }).failure).toEqual({ kind: "download", detail: failure.detail })
+  }
+  for (const failure of [{ kind: "http", status: 404, detail: "not published" }, { kind: "http", status: 403, detail: "registry forbidden" }, { kind: "integrity", detail: "digest mismatch" }, { kind: "disk", detail: "disk full" }, { kind: "resolution", detail: "requires-python conflict" }] as const) {
+    expect(classifyStartFailure(undefined, { type: "local" }, { download: { result: { ok: false, error: "network" }, failure } }).failure).toEqual({ kind: "unknown", detail: failure.detail })
+  }
+  expect(classifyStartFailure(undefined, { type: "local" }, { download: { result: { ok: false, error: "network" } } }).failure?.kind).toBe("unknown")
+}))
+
+// Integration, affected PR/nightly: real SDK peers and our own tool/recipe. No runtime archive or timer fixture.
+async function pinnedFilesPeers(prepare: ConnectorLaunchHost["prepareFiles"]) {
+  const client = new Client({ name: "owned-pinned-client", version: "1" }, { versionNegotiation: { mode: "legacy" } })
+  const server = new Server({ name: "owned-pinned-server", version: "1" }, { capabilities: { tools: {} } })
+  const id = "speech-model/any/own-fixture" as const
+  const tools = [{ name: "own", inputSchema: { type: "object" as const } }]
+  const managed = {
+    binding: { identity: { directory: ROOT, server: "own", attempt: crypto.randomUUID() }, sidecarGeneration: "owned-generation", entry: { type: "local" as const, command: ["owned-service"] }, declarationSha256: "a".repeat(64), recipeSha256: "b".repeat(64) },
+    declaration: { tools, recipe: [{ id, archive: "file" as const, entry: "model", required: ["model"] }], declarationSha256: "a".repeat(64), recipeSha256: "b".repeat(64) },
+  }
+  const pinned = registerPinnedFilesHandler(client, managed, prepare)
+  const [left, right] = InMemoryTransport.createLinkedPair()
+  await Promise.all([client.connect(left), server.connect(right)])
+  const request = (meta: MetaObject, params: Record<string, unknown> = { ids: [id] }) => server.request({ method: "codepuppy/pinned-files.ensure", params: { ...params, _meta: meta } }, fromJsonSchema({ type: "object" }))
+  return { client, server, pinned, managed, id, tools, request, async close() { pinned.close(); await Promise.all([client.close(), server.close()]) } }
+}
+
+test("managed pinned requests validate all ids and active call metadata before host IO", async () => {
+  const requests: unknown[] = []
+  const f = await pinnedFilesPeers(async (input) => { requests.push(input); return { ok: true, files: input.ids.map((id) => ({ id, path: "/owned/model" })) } })
+  try {
+    await expect(f.request({})).rejects.toMatchObject({ code: -32600 })
+    f.pinned.listed(f.tools)
+    await expect(f.request({ "codepuppy/pinned-files.call": crypto.randomUUID(), "codepuppy/pinned-files.deadline": Date.now() })).rejects.toMatchObject({ code: -32600 })
+    let previous: MetaObject = {}
+    await f.pinned.withCall({ preparation: { callID: Tool.CallID.make("owned-call"), report: async () => {} }, signal: new AbortController().signal, deadline: Date.now() + 10_000, run: async (meta) => {
+      previous = meta
+      await expect(f.request({ ...meta, "codepuppy/pinned-files.deadline": Number(meta["codepuppy/pinned-files.deadline"]) + 1 })).rejects.toMatchObject({ code: -32600 })
+      for (const params of [{ ids: [] }, { ids: [f.id], url: "https://outside.invalid" }, { ids: [f.id, "speech-model/any/not-in-recipe"] }])
+        await expect(f.request(meta, params)).rejects.toMatchObject({ code: -32602 })
+      expect(requests).toEqual([])
+      expect(await f.request(meta, { ids: [f.id, f.id] })).toEqual({ ok: true, files: [{ id: f.id, path: "/owned/model" }] })
+    } })
+    expect(requests).toEqual([{ binding: f.managed.binding, ids: [f.id] }])
+    await expect(f.request(previous)).rejects.toMatchObject({ code: -32600 })
+  } finally { await f.close() }
+})
+
+test("managed pinned calls keep concurrent progress with its own call and revoke on finish", async () => {
+  const callbacks: Array<{ signal: AbortSignal; progress: (update: PinnedPreparationProgress) => void; finish: () => void }> = []
+  let both: () => void = () => {}
+  const ready = new Promise<void>((resolve) => { both = resolve })
+  const f = await pinnedFilesPeers((_input, signal, progress) => new Promise((resolve) => {
+    callbacks.push({ signal, progress, finish: () => resolve({ ok: false, error: "network" }) })
+    if (callbacks.length === 2) both()
+  }))
+  try {
+    f.pinned.listed(f.tools)
+    const updates: PinnedPreparationProgress[][] = [[], []]
+    const metadata: MetaObject[] = []
+    const run = (index: number) => f.pinned.withCall({ preparation: { callID: Tool.CallID.make(`owned-${index}`), report: async (update) => { updates[index]!.push(update) } }, signal: new AbortController().signal, deadline: Date.now() + 10_000, run: (meta) => { metadata[index] = meta; return f.request(meta) } })
+    const first = run(0)
+    const second = run(1)
+    await ready
+    callbacks[1]!.progress({ id: f.id, phase: "download", sequence: 999, receivedBytes: 2, totalBytes: 4 })
+    callbacks[0]!.progress({ id: f.id, phase: "verify", sequence: 999 })
+    callbacks.forEach((entry) => entry.finish())
+    expect(await Promise.all([first, second])).toEqual([{ ok: false, error: "network" }, { ok: false, error: "network" }])
+    expect(metadata[0]!["codepuppy/pinned-files.call"]).not.toBe(metadata[1]!["codepuppy/pinned-files.call"])
+    expect(updates).toEqual([[{ id: f.id, phase: "verify", sequence: 1 }], [{ id: f.id, phase: "download", sequence: 1, receivedBytes: 2, totalBytes: 4 }]])
+    callbacks[0]!.progress({ id: f.id, phase: "ready", sequence: 1000 })
+    expect(updates[0]).toHaveLength(1)
+    expect(callbacks.every((entry) => entry.signal.aborted)).toBe(true)
+  } finally { await f.close() }
+})
+
+test("refuted managed tools and ordinary calls get no pinned correlation", async () => {
+  const f = await pinnedFilesPeers(async () => { throw Error("must not reach host") })
+  try {
+    f.pinned.listed(f.tools)
+    const ordinary = await f.pinned.withCall({ signal: new AbortController().signal, deadline: Date.now() + 10_000, run: async (meta) => meta })
+    expect(ordinary).toEqual({})
+    f.pinned.listed([{ ...f.tools[0]!, description: "changed" }])
+    f.pinned.listed(f.tools)
+    const refuted = await f.pinned.withCall({ preparation: { callID: Tool.CallID.make("owned-refuted"), report: async () => {} }, signal: new AbortController().signal, deadline: Date.now() + 10_000, run: async (meta) => meta })
+    expect(refuted).toEqual({})
+    await expect(f.request({})).rejects.toMatchObject({ code: -32600 })
+  } finally { await f.close() }
+})
+
+test("managed pinned waiters cancel with their original call and reject late progress", async () => {
+  let entered: () => void = () => {}
+  const ready = new Promise<void>((resolve) => { entered = resolve })
+  let hostSignal: AbortSignal | undefined
+  let late: (() => void) | undefined
+  const updates: PinnedPreparationProgress[] = []
+  const f = await pinnedFilesPeers((_input, signal, progress) => new Promise((resolve) => {
+    hostSignal = signal
+    late = () => progress({ id: f.id, phase: "ready", sequence: 99 })
+    signal.addEventListener("abort", () => resolve({ ok: false, error: "cancelled" }), { once: true })
+    entered()
+  }))
+  try {
+    f.pinned.listed(f.tools)
+    const cancellation = new AbortController()
+    const call = f.pinned.withCall({ preparation: { callID: Tool.CallID.make("owned-cancel"), report: async (update) => { updates.push(update) } }, signal: cancellation.signal, deadline: Date.now() + 10_000, run: (meta) => f.request(meta) })
+    await ready
+    cancellation.abort()
+    expect(await call).toEqual({ ok: false, error: "cancelled" })
+    expect(hostSignal?.aborted).toBe(true)
+    late?.()
+    expect(updates).toEqual([])
+  } finally { await f.close() }
+})
+
+// Integration, affected PR/nightly: actual connection constructs the binding, real stdio/SDK
+// sends the nested request. Host is the frozen port, not the #1759-dependent app root.
+test("production MCP connection registers pinned requests only for its verified managed context", async () => {
+  const id = "speech-model/any/own-production-fixture" as const
+  const tools = [{ name: "echo", description: "echo", inputSchema: { type: "object" as const, properties: { text: { type: "string" } } } }]
+  const calls: unknown[] = []
+  const updates: PinnedPreparationProgress[] = []
+  const snapshots: LaunchSnapshot[] = []
+  const config = local({}, { protocol: "legacy" })
+  const launchers: LauncherEnvironment = { platform: "darwin-arm64", pinSet: "a".repeat(64), uv: path.join(ROOT, "uv"), uvx: path.join(ROOT, "uvx"), node: process.execPath, npmCli: path.join(ROOT, "npm.js"), npxCli: path.join(ROOT, "npx.js"), runtimeRoot: path.join(ROOT, "runtime"), pythonFileId: "python/darwin-arm64/3.12.16-20261124", packageManagerEnv: {}, environment: {}, firstPartyCacheRoots: {} }
+  const declaration = { tools, recipe: [{ id, archive: "file" as const, entry: "model", required: ["model"] }], declarationSha256: "a".repeat(64), recipeSha256: "b".repeat(64) }
+  const unused = async (): Promise<never> => { throw Error("unused host port") }
+  const host: ConnectorLaunchHost = {
+    ensureFile: unused,
+    changed: (snapshot) => { snapshots.push(structuredClone(snapshot)) },
+    runtimeDependencies: async () => ({ runtimeDep: [], executables: {}, missing: [] }),
+    beginEgress: unused, egressEvidence: unused, endEgress() {}, resolveAssets: async () => launchers,
+    prepareFiles: async (input, signal, progress) => {
+      calls.push(input)
+      expect(signal.aborted).toBe(false)
+      progress({ id, phase: "ready", sequence: 500 })
+      return { ok: true, files: [{ id, path: "/owned/production-model" }] }
+    },
+  }
+  // The publication contract remains once per process. This is still the only publisher.
+  publishConnectorLaunchHost(host)
+  const output = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+    const environment = yield* Environment.Service
+    const scope = yield* Effect.scope
+    const connection = McpConnection.make({
+      name: "own", config, directory: ROOT, environment, scope, fetch: globalThis.fetch,
+      authProvider: Effect.succeed(undefined), elicitation: { create: () => Effect.die("unused"), complete: () => Effect.void },
+      lock: (effect) => effect, callbacks: (effect) => Effect.runFork(effect), fork: (effect) => Effect.runFork(effect),
+      localLaunch: { sidecarGeneration: "owned-generation", runtimeRoot: launchers.runtimeRoot, secrets: [], host, firstParty: { launchers, declaration } },
+      events: { connecting: Effect.void, connected: Effect.void, failed: () => Effect.die("must connect"), settled: Effect.void, closed: () => Effect.void, changed: () => Effect.void },
+    })
+    expect(calls).toEqual([])
+    yield* connection.start
+    expect(connection.client).toBeDefined()
+    expect(calls).toEqual([])
+    const callContext = yield* Effect.context()
+    return yield* connection.client!.callTool({ name: "echo", args: { ensure_pin: id }, preparation: { callID: Tool.CallID.make("owned-production-call"), report: (update) => Effect.runPromiseWith(callContext)(Effect.sync(() => { updates.push(update) })) } })
+  })).pipe(Effect.provide(hostEnvironmentLayer)))
+  expect(output.content).toEqual([{ type: "text", text: JSON.stringify({ ok: true, files: [{ id, path: "/owned/production-model" }] }) }])
+  expect(snapshots.map((row) => row.state.phase)).toEqual(["preparing", "connecting", "connected"])
+  expect(calls).toEqual([{ binding: { identity: snapshots[0]!.identity, sidecarGeneration: "owned-generation", entry: { type: "local", command: config.command, environment: config.environment, cwd: config.cwd }, declarationSha256: declaration.declarationSha256, recipeSha256: declaration.recipeSha256 }, ids: [id] }])
+  expect(updates).toEqual([{ id, phase: "ready", sequence: 1 }])
+})
+
+test("ordinary MCP client exposes no managed pinned-file request handler", async () => {
+  const server = new Server({ name: "owned-ordinary-server", version: "1" }, { capabilities: { tools: {} } })
+  const [left, right] = InMemoryTransport.createLinkedPair()
+  await server.connect(right)
+  try {
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      yield* McpClient.connect({ server: "ordinary", directory: ROOT, config: { type: "attached", transport: left } })
+      yield* Effect.promise(async () => {
+        await expect(server.request({ method: "codepuppy/pinned-files.ensure", params: { ids: ["speech-model/any/owned-fixture"] } }, fromJsonSchema({ type: "object" }))).rejects.toMatchObject({ code: -32601 })
+      })
+    })).pipe(Effect.provide(hostEnvironmentLayer)))
+  } finally { await server.close() }
 })

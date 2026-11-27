@@ -1,3 +1,4 @@
+import type { ConnectorLaunchFailure, PinnedFileDelivery } from "@opencode/util/codepuppy-connector-launch"
 /**
  * Code Puppy's MCP startup rules on OpenCode 2 (#1563, #1572; #1662 L4 ruling item 5). Used by the re-taken
  * `client.ts` (classification at the source), `connection.ts` (start concurrency) and `index.ts` (background
@@ -31,6 +32,7 @@ export interface StartFailure {
   /** A registered code: index.ts prefixes the failed status with it, and the desktop reads it back (#1564). */
   readonly code: CodepuppyFailureCode
   readonly reconnect: boolean
+  readonly failure?: ConnectorLaunchFailure
 }
 
 const RECONNECT_CODES = new Set([
@@ -50,18 +52,41 @@ const RECONNECT_CODES = new Set([
  */
 export function classifyStartFailure(
   error: unknown,
-  config: { readonly type: string; readonly url?: string },
-  hints: { readonly timedOut?: boolean; readonly httpStatus?: number } = {},
+  config: { readonly type: string; readonly url?: string; readonly command?: readonly string[] },
+  hints: { readonly timedOut?: boolean; readonly httpStatus?: number; readonly download?: PinnedFileDelivery; readonly preparation?: { readonly stderr: string } } = {},
   env: Record<string, string | undefined> = process.env,
   egressProxy: string | undefined = tryCodePuppyBootstrap()?.network.egressProxy,
 ): StartFailure {
+  if (hints.preparation) {
+    const detail = hints.preparation.stderr
+    const http = /(?:^Requirement source HTTP (\d{3})(?: https?:\/\/\S+)?\s*$|^npm (?:error|ERR!) code E(\d{3})\s*$|HTTP status (?:client|server) error \((\d{3})\b)/m.exec(detail)
+    const code = /(?:^(?:npm (?:error|ERR!) code|Connector source code) ([A-Z][A-Z_0-9]+)\s*$|\breason: connect ([A-Z][A-Z_0-9]+)\b)/m.exec(detail)
+    const status = http ? Number(http[1] ?? http[2] ?? http[3]) : undefined
+    const errno = code?.[1] ?? code?.[2]
+    const network = classifyNetFailure({ code: errno, status, message: detail }, { via: "other" })
+    const temporary = status !== undefined ? status === 429 || status >= 500 && status < 600
+      : network !== undefined && ["dns", "tcp", "connect-timeout", "timeout"].includes(network.layer) || errno === "ETIMEDOUT" || errno === "ESOCKETTIMEDOUT" || /Failed to (?:fetch|download)[\s\S]*\b(?:operation|request) timed out\b/.test(detail)
+    return { code: "spawn_failed", reconnect: false, failure: { kind: temporary ? "download" : "unknown", detail } }
+  }
+  if (hints.download && !hints.download.result.ok) {
+    const fact = hints.download.failure
+    const temporary = fact?.kind === "connect" || fact?.kind === "timeout" || (fact?.kind === "http" && (fact.status === 429 || fact.status >= 500))
+    return { code: "spawn_failed", reconnect: false, failure: { kind: temporary ? "download" : "unknown", detail: fact?.detail ?? hints.download.result.error } }
+  }
   const remote = config.type === "remote"
   if (hints.timedOut) return { code: "handshake_timeout", reconnect: remote }
   if (!remote) {
     if (PlatformError.isPlatformError(error) && error.reason._tag === "NotFound") {
       // The spawner checks the working directory (FileSystem.access) before it spawns the command.
-      if (error.reason.module === "FileSystem") return { code: "workspace_missing", reconnect: false }
-      if (error.reason.module === "ChildProcess") return { code: "dependency_missing", reconnect: false }
+      if (error.reason.module === "FileSystem")
+        return { code: "workspace_missing", reconnect: false, failure: { kind: "workspace", reason: "missing" } }
+      if (error.reason.module === "ChildProcess")
+        return {
+          code: "dependency_missing", reconnect: false,
+          ...(config.command?.[0] !== undefined
+            ? { failure: { kind: "dependency", program: config.command[0] } as const }
+            : {}),
+        }
     }
     return { code: "spawn_failed", reconnect: false }
   }

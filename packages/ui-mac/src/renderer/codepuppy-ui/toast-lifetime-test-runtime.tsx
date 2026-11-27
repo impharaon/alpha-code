@@ -63,4 +63,4 @@ export { CatalogProblemWatcher } from "./catalog-problem-watcher"
 export { BackgroundProblemWatcher } from "./background-problem-watcher"
 import { extHubOpen, hubSection } from "../extensions/ext-hub-state"
 export const hubState = () => ({ open: extHubOpen(), section: hubSection() })
-export { setHubSection, takeHubLocateTarget } from "../extensions/ext-hub-state"
+export { setHubSection, takeHubLocateTarget, takePackageManagementTarget, setExtHubOpen } from "../extensions/ext-hub-state"

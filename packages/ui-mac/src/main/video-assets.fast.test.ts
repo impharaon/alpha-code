@@ -28,8 +28,6 @@ test("first complete zh/en preparation includes every speech role and target cod
 test("each video recipe references a unique pinned delivery and requires its actual entry", () => {
   expect(new Set(pins.files.map((file) => file.id)).size).toBe(pins.files.length)
   for (const recipe of videoRecipes) {
-    // Python pins are contributed by #1760, not duplicated by the video owner.
-    if (recipe.id.startsWith("python/")) continue
     expect(pins.files.find((file) => file.id === recipe.id)).toBeDefined()
     expect(recipe.required).toContain(recipe.entry)
   }

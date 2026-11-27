@@ -1,6 +1,8 @@
 import type { Plugin } from "@opencode/plugin"
 import type { PinnedFiles } from "../../util/src/codepuppy-pinned-files"
-import { documentHost, type DocumentCaller, type DocumentHost } from "../../util/src/codepuppy-document"
+import { documentHost, publishDocumentHost, type DocumentCaller, type DocumentHost } from "../../util/src/codepuppy-document"
+import { createDocumentHostBridge } from "./document-host-bridge"
+import type { HubBridge } from "./hub-bridge"
 import { createDocumentInspection, subscribeDocumentChecks } from "./document-check"
 import { createDocumentRenderer } from "./document-render"
 import { createDocumentTool } from "./document-tool"
@@ -54,6 +56,18 @@ export function documentToolForLocation(location: DocumentCaller["location"]) {
       }
     },
   })
+}
+
+const PUBLISHED_HOST = Symbol.for("codepuppy.ext.document-host-bridge")
+/** One bridge-backed host per sidecar process, published before any Location calls it; ext is evaluated once per Location. */
+export function publishedDocumentHost(bridge: HubBridge, sidecarGeneration: number) {
+  const holder = globalThis as { [PUBLISHED_HOST]?: ReturnType<typeof createDocumentHostBridge> }
+  const existing = holder[PUBLISHED_HOST]
+  if (existing) return existing
+  const published = createDocumentHostBridge(bridge, sidecarGeneration)
+  publishDocumentHost(published.host)
+  holder[PUBLISHED_HOST] = published
+  return published
 }
 
 /** Called by the document bootstrap consumer with the launcher/main's verified projection, not model data. */

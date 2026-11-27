@@ -18,6 +18,7 @@ const input = (overrides: Partial<CodePuppyBootstrapInput> = {}): CodePuppyBoots
   factorySkillDirs: [],
   env: {},
   log: () => {},
+  sidecarGeneration: 3,
   ...overrides,
 })
 
@@ -60,7 +61,18 @@ describe("buildCodePuppyBootstrap(G1:路径与通道)", () => {
       registryChannel: "stable",
       ...NO_G2,
       ...NO_G3,
+      sidecarGeneration: 3,
     })
+  })
+
+  // Integration layer: the generation and the document projection reach the sidecar only through this builder (#1760 Q2/Q3).
+  test("the sidecar generation is main's own value and the document projection passes through the production parser", () => {
+    const documents = { python: "/app/office/bin/python3", assets: "/app/document-assets", templates: "/app/document-assets/templates", documentRuntimeRoot: "/u/data/document-runtime", verify: "/app/document-runtime/verify_runtime.py", render: "/app/document-runtime/render_document.py", recalculate: "/app/document-runtime/recalculate_document.py", libreoffice: [] }
+    expect(buildCodePuppyBootstrap(input({ sidecarGeneration: 0, documents })).sidecarGeneration).toBe(0)
+    expect(buildCodePuppyBootstrap(input({ documents })).documents).toEqual(documents)
+    expect(buildCodePuppyBootstrap(input())).not.toHaveProperty("documents")
+    expect(() => buildCodePuppyBootstrap(input({ sidecarGeneration: -1 }))).toThrow(expect.objectContaining({ reason: "invalid", path: "sidecarGeneration" }))
+    expect(() => buildCodePuppyBootstrap(input({ documents: { ...documents, verify: "verify_runtime.py" } }))).toThrow(expect.objectContaining({ reason: "invalid", path: "documents.verify" }))
   })
 
   test("没有 ext 目录 ⇒ ext 与随包清单都缺席;没有通道 ⇒ 通道缺席(sidecar 照今天跳过 override 注入)", () => {

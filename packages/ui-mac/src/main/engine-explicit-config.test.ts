@@ -88,6 +88,17 @@ describe("显式文件的合成", () => {
   })
 })
 
+// Fast layer, #1760 §4.4: launcher-prepared runners lose the synthetic first-fetch startup; other runners and explicit values keep theirs.
+test("uvx and npx keep the default handshake while bunx keeps its first-fetch startup and an explicit timeout wins", () => {
+  const user = { mcp: { git: { type: "local", command: ["uvx", "mcp-server-git"] }, browser: { type: "local", command: ["/usr/local/bin/npx", "-y", "@playwright/mcp"] }, bun: { type: "local", command: ["bunx", "tool"] }, own: { type: "local", command: ["bunx", "tool"], timeout: 9000 } } }
+  const { document } = composeExplicitDocument(JSON.stringify(user), LAYER)
+  const mcp = document.mcp as Record<string, unknown> & { servers?: Record<string, { timeout?: unknown }> }
+  expect(mcp.git).toEqual(user.mcp.git)
+  expect(mcp.browser).toEqual(user.mcp.browser)
+  expect(mcp.servers?.bun?.timeout).toEqual({ startup: 300_000 })
+  expect(mcp.own).toEqual(user.mcp.own)
+})
+
 describe("运行中:输入一变就重写显式文件", () => {
   const waitFor = async (pred: () => boolean, ms = 3_000) => {
     const until = Date.now() + ms

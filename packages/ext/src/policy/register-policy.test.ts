@@ -118,6 +118,7 @@ const setup = (options: Setup = {}) =>
     const plugins = yield* Plugin.Service
     const location = yield* Location.Service
     const services = yield* Effect.context<never>()
+    let registration: Awaited<ReturnType<typeof registerPolicy>> | undefined
     const tool = (name: string, key: keyof typeof counts, extra: Record<string, unknown> = {}) => ({
       name,
       description: name,
@@ -152,6 +153,7 @@ const setup = (options: Setup = {}) =>
       })),
       promisePlugin("codepuppy-ext", async (ctx: any) => {
         const policy = options.policy === false ? undefined : await registerPolicy(ctx, options.unattended ?? createUnattendedState())
+        registration = policy
         await ctx.tool.transform((editor: any) => editor.add(tool(ALIAS_PROBE, "probe")))
         await options.inside?.(ctx)
         await policy?.seal()
@@ -200,7 +202,8 @@ const setup = (options: Setup = {}) =>
       prompt: { text: "go" },
       delivery: "queue",
     } as never)
-    return { session }
+    // The Location's release (what plugin disposal runs), for cases that release while a call is running.
+    return { session, release: () => registration?.dispose() }
   })
 
 /** The catalog the model request is built from (`SessionContext.select`), after the context hook. */
@@ -1832,6 +1835,40 @@ describe("safe file tools", () => {
     expect(Exit.isSuccess(echoed)).toBe(true)
     expect(JSON.stringify(echoed).includes(second)).toBe(false)
     fs.rmSync(other, { recursive: true, force: true })
+  }))
+
+  // Design §10 SPEC5-03: a read of another project's protected file that runs across the Location's release finishes with
+  // its safe projection; without its descriptor the general mask does not know the file's values.
+  it.live("an outside project protected read running across release stays masked", () => Effect.gen(function* () {
+    const other = path.join(os.homedir(), "work", `other-${randomUUID()}`)
+    fs.mkdirSync(other, { recursive: true })
+    const file = path.join(other, ".env")
+    const value = randomUUID()
+    fs.writeFileSync(file, `TOKEN=${value}\nPORT=3000\n`)
+    const entered = Promise.withResolvers<void>(), resume = Promise.withResolvers<void>()
+    const { session, release } = yield* setup({
+      internal: [ReadTool.Plugin],
+      records: NEUTRAL,
+      rules: [ALLOW_ALL, { action: "external_directory", resource: "*", effect: "allow" }],
+      // Activated after the extension, so this hook runs once the read's masking transaction has begun.
+      after: promisePlugin("hold-read", async (ctx: any) => {
+        await ctx.tool.hook("execute.before", async (event: any) => {
+          if (event.tool !== "read") return
+          entered.resolve()
+          await resume.promise
+        })
+      }),
+    })
+    const fiber = yield* Effect.forkChild(callRaw(session.id, "read", { path: file }))
+    yield* Effect.promise(() => entered.promise)
+    release()
+    resume.resolve()
+    const read = yield* E.Fiber.join(fiber)
+    fs.rmSync(other, { recursive: true, force: true })
+    expect(Exit.isSuccess(read)).toBe(true)
+    expect(JSON.stringify(read).includes(value)).toBe(false)
+    expect(JSON.stringify(read)).toContain("TOKEN=[REDACTED]")
+    expect(JSON.stringify(read)).toContain("PORT=3000")
   }))
 
   it.live("env files mask only credential-named values", () => Effect.gen(function* () {

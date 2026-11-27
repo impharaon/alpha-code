@@ -1,30 +1,30 @@
 {
- "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at fc825e9e6d: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Message lineage: via the adapter, a prompt with agent build (2.x records agent-switched first; permission asks answered once), then summarize (compaction), then a composer shell command echo lineage. `final` = order=asc once the compaction settled and the shell exited.",
- "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-tfy1vU/proj",
- "sessionID": "ses_de507e532ffe9sMSmIhBYNAup4",
+ "_source": "Sampled by `bun packages/ui-mac/test-fixtures/engine-adapter-sampler/sample.ts` (alpha-code#1668 L6) at df6c3a1418: a real OpenCode 2 engine from this repo's packages/cli `serve`, isolated HOME/XDG, one git project, and the scripted OpenAI-compatible mock model next to the sampler. Message lineage: via the adapter, a prompt with agent build (2.x records agent-switched first; permission asks answered once), then summarize (compaction), then a composer shell command echo lineage. `final` = order=asc once the compaction settled and the shell exited.",
+ "directory": "/var/folders/w5/9ltc186j4xx99mfzlbmh8z0w0000gn/T/codepuppy-sampler-PpkkRI/proj",
+ "sessionID": "ses_de465679cffealrY8kgMxD9scx",
  "final": [
   {
-   "id": "msg_21af81ad0001PPSiJYTzCK1R33",
+   "id": "msg_21b9a9864001hdFLjO4R6Vh9KF",
    "time": {
-    "created": 1795748797136
+    "created": 1795759446116
    },
    "type": "agent-switched",
    "agent": "build"
   },
   {
-   "id": "msg_21af81ad20012nVZZywv3fNu3B",
+   "id": "msg_21b9a98660018OI6encLKhJZRO",
    "time": {
-    "created": 1795748797141
+    "created": 1795759446120
    },
    "text": "say hello plainly",
    "type": "user"
   },
   {
-   "id": "msg_21af81ada001279c0VSDwrjZR9",
+   "id": "msg_21b9a986c001ZookxHBEg981EG",
    "time": {
-    "created": 1795748797147,
-    "streamed": 1795748797274,
-    "completed": 1795748797286
+    "created": 1795759446125,
+    "streamed": 1795759446254,
+    "completed": 1795759446262
    },
    "type": "assistant",
    "agent": "build",
@@ -57,18 +57,18 @@
    }
   },
   {
-   "id": "msg_21af81b670027Lgn3hSpN4oQF6",
+   "id": "msg_21b9a98f7002JIGngFmm8wybkN",
    "time": {
-    "created": 1795748797287
+    "created": 1795759446263
    },
    "type": "idle",
    "outcome": "succeeded"
   },
   {
    "type": "compaction",
-   "id": "msg_21af81b9f001FH5yORfms7ODkm",
+   "id": "msg_21b9a993300163jE6R4bfVH01Q",
    "time": {
-    "created": 1795748797347
+    "created": 1795759446324
    },
    "status": "failed",
    "reason": "manual",
@@ -88,24 +88,24 @@
    }
   },
   {
-   "id": "msg_21af81dca001Wds0XvlzhKsbXE",
+   "id": "msg_21b9a9b3e0014LUur9UP7YoOaE",
    "time": {
-    "created": 1795748797898
+    "created": 1795759446846
    },
    "type": "idle",
    "outcome": "succeeded"
   },
   {
-   "id": "msg_21af81e35002hVzeKFoMfFgDWv",
+   "id": "msg_21b9a9b44002IVowIVgl3L4l1s",
    "metadata": {
     "background": true
    },
    "time": {
-    "created": 1795748798005,
-    "completed": 1795748798014
+    "created": 1795759446852,
+    "completed": 1795759446862
    },
    "type": "shell",
-   "shellID": "sh_21af81e32001P6p2W2MeS8s0at",
+   "shellID": "sh_21b9a9b42001G46sxa27tK82bA",
    "command": "echo lineage",
    "status": "exited",
    "exit": 0,
@@ -127,7 +127,7 @@
    "packages/core": "2eaadedb42c9606b47107521c45211971be9b7ce",
    "packages/latex": "abcd38e17eb09d996d975964f46be0a2e758fdf4",
    "packages/merman": "3feaef89d940956096deb30e2b9f85f3fabdfe15",
-   "packages/plugin": "f16f237205d777931695d221d76b1dfd00d6af19",
+   "packages/plugin": "fbc4ed3cf20490bcdf5f4842b56d5106c30aa0e2",
    "packages/plugin-browser": "a3fd121205a803d1a82d97514cc09245010656cb",
    "packages/protocol": "3117071f374c96909ccc2250cd5333a11d521854",
    "packages/schema": "593c77738f6932ee193f2d032eaf80c54c9a54c4",

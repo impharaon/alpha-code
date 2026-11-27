@@ -960,3 +960,18 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 | AC-10 开发入口 | `PROBE_PHASE=offline` exit 0：同一 userData、新进程第 2 代、代理拒绝一切出网：filesystem 1.2 s、fetch 3.1 s、playwright 4.1 s、chrome-devtools 4.2 s、markitdown 5.0 s 全部 connected，代理记录为空（没有任何 CONNECT 尝试），HOME 无新增 | `PROBE_PHASE=offline-arm` exit 0：同一入口改用随包 node + npx 的默认设置（无准备入口）→ 5.1 s 后 `failed`（进程 exit 1），代理记录三次 `registry.npmjs.org deny` |
 
 未取得：AC-03 北京/香港、AC-04 用户添加的带本机模块的 npx 包（uvx 一侧的 fetch 依赖 pydantic-core 原生扩展，已连上；npm 原生模块与签名 Node 的库验证属正式包）、AC-06 200 KB/s 限速、AC-09 Windows、正式包/干净账户——均属发布层或下一轮。HOME 下引擎自建的空 `opencode/shell/<hash>` 是否计入 AC-02 由验收方判定（非启动器路径，位于引擎自己的数据根）。
+
+**B 组真入口**（同一探针，`gate slot --`）：
+- BR-08 联网：`PROBE_PHASE=egress` exit 0：冷启动 filesystem，代理对 registry.npmjs.org 以用户拒绝作答 → 行 `failed {kind:"egress", host:"registry.npmjs.org", port:443}`（真 npm 经标记代理 URL 发 Proxy-Authorization，归属到本 attempt）；改为批准后 `connectorLaunchApi.openNetworkApproval(identity)` → `{ok:true}`，新 attempt `preparing → connecting → connected`。
+- AC-07 下载：`PROBE_PHASE=outage` exit 0：上游拨号恒拒（502）→ npm 自身重试与准备事务一次自动恢复后 `failed {kind:"download"}`（约 338 s）；恢复拨号后 `connectorLaunchApi.retry(identity)` → `{ok:true}` → connected。修 hub-bridge 后同一探针日志的「no pending request」噪音为 0（修前每次回包一行）。
+- 缺密钥、换文件夹：组件证据（`connector-launch-generation.test.ts` 真配置文件；R8 为既有 connect 加系统目录对话框，未在无窗口约束下点开对话框）。
+
+### r11 收据
+
+依据：SPEC v1、DESIGN v2.3、本节计划及核对行裁定、#1759 合入 `51b7963872`；已核：Claude Opus 5.5；结论 **PARTIAL**（A、B 代码完成，下列验收未取得）。本轮提交：`4322779e70`、`d0da542d6c`、`51b7963872`、`79010eb75b`、`c3098a329a`、`11a33c022b` 及本收据。
+
+相关检查一次：ui-mac 合入后 8 文件 113 PASS、接线后 7 文件 113 PASS、B 组 5 文件 99 PASS（server/sidecar-wiring/generation/sidecar/egress-proxy）、old-name-scan 等 4 文件 48 PASS；ext hub-bridge 19 PASS、identity/plugin-host 命名例 7 PASS、identity 全文件 23 PASS；core local-launch/collision/attach 24 PASS、mcp 命名例 4 PASS；util bootstrap+command-head 23 PASS；四包 `bun typecheck` exit 0；`bash scripts/north-star-guard.sh` exit 0；`affected-tests --list` exit 0：**affected tests: 433 of 763 test files**。移除臂（均 FAIL 后复原）：300 s 撤销（旧集合红）、R5 代理归属、secret 补充、hub-bridge 车道。
+
+未取得（仍待）：AC-03 北京/香港与入口不可达；AC-04 npm 一侧带本机模块的第三方包与签名 Node 库验证；AC-06 200 KB/s 限速；AC-09 Windows；正式包/干净账户/无弹窗；R8 显式 cwd 声明的改写端；文档行 unknown 失败的诊断（无进程 transcript）。
+
+遗留去向：①#1759 R1 env 里 pnpm 的 `npm_config_store_dir/cache_dir/state_dir` 让 npm 11 每次打印「Unknown env config」三行，并出现在下载失败的详情开头 → #1759 拥有者（或呈现层只取末行）；②网络中断时一次下载失败约需 338 s 才定论（npm 自身重试 × 准备事务一次恢复）→ 意图项（是否在 BR-06/07 下接受）；③AC-02 中引擎首次起子进程时在 HOME 的引擎数据根建空目录 `opencode/shell/<hash>` → 验收方判定是否计入；④开发树未做启动器预构建时不写描述（打包产物必有）→ 无需处理，已记偏离。OPTIONAL：无。

@@ -7,7 +7,7 @@ import type { HomebrewInstallation } from "./homebrew-installation"
 import { readHomebrewInstallations, homebrewFenceLocations } from "./homebrew-installation"
 import { engineAuthorization } from "./engine-authorization"
 import { toV1PermissionRequest } from "../engine-adapter/opencode2/v1-shapes"
-import type { WriteScopeRequest, WriteScopeReply } from "./codepuppy-sidecar-messages"
+import type { WriteScopeOutcome, WriteScopeRequest, WriteScopeReply } from "./codepuppy-sidecar-messages"
 import { parsePackageManagerEnvironmentRequest, type PackageManagerEnvironmentReply } from "../shared/package-manager-environment"
 import { publishVideoEnvironment } from "./codepuppy-video-environment"
 import { engineClient } from "./engine-client"
@@ -67,7 +67,7 @@ import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
 // sidecar 在 import 引擎之前 apply。计划做不出来 = 拒绝 fork(fail-closed,原因可读),不静默无围栏。
-import { planCredentialStores, plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
+import { checkWritableTarget, planCredentialStores, plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
 import { configureCommandSourceFence } from "./plugin-command-source"
 import { trialCompileProfile } from "./process-fence-compile"
 import type { ProcessFenceStartInput } from "./process-fence-apply"
@@ -87,7 +87,7 @@ import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteGrantRequester, createWriteProbeRequester, type WorkspaceWriteGrantReply, type WorkspaceWriteProbeFact } from "./workspace-write-probe"
 import { loadFenceAddon } from "./process-fence-apply"
-import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule, type ProcessFenceWriteRules } from "./process-fence-profile"
+import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule, type ProcessFenceWriteRules, type WorkspaceDirectoryInput } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, writableLocationTruthPath, type FenceRunWritable } from "./process-fence-workspaces"
@@ -331,7 +331,8 @@ function capturePackageManagerUserEnvironment(userDataPath: string, source: Reco
   return snapshot
 }
 
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; configFence?: ProcessFencePlan["configFence"]; roots?: ProcessFencePlan["roots"] }
+/** `eligibility`: the planner's identity/eligibility input (the same one R4 uses); R6 answers `ineligible` from it. */
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; eligibility?: WorkspaceDirectoryInput; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; configFence?: ProcessFencePlan["configFence"]; roots?: ProcessFencePlan["roots"] }
 
 type ProductionFenceInput = {
   userDataPath: string
@@ -475,7 +476,7 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
   await refreshGoEnvironment()
   Object.assign(input.sidecarEnv, projected.env)
   // The R7-verified R1/R3 fixed table: the write scope reports these targets as "fixed" (R6).
-  return { ...plan, fixedWritable: userLocations.rules, homebrewInstallations: installations, cacheEnv: projected.cacheEnv, refreshGoEnvironment, cancelGoQuery: () => cancellation.abort() }
+  return { ...plan, fixedWritable: userLocations.rules, eligibility: locationInput.eligibility, homebrewInstallations: installations, cacheEnv: projected.cacheEnv, refreshGoEnvironment, cancelGoQuery: () => cancellation.abort() }
 }
 
 /**
@@ -971,12 +972,18 @@ export async function spawnLocalServer(
   }
   const readWriteScope: SidecarListener["readWriteScope"] = async (request) => {
     if (exited || (fence && !writeRules)) return { error: "unavailable" }
-    return { revision: writeScopeRevision, targets: request.targets.map((target) => {
-      if (!fence) return { absolute: target.absolute, outcome: "no-fence" as const }
+    return { revision: writeScopeRevision, targets: request.targets.map((target): Extract<WriteScopeReply["result"], { targets: unknown }>["targets"][number] => {
+      // Filesystem semantics, never lexical: `P/link/../b` is written in the link target's parent (design v6 §4.2, R1-F1).
+      const directory = plannedWritableTarget(target.directory, realpathSync.native)
+      const answer = (outcome: WriteScopeOutcome) => ({ absolute: target.absolute, outcome, realDirectory: directory.target })
+      if (!fence) return answer("no-fence")
       const actual = plannedWritableTarget(target.absolute, realpathSync.native).target
-      const protectedTarget = processFenceRulesCover({ allow: writeRules!.deny, deny: [] }, actual, "file")
-      if (!protectedTarget && processFenceRulesCover({ allow: [...(fence.fixedWritable ?? [])], deny: writeRules!.deny }, actual, "file")) return { absolute: target.absolute, outcome: "fixed" as const }
-      return { absolute: target.absolute, outcome: protectedTarget ? "protected" as const : processFenceRulesCover({ allow: [...writeRules!.allow, ...[...grantedDirectories].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules!.deny }, actual, "file") ? "writable" as const : "needs-approval" as const }
+      if (processFenceRulesCover({ allow: writeRules!.deny, deny: [] }, actual, "file")) return answer("protected")
+      if (processFenceRulesCover({ allow: [...(fence.fixedWritable ?? [])], deny: writeRules!.deny }, actual, "file")) return answer("fixed")
+      if (processFenceRulesCover({ allow: [...writeRules!.allow, ...[...grantedDirectories].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules!.deny }, actual, "file")) return answer("writable")
+      // R4's own eligibility rule: a folder it would refuse to grant is never offered after the fact (BR-11).
+      if (fence.eligibility && !checkWritableTarget(fence.eligibility, directory).eligible) return answer("ineligible")
+      return answer("needs-approval")
     }) }
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。

@@ -87,10 +87,17 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots, credentia
       seen.delete(value)
     }
   }
+  // The engine's decline class, from a rejection of the engine's own permission assert (see `engineDecline`).
+  let declinePrototype: object | undefined
   const permissionCause = (cause: unknown, mode: "mask" | "hide", seen = new Set<object>()): unknown => {
     if (!cause || typeof cause !== "object" || seen.has(cause)) return undefined
     seen.add(cause)
     const source = cause as { _tag?: string; error?: unknown; message?: string; reason?: string; feedback?: string; rules?: unknown; permission?: string; resources?: unknown }
+    // A plain decline ends the step only while the engine recognises its class (PermissionDomain.assert). Only that class,
+    // learned from the engine's own assert (`engineDecline`), is kept — rebuilt, so nothing a tool attached survives; a
+    // tag string alone proves nothing and is dropped.
+    if (source._tag === "Permission.DeclinedError")
+      return declinePrototype !== undefined && Object.getPrototypeOf(cause) === declinePrototype ? Object.create(declinePrototype, { _tag: { value: source._tag, enumerable: true, configurable: true, writable: true } }) : undefined
     if (source._tag !== "Permission.BlockedError" && source._tag !== "Permission.CorrectedError")
       return permissionCause(source.error, mode, seen)
     const fields = mode === "hide"
@@ -439,6 +446,10 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots, credentia
           Object.defineProperty(wrapped, WRAPPED, { value: true })
           draft.execute = wrapped
         })
+    },
+    /** A rejection of the engine's own permission assert: its plain decline teaches the class `error` may keep. */
+    engineDecline: (error: unknown) => {
+      if (error && typeof error === "object" && (error as { _tag?: unknown })._tag === "Permission.DeclinedError") declinePrototype ??= Object.getPrototypeOf(error)
     },
     release: (call: MaskCall) => {
       calls.delete(toolCallKey(call))

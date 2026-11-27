@@ -13,6 +13,9 @@ const A = process.env.CODEPUPPY_WRITABLE_A!
 // project, and a project granted in an earlier generation is carried into later W1s, INT-safety R3.)
 const OUTSIDE = process.env.CODEPUPPY_WRITABLE_OUTSIDE!
 const sandbox = engineSandbox()
+// The ext reaches the production main of the parent test through this IPC channel when asked (directory-write-approval
+// engine cases: R6 queries); otherwise codepuppyEngine() gives it the shared fake main, as before.
+if (process.env.CODEPUPPY_WRITABLE_PARENT_PORT === "1") await import("../../../test-fixtures/process-fence/engine-parent-port-preload")
 let engine: Running | undefined
 let delayConsume = 0
 let starting: Promise<void> | undefined

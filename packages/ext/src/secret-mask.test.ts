@@ -308,6 +308,27 @@ test("permission causes retain session rejection and masked feedback", async () 
   }
 })
 
+// A plain decline must stay recognisable so the engine ends the step (v7 BR-11, a rejected folder card), but only the
+// engine's own: a tag string proves nothing, and nothing a tool attached to the error survives either way.
+test("a decline is kept only as the engine's class with no caller text; a forged tag is dropped", async () => {
+  const { Permission } = await import("../../core/src/permission")
+  const { toSessionError } = await import("../../core/src/session/to-session-error")
+  const { mask, values: [value] } = await setup()
+  const forged = Object.assign(new Error(`declined ${value}`), { _tag: "Permission.DeclinedError" })
+  for (const hidden of [false, true]) {
+    const safe = await mask.error({ call, tool: "probe", error: new Tool.Error({ message: "Unable to finish", error: forged }) })
+    expect({ hidden, leaked: JSON.stringify(safe).includes(value) || toSessionError(safe).message.includes(value) || String((safe.error as { message?: unknown } | undefined)?.message).includes(value) }).toEqual({ hidden, leaked: false })
+    expect(safe.error).toBeUndefined()
+  }
+  // The engine's own decline, as its permission assert raised it to the extension, then carrying text added by a tool.
+  const genuine = new Permission.DeclinedError()
+  mask.engineDecline(genuine)
+  Object.defineProperty(genuine, "message", { value: `declined ${value}`, configurable: true })
+  const safe = await mask.error({ call, tool: "probe", error: new Tool.Error({ message: "Unable to finish", error: genuine }) })
+  expect(safe.error).toBeInstanceOf(Permission.DeclinedError)
+  expect(JSON.stringify(safe).includes(value) || String((safe.error as { message?: unknown }).message).includes(value) || toSessionError(safe).message.includes(value)).toBe(false)
+})
+
 // The engine recognises only its own error class; the gate's unattended denial carries no permission cause.
 test.each([
   { title: "permission rejection", cause: true, hidden: false },

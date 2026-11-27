@@ -28,7 +28,7 @@ import os from "node:os"
 import path from "node:path"
 import type { Plugin } from "@opencode/plugin"
 import { createCatalog } from "./catalog"
-import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, attachWriteDenied, displaySnapshot, wrapForDisplay } from "./display"
+import { attachDirectoryDisplay, attachUnattendedDenial, attachNetFailure, attachTerminal, attachWriteDenied, displaySnapshot, refusedWriteNote, refusedWritePaths, wrapForDisplay } from "./display"
 import { PACKAGE_INVOCATION_ALLOW, PACKAGE_HOOK_DECISION, packageCallAllows, confirm, decide, effectiveFor, gateWithoutToolCall, holdAsk, holdUnattendedDeny, isInstallAsk, deepFreeze, pin, type GateCall, type GateDecision, type GateDeps } from "./gate"
 import {
   codeModeFacts,
@@ -76,6 +76,9 @@ export interface PolicyRegistration {
 /** One tool call: provider call IDs repeat across sessions and messages, so all three identify it. */
 export type InstallCall = { readonly sessionID: string; readonly messageID: string; readonly id: string }
 const toolCallKey = (call: InstallCall) => JSON.stringify([call.sessionID, call.messageID, call.id])
+
+/** Marks the after-the-fact approval wrapper on the shell tool (v7 BR-11), so a rebuild never wraps twice. */
+const REFUSED_WRITE_WRAPPED = Symbol.for("codepuppy.policy.refused-write")
 
 /** MCP argv placeholder replaced with the Location directory at spawn time (#1011, REQ-134). */
 export const WORKSPACE_PLACEHOLDER = "{workspace}"
@@ -225,6 +228,11 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     return [...configured, ...(permissions ?? []).filter((rule) => rule.effect === "deny"), ...(facts ? invocationRules(sessionID, facts, call?.input) : []), ...(hook && facts ? packageHookRules(hook, facts) : [])]
   }
 
+  // Every approval the extension asks goes to the engine here; a plain decline it raises is the one the error mask keeps.
+  const assertPermission = (input: unknown) => context.permission.assert(input as never).catch((error: unknown) => {
+    secrets.engineDecline(error)
+    throw error
+  })
   const deps: GateDeps = {
     protectedRoots: secrets.roots,
     profile,
@@ -233,7 +241,137 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     facts: factsFor,
     ruleset,
     directory: () => context.location.directory,
-    assert: (input) => context.permission.assert(input as never),
+    assert: (input) => assertPermission(input),
+  }
+
+  // ── SPEC child-process-write-fence v7 BR-11 (design v6 §4.3, §4.3.1, §4.4): a write refused mid-command ───────────
+  // When a shell command's own error names the full path of a refused write, the folder gets BR-08's card after the
+  // command (same request shape, same R4 grant on click). This path only proposes; main decides (R6) and grants (R4).
+  type RefusedWriteCall = { sessionID: string; agent?: string; messageID: string; id: string }
+  type RefusedWriteCard = { owner: { messageID: string; id: string }; keys: string[]; members: Set<string>; decision: Promise<void> }
+  // Pending cards, one entry per session + real directory; a card ends (any outcome) before its entries are dropped.
+  const refusedWriteCards = new Map<string, RefusedWriteCard>()
+  // Owners whose card was withdrawn before the engine created its request: the evaluate hook denies that request.
+  const withdrawnRefusedWrites = new Set<string>()
+  // Calls whose refused folders the user approved; read and dropped by execute.after (toolCallKey: ids repeat across sessions).
+  const approvedRefusedWrites = new Set<string>()
+  // Background shells (session + shell ID) whose result has not reached a request yet, and the decisions recorded for them.
+  const backgroundShells = new Map<string, RefusedWriteCall>()
+  const backgroundDecisions = new Map<string, Promise<void>>()
+  const backgroundOutcomes = new Map<string, "approved" | "refused">()
+  const withdrawRefusedWriteCard = async (sessionID: string, card: RefusedWriteCard) => {
+    for (const key of card.keys) if (refusedWriteCards.get(key) === card) refusedWriteCards.delete(key)
+    const owner = toolCallKey({ sessionID, ...card.owner })
+    withdrawnRefusedWrites.add(owner)
+    const listed = await context.permission.list({ sessionID } as never).catch(() => [])
+    const pending = ((listed as { data?: unknown }).data ?? listed) as readonly { id: string; action: string; source?: { type: string; messageID: string; id: string } }[]
+    const request = pending.find((item) => item.action === "external_directory" && item.source?.type === "tool" && item.source.messageID === card.owner.messageID && item.source.id === card.owner.id)
+    // Reject is the only reply that cannot grant; the engine retracts the card with a replied event.
+    if (request) await context.permission.reply({ sessionID, requestID: request.id, decision: "reject" } as never).catch(() => undefined)
+  }
+  /** AB3: offer the card for the folders `output` names; resolves "approved" once main reads every one as writable. */
+  const approveRefusedWrites = async (call: RefusedWriteCall, output: string, signal?: AbortSignal): Promise<"approved" | "not-offered"> => {
+    const paths = refusedWritePaths(output)
+    if (!paths.length || !readWriteScope) return "not-offered"
+    // Nobody can click a card in an unattended run: its result and note stay as they are.
+    if (await profile(call.sessionID, call.agent) !== undefined) return "not-offered"
+    // The folder is the refused object's parent: creating, writing and renaming happen there.
+    const targets = paths.map((absolute) => ({ absolute, directory: path.dirname(absolute) }))
+    const classify = async (asked: typeof targets) => {
+      const scope = await readWriteScope({ access: "write", targets: asked }).catch(() => undefined)
+      return !scope || "error" in scope || scope.targets.length !== asked.length || scope.targets.some((target, index) => target.absolute !== asked[index]!.absolute) ? undefined : scope.targets
+    }
+    const scope = await classify(targets)
+    if (!scope) return "not-offered"
+    // The card's folder is the one main resolved now, not the path text: a link re-pointed later (to HOME, say) cannot
+    // change what the card shows, merges on or grants. The raw path stays for main's re-check.
+    const offered = new Map<string, (typeof targets)[number]>()
+    scope.forEach((target, index) => { if (target.outcome === "needs-approval" && !offered.has(target.realDirectory)) offered.set(target.realDirectory, { absolute: targets[index]!.absolute, directory: target.realDirectory }) })
+    if (!offered.size) return "not-offered"
+    const key = toolCallKey(call)
+    const waiting = new Set<RefusedWriteCard>()
+    const fresh = [...offered].filter(([real]) => {
+      const joined = refusedWriteCards.get(call.sessionID + "\0" + real)
+      if (joined) waiting.add(joined)
+      return !joined
+    })
+    if (fresh.length) {
+      const resources = fresh.map(([real]) => `${real}/*`)
+      const card: RefusedWriteCard = {
+        owner: { messageID: call.messageID, id: call.id },
+        keys: fresh.map(([real]) => call.sessionID + "\0" + real),
+        members: new Set(),
+        decision: assertPermission({
+          sessionID: call.sessionID,
+          ...(call.agent ? { agent: call.agent } : {}),
+          action: "external_directory",
+          resources,
+          save: resources,
+          metadata: { directoryAccess: { access: "write", targets: fresh.map(([, target]) => target) } },
+          source: { type: "tool", messageID: call.messageID, id: call.id },
+        } as never),
+      }
+      for (const entry of card.keys) refusedWriteCards.set(entry, card)
+      const settled = () => {
+        for (const entry of card.keys) if (refusedWriteCards.get(entry) === card) refusedWriteCards.delete(entry)
+        withdrawnRefusedWrites.delete(toolCallKey({ sessionID: call.sessionID, ...card.owner }))
+      }
+      card.decision.then(settled, settled)
+      waiting.add(card)
+    }
+    for (const card of waiting) card.members.add(key)
+    const leave = () => {
+      for (const card of waiting) {
+        card.members.delete(key)
+        // The last waiting call stopped and the card is still open: nobody is left to receive its answer.
+        if (card.members.size === 0 && card.keys.some((entry) => refusedWriteCards.get(entry) === card)) void withdrawRefusedWriteCard(call.sessionID, card)
+      }
+    }
+    try {
+      // Every member rethrows the card's own error: one rejection ends every call waiting on it, as the engine does.
+      await Promise.race([
+        Promise.all([...waiting].map((card) => card.decision)),
+        ...(signal ? [new Promise<never>((_, reject) => {
+          if (signal.aborted) reject(signal.reason)
+          signal.addEventListener("abort", () => reject(signal.reason), { once: true })
+        })] : []),
+      ])
+    } catch (error) {
+      if (signal?.aborted) leave()
+      throw error
+    }
+    for (const card of waiting) card.members.delete(key)
+    // Main's facts decide, not the reply: every offered folder must now read as writable.
+    const after = await classify([...offered.values()])
+    return after?.every((target) => target.outcome === "writable" || target.outcome === "fixed" || target.outcome === "no-fence") ? "approved" : "not-offered"
+  }
+  /** AB5: a background shell's result reaches the model as the engine's `<shell id="…" state="…">` notification. */
+  const approveBackgroundRefusedWrites = async (event: { sessionID: string; messages: unknown[] }) => {
+    type MessageLike = { role?: unknown; content?: unknown; constructor: new (fields: Record<string, unknown>) => unknown }
+    for (const [index, raw] of event.messages.entries()) {
+      const message = raw as MessageLike
+      if (message.role !== "user" || !Array.isArray(message.content)) continue
+      const text = (message.content[0] as { type?: unknown; text?: unknown } | undefined)?.text
+      if (typeof text !== "string") continue
+      const shellID = /^<shell id="([^"]+)" state="/.exec(text)?.[1]
+      if (!shellID) continue
+      const key = event.sessionID + "\0" + shellID
+      const call = backgroundShells.get(key)
+      if (call && !backgroundDecisions.has(key)) {
+        backgroundShells.delete(key)
+        const body = text.slice(text.indexOf("\n") + 1).replace(/\n<\/shell>$/, "")
+        // The card belongs to the finished command, not to this request: it survives a stopped request (no signal).
+        const decided = approveRefusedWrites(call, body).then(
+          (outcome) => { if (outcome === "approved") backgroundOutcomes.set(key, "approved") },
+          // A refusal is caught here: throwing would fail this model request, and no tool call is running to end.
+          () => { backgroundOutcomes.set(key, "refused") },
+        ).finally(() => backgroundDecisions.delete(key))
+        backgroundDecisions.set(key, decided)
+      }
+      await backgroundDecisions.get(key)
+      const note = refusedWriteNote(backgroundOutcomes.get(key))
+      if (note) event.messages[index] = new message.constructor({ ...message, content: [...message.content, { type: "text", text: note }] })
+    }
   }
 
   // Early registry: what OpenCode's internal plugins registered before the extension (identity.ts `builtin`).
@@ -265,6 +403,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
   })
 
   await context.session.hook("context", async (event) => {
+    await approveBackgroundRefusedWrites(event as never)
     await catalog.prune(event as never, async (name) => {
       const facts = await factsFor(name)
       if (!facts) return true
@@ -306,6 +445,8 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       return holdUnattendedDeny(event, selected, event.action, (denial) => denied(event.source?.type === "tool" ? event.source.id : undefined, denial))
     }
     externalRead.evaluate(event)
+    // v7 BR-11: an after-the-fact card whose calls all stopped before the engine created the request is not shown.
+    if (event.action === "external_directory" && event.source?.type === "tool" && withdrawnRefusedWrites.has(toolCallKey({ sessionID: event.sessionID, messageID: event.source.messageID, id: event.source.id }))) { event.effect = "deny"; return }
     await evaluateDirectoryWrite(event, readWriteScope)
     if (isCodePuppyPolicyRequest(event.metadata)) {
       // BR-10: an assistant-initiated install asks in every tier — no allow rule, saved approval or tier skips it.
@@ -457,6 +598,21 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
       await context.tool.transform((editor) => {
         wrapForDisplay(editor as never, (callID) => displays.get(callID), network ? (tool, call, execute) => network.run(context.location.directory, tool, call, execute) : undefined)
         secrets.wrap(editor, { facts: factsFor, profile, protect: externalRead.protect })
+        // v7 BR-11 (AB3): after the command, before its result goes back to the engine; a decline is rethrown as raised.
+        editor.update("shell", (draft: { execute: (input: unknown, context: import("@opencode/plugin/promise/tool").ToolContext) => Promise<unknown> }) => {
+          if (Object.hasOwn(draft.execute, REFUSED_WRITE_WRAPPED)) return
+          const inner = draft.execute
+          const wrapped: typeof inner = async (input, ctx) => {
+            const result = await inner(input, ctx) as { output?: { output?: unknown }; metadata?: { status?: unknown; shellID?: unknown } } | undefined
+            const call = { sessionID: ctx.sessionID, agent: ctx.agent, messageID: ctx.messageID, id: ctx.id }
+            // A background command returns at once; its result is read later (AB5).
+            if (result?.metadata?.status === "running" && typeof result.metadata.shellID === "string") backgroundShells.set(call.sessionID + "\0" + result.metadata.shellID, call)
+            else if (typeof result?.output?.output === "string" && await approveRefusedWrites(call, result.output.output, ctx.signal) === "approved") approvedRefusedWrites.add(toolCallKey(call))
+            return result
+          }
+          Object.defineProperty(wrapped, REFUSED_WRITE_WRAPPED, { value: true })
+          draft.execute = wrapped
+        })
       })
       await context.tool.hook("execute.progress", async (event) => {
         const safe = deepFreeze(await secrets.progress({ call: event, facts: await factsFor(event.tool), update: event.metadata }))
@@ -472,7 +628,7 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
             codeModeDenials.delete(event.id)
           }
           if (!networkNotice) attachNetFailure(event as never)
-          attachWriteDenied(event as never, context.location.directory)
+          attachWriteDenied(event as never, approvedRefusedWrites.delete(toolCallKey(event)))
           attachDirectoryDisplay(event as never)
           attachTerminal(event as never, displays.get(event.id))
           if (event.status === "completed" && event.tool === "read" && externalRead.file(event)) event.result = await secrets.read({ call: event, file: externalRead.file(event)!, result: event.result })
@@ -506,7 +662,8 @@ export async function evaluateDirectoryWrite(event: { action: string; effect: "a
   if (result.targets.length !== request.targets.length || result.targets.some((target, index) => target.absolute !== request.targets[index]!.absolute)) { event.effect = "ask"; return }
   if (result.targets.every((target) => target.outcome === "no-fence")) return
   if (result.targets.some((target) => target.outcome === "protected")) { event.effect = "deny"; return }
-  if (result.targets.some((target) => target.outcome === "needs-approval")) { event.effect = "ask"; return }
+  // BR-08 before the write is unchanged by v7: a folder R4 cannot grant still asks here (R4 refuses it on the card).
+  if (result.targets.some((target) => target.outcome === "needs-approval" || target.outcome === "ineligible")) { event.effect = "ask"; return }
   // R6: only fixed global-install/user-config targets skip external_directory; for /tmp, caches and run-approved
   // folders the engine's own decision stands (BR-08).
   if (result.targets.every((target) => target.outcome === "fixed")) event.effect = "allow"

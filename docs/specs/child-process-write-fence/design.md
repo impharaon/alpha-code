@@ -1,15 +1,15 @@
 ---
 id: DESIGN-child-process-write-fence
 title: 子进程写入围栏技术设计
-summary: 保留既有围栏、Homebrew 与 Cargo 裁决；v4.2 将 Go 的 GOPATH/sumdb 缓存迁入应用数据，并固定原生 GOBIN，保持全局安装目标与校验语义；v4.4 让 Homebrew 节点只能由实际执行到的语法叶领取；v4.5 以 PID 加进程启动时间认定根 Shell，跨 exec 不变；v6 增量（SPEC v7，I-55）从命令报错里认出被拦的完整路径，经同一张 external_directory 卡与 R4 事后放行，R6 增 ineligible 与 realDirectory；R1 修订补上取消撤回、合并拒绝传递、后台完成路径与按完整调用键记录。
+summary: 保留既有围栏、Homebrew 与 Cargo 裁决；v4.2 将 Go 的 GOPATH/sumdb 缓存迁入应用数据，并固定原生 GOBIN，保持全局安装目标与校验语义；v4.4 让 Homebrew 节点只能由实际执行到的语法叶领取；v4.5 以 PID 加进程启动时间认定根 Shell，跨 exec 不变；v6 增量（SPEC v7，I-55）从命令报错里认出被拦的完整路径，经同一张 external_directory 卡与 R4 事后放行，R6 增 ineligible 与 realDirectory；R1 修订补上取消撤回、合并拒绝传递、后台完成路径与按完整调用键记录；v7 增量（SPEC v8，I-56）让直接位于主目录下、此刻还不存在的那一个路径经同一张卡获准：一份批准范围判定供 R6/R4/tracker/planner 共用，扩展直接签给不存在的路径（真 sandbox-exec 探针证实），不预建，换代以 subpath 携带。
 kind: tech-design
 status: frozen
 spec: SPEC-child-process-write-fence
-spec_version: 7
+spec_version: 8
 review:
-  rounds: 1
-  reviewed_sha: "555fef4e9daa95273ac4ee25113bef047ff45743"
-  verdict: "v6 increment (SPEC v7, I-55): R1 fix-then-merge, 6 Major accepted and corrected 2026-11-27, awaiting orchestrator freeze; earlier increments frozen-per-r8, scoped review flagged for Go install-location capture and coupled projection"
+  rounds: 0
+  reviewed_sha: ""
+  verdict: "v7 increment (SPEC v8, I-56) drafted 2026-11-27, independent review not yet run; v6 increment (SPEC v7, I-55) R1 fix-then-merge on 555fef4e9d, 6 Major corrected, implemented in 91a3b4f0c8; earlier increments frozen-per-r8, scoped review flagged for Go install-location capture and coupled projection"
 owners: [owner]
 last_reviewed: 2026-11-27
 ---
@@ -1506,3 +1506,241 @@ export const WRITE_APPROVED_RETRY_NOTE =
 **仍属推断或未验证**：非管理员账户不能 `log stream`（只见二进制里的提示串）；调用的 `signal` 只在这一步被中断时中止，因此用 reject 撤回不会连带活着的请求；synthetic 后台结果在 context 钩子的 `messages` 里以引擎标签开头的文本出现；普通拒绝结束本步与合并成员抛同一错误的运行时行为（有代码依据，未实跑）；普通拒绝后命令输出不再交给模型；Python `os.makedirs` 等未逐一核对的报错形态；生产签名进程树下的报错与本机探针一致。没有 owner 待决项。
 
 **交接收据**：依据 SPEC v7 `10bae65505`、设计 v6 送审稿 `555fef4e9d` 与 R1 审查（Codex gpt-6.1-sol，FIX-THEN-MERGE，6 Major）。designer Claude Opus 5.5 按编排者处置修订 §4.1–§4.5、§5、§6、§10，新增 §2 AB-P12 与 §4.3.1 AB5；核对插件适配层、core 权限请求的中断与 reject 连带、ADR-038 期限、后台 shell 路径、`toolCallKey` 与脚本化模型入口的现有符号；每项依赖能力都映射到现有符号或本节明确的 raise（§4.5）。下一步：编排者决定冻结，再交 #1759 实施车道写 plan.md 切片。只改 design.md，未实现、未推送。
+
+# v7 增量｜直接在主目录下新建的文件夹或文件可批准（SPEC v8，INT-safety I-56）
+
+**状态：草稿，未经独立审查。** designer Claude Opus 5.5 受编排者委派起草。前文 v2–v6 各增量的决定与收据不变。本增量新增 NP1–NP7：一份「批准范围」判定（NP1）供 R6、R4、tracker 与 planner 共用；新路径不预建、直接签发；换代时携带。没有新 IPC 通道、新消息类型、新原生能力或引擎改动；R6 线上形状不变，`realDirectory` 的含义扩为「批准这个目标会变为可写的真实位置」。
+
+## 1. 基线
+
+- 已批准输入：SPEC-child-process-write-fence **v8**，[提交 `87bbb7a14a` 的规格](https://github.com/impharaon/alpha%2Dcode/blob/87bbb7a14a5b2af212da6df174cfbf09f4a50009/docs/specs/child-process-write-fence/spec.md)（同目录 [当前规格](spec.md)）。覆盖 BR-08 的 v8 句、BR-11 的 v8 修订、AC-08 第一种情形的 v8 修订、AC-13 的 v8 修订、AC-14，以及限制段 v8 行。
+- 依据：owner 2026-11-27 U-46 批准 impharaon/alpha-work INT-safety I-56，问题与选项原文见规格「来源」v8 条。「主目录里已经存在的不算」取自选项原文「新建」「其他位置照旧不能写」。
+- 读码基线 `aedea8af9f`（`origin/alpha`，含 I-55 实施 `91a3b4f0c8`）。并行修复 `fix/1759-home-direct-card`（`a34b8093f7`，未合并）让 `evaluateDirectoryWrite` 对 `ineligible` 不出写前卡；本增量照原样消费它：新路径不再答 `ineligible`，照常出卡；主目录里已有的位置仍答 `ineligible`，仍不出卡。
+- 体验：沿用 BR-08 的批准卡；卡上点名的决定见 §4.6（NP6）。不新增页面、按钮或设计稿。
+
+## 2. 地面真相
+
+问题：现有判定在哪一步把「直接在主目录下的新路径」挡掉；围栏能否只放行一个此刻还不存在的路径（之后成为文件或文件夹），活着的进程（扩展）与下一代（profile）各怎样；软链与竞态的边界。停止条件：真 `sandbox-exec` 的正反两臂给出结论。探针用时约 15 分钟；探针目录已删除，命令与原样输出记在 NP-P07。
+
+| 编号 | 观察及证据 | 本增量依赖的结论 |
+| --- | --- | --- |
+| NP-P01（读） | 三条路都把父目录当成要批准的文件夹：写前 `FileAccess.resolve` 对不存在的目标取 `dirname`（`packages/core/src/file-access.ts:102-115`），所以写 `~/note.txt` 的请求是 `{ absolute: ~/note.txt, directory: HOME }`、resources 与 save 是 `HOME/*`；事后 AB3 同样取 `path.dirname`（`packages/ext/src/policy/index.ts:279`），`mkdir ~/newfolder` 也落到 HOME。R6 `readWriteScope`（`packages/ui-mac/src/main/server.ts:973-988`）在 protected/fixed/writable 之后按 `checkWritableTarget(directory)`（`process-fence-plan.ts:226-236`）判 `ineligible`；HOME 及其祖先按 dev+ino 被拒（`process-fence-profile.ts:800-803`）。另一面：`checkWritableTarget` 把不存在的路径当作待建文件夹，所以不存在的 `~/newfolder` 作为文件夹今天就合格（写前 `~/newfolder/x` 的卡写 `~/newfolder`，R4 预建后放行） | 挡住新路径的是「把父目录 HOME 当批准对象」这一步；判定只需在这一步认出新路径 |
+| NP-P02（读） | R4 授予：先 `mkdirSync` 真实文件夹（`directory-write-approval.ts:84`），再 `userOpened.register`（`:85`；它经 `checkWorkspaceDirectory`，不存在或不是文件夹的路径不合格，`process-fence-profile.ts:794-798`、`:837-841`），再 `tracker.grantWrite` → `settle`（`process-fence-workspaces.ts:392-441`）→ `SidecarListener.grantWrite`，后者在签发前后都断言 `realpathSync.native(directory) === directory`（`server.ts:928-934`、`:948-951`），对不存在的路径必失败。获准根记入 `grantedDirectories` 按 subpath 使用（`:954`、`:923-924`、`:983`） | 现有授予路线只认存在的文件夹；新路径需要一条不预建、不登记 `userOpened` 的签发路线 |
+| NP-P03（读） | 换代携带：`carry`（`process-fence-workspaces.ts:285-292`）→ `carriedWorkspaces()`（`:452`）→ 规划并集候选（`process-fence-plan.ts:477-478`）→ `selectWorkspaceUnion` 以 `stored` 模式过 `checkWorkspaceDirectory`（`process-fence-profile.ts:861`），文件与不存在的路径被排除；W1 渲染为 `(subpath w)`（`:359`）；`noteGeneration(listener, fence.workspaces)`（`server.ts:1296`） | 新路径若混进现有携带表，换代后成为文件或仍不存在时会被丢掉；需要单独一张表 |
+| NP-P04（读） | 原生签发 `IssueFileExtensionToProcess` 直接调 `sandbox_extension_issue_file_to_process(cls, path, 0, audit)`，自身不查路径是否存在（`packages/ui-mac/native/codepuppy-fence/codepuppy_fence.c:99-135`） | 能否签给不存在的路径由内核决定，见 NP-P07 |
+| NP-P05（读） | 引擎的写文件：`fs.mkdir(dirname, { recursive: true })` 后原地 `fs.writeFile`，没有临时伴随文件（`packages/core/src/environment/local.ts:48-52`） | 写前路线获准 `~/note.txt` 后，写入只碰这一个路径与已存在的 HOME（递归 mkdir 见 NP-P07 Node 行） |
+| NP-P06（读） | 卡片：真实路径行取 R4 描述的 `realDirectory`（`PermissionDialog.tsx:256`）；资源行取引擎请求的 `resources`（`:283-303`，`resourceText` 去掉 `/*`，`:740-742`）；「记住」框取请求的 `save`（`:644-656`），引擎来的外部目录请求是 `session` 类（`:619-624`）。AB3 的请求 resources 与 save 都是 `<realDirectory>/*`（`ext/src/policy/index.ts:299-310`）。R6 回答的 `realDirectory` 在 parser 里只按绝对路径校验（`codepuppy-sidecar-messages.ts:906`） | 写前新路径卡的资源行会写 HOME；`realDirectory` 装一个文件路径不需要改线上形状 |
+| NP-P07（测，见下） | 真 `sandbox-exec` 九组探针 | 见结论 NP-V |
+| NP-P08（读） | AB4 说明原文「The user approved writing to the folder this command was refused in…」（`packages/ext/src/context-injection.ts:591-593`） | 对主目录下的单个新文件，「folder」会被读成主目录 |
+| NP-P09（读） | 现有断言里按 v7 写的主目录臂：`server.test.ts:1499`（`home/file` → `ineligible`）、`directory-write-approval.engine.cases.ts:226`（`touch home/i55-home.txt` 不出卡） | 这两处在 SPEC v8 下应当翻转为出卡；「主目录不出卡」改由已有文件证明（§6 证明第 10 条） |
+
+**NP-P07 探针。** 环境：macOS 26.3.1（25D771280a）arm64，本机账户。探针目录 `~/.cache/alpha-orch/2026-11-27/i56-probe.0BEwMi/`（不在 W11/W12 这类本来可写的根下），测试主目录为其中的 `home`，项目外目标为 `outside`，每组重建；已删除。profile 与生产同形（`renderProcessFenceProfile` 的骨架，`process-fence-profile.ts:354-379`）：`(allow default)`、`(deny file-write*)`、只含 `/dev/null` 等设备节点和一个 `proj` 子树的 allow 块、X1 `(allow file-write* (extension "app.codepuppy.workspace-write"))`、X2 五种签发全禁。签发方在围栏外，用 Python ctypes 调与原生模块相同的 SPI：`task_name_for_pid` → `task_info(TASK_AUDIT_TOKEN)` → `sandbox_extension_issue_file_to_process(cls, path, 0, token)`（`/usr/bin/python3 -I issue.py app.codepuppy.workspace-write <path> <pid>`）。被围栏方：`/usr/bin/sandbox-exec -p <profile> /usr/bin/python3 -I -B consume.py '<步骤>' <pid 文件>`，写出自己的 pid、从 stdin 读令牌、`sandbox_extension_consume`，再 `execv("/bin/sh", ["sh","-c",<步骤>])`，步骤在继承扩展的后代进程里跑。落盘由围栏外 `find` 实读。原样输出（`$D` = 探针目录，`H` = `$D/home`，`O` = `$D/outside`）：
+
+| 组 | 签发 | 结果（原文） | 围栏外实读 |
+| --- | --- | --- | --- |
+| C1 扩展签给不存在的文件夹路径 `H/newfolder` | `exists: no -> token`；`CONSUME handle=1 errno=0` | `OK mkdir H/newfolder`；`OK write H/newfolder/a.txt`；`OK mkdir -p + write H/newfolder/sub/deeper/b.txt`；`FAIL sibling mkdir H/sibling: mkdir: $D/home/sibling: Operation not permitted`；`FAIL sibling write H/sibling.txt: /bin/sh: $D/home/sibling.txt: Operation not permitted` | 只有 `home/newfolder` 及其下三项 |
+| C2 扩展签给不存在的文件路径 `H/note.txt` | 同上 | `OK mkdir -p H`；`OK node-style recursive mkdir of H + create H/note.txt (python makedirs exist_ok)`；`OK append`；`OK rm then recreate`；`FAIL companion H/note.txt.tmp: … Operation not permitted`；`FAIL sibling H/note2.txt: … Operation not permitted` | 只有 `home/note.txt` |
+| C3 对照：不签发 | — | `FAIL mkdir H/newfolder: … Operation not permitted`；`FAIL create H/note.txt: … Operation not permitted` | 0 落盘 |
+| C4a 获准后在 `H/newfolder` 放一个指向 O 的软链，再经它写 | `H/newfolder`，token | `OK ln -s O H/newfolder`；`FAIL write H/newfolder/esc.txt: … Operation not permitted` | `outside` 为空 |
+| C4b 获准后在 `H/note.txt` 放一个指向 `O/target.txt` 的软链，再写 | `H/note.txt`，token | `OK ln -s`；`FAIL write H/note.txt: … Operation not permitted` | `outside` 为空 |
+| C5 获准的文件路径之后建成文件夹 | `H/note.txt`，token | `OK mkdir H/note.txt`；`OK write H/note.txt/inner.txt` | `home/note.txt/inner.txt` |
+| C6 只靠 profile（下一代形态）：allow 块加 `(subpath "H/newfolder") (subpath "H/note.txt")`，两者都不存在，不签发 | — | C1 的五步结果相同；`OK create H/note.txt`；`FAIL sibling H/note2.txt`；`FAIL replace H/newfolder by a symlink to O, write through it` | 只有 `home/newfolder`、`home/note.txt` |
+| C7 profile 用 `(literal "H/note.txt")` 对照 | — | `OK create H/note.txt`；`FAIL sibling H/note2.txt` | 只有 `home/note.txt` |
+| C8 扩展签给经软链父目录拼写的不存在路径 `$D/homelink/newfolder`（`homelink → home`） | token | `OK mkdir H/newfolder (canonical spelling)`；`OK write H/newfolder/a.txt` | `home/newfolder/a.txt` |
+| C9 签发时该路径已是指向 O 的软链（只有围栏外进程能放） | `H/newfolder`，token | `OK write O/via-planted.txt directly`；`OK write H/newfolder/x.txt (through the planted link)` | `outside/via-planted.txt`、`outside/x.txt` |
+| Node | `/opt/homebrew/bin/node` v26.13.1，profile 只放 `/dev/null`，HOME 不可写 | `OK recursive mkdir of existing H (no grant on H)`；`FAIL write H/n.txt (expected): EPERM` | — |
+
+**结论 NP-V（探针结论）。** 围栏能只放行一个此刻还不存在的路径。活进程：主进程把绑定进程的扩展直接签给不存在的路径即可，内核接受（C1、C2），放行的是「这个路径及其以下」：之后成为文件夹（连同子树）或文件都可写（C1、C2、C5），同目录的兄弟与伴随名仍被拒（C1、C2），不签发时 0 落盘（C3）。获准后围栏内代码在该路径放软链，经它写仍被拒（C4）。下一代：profile 的 `(subpath P)` 对不存在的 P 行为相同，软链改指照样被拒（C6）；`literal` 也能表达单个文件（C7），但批准时不知道路径将成为文件还是文件夹，子树一种形状已覆盖两者。签发时内核会解析已存在的路径分量：经软链父目录拼写签发绑定到真实父目录（C8）；若签发时该路径本身已是软链，放行的是链接目标（C9）。所以主进程签发前后都必须核对父目录仍是自身、路径仍不存在。围栏内代码在获准前写不进主目录（C3），C9 的软链只能由围栏外的进程放下。写文件工具对已存在的主目录做递归 mkdir 不会被拒（Node 行、C2）。**不需要 BLOCKED：沙箱能表达单个尚不存在的路径。**
+
+## 4. 接口契约
+
+### 4.1 NP1 批准范围：一份判定，四处共用（main，`process-fence-plan.ts`）
+
+```ts
+// 与 checkWritableTarget 同处（K2：资格只此一份）；同步、只读、不建目录
+export type WriteApprovalKind = "directory" | "new-path"
+export type WriteApprovalScope =
+  | { eligible: true; kind: "directory"; root: string; planned: { target: string; missing: Set<string> } }
+  | { eligible: true; kind: "new-path"; root: string }
+  | { eligible: false; reason: "home-or-app-state" | "protected-config" | "not-a-directory"; directory: string }
+export function planWriteApproval(
+  input: WorkspaceDirectoryInput,      // 与 R4、规划器同一份资格输入
+  target: DirectoryAccessTarget,       // { absolute, directory }：R5 与 AB3 的同一形状
+  mode: "open" | "stored" = "open",    // open = 现在批准；stored = 换代时复核已获准的新路径（§4.5）
+): WriteApprovalScope
+```
+
+1. `object = plannedWritableTarget(target.absolute, input.realpath)`，`folder = plannedWritableTarget(target.directory, input.realpath)`（`process-fence-plan.ts:208-224`，文件系统语义，不做词法规范化，与 v6 R1-F1 一致）。未解析的软链照旧抛出，调用方沿各自现有的失败路径。
+2. **新路径**（`kind: "new-path"`）当且仅当同时满足：
+   - a. 路径此刻不存在：`object.missing.has(object.target)`（缺失节点已由 lstat 确认 ENOENT，`:213-221`）。`stored` 模式另接受「已存在且 `realpath` 等于自身」，即获准后被建出来的文件或文件夹；软链或改指后的不算。
+   - b. 父节点 `dirname(object.target)` 存在，且与 `input.homeDir` 是同一对象：按 dev+ino 比较，Data 卷拼写按 `checkWorkspaceDirectory` 的同一规则折叠（`process-fence-profile.ts:766-771`）。只认主目录本身，主目录的祖先、`/` 与应用状态根都不算。
+   - c. `folder.target` 是这个父节点或路径本身。前者是写前请求与 AB3 原始分类的形状（NP-P01），后者是 AB3 卡片目标的形状（`ext/src/policy/index.ts:289` 把 `directory` 换成 R6 的 `realDirectory`）。其它组合不按新路径处理。
+   - d. `checkWritableTarget(input, object)` 合格：应用状态根相关与已存在的受保护配置目录，同文件夹规则。
+
+   `root = join(<主目录的规范拼写>, basename(object.target))`。规范拼写就是 `checkWorkspaceDirectory` 对主目录给出的 canonical 结果，与 W1 及现有授予断言用的是同一种拼写；通常它就等于 `object.target`，只有请求用 `/System/Volumes/Data/…` 拼写时才不同。
+3. 否则沿今天的文件夹规则：`checkWritableTarget(input, folder)` 合格 → `{ kind: "directory", root: check.directory, planned: folder }`；不合格 → `{ eligible: false, reason, directory: folder.target }`。
+4. 不存在的受保护位置（例如没有建过的 `~/.opencode`）不在 d 里拦：`checkWorkspaceDirectory` 跳过不在盘上的受保护根（`process-fence-profile.ts:821-827`）。它们由 R6 先答 `protected`（profile 拒写规则按路径匹配，`server.ts:981`），R4 拒绝 `protected`（`directory-write-approval.ts:72`），内核里 CF 拒写块排在 X1 之后、拒绝优先（`process-fence-profile.ts:378-387`）。
+5. 主目录里已有的条目不是新路径（a 不成立），按第 3 步得到主目录 → `home-or-app-state`。这就是 BR-08 v8 句的「已经存在的不算」，没有另设规则。
+6. 命名：概念是「批准这个写入目标会让哪里可写」，`kind` 轴列出同一条授予路线能给的两种形状：先建后放的文件夹，不建直接放的新路径。没有别的种类与上限（engineering-standards §6）。
+
+### 4.2 NP2 R6 用 NP1（`server.ts` 的 `readWriteScope`）
+
+- 次序不变：`no-fence` → `protected` → `fixed` → `writable`（这四步与今天相同，看 `absolute` 的实际落点）→ NP1：不合格 → `ineligible`，`realDirectory = scope.directory`；合格 → `needs-approval`，`realDirectory` 对 `kind: "directory"` 仍是今天的 `folder.target`，对 `kind: "new-path"` 是 `scope.root`。前四种结果的 `realDirectory` 仍是 `folder.target`。没有 `fence.eligibility`（只在测试替身里）时照旧答 `needs-approval`。
+- 线上形状不变（每个 target 仍是 3 个键）；`codepuppy-sidecar-messages.ts:884` 的说明改为：`realDirectory` = 批准这个目标会变为可写的真实位置；对主目录下的新路径就是该路径本身，可能是文件。字段名保留（§10 第 6 条）。
+- 消费者不改代码：`evaluateDirectoryWrite`（含修复分支）对新路径见到 `needs-approval` → ask → 卡；对主目录里已有的位置仍是 `ineligible` → 不出卡。AB3 按 `realDirectory` = P 去重合并，卡片目标为 `{ absolute, directory: P }`，resources 与 save 为 `P/*`；获准后复读，P 落在 `grantedDirectories` 里 → `writable`。
+
+### 4.3 NP3 R4 按 `kind` 授予（`directory-write-approval.ts`）
+
+- 描述：每个目标先算 NP1。`kind: "directory"` 与今天完全相同（`describe(target.directory)`，`:22-28`、`:47-51`）。`kind: "new-path"` 用 `describe(root)`：显示的 `realDirectory` 是 root，锚点是最深的已存在祖先，也就是主目录的 dev+ino。不合格的目标照今天显示 `folder.target`。快照记下 `kind`。
+- 批准（顺序仍是：先比对显示的身份，再授予，最后回复 allow）：
+  1. 现有的快照、指纹、代际、`no-fence` 检查不变（`:61-69`）。
+  2. 现有的 R6 调用（`:70`）：`error` → `grant-failed`；任一 `protected` → `protected-config`，两者都不变。**新增**：R6 答 `writable` 或 `fixed` 的目标此刻已可写，跳过，不比身份、不授予（并发见 §5）。
+  3. 其余目标重算 NP1 与描述；`kind`、root 与锚点必须与快照相同，否则 `conflict`（现有规则扩到 `kind`）。不合格 → `failed`，理由映射不变（`:81`）。
+  4. `kind: "directory"`：今天的路线（`generationWrites` 跳过 → `mkdirSync` → `register` → `grantWrite`，`:82-90`）。`kind: "new-path"`：`generationWrites(root)` 为真则跳过；否则不建、不 `register`，调 `tracker.grantNewPath({ server, path: root }, generation)`，未 granted 时与 `grantWrite` 同一套理由映射。
+
+### 4.4 NP4 tracker 与 listener 的新路径授予
+
+```ts
+// process-fence-workspaces.ts：FenceWorkspaceTracker 增两项、改一项
+/** 只由 R4 在用户点了写明该路径的卡之后调用：放行 NP1 kind "new-path" 的那一个路径。 */
+grantNewPath(input: { server: string; path: string }, sidecar: SidecarListener | null): Promise<Pick<WorkspaceWriteProbeResult, "grant" | "reason">>
+/** 规划器输入：本次运行获准过的新路径（§4.5）。carriedWorkspaces() 仍只含文件夹。 */
+carriedNewPaths(): string[]
+noteGeneration(generation: SidecarListener, workspaces: readonly string[], newPaths: readonly string[]): void
+
+// server.ts：SidecarListener 改一项；缺省 "directory"，现有调用不变
+grantWrite: (path: string, kind?: WriteApprovalKind) => Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>
+```
+
+- `grantNewPath`：①本代无围栏 → `no-fence`；server 不是本机 → `not-local`（同 `settle`，`:393-394`）。②`planWriteApproval(eligibility, { absolute: path, directory: dirname(path) })` 必须是 `kind: "new-path"` 且 `root === path`，否则 `ineligible`，理由沿 NP1；例如这期间 P 被建出来了，就得到主目录那一句。③`sidecar.generationWrites(path)` 或「本次运行别的代携带过它」→ 不签发，规则与理由同 `settle` 的 `:408-426`。④`carry(path, sidecar)`，记 `kind: "new-path"`；`sidecar.grantWrite(path, "new-path")`；失败 → `failed` / `grant-failed`。
+- 不进 `opened` 登记表，也不进工作区真源：两者只收存在的文件夹，真源还跨重启（标签页投影）；本人批准不活过应用重启（v4 §4.4）。`onWritableChanged` 只服务文件夹的只读标记，新路径不发。
+- `carried` 的条目带 `kind`；`carriedFromOtherGenerations` 仍对全部条目按 subpath 判（`:291-292`），语义不变。
+- `SidecarListener.grantWrite(path, "new-path")`：签发前与签发后（令牌发给 sidecar 之前）都核对 `realpathSync.native(dirname(path)) === dirname(path)`，且 `lstatSync(path)` 抛 ENOENT；任一不成立 → `failed`（「workspace path changed」），令牌不发出（C9：签给已是软链的路径会放行链接目标）。签发、`grant-write`、消费确认、`grantedDirectories.add(path)`、revision 加一与 `possiblyConsumed` 都沿 `:938-971`。`"directory"` 分支不变。
+
+### 4.5 NP5 换代：携带新路径
+
+- 规划输入 `PlanProcessFenceInput` 增 `carriedNewPaths: readonly string[]`（与 `carriedWorkspaces` 并列，`process-fence-plan.ts:272`；`server.ts:770` 由 `fenceRun.carriedNewPaths()` 供给）。每一项 `planWriteApproval(eligibility, { absolute: p, directory: dirname(p) }, "stored")` 为 `kind: "new-path"` 且 `root === p` 才保留，否则排除并记日志一行，不改指（与 stored 工作区的 stillSelf 同一原则，`process-fence-profile.ts:835-836`）。
+- `renderProcessFenceProfile` 增输入 `newPaths: readonly string[]`，在同一 allow 块里紧跟 W1，渲染为与 W1 同形的 `(subpath "<p>")`，经 `assertSeatbeltSafePath`，注释标明是本人批准的新路径。`processFenceWriteRules` 把它当普通 allow 读（只跳过 X1，`:547`），所以新一代的 `generationWrites` 与 R6 `writable` 都看得到它。
+- 计划输出增 `newPaths`（试编译裁剪之后），`server.ts:1296` 改为 `noteGeneration(listener, fence.workspaces, fence.newPaths)`，保住 `kind`。
+- 试编译裁剪：新路径与 W1 一起受同一道字节墙裁剪；被裁掉的与被裁掉的携带文件夹一样，得到 `grant-failed`，不另加机制（`process-fence-workspaces.ts:411-412`）。
+
+### 4.6 NP6 卡上点名（`PermissionDialog.tsx`）
+
+- 真实路径行（`:256`）代码不改：新路径时 R4 描述的 `realDirectory` 就是该路径（NP3）。
+- 资源行（`:283-303`）：目录写入卡（`directoryWrite` 为真）拿到描述之后，列描述里的 `realDirectory`，不再列引擎请求的 `resources`；描述还没到时照旧。原因：写前请求对主目录下新路径的 resources 是主目录本身（NP-P01），而批准永远不会放行主目录。既有的卡上，描述与请求指的是同一个文件夹，只是软链拼写改为显示真实路径；真实路径行本来就显示它。AB3 的卡两者本来相同。
+- 「记住」框（`:644-656`）不改：它说的是点「本次会话内允许」时引擎保存的 `save`，这一语义 v6 §4.3 第 3 步已经记下。写前新路径卡上它写的是主目录，后果见 §10 留档第 1 行。
+
+### 4.7 NP7 重试说明的措辞（`context-injection.ts:592-593`）
+
+```ts
+export const WRITE_APPROVED_RETRY_NOTE =
+  "The user approved writing to the location this command was refused at; it is writable now. Re-run only the part of the command that failed - the parts before it already ran once."
+```
+
+冻结的含义不变（已获准、现在可写、只重跑失败的部分）。只把「folder … in」换成「location … at」：对主目录下的单个新文件，「folder」会被模型读成主目录可写（NP-P08）。登记、上限与选择函数不变（v6 §4.4）。
+
+### 4.8 seam map
+
+| 依赖能力 | 可合法调用的现有符号 / 本次 raise | 状态 |
+| --- | --- | --- |
+| 认出主目录下的新路径 | NP1 `planWriteApproval`；内部用 `plannedWritableTarget`（`process-fence-plan.ts:208`）、`checkWritableTarget`（`:226`）、`checkWorkspaceDirectory` 的身份规则（`process-fence-profile.ts:752-842`） | 新纯函数（main），四处共用 |
+| 是否可写、能否批准、批准根 | R6 `readWriteScope`（`server.ts:973-988`），经 `hub-bridge.ts:86`、`:321` 到 ext | 现有；改用 NP1，线上形状不变 |
+| 本人点击 → 授予 → 回复 | R4 `describeDirectoryAccess` / `approveDirectoryWrite`（`directory-write-approval.ts:38-97`） | 现有；按 `kind` 分支（NP3） |
+| 授予新路径并携带 | `FenceWorkspaceTracker`（`process-fence-workspaces.ts:189-207`）的 `settle` 模式（`:392-441`）、`carry`（`:285-292`） | 已决定 raise：`grantNewPath`、`carriedNewPaths`，`noteGeneration` 增参 |
+| 给活进程签发不存在的路径 | `SidecarListener.grantWrite`（`server.ts:925-972`）→ `FenceAddon.issueFileExtensionToProcess`（`codepuppy_fence.c:99-135`）→ `grant-write` | 现有；`grantWrite` 增 `kind` 参数；原生不改（NP-P07 C1/C2） |
+| 下一代 profile | `planProcessFence`（`process-fence-plan.ts:441`，并集 `:477-478`）、`renderProcessFenceProfile`（`process-fence-profile.ts:343-390`）、`processFenceWriteRules`（`:522-547`）、`noteGeneration`（`server.ts:1296`） | 现有；增 `carriedNewPaths` / `newPaths` |
+| 卡上点名 | `PermissionDialog` 真实路径行（`:256`）与资源行（`:283-303`） | 现有；资源行改取描述 |
+| 写前出卡、事后出卡 | `evaluateDirectoryWrite`（`ext/src/policy/index.ts:656-669`，修复分支 `a34b8093f7`）、AB3 `approveRefusedWrites`（`:273-347`） | 现有，不改 |
+| 给模型的说明 | `WRITE_APPROVED_RETRY_NOTE`（`context-injection.ts:592`） | 现有；改文字 |
+
+## 5. 数据与失败
+
+- 没有持久化。获准的新路径与获准的文件夹一样，只在本次应用运行的内存里，并随换代渲染进下一代；不进工作区真源，应用重启后不记得。
+- R6 不可用、目标含未解析的软链 → 不出卡，原说明（不变）。
+- 显示之后、点击之前 P 被建出来（只能是围栏外的进程）：最深的已存在祖先变成 P 自己，锚点不符 → `conflict` → 卡片刷新。写前目标 `{ P, HOME }` 刷新后是主目录里已有的条目 → 批准得到主目录那一句。AB3 目标 `{ P, P }` 刷新后，P 是文件夹就按今天的文件夹规则可批准，是文件则得到 `grant-failed` 那一句。P 若已被另一会话获准而可写，第 2 步直接跳过，结果是 granted。
+- 签发失败（原生异常、`task_name_for_pid`、消费失败、超时）→ `grant-failed` 那一句，可再点（不变）。
+- 在 R4 核对与签发之间，围栏外进程在 P 放下软链：签发前后的 lstat 核对使结果为 `failed`，令牌不发出（C9）。围栏内代码在获准前放不下任何东西（C3）。
+- 获准后围栏内代码把 P 换成软链：经它写被拒（C4、C6）；下一代按 stored 规则排除 P。
+- 并发：同一会话的多个调用拦在同一新路径 → AB3 按 `realDirectory` = P 合并成一张卡。两个会话各一张卡：先批的那张放行，后批的那张在 R6 里已是 `writable`（或 `generationWrites` 为真）→ 跳过，结果为 granted。写前 `~/newfolder/x`（文件夹规则，R4 预建）与事后 `mkdir ~/newfolder`（新路径规则）两张卡同时存在：先批的放行，另一张随后读到可写而跳过；若后批的是新路径卡且 P 已被预建、却还不可写，得到主目录那一句，没有数据影响。
+- 换代发生在点击与授予之间 → `conflict`（不变）。携带的新路径在下一代被裁剪掉 → 写它得到 `grant-failed` 那一句（与文件夹相同）。
+- 「本次会话内允许」：引擎保存的是请求的 `save`。写前路线保存的是主目录，即 `HOME/*`，是引擎层的记忆；围栏仍只放行 P。其它新路径仍出卡，因为 R6 答 `needs-approval`，`evaluateDirectoryWrite` 强制 ask，不看已存规则；主目录里已有的条目仍是 `ineligible`，写入照样被围栏拒。
+- 命令前半段已执行一次（I-55 的代价）不变；对 `mkdir ~/newfolder` 来说重跑本身就是失败的那一步。
+
+## 6. 架构落点
+
+| 新增/改动的代码 | 落在哪个模块 | 依赖谁 | 复用的已有权威 |
+| --- | --- | --- | --- |
+| NP1 `planWriteApproval` | `packages/ui-mac/src/main/process-fence-plan.ts`（与 `checkWritableTarget` 同处） | `process-fence-profile.ts` 的身份规则 | `plannedWritableTarget`、`checkWritableTarget`、`checkWorkspaceDirectory` |
+| NP2 R6 分类 | `server.ts` 的 `readWriteScope`；`codepuppy-sidecar-messages.ts` 的说明 | NP1 | R6 既有消息与 parser |
+| NP3 R4 分支 | `directory-write-approval.ts` | NP1、tracker | R4 的快照、锚点、先授予后回复 |
+| NP4 新路径授予与携带 | `process-fence-workspaces.ts`（tracker）、`server.ts`（`SidecarListener.grantWrite`） | NP1、原生模块 | `settle` 的签发规则、`carry`、`grant-write` 合同 |
+| NP5 下一代 | `process-fence-plan.ts`（`planProcessFence`）、`process-fence-profile.ts`（`renderProcessFenceProfile`）、`server.ts` | NP1 | W1 渲染形状、试编译裁剪、`processFenceWriteRules` |
+| NP6 卡上点名 | `packages/ui-mac/src/renderer/codepuppy-ui/PermissionDialog.tsx` | preload 既有 `describeDirectoryAccess` | R4 描述 |
+| NP7 说明措辞 | `packages/ext/src/context-injection.ts` | 无 | `CONTEXT_INJECTIONS` 登记 |
+
+- 新目录/新模块：无；`docs/architecture/modules.md` 不变。
+- 不新增 IPC 或消息：R6 线上形状不变；R4 仍走既有 preload；卡片读既有描述；tracker、listener 与规划器都在 main 进程内。
+- 不改引擎、不加原生能力：现有签发接受不存在的路径（NP-P07 C1、C2）；写前请求的形状（主目录作 resources）不改，点名由 NP1 与 NP6 处理。
+- 架构约束：K2 资格只在 `process-fence-plan.ts`（NP1），R6、R4、tracker、规划器四处消费；ext 不知道主目录、不复制判定。K1 档位判定仍只在 `evaluateDirectoryWrite`。基线 I1 与 `docs/architecture/2026-09-09-req159-process-fence.md` 里若把可写集写成「只有文件夹」，由实施在同一变更里改成「文件夹，或本人批准的主目录下的那一个新路径」。无新偏离。
+- 工程标准 §6：NP1 以概念命名，`kind` 是枚举轴，`mode` 沿用 `checkWorkspaceDirectory` 的 open/stored 两态；`grantNewPath` 名为「放行一个尚不存在的路径」这一概念，「父节点是主目录」是 NP1 里的安全规则，不是调用方参数；全部没有上限。
+- 被否决的替代：
+  - R4 先把新路径建出来，再按文件夹放行（今天对缺失文件夹的做法）：文件会被建成文件夹；`mkdir ~/newfolder` 重跑会报「File exists」。扩展能直接签给不存在的路径（C1、C2），不需要预建。
+  - 文件与文件夹分两种范围（文件 literal、文件夹 subpath）：批准时不知道路径将成为哪一种（`mkdir`、`touch` 与 Python 的报错是同一种形态）；内核扩展本来就只有子树一种形状（C5）。
+  - 把新路径登记进 `userOpened` 与工作区真源：两处只收存在的文件夹，真源还跨重启。
+  - 在 ext 判定「主目录下的新路径」：ext 没有主目录的可信身份，复制判定违反 K2。
+  - 改引擎 `FileAccess` 让写前请求写新路径：这是第三处引擎改动，要 owner 逐处允许；NP6 在卡面上解决点名。
+  - 主目录里已有的条目只要用户点也放行：超出 owner 原话「新建」「其他位置照旧不能写」。
+- 安全面：
+  - 威胁边界不变（v2 §6）。
+  - 不变量：NP-S1 只有 R4 处的本人点击能授予（BR-05）；NP1、R6、ext 都只判定、不授予。NP-S2 授予的只是这一个路径及其以下：兄弟与伴随名仍被拒（C1、C2、C6）。NP-S3 主目录本身永不授予：它存在，所以不可能是新路径；文件夹规则对它答 `home-or-app-state`。NP-S4 受保护位置：R6 先答 `protected`，R4 拒绝，内核拒写块排在 X1 之后（NP1 第 4 条）。NP-S5 软链：获准前围栏内放不下东西（C3）；签发前后核对父目录与「仍不存在」（C9）；获准后经软链出逃被拒（C4、C6），换代时被排除。NP-S6 X1/X2、令牌绑定进程、运行内携带不变。
+  - 接受的残留（同 v6 §6）：伪造的报错能让卡片点名主目录下任意一个新路径；只有用户点击才放行，卡上写的是 main 解析出的真实路径，与模型直接用写文件工具触发写前卡等价。
+- 实施必须拿出的证据（每条都要能失败；用例、文件与顺序归 plan.md）：
+  1. 入口同 v6 §6 第 1 条：脚本化模型经会话 prompt 发出真实的工具调用（shell 与写文件工具），生产围栏经 `spawnLocalServer → planProcessFence → sidecar.start/applyProcessFence`。测试主目录不放在 W11/W12（`/private/tmp`、`/private/var/folders`，`process-fence-profile.ts:372-373`）下面，否则它本来就可写。「全部批准」与「请求审批」两档：`mkdir ~/newfolder` 被拦 → 卡写明 `<H>/newfolder` → 批准 → R4 granted、引擎 pid 不变 → 结果带 NP7 说明 → 重跑 `mkdir` 成功，随后 `mkdir -p ~/newfolder/a && echo x > ~/newfolder/a/b` 落盘；`echo hi > ~/note.txt` 被拦 → 卡写明 `<H>/note.txt` → 批准 → 落盘；写文件工具写另一个新文件 → 写前卡的真实路径行与资源行都写该路径，不写 `<H>` → 批准 → 落盘。
+  2. 兄弟路径：两者获准后 `echo s > ~/sibling.txt` → EPERM、0 落盘；出卡写明 `~/sibling.txt`；拒绝 → 0 落盘。
+  3. 拒绝臂：`~/note.txt` 的卡点拒绝 → 0 落盘，本步结束。
+  4. 已有文件：写前改写 `~/existing.txt` → 没有卡、BR-06 说明、内容不变；命令 `echo y >> ~/existing.txt` → 没有卡、内容不变。已知的坏：NP1 去掉条件 a（已存在也算新路径）→ 出卡，必须红。
+  5. 去掉做法的对照臂：同一入口，NP1 去掉新路径分支 → 第 1 条的步骤没有卡、0 落盘，必须红。
+  6. 软链：获准 `~/newfolder` 后，命令 `rm -r ~/newfolder && ln -s <项目外> ~/newfolder && echo z > ~/newfolder/esc` → EPERM、项目外 0 落盘；随后换代 → 新 profile 不含该路径、日志一行。已知的坏：stored 规则跟随链接 → 新一代放行项目外目录，必须红。
+  7. 签发时核对：注入「R4 核对之后、签发之前在 P 放软链」→ `failed`、令牌未发出、项目外 0 落盘。已知的坏：去掉 lstat 核对 → 经链接写进项目外（C9），必须红。
+  8. 换代携带：获准 `~/note.txt` 并写入后制造一次换代 → 再写 `~/note.txt` 直接落盘，不再出卡。已知的坏：只携带文件夹 → EPERM，必须红。
+  9. 并发：两个会话都拦在 `~/note.txt`；A 批准并重跑建出文件后，B 再批准 → granted，没有失败那句。已知的坏：去掉 NP3 第 2 步的跳过 → `grant-failed` 或主目录那一句，必须红。
+  10. 按 SPEC v8 翻转的既有断言：`server.test.ts:1499` 的 `home/file` 改为 `needs-approval`、`realDirectory` 为 `home/file`，另加一条已有文件仍为 `ineligible`；`directory-write-approval.engine.cases.ts:226` 的主目录臂改为改写主目录里已有的文件，v6 §6 第 3 条「测试 HOME 下直接写文件」随之改为「改写测试 HOME 下已有的文件」。这是规格变化，不是回归。
+  11. 卡上点名：写前新路径卡的资源行是 `<H>/note.txt`。已知的坏：资源行仍取请求 resources → 显示 `<H>`，必须红。
+
+## 8. 拆分决定
+
+不适用：都在 alpha-code 一个仓，同一负责方（#1759）。
+
+## 9. 回滚
+
+不适用：无数据迁移或不可逆数据变更。
+
+## 10. 裁决与审查结论（v7 增量）
+
+| 送审前裁决 | 依据与适用版本 |
+| --- | --- |
+| 1. 新路径判定只有 NP1 一份，放在 `process-fence-plan.ts`，R6、R4、tracker、规划器共用 | K2；NP-P01、NP-P02（读，`aedea8af9f`） |
+| 2. 新路径 = 此刻不存在、父节点就是主目录本身（dev+ino）、请求的文件夹是父节点或路径本身；主目录里已有的条目不算 | U-46 选项原文「新建」「其他位置照旧不能写」；NP-P01 |
+| 3. 范围只有一种：这个路径及其以下（活进程用扩展，下一代用 `(subpath P)`）；不分文件与文件夹 | NP-P07 C1、C2、C5、C6（测，macOS 26.3.1） |
+| 4. 不预建、不登记 `userOpened`；listener 在签发前后核对父节点与「仍不存在」 | NP-P07 C9；NP-P02 |
+| 5. 换代时新路径单独一张携带表，stored 规则不跟随改指 | NP-P03；v4 §4.4 运行内携带 |
+| 6. R6 线上形状不变，`realDirectory` 的含义扩为批准根；字段名不改。改名要动 R4 描述、AB3、卡片三处，行为没有差别 | NP-P06（parser 只校验绝对路径） |
+| 7. R4 对 R6 已答 `writable`/`fixed` 的目标不再授予 | §5 并发 |
+| 8. 卡的资源行改列 R4 描述的真实路径；「记住」框不改 | NP-P06 |
+| 9. 重试说明「folder … in」改为「location … at」，含义不变 | NP-P08 |
+| 10. 无新 IPC、无引擎改动、无新原生能力 | NP-P04、NP-P07 |
+
+审查：本增量尚未送审（frontmatter `rounds: 0`）。
+
+**传播核对**：`realDirectory` 含义扩大。`rg -n -c 'realDirectory' docs --glob '*.md'` 命中本设计 15 处、同目录 `plan.md` 5 处，都是 v6 的描述，本增量 §4.2 给出新含义，不改历史段；plan.md 由实施车道按本增量补切片。代码消费者 `rg -n -l 'realDirectory' packages --glob '!**/node_modules/**'`：ext `policy/index.ts`、`hub-bridge.test.ts`、`identity.test.ts`、`register-policy.test.ts`；ui-mac `codepuppy-sidecar-messages.ts`（及测试）、`directory-write-approval.ts`（及测试与 engine cases）、`hub-view.test.ts`、`server.ts`（及测试）、`PermissionDialog.tsx`（及测试）、`shared/directory-write-approval.ts`。其中 AB3（`policy/index.ts`）只按字符串去重、拼 resources，不需要改；其余归实施。`WRITE_APPROVED_RETRY_NOTE` 的引用：`context-injection.ts`、`policy/display.ts`、`display.test.ts`、`register-policy.test.ts`、`directory-write-approval.engine.cases.ts`，按常量引用，文字改动随常量走。
+
+**留档**
+
+| 提议 | 实际影响或未核实点 | 为什么现在不做 | 什么情况再看 |
+| --- | --- | --- | --- |
+| 写前新路径卡的「记住」框写的是主目录 | 引擎保存请求的 `save`，即 `HOME/*`（`file-access.ts:107-115`）。点「本次会话内允许」后，引擎层对主目录不再问；围栏仍只放行这个路径，其它新路径仍出卡，主目录里已有的条目仍被围栏拒 | 要么改引擎请求（第三处引擎改动），要么让卡面与实际保存的规则不一致 | owner 觉得卡面误导时经 intent 提出 |
+| 获准的单个文件路径之后可以被换成文件夹，再写进里面 | C5；放行的就是这一个路径 | 符合「这一个新文件夹或文件」；拆成两种范围需要先知道它将来是文件还是文件夹 | 无 |
+
+**仍属推断或未验证**：探针用的是未签名的 Python ctypes 签发方与 `sandbox-exec`，不是生产的签名 Electron 主进程 → utilityProcess 与生产 `.node`；文件夹已由 v2 的 G0 证明，新路径在生产形态上的表现归实施证明。Node 对已存在主目录的递归 mkdir 只用 Homebrew node v26.13.1 测过，没跑 sidecar 内的 Electron Node。外部目录卡显示资源行，是从 `permissionApprovalOf` 读出来的（`session` 类），没有实跑。签发时内核解析已存在路径分量（C8、C9）只在 macOS 26.3.1 上见过。没有 owner 待决项。
+
+**交接收据**：依据 SPEC v8 `87bbb7a14a`（U-46 批准的 I-56）与读码基线 `aedea8af9f`，消费未合并的修复分支 `a34b8093f7`。designer Claude Opus 5.5 新增本增量 §1–§10；跑了真 `sandbox-exec` 探针 NP-P07（约 15 分钟，探针目录已删除）；每项依赖能力都映射到现有符号或本节明确的 raise（§4.8）。下一步：编排者安排独立审查与冻结，再交 #1759 实施车道写 plan.md 切片。只改 spec.md 与 design.md，未实现、未推送。

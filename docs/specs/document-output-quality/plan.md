@@ -938,7 +938,7 @@ AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口�
 ### AC-01..03 实测
 
 - 依据：[spec v1](spec.md) @ `31cd182e09` AC-01..03 与「待决」（owner U-12「授权」：默认模型 W/P/X 各 3 次，上限 50 元）；本节「现状」算出的剩余授权 ≤3590 分；调度方本轮上限 3000 分。Issue #1761。基线 origin/alpha `aedea8af9f`（含 #1830）。
-- 核对：本节提交时未经调度方核对；runner 的宿主形状待调度方定（见下「宿主」），定之前不写 runner、不花钱。
+- 核对：plan `3311931db4` · 调度方（Claude Opus 5.5）· 通过，附裁决：无窗口 Electron main 宿主算 AC-01..03 的已组合产品引擎；分两段，样本推算九次 ≤3000 分即连续跑完，累计 3000 分硬停；三个一组并行只在能按账本逐笔归属费用时允许，否则顺序跑。
 
 #### 调用链核对（2026-11-27）
 
@@ -946,11 +946,13 @@ AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口�
 - 产品没有无窗口的 main：`index.ts:1566` 无条件建主窗口，`windows.ts:271-273` 在 ready-to-show 时 `show()`。
 - 长期测试账号是 service-only 的 API key（alpha-platform `docs/runbooks/production-test-account.md`），产品登录用不了它：`applyAuthEnv` 对每个凭据做 `requireTokenPurpose`（`codepuppy-auth.ts:388-395`，`packages/codepuppy-contracts-consumer/src/decode.ts:172-181`），开发短路 `DEV_PLATFORM_TOKEN` 同样要 purpose JWT。所以即使 owner 离开时开窗，真实 dev 应用也不能用这把 key 跑平台默认模型。
 
-#### 宿主（推荐做法，待调度方确认）
+#### 宿主（调度方已确认）
 
 runner 本身是一个不开窗口的 Electron main 进程：用 `packages/ui-mac/node_modules/electron` 的 Electron.app 在证据目录里的副本（Info.plist 加 `LSUIElement`，不进 Dock 和菜单栏；结束后 `lsregister -u`），不建 BrowserWindow，不注册 `codepuppy://`。它按 `index.ts` 的顺序调用产品自己的启动函数中与这条链有关的部分（环境快照、入口地址、shell 环境、出厂技能 reconcile、模型目录刷新与钉住、悬挂引用清扫），在 fork 之前把测试 key 读进本进程，写进 `CODEPUPPY_API_KEY`、`CODEPUPPY_MCP_TOKEN`，地址取香港入口；然后调用产品的 `spawnLocalServer`，也就是真的 utilityProcess sidecar、进程围栏与出网代理、`openDocumentGeneration`、启动器的 Node 和固定文件入口。会话经引擎 HTTP 接口创建，发送任务文本，等到空闲；权限询问按「本次允许」作答并逐条记录。userData、HOME、XDG、工作区都放在本次证据目录下。
 
-不改产品代码，也不自己组装 DocumentHost。但有两处和真实应用不同，需要调度方判断它们是否仍算「已组合的产品引擎」：一是 `index.ts` 的启动只重放其中一部分，DB 预检、扩展台账、桌面 IPC 这些与本链无关的步骤不跑；二是 key 不经 auth 模块，直接进入凭据文件通道。
+不改产品代码，也不自己组装 DocumentHost。测量宿主与真实应用有两处不同，属于宿主的偏离，不是产品的偏离（调度方裁决：这些 AC 量的是默认模型经产品技能、引擎和文档宿主做出的成品，这两处不参与成品）：一是 `index.ts` 的启动只重放其中一部分，DB 预检、扩展台账、桌面 IPC 不跑；二是 key 不经 auth 模块，直接进入凭据文件通道（同一网关、同一账号、同一计费）。
+
+这个宿主同时是 AC-04、05、12 等其它付费真引擎验收的测量宿主：任务、素材和评分都由输入文件给出，换任务不改宿主。
 
 #### 改动（按推荐做法）
 

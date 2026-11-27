@@ -1,0 +1,11 @@
+{
+ "W": {"assets": ["shared/content.json", "shared/chart.png"],
+       "assets_note": "content.json（报告的全部文字、表格与图表数据，以 W_ 开头的字段）、chart.png（月度收入图表）。",
+       "user": "请根据工作目录里 content.json 中以 W_ 开头的内容和图片 chart.png，做一份 5 到 6 页的 Word 报告《2026 年第三季度经营分析》，保存为 report.docx。报告需要包含：封面标题；三级标题结构；两个数据表格（其中一个不少于 6 行数据）；一个项目符号列表；一个编号列表；一张图表或图片；页眉；带页码的页脚；一个简短的目录。"},
+ "P": {"assets": ["shared/content.json", "shared/img_market.png", "shared/img_ui.png", "shared/chart.png"],
+       "assets_note": "content.json（演示文稿的全部文字、表格与图表数据，以 P_ 开头的字段）、img_market.png、img_ui.png（配图）、chart.png（图表图片）。",
+       "user": "请根据工作目录里 content.json 中以 P_ 开头的内容和图片 img_market.png、img_ui.png，做一份《新产品发布方案》演示文稿，保存为 deck.pptx。要求正好 10 页，包括：标题页；议程页；两页文字配图片的页面；一页表格；一页图表；一页左右两栏的对比页；一页时间线；结束页。整套幻灯片风格统一。"},
+ "X": {"assets": ["sales.json"],
+       "assets_note": "sales.json（2025 年 1 至 12 月共 200 条销售明细：日期、区域、产品、数量、单价）。",
+       "user": "请用工作目录里的 sales.json 做一个 12 个月的销售工作簿，保存为 sales.xlsx。要求：一张明细数据表（约 200 行），金额列用公式计算（数量×单价）；按区域汇总的合计，用公式引用明细表；按月汇总的合计；月度环比增长率用公式计算；设置数字格式（货币、百分比、千位分隔符）；冻结表头行；列宽适合中文内容；增长率列加条件格式；一个柱形图和一个折线图，图表标题用中文；在一个输入单元格上加下拉选择（数据验证）；定义一个命名区域；打印设置为横向、宽度缩放为一页、每页重复打印表头行。"}
+}

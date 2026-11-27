@@ -91,13 +91,26 @@ export function planPackageManagerExecution(input: {
       return invert({ success: next }, leaf.negated)
     }
     if (program === "unset") {
-      // The name loses its value and export attribute. A snapshot name still reaches brew: assignments can only set values.
-      if (leaf.words.slice(index + 1).some((raw) => raw.raw.startsWith("-") && raw.raw !== "-v")) return invert({ success: state }, leaf.negated)
-      const next = leaf.words.slice(index + 1).reduce((current, raw) => {
-        const name = /^[A-Za-z_][A-Za-z0-9_]*$/.exec(raw.raw)?.[0]
-        if (!name) return current
-        return { ...current, env: { ...current.env, [name]: "" }, exported: without(current.exported, name), assignments: current.assignments.filter((entry) => entry.name !== name), unset: new Set([...current.unset, name]) }
-      }, state)
+      // The name loses its value and export attribute; main deletes it from the snapshot before spawning brew (C-2).
+      // Operands are ordinary words and `--` ends the options. An operand or option that cannot be determined makes the
+      // rest of the command unplanned (design :786): any later name could be gone.
+      const unknownRest = { ...state, cwd: null }
+      let functions = false, options = true
+      const names: string[] = []
+      for (const raw of leaf.words.slice(index + 1)) {
+        const value = word(raw.raw, state)
+        if (value === undefined) return invert({ success: unknownRest, failure: unknownRest }, leaf.negated)
+        if (options && value === "--") { options = false; continue }
+        if (options && value.startsWith("-") && value !== "-") {
+          if (value === "-f") functions = true
+          else if (value !== "-v") return invert({ success: unknownRest, failure: unknownRest }, leaf.negated)
+          continue
+        }
+        options = false
+        if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) names.push(value)
+      }
+      if (functions) return invert({ success: state }, leaf.negated)
+      const next = names.reduce((current, name) => ({ ...current, env: { ...current.env, [name]: "" }, exported: without(current.exported, name), assignments: current.assignments.filter((entry) => entry.name !== name), unset: new Set([...current.unset, name]) }), state)
       return invert({ success: next }, leaf.negated)
     }
     if (program === "set") {

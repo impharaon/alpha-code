@@ -18,6 +18,7 @@
  * `name` (the MCP key) is not part of the binding; the engine derives the tools' identity from it either way.
  */
 
+import { matchesDocumentPythonEnvironment, type DocumentPythonEnvironment } from "@opencode/util/codepuppy-document"
 import { createHash } from "node:crypto"
 import path from "node:path"
 
@@ -48,9 +49,11 @@ export function declaredFirstPartyTools(
   entry: unknown,
   manifestPath: string | undefined,
   readFile: (file: string) => Uint8Array,
+  pythonEnvironment?: DocumentPythonEnvironment,
 ): unknown[] | undefined {
   if (!manifestPath || !entry || typeof entry !== "object") return undefined
-  const { type, command } = entry as { type?: unknown; command?: unknown }
+  const { type, command, environment, disabled } = entry as { type?: unknown; command?: unknown; environment?: unknown; disabled?: unknown }
+  if (!matchesDocumentPythonEnvironment(environment, disabled === true ? undefined : pythonEnvironment)) return undefined
   if (type !== "local" || !Array.isArray(command)) return undefined
   try {
     const manifest = JSON.parse(new TextDecoder().decode(readFile(manifestPath))) as Manifest
@@ -86,8 +89,9 @@ export function declaredListedTools(
   entry: unknown,
   manifestPath: string | undefined,
   readFile: (file: string) => Uint8Array,
+  pythonEnvironment?: DocumentPythonEnvironment,
 ): DeclaredTool[] | undefined {
-  const tools = declaredFirstPartyTools(name, entry, manifestPath, readFile)?.flatMap((tool): DeclaredTool[] => {
+  const tools = declaredFirstPartyTools(name, entry, manifestPath, readFile, pythonEnvironment)?.flatMap((tool): DeclaredTool[] => {
     if (!record(tool) || typeof tool.name !== "string" || tool.name === "" || !record(tool.inputSchema)) return []
     return [
       {

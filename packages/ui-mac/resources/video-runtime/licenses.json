@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "licences": [
+    {
+      "name": "sherpa-onnx",
+      "file": "sherpa-onnx.txt",
+      "provenanceUrl": "https://github.com/k2-fsa/sherpa-onnx/blob/v2.0.3/LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "name": "leptonica",
+      "file": "leptonica.txt",
+      "provenanceUrl": "https://github.com/DanBloomberg/leptonica/releases/download/1.85.0/leptonica-1.85.0.tar.gz",
+      "bytes": 1521,
+      "sha256": "87829abb5bbb00b55a107365da89e9a33f86c4250169e5a1e5588505be7d5806"
+    },
+    {
+      "name": "libjpeg-turbo",
+      "file": "libjpeg-turbo.txt",
+      "provenanceUrl": "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.2/libjpeg-turbo-3.1.2.tar.gz",
+      "bytes": 5620,
+      "sha256": "2189dc45a8fe96204069f8124caa53a148dfdc193f50f584c6ca7849a6072872"
+    },
+    {
+      "name": "libjpeg-IJG",
+      "file": "libjpeg-IJG.txt",
+      "provenanceUrl": "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.2/libjpeg-turbo-3.1.2.tar.gz",
+      "bytes": 12799,
+      "sha256": "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6"
+    },
+    {
+      "name": "SenseVoiceSmall",
+      "file": "SenseVoiceSmall.txt",
+      "provenanceUrl": "https://api.github.com/repos/modelscope/FunASR/git/blobs/d5cc52aad23a88da10b8cffbd9b56d43ac7398fa",
+      "bytes": 5306,
+      "sha256": "7dba975a2069691db4992b0592d70828b330d2f8a30a71450f4e152a554e84f8"
+    },
+    {
+      "name": "silero-vad",
+      "file": "silero-vad.txt",
+      "provenanceUrl": "https://github.com/snakers4/silero-vad/blob/v5.1.2/LICENSE",
+      "bytes": 1075,
+      "sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b"
+    },
+    {
+      "name": "ffmpeg-LGPL2.1",
+      "file": "ffmpeg-LGPL2.1.txt",
+      "provenanceUrl": "https://ffmpeg.org/releases/ffmpeg-9.1.tar.xz",
+      "bytes": 26517,
+      "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30"
+    },
+    {
+      "name": "tesseract",
+      "file": "tesseract.txt",
+      "provenanceUrl": "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.5.2.tar.gz",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "name": "openai-whisper",
+      "file": "openai-whisper.txt",
+      "provenanceUrl": "https://github.com/openai/whisper/blob/v20240930/LICENSE",
+      "bytes": 1063,
+      "sha256": "b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d"
+    },
+    {
+      "name": "tessdata-fast",
+      "file": "tessdata-fast.txt",
+      "provenanceUrl": "https://github.com/tesseract-ocr/tessdata_fast/blob/65727574dfcd264acbb0c3e07860e4e9e9b22185/LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "name": "3dspeaker",
+      "file": "3dspeaker.txt",
+      "provenanceUrl": "https://github.com/modelscope/3D-Speaker/blob/main/LICENSE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "name": "OpenH264",
+      "file": "OpenH264.txt",
+      "provenanceUrl": "https://github.com/cisco/openh264/archive/refs/tags/v2.7.0.tar.gz",
+      "bytes": 1295,
+      "sha256": "dd5c1c9668512530fa5a96e4c29ac4033d70a7eeb0eed7a42fddb6dd794ebdbb"
+    },
+    {
+      "name": "pyannote-segmentation",
+      "file": "pyannote-segmentation.txt",
+      "provenanceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-segmentation-models",
+      "bytes": 1061,
+      "sha256": "14d7016ad68e7394d6e6b78d96cc2ae431c905287b89674cfdf021e79e62b8ba"
+    },
+    {
+      "name": "whisper-node",
+      "file": "whisper-node.txt",
+      "provenanceUrl": "https://github.com/mybigday/whisper.node/blob/3e05649a6aab6c52bb566ef731231ba5296b7885/LICENSE",
+      "bytes": 1194,
+      "sha256": "dcf058ad1c7a2eac57e41d3d45baae7b10eb3da71b9fa4c7f899b99e56fe3a7e"
+    },
+    {
+      "name": "whisper-cpp",
+      "file": "whisper-cpp.txt",
+      "provenanceUrl": "https://github.com/ggml-org/whisper.cpp/blob/978113305b2ead22249b881deafa131dc8884911/LICENSE",
+      "bytes": 1078,
+      "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+    },
+    {
+      "name": "node-addon-api",
+      "file": "node-addon-api.txt",
+      "provenanceUrl": "https://github.com/nodejs/node-addon-api/blob/v8.5.0/LICENSE.md",
+      "bytes": 1150,
+      "sha256": "89024017b88a9f2b763f79b941a4f2db3b4428edfcacdc0b23866b2da633ad0c"
+    },
+    {
+      "name": "ytdlp yt_dlp-2026.11.23.dist-info/licenses/LICENSE",
+      "file": "ytdlp-LICENSE",
+      "provenanceUrl": "https://files.pythonhosted.org/packages/30/1e/f4bf64ca733135e609696c6df77a6c22c6d4909b6e293e4563ae51ea335c/yt_dlp-2026.11.23-py3-none-any.whl",
+      "bytes": 1211,
+      "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c"
+    },
+    {
+      "name": "ejs yt_dlp_ejs-0.8.0.dist-info/licenses/LICENSE",
+      "file": "ejs-LICENSE",
+      "provenanceUrl": "https://files.pythonhosted.org/packages/e3/bd/520769863744b669440a924271a6159ddd82ad5ae26b4ac4d4b69e9f8d44/yt_dlp_ejs-0.8.0-py3-none-any.whl",
+      "bytes": 1212,
+      "sha256": "b5065838cbac452dfc855ba6e6e031481ad2c68406f70d21ead9321374653e6c"
+    },
+    {
+      "name": "ONNX Runtime 1.28.2 / Microsoft",
+      "file": "onnxruntime-ThirdPartyNotices.txt",
+      "provenanceUrl": "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.28.2/onnxruntime-osx-arm64-1.28.2.zip",
+      "bytes": 325054,
+      "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2"
+    },
+    {
+      "name": "ONNX Runtime 1.28.2 / Microsoft",
+      "file": "onnxruntime-LICENSE.txt",
+      "provenanceUrl": "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.28.2/onnxruntime-osx-arm64-1.28.2.zip",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "name": "libdav1d / VideoLAN and dav1d authors (BSD-2-Clause)",
+      "file": "dav1d.txt",
+      "provenanceUrl": "https://downloads.videolan.org/pub/videolan/dav1d/1.5.3/dav1d-1.5.3.tar.xz",
+      "bytes": 1317,
+      "sha256": "dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5"
+    }
+  ]
+}

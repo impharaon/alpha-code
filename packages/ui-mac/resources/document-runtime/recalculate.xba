@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Module1" script:language="StarBasic">
+REM Fixed application task; calculateAll/store/close from pinned Anthropic xlsx/scripts/recalc.py.
+Sub RecalculateAndSave()
+  ThisComponent.calculateAll()
+  ThisComponent.store()
+  ThisComponent.close(True)
+End Sub
+</script:module>

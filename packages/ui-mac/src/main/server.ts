@@ -7,6 +7,8 @@ import { engineAuthorization } from "./engine-authorization"
 import { toV1PermissionRequest } from "../engine-adapter/opencode2/v1-shapes"
 import type { WriteScopeRequest, WriteScopeReply } from "./codepuppy-sidecar-messages"
 import { parsePackageManagerEnvironmentRequest, type PackageManagerEnvironmentReply } from "../shared/package-manager-environment"
+import { publishVideoEnvironment } from "./codepuppy-video-environment"
+import { engineClient } from "./engine-client"
 import { clearOfficialConnectorRuntime, clearOfficialConnectorRuntimeOnExit, officialAvailabilityPublished, restoreCommittedOfficialConnectors } from "./official-connector-resources"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
@@ -75,9 +77,6 @@ import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } 
 import { deriveEgressDestinations, deriveMcpEgressDestinations, egressDestinationFromBaseUrl, setConfiguredEgressDestinations } from "./network-egress-derived"
 // `#1412`:出网授权的**第三个半场** —— 用户当场批准的目的地。两条轴(`webfetch` 的 URL 与 `bash` 里命令
 // 自带的目的地)的目的地由模型即时生成,没有配置来源可派生,所以它们的真源只能是「用户点的那一下」。
-import { configureEgressGrantApproval, setUserEgressGrants } from "./network-egress-grants"
-import { persistEgressGrantRecord, readEgressGrantRecords } from "./egress-grant-records"
-import { askUserForEgressGrant } from "./egress-approval-dialog"
 // REQ-159 `#1322`:工作区写探针的 main 半场 —— 请求/应答簿记住在 workspace-write-probe.ts,这里只接线到子进程。
 import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
@@ -203,23 +202,7 @@ function ensureEgressPolicyProxy(): Promise<EgressProxyHandle> {
       if (denied || record.event === "egress.tunnel-silent") getLogger()?.warn(line)
       else getLogger()?.log(line)
     }
-    // `#1412`:第三个半场在这里接上 —— 装载盘上已批准的目的地,并把「问用户」与「记住」两条通道
-    // 交给编排模块。**接线只在这一处**:没有它,requestUserEgressGrant 恒答 `not-asked`(不是 false ——
-    // 结局是三态,`not-asked` 表示「根本没问人」,代理据此不写 grant 记录),未登记目的地照旧 403。
-    // ⚠️ **装载只发生在这里,没有任何重读**:用户删掉真源里的一条记录,**本次运行照样放行** ——
-    // 要撤销得删记录**并重启应用**。文案两处都必须这么说(egress-grant-records.ts 的那行日志、
-    // 方案基线 §7.4);少说「并重启」就是产品在说假话。真正的热重读是另一票。
-    const grantLog = (line: string) => getLogger()?.log(line)
-    const loaded = setUserEgressGrants(readEgressGrantRecords(grantLog))
-    getLogger()?.log(
-      `network egress: ${loaded.length} user-approved destination(s) restored from the grant truth — ` +
-        (loaded.map((g) => `${g.host}:${g.port}`).join(", ") || "none") +
-        "; a destination enters this set only from the approval dialog in this process",
-    )
-    configureEgressGrantApproval({
-      approver: askUserForEgressGrant,
-      persist: (grant) => persistEgressGrantRecord(grant, new Date().toISOString(), grantLog),
-    })
+    // Conversation approval is registered by the main composition root before the sidecar starts.
     egressProxySingleton = startEgressPolicyProxy({ log }).then(
       (handle) => {
         getLogger()?.log(`network egress policy proxy listening on ${handle.host}:${handle.port} — the only way out of the engine tree (REQ-137); destinations = network-egress-registry.ts`)
@@ -760,6 +743,8 @@ export async function spawnLocalServer(
     env: process.env,
     log: (line) => getLogger()?.warn(line),
   })
+  publishVideoEnvironment(bootstrap) // #1775 consumes FIRST-PARTY-CACHE-v2.2; #1760 owns its producer.
+
   let fence: PlannedFence | undefined
   try {
     fence = await (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory: bootstrap.paths.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
@@ -1067,7 +1052,19 @@ export async function spawnLocalServer(
     throw error
   })
   // REQ-234 `#1529`:ready 之后接上重载请求的发送口(重发 main 记录里仍在途的 generation)。
-  if (!exited) detachCodePuppy = options.codepuppySidecar?.attach(postCodePuppy)
+  if (!exited) {
+    const client = engineClient({ url: `http://${hostname}:${port}`, username: null, password })
+    detachCodePuppy = options.codepuppySidecar?.attach(postCodePuppy, options.generation, {
+      session: async (ref) => {
+        const info = await client.session.get({ sessionID: ref.sessionID })
+        return info.location.directory === ref.directory ? { parentID: info.parentID } : undefined
+      },
+      shell: async (ref, id) => {
+        const info = await client.shell.get({ id, location: { directory: ref.directory } })
+        return info.data.status === "running" && info.data.metadata.sessionID === ref.sessionID
+      },
+    })
+  }
 
   const wait = (async () => {
     const url = `http://${hostname}:${port}`

@@ -20,7 +20,7 @@ import {
   type PackageProfilePayloadV1,
   type PackageSupportedComponentV1,
 } from "../shared/host-extension-package-contract/decoder"
-import { HOST_EXTENSION_PACKAGE_LIMITS_V1 } from "../shared/host-extension-package-contract/registry"
+import { findPackageProfileV1, HOST_EXTENSION_PACKAGE_LIMITS_V1 } from "../shared/host-extension-package-contract/registry"
 import {
   packageEffectiveInstallGraphV1,
   type PackageEffectiveInstallGraphV1,
@@ -322,9 +322,9 @@ export async function evaluatePackageForHost(
       component.capabilities,
     )
     if (!decoded.ok) return refuse("package-payload-invalid")
-    if (["mcp:github-official", "mcp:dbhub-readonly"].includes(component.id) && !("officialRecipe" in decoded.payload.behavior))
+    if (["mcp:github-official", "mcp:dbhub-readonly"].includes(component.id) && !("behavior" in decoded.payload && "officialRecipe" in decoded.payload.behavior))
       return refuse("package-payload-invalid")
-    if ("officialRecipe" in decoded.payload.behavior && decoded.payload.behavior.officialRecipe) {
+    if ("behavior" in decoded.payload && "officialRecipe" in decoded.payload.behavior && decoded.payload.behavior.officialRecipe) {
       const name = decoded.payload.behavior.officialRecipe === "github-remote-v1" ? "github-official" : "dbhub-readonly"
       if (supported.length !== 1 || component.id !== `mcp:${name}` || header.envelope.prelude.packageId !== `package:${name}`)
         return refuse("package-payload-invalid")
@@ -646,7 +646,8 @@ export async function fetchPackagePayload(
   ref: PackagePayloadRefV1,
   fetchImpl: typeof fetch = fetch,
 ): Promise<Uint8Array> {
-  if (ref.bytes > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxPayloadBytes)
+  const aggregate = ref.mediaType === findPackageProfileV1("plugin-package", 1)!.mediaType
+  if (!aggregate && ref.bytes > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxPayloadBytes)
     throw new Error("package payload exceeds host limit")
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), PAYLOAD_TIMEOUT_MS)
@@ -662,7 +663,7 @@ export async function fetchPackagePayload(
         throw new Error("package payload redirected outside HTTPS")
     }
     const bytes = new Uint8Array(await response.arrayBuffer())
-    if (bytes.byteLength > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxPayloadBytes)
+    if (!aggregate && bytes.byteLength > HOST_EXTENSION_PACKAGE_LIMITS_V1.maxPayloadBytes)
       throw new Error("package payload exceeds host limit")
     return bytes
   } finally {

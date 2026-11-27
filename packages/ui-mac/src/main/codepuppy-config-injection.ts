@@ -12,7 +12,10 @@
 // 正向闸门锁 model/enabled_providers/provider/三个 alpha agent/{file:} ref,反向闸门锁 catch 的
 // 真实爆炸半径 + 失败必须出声)。
 
+import { codepuppyVideoDefinition } from "./codepuppy-video"
+import { VIDEO_MCP_NAME } from "../shared/media-attachment"
 import { codepuppyBootstrap } from "@opencode/util/codepuppy-bootstrap"
+import { ASK_AGENT, READONLY_AGENT } from "../shared/permission-tier"
 import { AUTOMATION_DEFAULTS } from "../shared/automation-types"
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -354,14 +357,14 @@ export function injectCodePuppyConfig(
     if (!switches.readonlyDisabled) {
       config.agents = {
         ...config.agents,
-        "codepuppy-readonly": {
-          description: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].description,
+        [READONLY_AGENT]: {
+          description: CODEPUPPY_AGENT_TEXT[READONLY_AGENT].description,
           // REQ-055:对选择器隐藏;CodePuppyComposer 只读档改为提交时 agent 参数,不再依赖可见列表轮转
           hidden: true,
           mode: "primary",
-          system: CODEPUPPY_AGENT_TEXT["codepuppy-readonly"].prompt,
+          system: CODEPUPPY_AGENT_TEXT[READONLY_AGENT].prompt,
           permissions: rules([
-            ["read", { "*": "allow", "*.env*": "deny" }],
+            ["read", "allow"],
             ["glob", "allow"],
             ["grep", "allow"],
             ["list", "allow"],
@@ -371,7 +374,7 @@ export function injectCodePuppyConfig(
             ["edit", "deny"],
             ["shell", "deny"],
             ["external_directory", "deny"],
-            ["subagent", { "*": "deny", "codepuppy-readonly": "allow" }],
+            ["subagent", { "*": "deny", [READONLY_AGENT]: "allow" }],
             ["mcp:*", "ask"],
             ["plugin:*", "ask"],
             // BR-01 / BR-10(SPEC-plugin-helper-and-hub v5):助手的只读查找与状态工具不问;安装仍每档都问(hubInstallAsk)。
@@ -393,8 +396,7 @@ export function injectCodePuppyConfig(
     //       的两条覆盖原样带上,否则「请求审批」会比「全部批准」少掉 question 工具。
     //       REQ-236(方案 §2.3):委派给其它助手(模型派子任务 / 点名 / 命令换助手 / 直接子任务)派出前
     //       也问一次 —— 子会话不继承本 agent 的 ask,不问就等于整段跳过「逐次询问」;同档自身不问。
-    //       另把 defaults 里 `doom_loop` 与 `read *.env*` 的 ask **原样重写一遍**:agent 自己的键排在
-    //       配置顶层 `permission` 之后,项目配置放宽不了它们(`*.env.example` 照 defaults 仍放行)。
+    //       doom_loop 沿用原 ask；交互 read 的密钥文件安全视图由扩展在原授权前提供(#1758)。
     //       `external_directory`(R2:工作区外先问)不写在这里:写进配置会排在用户自己的规则之后、压过它们;由 ext 的 agent 变换
     //       插在引擎底座之后(packages/ext/src/external-directory-rule.ts,`#1662` parity)。
     //       没有 prompt(见 codepuppy-agents.ts 抬头:给了 prompt 就会顶掉整份底座)。
@@ -403,8 +405,8 @@ export function injectCodePuppyConfig(
     //       常驻闸:packages/opencode/test/permission/codepuppy-composer-tiers.test.ts(真 Agent + 真 Permission.ask)。
     config.agents = {
       ...config.agents,
-      "codepuppy-ask": {
-        description: CODEPUPPY_AGENT_TEXT["codepuppy-ask"].description,
+      [ASK_AGENT]: {
+        description: CODEPUPPY_AGENT_TEXT[ASK_AGENT].description,
         hidden: true,
         mode: "primary",
         permissions: rules([
@@ -417,9 +419,8 @@ export function injectCodePuppyConfig(
           ["websearch", "allow"],
           ["edit", "ask"],
           ["shell", "ask"],
-          ["subagent", { "*": "ask", "codepuppy-ask": "allow" }],
+          ["subagent", { "*": "ask", [ASK_AGENT]: "allow" }],
           ["doom_loop", "ask"],
-          ["read", { "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" }],
         ]),
       },
     }
@@ -555,6 +556,12 @@ export function injectCodePuppyConfig(
         console.error(
           `[alpha-code#223] web search kill switch is set — the cloud MCP server definition is WITHHELD from the engine config (a neutralised ${WITHHELD_CLOUD_MCP.url} entry overrides any inherited one); only a confirmed @codepuppy/ext load installs the real one from the bootstrap document${extPluginPath ? "" : ", and no ext bundle path was resolved this fork so it will stay dark"}`,
         )
+    }
+
+    const video = codepuppyVideoDefinition(bootstrap)
+    if (video) {
+      config.mcp = { ...config.mcp, servers: { ...config.mcp?.servers, [VIDEO_MCP_NAME]: video } }
+      injectedMcpNames.add(VIDEO_MCP_NAME)
     }
 
     // Remote MCP config only toggles whole servers, but the engine's global permission layer filters

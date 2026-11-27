@@ -1,3 +1,4 @@
+import { testEgressDial } from "./egress-upstream-fixture"
 import { afterEach, beforeEach, expect, mock, test } from "bun:test"
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto"
 import {
@@ -759,14 +760,14 @@ test("GitHub recipe decrypts through actual engine file substitution into HTTP h
       },
     },
   })
-  const proxy = await startEgressPolicyProxy({
+  const proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }],
     log: (record) => {
       records.push(record)
     },
-    dial: (host, port) => {
+    dial: testEgressDial((host, port) => {
       dialed.push(`${host}:${port}`)
       return connect(target.port, "127.0.0.1")
-    },
+    }),
   })
   const tunnel = (authority: string) =>
     new Promise<string>((done, reject) => {

@@ -1,0 +1,41 @@
+{
+  "source": "Actual build-document-assets.ts output, 2026-11-26",
+  "fontLockSha256": "09dcd24ee1d7ba7d74ac4648467215ef04e1c5ebd05cc2b504357020b372b9fa",
+  "fontInputs": [
+    {
+      "path": "fonts/NotoSansSC-Regular.ttf",
+      "family": "Noto Sans SC",
+      "weight": 400,
+      "sha256": "a89babdfd7c3d0b7d69e489acacb8a363db38e7cd8b6f96ba08b10133acf777f"
+    },
+    {
+      "path": "fonts/NotoSansSC-Bold.ttf",
+      "family": "Noto Sans SC",
+      "weight": 700,
+      "sha256": "32173a0cecf15ac3c0752966be2e41cd881109f0ebec621072443555a1b9e420"
+    },
+    {
+      "path": "fonts/NotoSerifSC-Regular.ttf",
+      "family": "Noto Serif SC",
+      "weight": 400,
+      "sha256": "8be18a5b9bdc0ea76db6fdf77104bb63d24eb869fc4005615683cc2116136144"
+    },
+    {
+      "path": "fonts/NotoSerifSC-Bold.ttf",
+      "family": "Noto Serif SC",
+      "weight": 700,
+      "sha256": "473d03b9cf6d13ef4897f46b3f87ba31bab8d6c4b17601542f4dbea1f0d896f8"
+    }
+  ],
+  "fontFixtureTransformation": "FontTools 4.69.1 subset for 中文报告销售汇总，。ABC0123; original OFL retained. Test path/hash projection only, not full glyph coverage.",
+  "templateGeneratorSha256": "8b6764d0bf1387e471c62286b33a79128606157ba2349161dd3f82ca77876df4",
+  "npmLockSha256": "a71a683cf53c9b91ee466dd74315a61334bc1c1a5f269ae7a82d13405d0c769c",
+  "windowsHeader": "First 4096 bytes of python/python.exe from CPython 3.11.15 PBS 20260310 win32-x64 SHA256 9302cfe055216e60309bb99961d8a093189183af8dd27a3bd7c40d5e6252090b; header inspection only, not executable evidence.",
+  "darwinHeader": "First 4096 bytes of bundled bin/python3 from CPython 3.11.15 PBS 20260310 darwin-arm64 pin 96842b1451580427d724500306f39466941f9cba2fc03a1de6f27016d899a764; header/path tests only.",
+  "wordTemplate": {
+    "source": "Actual build-document-assets.ts output after replacing empty simple TOC with locked docx 9.16.0 native TableOfContents and its heading bookmark",
+    "version": "2",
+    "generatorSha256": "643fe2ea5b24a879f33045025e504270f8044698f11e1ec3170905d836b1ec26",
+    "sha256": "3fe0b8e1d5042b17ca1147b746346b8b198c52c95d3dd62c6a8ede8a31fae128"
+  }
+}

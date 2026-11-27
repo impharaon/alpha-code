@@ -1,3 +1,9 @@
+import { createMainVideoService } from "./codepuppy-video-cloud"
+import { dispatchVideoUpload } from "./codepuppy-video-transport"
+import { videoCacheRoot } from "./codepuppy-video-environment"
+import { getVideoModels, getVideoCloudJobStatus } from "./codepuppy-cloud-jobs"
+import type { VideoCall, VideoBridgeRequest, VideoBridgeReply } from "../shared/video-understanding"
+import type { UploadPreview } from "../preload/types"
 // alpha cloud jobs IPC (main process). Mirrors account-ipc.ts: thin handlers dispatching/polling cloud
 // jobs on the alpha-platform (B) `cloud` worker using the main-held JWT (codepuppy-cloud-jobs.ts). The
 // renderer receives only the resolved result, never the token.
@@ -174,6 +180,80 @@ const uploadService = createMainUploadService({
   dispatch: dispatchExplicitCloudUpload,
   log: (message) => getLogger().warn(message),
 })
+// Display routing is bound by the existing renderer session identity, never by connector arguments.
+const videoSenders = new Map<string, number>()
+const videoRouteListeners = new Set<() => void>()
+const videoRouteKey = (call: Pick<VideoCall, "sessionID" | "directory">) =>
+  JSON.stringify([call.sessionID, call.directory])
+export const videoCloudService = createMainVideoService({
+  root: videoCacheRoot,
+  identity: () => getAccessTokenIdentity("cloud.dispatch"),
+  models: getVideoModels,
+  upload: uploadService,
+  endpoint: () => `${resolveEndpoints().cloud}/v1/cloud/jobs`,
+  dispatch: dispatchVideoUpload,
+  status: getVideoCloudJobStatus,
+  cancel: cancelCloudJob,
+  sender: (call, signal) =>
+    new Promise<number>((resolve, reject) => {
+      const check = () => {
+        const id = videoSenders.get(videoRouteKey(call))
+        if (id !== undefined) {
+          cleanup()
+          resolve(id)
+        }
+      }
+      const abort = () => {
+        cleanup()
+        reject(signal.reason)
+      }
+      const cleanup = () => {
+        videoRouteListeners.delete(check)
+        signal.removeEventListener("abort", abort)
+      }
+      videoRouteListeners.add(check)
+      signal.addEventListener("abort", abort, { once: true })
+      if (signal.aborted) abort()
+      else check()
+    }),
+  artifact: async (jobId, artifactId, call, signal) => {
+    const list = await listCloudArtifacts(jobId)
+    if ("error" in list) throw new Error(list.error)
+    const artifact = list.artifacts.find((item) => item.id === artifactId)
+    if (!artifact) throw new Error("not-registered")
+    const saved = await saveCloudRun(call.directory, jobId, {
+      ...runSaveDeps(call.directory, jobId, signal),
+      status: getCloudJobStatus,
+      artifacts: async () => ({ ...list, artifacts: [artifact] }),
+    })
+    if (!saved.ok || saved.failures.length) throw new Error("artifact-read-failed")
+    const file = saved.files.find((file) => file.startsWith(`artifacts${path.sep}`) || file.startsWith("artifacts/"))
+    if (!file) throw new Error("artifact-read-failed")
+    return JSON.parse(await fs.promises.readFile(path.join(saved.dir, file), "utf8"))
+  },
+})
+export async function handleVideoCloudRequest(request: VideoBridgeRequest, referencePath?:string): Promise<VideoBridgeReply> {
+  try {
+    if(request.action === "start" && !referencePath)throw new Error("video_request_invalid")
+    const result =
+      request.action === "start"
+        ? await videoCloudService.start(request.call, request.request, referencePath!)
+        : request.action === "prepare"
+          ? await videoCloudService.prepare(request.requestId, request.call, request.request)
+          : request.action === "cancel"
+            ? await videoCloudService.cancel(request.requestId, request.call)
+            : await videoCloudService.query(request.requestId, request.call)
+    return { type: "codepuppy.video.understand.reply", id: request.id, ok: true, ...result }
+  } catch (error) {
+    return {
+      type: "codepuppy.video.understand.reply",
+      id: request.id,
+      ok: false,
+      error: error instanceof Error && /^[a-z][a-z0-9_-]+$/.test(error.message) ? error.message : "cloud_failed",
+    }
+  }
+}
+
 const uploadCleanupSenders = new Set<number>()
 
 async function pickExplicitUpload(event: IpcMainInvokeEvent) {
@@ -194,6 +274,33 @@ async function pickExplicitUpload(event: IpcMainInvokeEvent) {
 }
 
 export function registerCloudIpcHandlers() {
+  ipcMain.handle(
+    "cloud-video-upload-state",
+    (event: IpcMainInvokeEvent, identity: unknown): Array<{ requestId: string; preview: UploadPreview }> => {
+      if (
+        identity &&
+        typeof identity === "object" &&
+        "sessionID" in identity &&
+        "directory" in identity &&
+        typeof identity.sessionID === "string" &&
+        typeof identity.directory === "string"
+      ) {
+        videoSenders.set(videoRouteKey({ sessionID: identity.sessionID, directory: identity.directory }), event.sender.id)
+        for (const listener of videoRouteListeners) listener()
+      }
+      if (!uploadCleanupSenders.has(event.sender.id)) {
+        const senderId = event.sender.id
+        uploadCleanupSenders.add(senderId)
+        event.sender.once("destroyed", () => {
+          uploadCleanupSenders.delete(senderId)
+          uploadService.clear(senderId)
+          for (const [key, id] of videoSenders) if (id === senderId) videoSenders.delete(key)
+        })
+      }
+      return uploadService.videoPreviews(event.sender.id)
+    },
+  )
+
   ipcMain.handle("cloud-open-billing-page", (_event, page: "recharge" | "overflow") =>
     shell.openExternal(new URL(page === "recharge" ? "/wallet?tab=recharge" : "/account", resolveEndpoints().web).href),
   )
@@ -208,6 +315,7 @@ export function registerCloudIpcHandlers() {
       event.sender.once("destroyed", () => {
         uploadCleanupSenders.delete(senderId)
         uploadService.clear(senderId)
+        for (const [key, id] of videoSenders) if (id === senderId) videoSenders.delete(key)
       })
     }
     return assertSafeUploadResult(await uploadService.prepare(event.sender.id, intent, selection))

@@ -39,6 +39,7 @@ export function createUnattendedRuns() {
   }
 
   return {
+    has: (sessionID: string) => live.has(sessionID),
     register(sessionID: string, entry: { agent?: string; promptID: string }, signal?: AbortSignal) {
       live.set(sessionID, entry)
       return publish(true, signal)

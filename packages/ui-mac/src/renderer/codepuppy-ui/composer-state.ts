@@ -7,6 +7,8 @@
 // - 纯函数(buildPromptRequest / routeSlash / filterAgents)与 signals 分离,前者可直接单测。
 
 import { createSignal } from "solid-js"
+import { ASK_AGENT, READONLY_AGENT, PERM_AGENT, tierAgent, type PermMode } from "../../shared/permission-tier"
+export { ASK_AGENT, READONLY_AGENT, PERM_AGENT, tierAgent, type PermMode } from "../../shared/permission-tier"
 import type { ModelRef } from "../../engine-adapter/contract/v1"
 
 /* ── 类型 ─────────────────────────────────────────────────────────────────── */
@@ -19,41 +21,6 @@ export type ComposerModel = ModelRef & {
 }
 
 export type ComposerAgent = { name: string; description?: string }
-
-/** 运行权限三档(`#1413`)。每一档提交时发出的请求**逐字节不同**(见 `PERM_AGENT`),这是它存在的唯一理由:
- *
- *  - `allow`「全部批准」:不压 agent,请求走引擎默认档 `build`(规则集基底 `"*": "allow"`)—— 这就是
- *    2026-09-23 之前「请求审批」档**实际**的行为,只是当时它顶着「逐次询问」的副标题。
- *  - `ask`「请求审批」:强制 `codepuppy-ask`(= build + edit/bash 改 ask,主进程注入)。此前这档不带 agent、
- *    落到 build,真 `Permission.ask` 实测 edit/bash 直接放行不弹框 —— 副标题是假的
- *    (docs/architecture/2026-09-23-runtime-permission-tiers.md §3)。
- *  - `readonly`「只读」:强制 `codepuppy-readonly`(REQ-028,edit/bash 静态 deny)。行为逐字不变。
- *
- *  历史:REQ-126 AC7(#658)退休过一个第三档 `full`(「全自动」)—— 它是**空承诺**:提交层只对 `readonly`
- *  分支,`full` 与 `ask` 产出逐字节相同的请求;chip 唯一的"生效"路径是发上游根本不存在的两个命令 id。
- *  本轮的三档不走 if/else:`PERM_AGENT` 是 `Record<PermMode, …>` 的穷举表,少写一档 typecheck 就红,
- *  多加一档而不给它映射也红 —— 第三个值**不可能**静默落进某个 else 分支变成另一档的复制品。 */
-export type PermMode = "allow" | "ask" | "readonly"
-
-/** 只读档的真载体(REQ-028:静态权限档 edit/bash deny 的引擎 agent)。 */
-export const READONLY_AGENT = "codepuppy-readonly"
-/** 请求审批档的真载体(`#1413`:build + edit/bash ask 的引擎 agent,主进程 codepuppy-config-injection.ts 注入)。 */
-export const ASK_AGENT = "codepuppy-ask"
-
-/** 每一档提交时**强制**的 agent;`null` = 不压,透传用户手选的档位(计划 / 第三方主档)或引擎默认。
- *  穷举表而不是分支:见 `PermMode` 抬头。 */
-export const PERM_AGENT: Record<PermMode, string | null> = {
-  allow: null,
-  ask: ASK_AGENT,
-  readonly: READONLY_AGENT,
-}
-
-/** 该档**强制**的 agent;`undefined` = 不压。普通发送(`buildPromptRequest`)与两处斜杠命令发送
- *  (会话内 `codepuppy-composer`、首页 `use-projects.startChat`)共用这一问 —— 命令请求只带它、不带手选档位,
- *  所以「全部批准」下命令请求与改动前逐字相同(REQ-236 方案 §2.3 E5)。 */
-export function tierAgent(mode: PermMode): string | undefined {
-  return PERM_AGENT[mode] ?? undefined
-}
 
 /** 该档是否压过手选档位(计划 chip 置灰、Shift+Tab 不切、装配弹窗计划行禁用都读这一问)。 */
 export function permLocksAgent(mode: PermMode): boolean {

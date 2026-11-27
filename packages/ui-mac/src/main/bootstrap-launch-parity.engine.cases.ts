@@ -164,6 +164,7 @@ async function launch() {
     userDataPath,
     healthCheck: async () => true,
     planFence: fakePlanFence,
+    // Value-only fork fixture: fakeFork and fakePlanFence never bind or connect to this port.
     egressProxy: async () => ({ port: 4433 }),
     fork: fakeFork,
   })

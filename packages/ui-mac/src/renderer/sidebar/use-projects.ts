@@ -1,3 +1,4 @@
+import { setSessionNetworkTier } from "../codepuppy-ui/network-egress"
 // Data layer for the alpha sidebar: the list of projects and, per project, its root
 // conversations. We talk to the local opencode server through @opencode-ai/sdk/v2 only —
 // opencode's own layout/session contexts are not exported (restrictive `exports` map), and
@@ -460,6 +461,7 @@ export function useCodePuppyProjects(
     },
   ): Promise<string | undefined> {
     const c = client
+    const submittedServer = serverInfo?.baseUrl
     if (!c) return undefined
     try {
       let id: string
@@ -480,6 +482,7 @@ export function useCodePuppyProjects(
       }
       const body = text.trim()
       if (body) {
+        if (opts?.perm) await setSessionNetworkTier({ serverKey: submittedServer, directory: worktree, sessionID: id }, opts.perm)
         let ranCommand = false
         const [head, ...tail] = body.split(" ")
         if (head?.startsWith("/")) {

@@ -101,6 +101,7 @@ export type ProvidedKey = keyof ReturnType<typeof createBaseStub>
  */
 export type AbsentOnPurposeKey =
   // ① 缺席即语义:组件按「有没有这个键」分支
+  | "networkEgress" // Connection cards require an applied fence; tests inject their own main service.
   | "sidecarGeneration"
   | "ext"
   | "workspaceWriteProbe"

@@ -7,19 +7,25 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { build } from "vite"
 import { decodeContract } from "@codepuppy/contracts-consumer"
-import type { createComponent } from "solid-js"
+import type { createComponent, createRoot } from "solid-js"
 import type { render } from "solid-js/web"
 import type { CloudJobEnvelope, CloudUploadResult, UploadPreview } from "../../preload/types"
 import type { UploadConsentDialog } from "./upload-consent-dialog"
 import type { CloudDispatchBox } from "./cloud-dispatch-box"
-import type { ExtensionDetail } from "./extension-detail"
+import type { createInstallConfirm } from "./install-confirm"
+import type { ExtensionDetail, InstalledPackageDetail } from "./extension-detail"
 import type { CatalogEntry, CloudPipelineSpec } from "./catalog-types"
 import bundledCatalog from "./codepuppy-catalog.json"
 import { dict as zh } from "../i18n/zh"
 import { PROJECT_HIDDEN_DIR } from "../../shared/project-hidden-dir"
 
 type Runtime = {
+  VideoUploadDialog: typeof import("./video-upload-dialog").VideoUploadDialog
+  publishActiveSessionIdentity: typeof import("../codepuppy-ui/active-session-directory").publishActiveSessionIdentity
   createComponent: typeof createComponent
+  createRoot: typeof createRoot
+  createInstallConfirm: typeof createInstallConfirm
+  InstalledPackageDetail: typeof InstalledPackageDetail
   render: typeof render
   UploadConsentDialog: typeof UploadConsentDialog
   CloudDispatchBox: typeof CloudDispatchBox
@@ -95,14 +101,14 @@ async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-function mount(options: { busy?: boolean; onCancel?: () => void; onConfirm?: () => void } = {}) {
+function mount(options: { busy?: boolean; onCancel?: () => void; onConfirm?: () => void; preview?: UploadPreview } = {}) {
   const host = document.createElement("div")
   document.body.append(host)
   disposers.push(
     runtime.render(
       () =>
         runtime.createComponent(runtime.UploadConsentDialog, {
-          state: { requestId: "request-1", preview },
+          state: { requestId: "request-1", preview: options.preview ?? preview },
           busy: options.busy ?? false,
           onCancel: options.onCancel ?? (() => {}),
           onConfirm: options.onConfirm ?? (() => {}),
@@ -508,6 +514,30 @@ describe("#1509 customization center cloud entries", () => {
   })
 })
 
+test("package authorization and the installed card display skills without a bundle component entry", async () => {
+  const components = [
+    { componentId: "bundle:package-root", kind: "bundle", name: "package-root", required: true, desiredState: "enabled" as const },
+    { componentId: "skill:source-skill", kind: "skill", name: "source-skill", required: true, desiredState: "enabled" as const },
+  ]
+  runtime.createRoot(dispose => {
+    disposers.push(dispose)
+    const confirm = runtime.createInstallConfirm({ install: async () => null, projectDir: () => undefined })
+    const state = { view: {}, preview: { plan: { items: components.map(component => ({ ...component, included: true, prerequisites: [] })) } }, finish: () => {} } as unknown as Parameters<typeof confirm.openPackage>[0]
+    confirm.openPackage(state)
+    expect(confirm.packagePlanIncluded().map(item => item.componentId)).toEqual(["skill:source-skill"])
+  })
+  Object.defineProperty(window, "api", { configurable: true, value: { ext: { packageAuthorization: async () => ({ ok: true, items: [] }) } } })
+  const host = document.createElement("div")
+  document.body.append(host)
+  disposers.push(runtime.render(() => runtime.createComponent(runtime.InstalledPackageDetail, {
+    pack: { packageId: "claude:package", desiredState: "enabled", installedGraphDigest: "sha256:" + "1".repeat(64), displayName: "Package", rootComponentName: "package-root", version: "1.0.0", origin: "imported-claude", components },
+    label: "Package", ext: { store: { mcp: {}, receipts: [] } } as unknown as Parameters<typeof InstalledPackageDetail>[0]["ext"], menu: undefined, onBack: () => {},
+  }), host))
+  await flush()
+  const row = Array.from(host.querySelectorAll(".codepuppy-ext-kv-row")).find(row => row.querySelector(".k")?.textContent === zh["codepuppy.ext.packageIncludes"])!
+  expect(row.querySelector(".v")?.textContent).toBe(zh["codepuppy.ext.packageComponentCount"].replace("{{count}}", "1").replace("{{kind}}", zh["codepuppy.ext.tabSkills"]))
+})
+
 // ── #1595 定制中心详情页说人话(批准稿 docs/design/2026-10-30-req236-ux-config-pages #cloud-task / #cloud-connector)──
 
 function mountDetail(target: Parameters<typeof ExtensionDetail>[0]["target"], options: { cloudReady?: boolean; onLogin?: () => void } = {}) {
@@ -627,4 +657,71 @@ describe("#1595 AC4 发送框、结果、生效状态与云端错误的文字按
       expect(zh[key]).not.toContain(PROJECT_HIDDEN_DIR)
     }
   })
+})
+
+
+test("video privacy reuses the original card with its actual purpose and inherited source scope", async () => {
+  mount({
+    preview: {
+      ...preview,
+      pipeline: "video-understanding",
+      files: [{ path: "project/.ssh/speech.mp4", sizeBytes: 1550, sensitive: true }],
+      fileCount: 1,
+    },
+  })
+  const host = document.body
+  await flush()
+  expect(host.textContent).toContain("视频理解")
+  expect(host.textContent).not.toContain("代码审查")
+  const expand = host.querySelector(".codepuppy-upl-more") as HTMLButtonElement
+  expand.click()
+  await flush()
+  expect(host.textContent).toContain(".ssh/speech.mp4")
+})
+
+test("video upload host reads the active session and uses existing confirm and cancel IPC", async () => {
+  const identity = { sessionID: "ses_video", directory: "/project" }
+  runtime.publishActiveSessionIdentity(identity)
+  const values = [{ requestId: "video-consent", preview: { ...preview, pipeline: "video-understanding" as const } }]
+  const uploadRoutes: unknown[] = [],
+    confirmed: string[] = [],
+    cancelled: string[] = []
+  Object.defineProperty(window, "api", {
+    configurable: true,
+    value: {
+      cloud: {
+        videoUploads: async (route: unknown) => {
+          uploadRoutes.push(route)
+          return [...values]
+        },
+        confirmUpload: async (id: string) => {
+          confirmed.push(id)
+          values.length = 0
+        },
+        cancelUpload: async (id: string) => {
+          cancelled.push(id)
+          values.length = 0
+        },
+      },
+    },
+  })
+  const host = document.createElement("div")
+  document.body.append(host)
+  disposers.push(runtime.render(() => runtime.createComponent(runtime.VideoUploadDialog, {}), host))
+  await flush()
+  expect(uploadRoutes[0]).toEqual(identity)
+  expect(document.body.textContent).toContain("视频理解")
+  document.body.querySelector<HTMLButtonElement>('.a-btn[data-variant="primary"]')!.click()
+  await flush()
+  expect(confirmed).toEqual(["video-consent"])
+  expect(document.body.querySelector("[role=dialog]")).toBeNull()
+  disposers.pop()!()
+  values.push({ requestId: "video-cancel", preview: { ...preview, pipeline: "video-understanding" } })
+  disposers.push(runtime.render(() => runtime.createComponent(runtime.VideoUploadDialog, {}), host))
+  await flush()
+  document.body.querySelector<HTMLButtonElement>('.a-btn[data-variant="ghost"]')!.click()
+  await flush()
+  expect(cancelled).toEqual(["video-cancel"])
+  expect(document.body.querySelector("[role=dialog]")).toBeNull()
+  runtime.publishActiveSessionIdentity(undefined)
 })

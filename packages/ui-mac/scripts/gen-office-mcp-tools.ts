@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+import { officePythonPath } from "../src/shared/document-resources"
+import { officeRuntimeDir } from "./build-office-runtime"
 // gen-office-mcp-tools — #1565(REQ-236 §2.3):四个随包文档工具的「声明定义」清单 resources/office-mcp/tools.json。
 //
 // 引擎在文档工具连上之前就要把它们的用法告诉模型(连上要几秒;那几秒里模型会以为没有文档工具)。用法只有一个来源:
@@ -14,6 +16,10 @@ import { createHash } from "node:crypto"
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { videoToolDefinitions } from "../resources/video-mcp/contracts"
+import { videoRecipes } from "../resources/video-mcp/asset-recipes"
+import { VIDEO_RUNTIME_BUILD_DIR } from "./target-arch"
+import { VIDEO_DECLARATION_ID, VIDEO_SERVICE_COMMAND } from "../src/shared/video-service"
 import { CODEPUPPY_OFFICE_CONNECTORS, codepuppyOfficeInstallCommand } from "../src/shared/office-advisories"
 
 const OFFICE_MCP_DIR = join(import.meta.dir, "..", "resources", "office-mcp")
@@ -33,18 +39,55 @@ print(json.dumps({name: server.tools_for(name) for name in formats}))
 `
 
 /** 由 `server` 的 tools_for() 渲染清单全文(不写盘)。 */
-export function renderOfficeMcpTools(server: string = OFFICE_MCP_SERVER): string {
+export function renderOfficeMcpTools(
+  server: string = OFFICE_MCP_SERVER,
+  videoRoot = join(OFFICE_MCP_DIR, "../../dist-video"),
+  runtimeRoot = join(
+    OFFICE_MCP_DIR,
+    "../..",
+    VIDEO_RUNTIME_BUILD_DIR,
+    process.platform === "darwin" ? "mac-arm64" : "win-x64",
+  ),
+): string {
   const formats = CODEPUPPY_OFFICE_CONNECTORS.map((connector) => connector.format)
-  const python = Bun.which("python3")
+  const python = officePythonPath(officeRuntimeDir(process.arch === "arm64" ? "arm64" : "x64"), process.platform)
   if (!python) throw new Error("gen-office-mcp-tools: python3 is not on PATH (needed to load server.py's tools_for)")
   const run = Bun.spawnSync([python, "-I", "-B", "-c", EXPORT_TOOLS, server, ...formats], { stderr: "pipe" })
-  if (run.exitCode !== 0) throw new Error(`gen-office-mcp-tools: ${python} exited ${run.exitCode}: ${run.stderr.toString()}`)
+  if (run.exitCode !== 0)
+    throw new Error(`gen-office-mcp-tools: ${python} exited ${run.exitCode}: ${run.stderr.toString()}`)
   const tools = JSON.parse(run.stdout.toString()) as Record<string, unknown[]>
   const manifest = {
     serverSha256: createHash("sha256").update(readFileSync(server)).digest("hex"),
-    formats: Object.fromEntries(
-      formats.map((format) => [format, { command: codepuppyOfficeInstallCommand(format), tools: tools[format] }]),
-    ),
+    formats: Object.fromEntries([
+      ...formats.map((format) => [format, { command: codepuppyOfficeInstallCommand(format), tools: tools[format] }]),
+      [
+        VIDEO_DECLARATION_ID,
+        {
+          command: VIDEO_SERVICE_COMMAND,
+          environment: {},
+          cwd: null,
+          codeSha256: Object.fromEntries([
+            ...["server.js", "speech-worker.js"].map((name) => [
+              `video-mcp/${name}`,
+              createHash("sha256")
+                .update(readFileSync(join(videoRoot, name)))
+                .digest("hex"),
+            ]),
+            ...[
+              "runtime.json",
+              ...Object.keys(JSON.parse(readFileSync(join(runtimeRoot, "runtime.json"), "utf8")).files),
+            ].map((name) => [
+              `video-mcp/${name}`,
+              createHash("sha256")
+                .update(readFileSync(join(runtimeRoot, name)))
+                .digest("hex"),
+            ]),
+          ]),
+          tools: videoToolDefinitions(),
+          recipe: videoRecipes,
+        },
+      ],
+    ]),
   }
   return `${JSON.stringify(manifest, null, 2)}\n`
 }

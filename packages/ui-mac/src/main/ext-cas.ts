@@ -26,6 +26,8 @@
 import * as crypto from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
+import { validPluginTree } from "../shared/host-extension-package-contract/plugin-package"
+import type { TreeNode } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import { isSafeRelPath, resolveUnder, sha256FileSync, writeFileAtomicSync } from "./ext-atomic-fs"
 import type { TxFileSpec } from "./ext-transaction"
 
@@ -276,6 +278,62 @@ export function materializeFilesFromCas(baseRoot: string, files: TxFileSpec[], d
       throw new Error(`size MISMATCH for ${f.path}: ${read.data.length} ≠ ${f.size}`)
     fs.mkdirSync(path.dirname(dest), { recursive: true })
     fs.writeFileSync(dest, read.data)
+    if (f.mode !== undefined) fs.chmodSync(dest, f.mode)
+  }
+}
+
+/** Populate a declared tree without ever writing through one of its links. */
+export function materializePluginTreeFromCas(baseRoot: string, tree: TreeNode[], destDir: string): void {
+  if (!path.isAbsolute(destDir) || !validPluginTree(tree)) throw new Error("Invalid plugin tree destination or nodes")
+  for (const node of tree.filter(node => node.kind !== "symlink")) {
+    const dest = path.join(destDir, node.path)
+    if (node.kind === "directory") fs.mkdirSync(dest, { recursive: true })
+    if (node.kind === "file") {
+      fs.mkdirSync(path.dirname(dest), { recursive: true })
+      const read = node.bytes === 0 ? { ok: true as const, data: Buffer.alloc(0) } : readCasBlobVerified(baseRoot, node.digest.slice(7))
+      if (!read.ok || read.data.length !== node.bytes) throw new Error("Plugin blob is missing or corrupt: " + node.path)
+      fs.writeFileSync(dest, read.data)
+    }
+  }
+  for (const node of tree) if (node.kind === "symlink") {
+    fs.mkdirSync(path.dirname(path.join(destDir, node.path)), { recursive: true })
+    fs.symlinkSync(node.target, path.join(destDir, node.path))
+  }
+  for (const node of [...tree].sort((a, b) => b.path.split("/").length - a.path.split("/").length))
+    if (node.kind !== "symlink") fs.chmodSync(path.join(destDir, node.path), node.mode)
+}
+
+/** Exact declared nodes plus their implicit ancestor directories; links are inspected, never followed. */
+export function verifyPluginTreeOnDisk(tree: TreeNode[], directory: string): { ok: true } | { ok: false; reason: string } {
+  if (!validPluginTree(tree)) return { ok: false, reason: "Invalid plugin tree" }
+  const expected = new Map(tree.map(node => [node.path, node]))
+  const seen = new Set<string>()
+  const walk = (dir: string, prefix = ""): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const relative = prefix + entry.name
+      const node = expected.get(relative)
+      const file = path.join(dir, entry.name)
+      const stat = fs.lstatSync(file)
+      if (!node) {
+        if (!stat.isDirectory() || !tree.some(node => node.path.startsWith(relative + "/"))) throw new Error("Unexpected plugin node: " + relative)
+      } else {
+        if (node.kind === "symlink") {
+          if (!stat.isSymbolicLink() || fs.readlinkSync(file) !== node.target) throw new Error("Plugin link mismatch: " + relative)
+        } else {
+          if ((node.kind === "directory" ? !stat.isDirectory() : !stat.isFile()) || (stat.mode & 0o7777) !== node.mode) throw new Error("Plugin kind or mode mismatch: " + relative)
+          if (node.kind === "file" && (stat.size !== node.bytes || "sha256:" + sha256FileSync(file) !== node.digest)) throw new Error("Plugin file mismatch: " + relative)
+        }
+        seen.add(relative)
+      }
+      if (stat.isDirectory()) walk(file, relative + "/")
+    }
+  }
+  try {
+    walk(directory)
+    if (seen.size !== expected.size) return { ok: false, reason: "Plugin tree has missing nodes" }
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Plugin tree could not be verified" }
   }
 }
 

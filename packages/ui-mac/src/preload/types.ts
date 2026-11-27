@@ -1,4 +1,5 @@
 import type { DirectoryAccessDescriptionInput, DirectoryAccessDescription, DirectoryWriteApproval, DirectoryWriteApprovalResult } from "../shared/directory-write-approval"
+import type { NetworkEgressApi } from "../shared/network-egress-wire"
 import type { SourceSearchResultV1, PreparePluginSourceInputV1, PreparePluginSourceResultV1 } from "../main/plugin-sources"
 import type { InstallRequestV1, InstallOutcomeV1 } from "../shared/plugin-install"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
@@ -28,6 +29,7 @@ import type { ToolPolicyApi } from "../shared/tool-policy-wire"
 import type { PackageEffectV1 } from "../shared/plugin-install"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import type { OfficeRuntimeReadiness } from "../shared/office-advisories"
+import type { MediaAttachmentResult } from "../shared/media-attachment"
 import type { AttachmentReader, AttachmentStageResult } from "../shared/attachment-path"
 import type {
   PackageAdmissionAuthorizationV1,
@@ -505,7 +507,7 @@ export type CloudResult<T> = T | { error: string; netLayer?: NetFailureLayer }
 export type CloudAccountStatus = AccountStatusV1
 export type UploadFindingKind = "contact" | "identity" | "credential" | "protected" | "unknown"
 export type UploadPreview = {
-  pipeline: "code-review"
+  pipeline: "code-review" | "video-understanding"
   fileCount: number
   totalBytes: number
   files: Array<{ path: string; sizeBytes: number; sensitive: boolean }>
@@ -679,6 +681,7 @@ export type {
 export type { CodePuppyEnvironmentInfo }
 
 export type ElectronAPI = {
+  networkEgress: NetworkEgressApi
   killSidecar: () => Promise<void>
   sidecarGeneration: {
     getState: () => Promise<SidecarGenerationState>
@@ -799,6 +802,7 @@ export type ElectronAPI = {
   /** REQ-236 `#1553` AC2:把一份 PDF / Word / Excel / PPT 附件存进 `directory`(会话实例目录)的隐藏目录
    *  `attachments/<uuid>/<净化后的文件名>`;只在用户选择、拖入、粘贴时调用。`path` 相对隐藏目录根。 */
   attachments: {
+    media: (file: File) => Promise<MediaAttachmentResult>
     stage: (directory: string, name: string, reader: AttachmentReader, bytes: ArrayBuffer) => Promise<AttachmentStageResult>
   }
   /** REQ-098:App 环境快照(只读)。main 启动时解析后冻结;此 IPC 无参数、无对应写面 —— renderer
@@ -1197,6 +1201,7 @@ export type ElectronAPI = {
     dispatch: (envelope: CloudJobEnvelope) => Promise<CloudResult<CloudDispatchResult>>
     /** Main picks, reads, classifies and freezes explicit files. Sensitive scope returns a preview only. */
     upload: (intent: CloudUploadIntent) => Promise<CloudUploadResult>
+    videoUploads: (identity?: {sessionID:string;directory:string}) => Promise<Array<{requestId:string;preview:UploadPreview}>>
     confirmUpload: (requestId: string) => Promise<CloudUploadResult>
     cancelUpload: (requestId: string) => Promise<CloudUploadResult>
     status: (jobId: string) => Promise<CloudResult<CloudJobStatus>>

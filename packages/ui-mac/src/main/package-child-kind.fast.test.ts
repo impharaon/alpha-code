@@ -56,6 +56,7 @@ describe("package child kind 路由表 (#809 · 基线 §5 第 7 类)", () => {
       command: "command",
       "mcp-local": "mcp",
       "mcp-remote": "mcp",
+      "plugin-package": "bundle",
     })
     // ADR-040(`#830`):**没有任何 package profile 派生出 `plugin`**。这一条是那条裁决在这张表
     // 上的具名形式 —— 把 `opencode-plugin: "plugin"` 加回来,上面那条 exact-set 与这一条同时红。
@@ -105,8 +106,8 @@ describe("package child kind 路由表 (#809 · 基线 §5 第 7 类)", () => {
       expect(packageChildPreviewKeyV1(kind, "foo")).toBe(packageChildTxKeyV1(kind, "foo"))
   })
 
-  test("isPackageChildKindV1 恰认这六个", () => {
-    for (const kind of ["skill", "agent", "cloud", "command", "mcp", "plugin"]) expect(isPackageChildKindV1(kind)).toBe(true)
-    for (const kind of ["bundle", "Cloud", "", "Plugin", "Command"]) expect(isPackageChildKindV1(kind)).toBe(false)
+  test("isPackageChildKindV1 恰认这七个", () => {
+    for (const kind of ["skill", "agent", "cloud", "command", "mcp", "plugin", "bundle"]) expect(isPackageChildKindV1(kind)).toBe(true)
+    for (const kind of ["Cloud", "", "Plugin", "Command"]) expect(isPackageChildKindV1(kind)).toBe(false)
   })
 })

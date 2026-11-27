@@ -25,6 +25,7 @@ import {
   taskCardInfoOf,
   toolCardBodyOf,
   toolCardHeadOf,
+  videoProgressLineOf,
   toolDevDetailsOf,
   toolProvenanceOf,
   PROVENANCE_SOURCE_KEYS,
@@ -585,6 +586,7 @@ function DiffBody(props: { patch: string }) {
 // 只有确定的隐藏理由与开发者详情,input / output / error 的内容零字符进 DOM。
 export function ToolStepDetail(props: { part: ToolPart }) {
   const head = createMemo(() => toolCardHeadOf(props.part))
+  const video = createMemo(() => videoProgressLineOf(props.part))
   const body = createMemo(() => toolCardBodyOf(props.part))
   const hasBody = () => body().type !== "none" && body().type !== "hidden" && body().type !== "error"
   // #879:命令说明副行经模型层 identity 分派 + redactor(不再直读 input)。
@@ -606,6 +608,7 @@ export function ToolStepDetail(props: { part: ToolPart }) {
   }
   return (
     <div class="a-tl-pf-detail" data-codepuppy-step-detail>
+      <Show when={video()}>{(value) => <div class="a-tc-facts" data-codepuppy-video-progress>{t(value().key as Parameters<typeof t>[0])} · {value().amount}</div>}</Show>
       {/* 次级事实(原卡头的第二行):目录 / include、子任务 agent。脱敏失败出确定标记(AC5)。 */}
       <Show when={head().detail || head().detailHidden || task()?.agent || task()?.agentHidden}>
         <div class="a-tc-facts">

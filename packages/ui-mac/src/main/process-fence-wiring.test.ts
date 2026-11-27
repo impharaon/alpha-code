@@ -24,7 +24,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { mockElectron } from "../../test-component/electron-mock"
 import { CODEPUPPY_OFFICE_CONNECTORS, codepuppyOfficeInstallCommand, type CodePuppyOfficeFormat } from "../shared/office-advisories"
-import { buildOfficeRuntime } from "../../scripts/build-office-runtime"
+import { buildOfficeRuntime, OFFICE_READER_SAMPLE_SCRIPT } from "../../scripts/build-office-runtime"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
 import { upsertRecordV2 } from "./ext-receipt-v2"
@@ -204,7 +204,7 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
     installedHashes = hashes()
     __resetCodePuppyEnvironmentForTests()
     proxyLog.length = 0
-    proxy = await startEgressPolicyProxy({ log: (record) => void proxyLog.push(record) })
+    proxy = await startEgressPolicyProxy({ resolveEgressRoutes: async () => [{ kind: "direct" }], log: (record) => void proxyLog.push(record) })
     const child = new RecordingChild()
     creditDanglingSweepForSpawn()
     const result = await spawnLocalServer("127.0.0.1", 4319, "password", {
@@ -268,15 +268,16 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
     const messages = result.stdout.trim().split("\n").map((line) => JSON.parse(line))
     expect(messages.find((message) => message.id === 1)?.result).toMatchObject({ protocolVersion: "2025-06-18", serverInfo: { name: `codepuppy-office-${format}` } })
     const extension = CODEPUPPY_OFFICE_CONNECTORS.find((connector) => connector.format === format)!.extension.slice(1)
-    expect(messages.find((message) => message.id === 2)?.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual([`read_${extension}`, `write_${extension}`])
+    expect(messages.find((message) => message.id === 2)?.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual(format === "excel" ? ["excel_edit", "excel_inspect", "excel_objects", "excel_recalculate", "read_xlsx"] : [`read_${extension}`])
   }
 
   function hashes() {
     return ["codepuppy.jsonc", "installs.json"].map((file) => createHash("sha256").update(readFileSync(join(globalRoot, file))).digest("hex"))
   }
 
-  test("AC1: four cached Office commands initialize and list their read/write tools through production env", async () => {
-    for (const connector of CODEPUPPY_OFFICE_CONNECTORS) {
+  test("AC1: a cached uv reader initializes and lists its supported tools through production env", async () => {
+    // The real Word reader exercises generic uv caching; all four current Office commands run below.
+    for (const connector of CODEPUPPY_OFFICE_CONNECTORS.filter((entry) => entry.format === "word")) {
       connected(connector.format, await exchange(connector.format))
       const cached = await exchange(connector.format)
       connected(connector.format, cached)
@@ -323,19 +324,16 @@ describe.skipIf(!darwin)("#1504 Office cache under the unchanged process fence",
         argument.replace("{codepuppyResources}/office-runtime", runtime).replace("{codepuppyResources}", resolve(import.meta.dir, "../../resources")),
       )
       expect(template.slice(0, 3)).toEqual([join(runtime, "bin", "python3"), "-I", "-B"])
-      const file = join(workspace, `fenced${connector.extension}`)
-      const write: Record<string, unknown> = {
-        word: { path: file, paragraphs: ["fenced 1564"] },
-        excel: { path: file, sheets: [{ name: "S", cells: { A1: "fenced 1564" } }] },
-        powerpoint: { path: file, slides: [{ title: "fenced 1564", body: ["x"] }] },
-        pdf: { path: file, pages: ["fenced 1564"] },
-      }[connector.format] as Record<string, unknown>
+      const creation = Bun.spawn(["/usr/bin/sandbox-exec", "-p", profile, template[0]!, "-I", "-B", "-c", OFFICE_READER_SAMPLE_SCRIPT, workspace, JSON.stringify([connector.format])], { cwd: workspace, env: withoutUv, stdout: "pipe", stderr: "pipe" })
+      const [created, creationError, creationExit] = await Promise.all([new Response(creation.stdout).text(), new Response(creation.stderr).text(), creation.exited])
+      expect(creationExit, creationError || created).toBe(0)
+      const file = join(workspace, `sample${connector.extension}`)
       const extension = connector.extension.slice(1)
-      const result = await exchange(connector.format, withoutUv, template, [[`write_${extension}`, write], [`read_${extension}`, { path: file }]])
+      const result = await exchange(connector.format, withoutUv, template, [[`read_${extension}`, { path: file }]])
       connected(connector.format, result)
       const messages = result.stdout.trim().split("\n").map((line) => JSON.parse(line) as { id?: number; result?: { isError?: boolean; content?: Array<{ text: string }> } })
-      for (const id of [3, 4]) expect(messages.find((message) => message.id === id)?.result?.isError, JSON.stringify(messages)).not.toBe(true)
-      expect(messages.find((message) => message.id === 4)?.result?.content?.[0]?.text).toContain("fenced 1564")
+      expect(messages.find((message) => message.id === 3)?.result?.isError, JSON.stringify(messages)).not.toBe(true)
+      expect(messages.find((message) => message.id === 3)?.result?.content?.[0]?.text).toContain(connector.format === "excel" ? "East" : "Runtime check")
     }
     expect(proxyLog).toEqual([])
     expect(fs.readdirSync(join(root, "userData", "package-managers", "uv", "cache"))).toEqual([])

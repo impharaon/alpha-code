@@ -1,3 +1,4 @@
+import { SettingsNetworkEgress } from "./settings-network-egress"
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js"
 import {
   CODEPUPPY_SETTINGS_DEFAULTS,
@@ -679,6 +680,7 @@ export function CodePuppySettings(props: {
 
             {/* REQ-131(#1130):「工具」节 —— 逐条即写、无草稿,不参与上面通用/快捷键的 dirty / save 模型。 */}
             <Show when={section() === "tools"}>
+              <SettingsNetworkEgress api={typeof window !== "undefined" ? window.api?.networkEgress : undefined} />
               <CodePuppySettingsTools
                 open={props.open}
                 active={section() === "tools"}

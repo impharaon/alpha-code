@@ -254,16 +254,22 @@ describe("generation 卸载 owned-path 删除失败 → journal 保留(#346 相�
     expect(fs.existsSync(store)).toBe(false)
   })
 
-  test("generation 目录不可删(真实 EACCES)→ 非终态;修复后前滚收敛", async () => {
+  test("generation 父目录不可写(真实 EACCES)→ 非终态;修复后前滚收敛", async () => {
     const genDir = path.join(root, "ext-store", "skill--demo", "generations", "gen-000001-abcdef12")
     fs.mkdirSync(genDir, { recursive: true })
     fs.writeFileSync(path.join(genDir, "SKILL.md"), "x")
-    fs.chmodSync(genDir, 0o555) // 目录内容不可删
-    const r = await uninstallExtensionTransaction(root, "skill--demo", { commitLedger: () => {} })
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain("store removal incomplete")
-    expect(journalStates()).toEqual(["uninstall:uninstalling"])
-    fs.chmodSync(genDir, 0o755)
+    const parent = path.dirname(genDir)
+    // Payload modes are repaired during removal; a non-writable parent still prevents unlinking the generation.
+    fs.chmodSync(parent, 0o555)
+    try {
+      const r = await uninstallExtensionTransaction(root, "skill--demo", { commitLedger: () => {} })
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.reason).toContain("store removal incomplete")
+      expect(journalStates()).toEqual(["uninstall:uninstalling"])
+      expect(fs.existsSync(genDir)).toBe(true)
+    } finally {
+      fs.chmodSync(parent, 0o755)
+    }
     const rec = await recoverExtensionTransactions(root, { commitUninstall: () => {} })
     expect(rec.ok).toBe(true)
     expect(journalStates()).toEqual(["uninstall:uninstalled"])

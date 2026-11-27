@@ -1,0 +1,18 @@
+[
+  {
+    "file": "darwin-arm64.bin",
+    "offset": 0,
+    "bytes": 4096,
+    "sha256": "df618ddad147bc8e643727fa6fef10d2b5988676c43043f23b4396df0b1fef63",
+    "artifactSha256": "986b94b99d4f0fba5158944da90fe8aa617df4cf4d3e5a88e4d66ae4ad4cda4e",
+    "provenance": "Real whisper.node 1.1.3 build, locked sourceCommits in packages/ui-mac/resources/video-runtime/build.lock.json; N-API 6; macOS arm64 Metal/min12 or LLVM-MinGW Windows x64 CPU. Header only: not an executable or inference fixture."
+  },
+  {
+    "file": "win32-x64.bin",
+    "offset": 0,
+    "bytes": 4096,
+    "sha256": "3e490e1f8f4c8659a4d0e76a5e676f7f0473acbcb7c9ab0935d24123dddaffba",
+    "artifactSha256": "184a27f2f72157587b7bd1ab6282c8691e83c4d02709af271424c6dd479f2bdd",
+    "provenance": "Real whisper.node 1.1.3 build, locked sourceCommits in packages/ui-mac/resources/video-runtime/build.lock.json; N-API 6; macOS arm64 Metal/min12 or LLVM-MinGW Windows x64 CPU. Header only: not an executable or inference fixture."
+  }
+]

@@ -62,3 +62,12 @@ export function egressPolicyDenialOf(text: string | undefined | null): { authori
   if (!AUTHORITY_SHAPE.test(authority)) return undefined
   return { authority }
 }
+
+
+export type EgressDenialDetail = "user-denied" | "approval-timeout" | "approval-unavailable" | "non-public"
+export function egressDenialDescription(detail: EgressDenialDetail): string {
+  if (detail === "user-denied") return "the user denied this connection"
+  if (detail === "approval-timeout") return "the connection failed because nobody decided before the approval deadline; approve and retry"
+  if (detail === "approval-unavailable") return "the connection failed because conversation approval is unavailable; retry when a conversation can receive it"
+  return "the destination is not a public address"
+}

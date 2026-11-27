@@ -1,4 +1,6 @@
 import { parseDirectoryAccessTargets, type DirectoryAccessTarget } from "../shared/directory-write-approval"
+import { parseVideoBridgeRequest, type VideoBridgeRequest, type VideoBridgeReply } from "../shared/video-understanding"
+import type { NetworkOutbound } from "../shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
 import { isInstallOutcomeV1, type InstallOutcomeV1, type CreatedPluginDraftV1 } from "../shared/plugin-install"
 import type { SourceSearchResultV1, CandidateV1, SourceStatusV1 } from "./plugin-sources"
@@ -15,6 +17,21 @@ export type PackageManagerControl =
 export type PackageManagerControlRequest = { type: "codepuppy.package-manager.request"; id: number; request: PackageManagerControl }
 export type PackageManagerControlReply = { type: "codepuppy.package-manager.reply"; id: number; result: { ok: true; lease?: PackageManagerExecutionLease } | { ok: false; error: "unavailable" } }
 export type PackageManagerControlHandler = (request: PackageManagerControl) => Promise<PackageManagerControlReply["result"]>
+import { documentRecord, isDocumentRuntimeState, isDocumentRuntimeVerifyRef, isDocumentRuntimeVerifyTask, isDocumentRuntimeVerifyReceipt, type DocumentRuntimeState, type DocumentRuntimeVerifyRef, type DocumentRuntimeVerifyTask, type DocumentRuntimeVerifyReceipt } from "../../../util/src/codepuppy-document"
+
+export type DocumentRuntimeMessage =
+  | { type: "codepuppy.document.runtime.verify"; task: DocumentRuntimeVerifyTask }
+  | { type: "codepuppy.document.runtime.verify.cancel"; ref: DocumentRuntimeVerifyRef }
+  | { type: "codepuppy.document.runtime.verify.receipt"; receipt: DocumentRuntimeVerifyReceipt }
+  | { type: "codepuppy.document.runtime.changed"; sidecarGeneration: number; sequence: number; state: DocumentRuntimeState }
+
+export function parseDocumentRuntimeMessage(value: unknown): DocumentRuntimeMessage | undefined {
+  if (!documentRecord(value)) return
+  if (value.type === "codepuppy.document.runtime.verify" && isDocumentRuntimeVerifyTask(value.task)) return { type: value.type, task: value.task }
+  if (value.type === "codepuppy.document.runtime.verify.cancel" && isDocumentRuntimeVerifyRef(value.ref)) return { type: value.type, ref: value.ref }
+  if (value.type === "codepuppy.document.runtime.verify.receipt" && isDocumentRuntimeVerifyReceipt(value.receipt)) return { type: value.type, receipt: value.receipt }
+  if (value.type === "codepuppy.document.runtime.changed" && Number.isSafeInteger(value.sidecarGeneration) && Number(value.sidecarGeneration) >= 0 && Number.isSafeInteger(value.sequence) && Number(value.sequence) >= 0 && isDocumentRuntimeState(value.state)) return { type: value.type, sidecarGeneration: Number(value.sidecarGeneration), sequence: Number(value.sequence), state: value.state }
+}
 
 // Main ↔ sidecar contract: source lookup, ID-only installation, main-owned progress and reload messages.
 // Shared by ext and ui-mac; no filesystem or Electron dependencies. Build/parse pairs reject malformed payloads.
@@ -162,6 +179,7 @@ export type PackageAuthorizationReply = { type: "codepuppy.package.authorization
 export type CodePuppySidecarInbound =
   | PackageManagerControlRequest
   | WriteScopeRequest
+  | VideoBridgeRequest
   | HubViewRequestMessage
   | PackageAuthorizationQuery
   | HubRequestQueryMessage
@@ -172,6 +190,8 @@ export type CodePuppySidecarInbound =
 export type CodePuppySidecarOutbound =
   | PackageManagerControlReply
   | WriteScopeReply
+  | VideoBridgeReply
+  | NetworkOutbound
   | ReloadRequestMessage
   | PackageAuthorizationReply
   | HubViewReplyMessage
@@ -218,6 +238,8 @@ function parseReloadItems(value: unknown): ReloadItem[] | undefined {
 
 /** main 侧:ext → main 的封闭消息族。别的一律 undefined(含 main → ext 的方向)。 */
 export function parseCodePuppySidecarInbound(value: unknown): CodePuppySidecarInbound | undefined {
+  const video=parseVideoBridgeRequest(value)
+  if(video)return video
   if (!isRecord(value)) return
   if (value.type === "codepuppy.package-manager.request") return parsePackageManagerControlRequest(value)
   if (value.type === "codepuppy.write-scope.request") return parseWriteScopeRequest(value)

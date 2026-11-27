@@ -43,7 +43,7 @@ mock.module("./codepuppy-auth", () => ({
   getAuthIdentityTag: () => identityTag,
 }))
 mock.module("./codepuppy-endpoints", () => ({
-  resolveEndpoints: () => ({ cloud: activeBase }),
+  resolveEndpoints: () => ({ cloud: activeBase, platform: "https://platform.invalid" }),
 }))
 /** #1551 AC7:main 侧 warn 日志行(按调用序)。 */
 const warns: string[] = []
@@ -84,6 +84,7 @@ mock.module("./codepuppy-artifact-download", () => ({
 //   GET    /v1/cloud/jobs/:id/artifacts → artifact.read
 //   GET    /v1/cloud/account-status     → account.read(alpha-code#1686 / platform#582)
 const REQUIRED_ACTION: Array<[RegExp, RoutePurpose]> = [
+  [/^\/v1\/tools\/video\/models$/, "cloud.read"],
   [/^\/v1\/cloud\/account-status$/, "account.read"],
   [/^\/v1\/cloud\/jobs\/[^/]+\/artifacts$/, "artifact.read"],
   [/^\/v1\/cloud\/jobs\/[^/]+\/cancel$/, "cloud.dispatch"],
@@ -106,7 +107,10 @@ const accountStatusFixture = (await Bun.file(
 ).json()) as { value: Record<string, unknown> }
 let accountStatusBody = JSON.stringify(accountStatusFixture.value)
 
+const videoModels = JSON.stringify((await Bun.file(new URL("../../../codepuppy-contracts-consumer/vendor/alpha-platform-video-understanding/v1/fixtures/video-understanding/models-test-price.json", import.meta.url)).json()).value)
+
 const bodyFor = (path: string): string =>
+  path === "/v1/tools/video/models" ? videoModels :
   path === "/v1/cloud/account-status"
     ? accountStatusBody
     : path.endsWith("/artifacts")
@@ -453,4 +457,11 @@ for (const upload of [false, true]) test(`relay route: ${upload ? "explicit uplo
     activeBase = BASE
     duringFetch = undefined
   }
+})
+
+test("video model budgets come from the authenticated platform projection", async () => {
+  requested.length = 0
+  expect(await jobs.getVideoModels()).toEqual(JSON.parse(videoModels))
+  expect(requested).toEqual(["cloud.read"])
+  expect(lastWire()).toMatchObject({origin: "https://platform.invalid", path: "/v1/tools/video/models", bearer: "Bearer tok.cloud.read"})
 })

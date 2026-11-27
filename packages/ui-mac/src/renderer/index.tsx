@@ -1,3 +1,4 @@
+import { VideoUploadDialog } from "./extensions/video-upload-dialog"
 // @refresh reload
 
 import {
@@ -546,6 +547,7 @@ render(() => {
         <Show when={effectiveDefaultServer()} keyed>
           {(key) => (
             <AppInterface defaultServer={key} servers={servers()} router={RestoredMemoryRouter} surfaces={surfaceComponents()}>
+              <VideoUploadDialog />
               {/* C28(S17 T4)崩溃边界下沉:上游 ErrorBoundary 在 AppBaseProviders 内包住全部 children,
                   alpha 任一注入件 throw 会整屏坠成上游 ErrorPage —— 逐个紧裹 CodePuppyBoundary(更内层先命中)
                   = 崩溃只降级该区域。探针 window.__codepuppyCrashProbe */}

@@ -3149,11 +3149,23 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
       composer.setComposerAgent(selectedAgent)
       composer.setComposerPerm(mode) // Same write entry as PermChip.pick; keep the historical user unchanged.
 
+      const sandbox = await import("../src/renderer/codepuppy-ui/sandbox-state")
+      const previousApi = Object.getOwnPropertyDescriptor(window, "api")
+      const tiers: Array<{ tier: string; session: { sessionID: string } }> = []
+      Object.defineProperty(window, "api", { configurable: true, value: { networkEgress: { setTier: async (input: typeof tiers[number]) => {
+        expect(sdkPromptCalls).toHaveLength(0)
+        tiers.push(input)
+        return { ok: true, value: { revision: tiers.length } }
+      } } } })
+      sandbox.setSandboxStateForTests({ status: "ready", generation: 1, reason: "boot", fence: "applied" })
+      try {
       const cont = host.querySelector<HTMLButtonElement>(".a-tl-int-continue")
       expect(cont).not.toBeNull()
       cont!.click()
       await settle()
 
+      expect(tiers).toHaveLength(1)
+      expect(tiers[0]).toMatchObject({ tier: mode, session: { sessionID: BINDING_SESSION_ID } })
       // #620:续写的输入带 v1 wire 契约的 synthetic 标记(它是「系统替用户按的」,不是发言)。
       expect(sdkPromptCalls).toEqual([
         { sessionID: BINDING_SESSION_ID, ...(agent ? { agent } : {}), parts: [{ type: "text", text: "继续", synthetic: true }] },
@@ -3161,6 +3173,11 @@ describe("#589 真实继续生成闸门(生产绑定层挂载,SDK 层观察)", (
       // 续写与 composer 同代次:新引擎那条链一次都不碰。
       expect(v2PromptCalls).toEqual([])
       expect(host.querySelector(".a-tl-int-failed")).toBeNull()
+      } finally {
+        sandbox.setSandboxStateForTests(undefined)
+        if (previousApi) Object.defineProperty(window, "api", previousApi)
+        else Reflect.deleteProperty(window, "api")
+      }
     },
   )
 
@@ -4965,3 +4982,22 @@ test("BC4 production timeline intent reaches the existing SDK OAuth adapter and 
   expect(requests.every(request=>new URL(request.url).searchParams.get("location[directory]")==="/tmp/workspace")).toBe(true)
  }finally{Object.assign(window,{api:previous});bindingAccountClient=undefined}
 },15000)
+
+
+test("video progress updates the existing card with actual coverage and unknown-total bytes", async () => {
+  const host = mount()
+  const [state, setState] = solidStore.createStore<Record<string, unknown>>({ status: "running", input: {}, time: { start: 1 }, metadata: { "codepuppy.video.progress": { phase: "transcribing", completed: 60000, total: 3600000, unit: "ms" } } })
+  const display = { identity: { source: "mcp", origin: "codepuppy-video", name: "transcript" }, technicalId: "video", authority: { kind: "codepuppy-bundled", bindingId: "video", evidenceDigest: "sha256:abc" } }
+  runtime.setTimelineRows(assistantFixture([toolPartFixture("prt_video", "video_transcript", state, display)], "busy"))
+  await flush()
+  // Open the same step detail used by other local tools.
+  const card = host.querySelector("[data-codepuppy-tool-card]")!
+  await openStep(card)
+  await flush()
+  expect(host.textContent).toContain("1:00 / 60:00")
+  setState("metadata", { "codepuppy.video.progress": { phase: "preparing", completed: 2048, unit: "bytes" } })
+  await flush()
+  expect(host.textContent).toContain("2048 B")
+  expect(host.textContent).not.toContain("1:00 / 60:00")
+  expect(host.textContent).not.toContain("%")
+})

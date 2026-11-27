@@ -842,23 +842,27 @@ body[data-codepuppy-sidebar="open"] .codepuppy-topbar {
   flex-direction: column;
   align-items: center;
   box-sizing: border-box;
-  /* first button centre = y 70, level with the sidebar's brand row (frame audit #10b) */
-  padding: calc(var(--a-topbar-h) + 9px) 0 calc(var(--a-frame-gap) + 4px);
-  gap: 4px;
+  /* Keep the first button centred on the sidebar's brand row as its hit area grows. */
+  padding: calc(var(--a-topbar-h) + var(--a-space-1)) 0 calc(var(--a-frame-gap) + var(--a-space-1));
+  gap: var(--a-space-1);
 }
 .codepuppy-rail-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: var(--a-rail-button-size);
+  height: var(--a-rail-button-size);
+  flex-shrink: 0;
   border: 0;
   border-radius: var(--a-radius-md);
   background: transparent;
   color: var(--a-text-secondary);
   cursor: pointer;
   -webkit-app-region: no-drag;
+}
+.codepuppy-rail-btn svg {
+  stroke-width: var(--a-rail-icon-stroke);
 }
 .codepuppy-rail-btn:hover {
   background: var(--a-overlay-hover);

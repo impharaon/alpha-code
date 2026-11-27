@@ -308,7 +308,7 @@ describe("闸门文件登记簿完备性 (#647)", () => {
     const fixture = mkdtempSync(join(base, "gate-release-"))
     try {
       mkdirSync(join(fixture, "scripts"))
-      for (const script of ["assert-gate-files.sh", "test-layers.sh"]) cpSync(join(REPO_ROOT, "scripts", script), join(fixture, "scripts", script))
+      for (const script of ["assert-gate-files.sh"]) cpSync(join(REPO_ROOT, "scripts", script), join(fixture, "scripts", script))
       const rows = readFileSync(join(REPO_ROOT, "scripts/gate-files.tsv"), "utf8").split("\n").filter((line) => line && !line.startsWith("#"))
       const release = rows.find((line) => line.includes("\tsrc/main/process-fence-extension-packaged.test.ts\t"))!
       // Real registry rows; only the platform is removed to test the environment rule on every host OS.
@@ -317,7 +317,7 @@ describe("闸门文件登记簿完备性 (#647)", () => {
       for (const [enabled, bad, exit, expected] of [["", "", 2, "=0"], ["1", "", 0, "=1"], ["", "1", 1, "=0"]] as const) {
         const calls = join(fixture, "calls")
         writeFileSync(calls, "")
-        const result = Bun.spawnSync(["bash", join(fixture, "scripts/assert-gate-files.sh")], { env: { ...process.env, CALLS: calls, CODEPUPPY_TEST_SIGNED_FENCE: enabled, BAD_SELF_SKIP: bad, CODEPUPPY_TEST_LAYERS: "" } })
+        const result = Bun.spawnSync(["bash", join(fixture, "scripts/assert-gate-files.sh")], { env: { ...process.env, CALLS: calls, CODEPUPPY_TEST_SIGNED_FENCE: enabled, BAD_SELF_SKIP: bad } })
         expect(result.exitCode, result.stderr.toString() + result.stdout.toString()).toBe(exit)
         expect(readFileSync(calls, "utf8").trim().split("\n").at(-1)).toBe(`${expected}\tsrc/main/process-fence-extension-packaged.test.ts`)
       }
@@ -674,7 +674,7 @@ describe("--update 处理已删的闸门文件 (I-09)", () => {
     const root = mkdtempSync(join(tmpdir(), "i09-gate-update-"))
     mkdirSync(join(root, "scripts"))
     mkdirSync(join(root, "pkg"))
-    for (const script of ["assert-gate-files.sh", "bun-test-floor.sh", "test-layers.sh", "junit-file-counts.py"])
+    for (const script of ["assert-gate-files.sh", "bun-test-floor.sh", "junit-file-counts.py"])
       cpSync(join(REPO_ROOT, "scripts", script), join(root, "scripts", script))
     const rows: string[] = []
     for (let i = 1; i <= ROWS_N; i++) {
@@ -738,7 +738,7 @@ describe("--from-reports:从测试报告判条数 (ADR-0014)", () => {
     try {
       mkdirSync(join(root, "scripts"))
       mkdirSync(join(root, "packages", "pkg"), { recursive: true })
-      for (const script of ["assert-gate-files.sh", "bun-test-floor.sh", "test-layers.sh", "junit-file-counts.py"])
+      for (const script of ["assert-gate-files.sh", "bun-test-floor.sh", "junit-file-counts.py"])
         cpSync(join(REPO_ROOT, "scripts", script), join(root, "scripts", script))
       const rows: string[] = []
       for (let i = 1; i <= ROWS_N; i++) {
@@ -759,15 +759,22 @@ describe("--from-reports:从测试报告判条数 (ADR-0014)", () => {
       const run = (dir: string) => {
         const r = Bun.spawnSync(["bash", join(root, "scripts", "assert-gate-files.sh"), "--from-reports", dir], {
           cwd: root,
-          env: { ...env, CODEPUPPY_TEST_LAYERS: "fast integration" },
+          env: { ...env, CODEPUPPY_TEST_FILES: join(root, "selected-tests") },
         })
         return { code: r.exitCode, out: `${r.stdout.toString()}${r.stderr.toString()}` }
       }
       const inScope = Array.from({ length: ROWS_N - 1 }, (_, i) => name(i + 1))
+      writeFileSync(join(root, "selected-tests"), inScope.map((file) => `packages/pkg/${file}`).join("\n") + "\n")
 
+      for (const args of [
+        ["init", "-q"],
+        ["add", "scripts", "packages"],
+        ["-c", "user.name=Gate", "-c", "user.email=gate@example.invalid", "-c", "core.hooksPath=/dev/null", "commit", "-qm", "fixture registry"],
+        ["update-ref", "refs/remotes/origin/alpha", "HEAD"],
+      ]) expect(Bun.spawnSync(["git", ...args], { cwd: root, env }).exitCode).toBe(0)
       const green = run(report(inScope))
       expect(green.code, green.out).toBe(0)
-      expect(green.out).toContain(`本次范围外:packages/pkg/${name(ROWS_N)}(scenario 层`)
+      expect(green.out).toContain(`本次范围外:packages/pkg/${name(ROWS_N)}(未被 affected-tests 选中)`)
 
       writeFileSync(join(root, "packages", "pkg", name(2)), testBody(2))
       const more = run(report(inScope))
@@ -783,6 +790,19 @@ describe("--from-reports:从测试报告判条数 (ADR-0014)", () => {
       const red = run(report(inScope))
       expect(red.code, red.out).toBe(1)
       expect(red.out).toContain(`packages/pkg/${name(4)} 有 1 条失败`)
+
+      // A registry-only count edit must be checked even when its scenario file is outside PR selection.
+      writeFileSync(join(root, "packages", "pkg", name(4)), testBody(1))
+      const cleanReports = report(inScope)
+      const manifest = join(root, "scripts", "gate-files.tsv")
+      writeFileSync(manifest, `# probe registry\n${rows.map((row, i) => i === ROWS_N - 1 ? row.replace(/^1\t/, "2\t") : row).join("\n")}\n`)
+      const changed = run(cleanReports)
+      expect(changed.code, changed.out).toBe(1)
+      expect(changed.out).toContain(name(ROWS_N))
+      expect(changed.out).toContain("实际通过 1 条")
+      writeFileSync(manifest, `# probe registry\n${rows.join("\n")}\n`)
+      const restored = run(cleanReports)
+      expect(restored.code, restored.out).toBe(0)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

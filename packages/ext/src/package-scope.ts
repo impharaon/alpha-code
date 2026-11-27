@@ -1,3 +1,4 @@
+import { installedPluginSkill, PLUGIN_STORE_KEY } from "./plugin-package-skills"
 import { isAbsolute, join, relative, sep } from "node:path"
 
 /** main 派生、ext 只读的允许集(`skills-enabled.json`)。唯一定义与解码在这里,main 与 ext 共用。 */
@@ -52,6 +53,11 @@ export function managedMcpAllowedHere(name: string, allowSet: PackageAllowSetV3 
 
 export function managedSkillIdentity(path: string, globalRoot: string) {
   const parts = relative(join(globalRoot, "ext-store"), path).split(sep)
+  if (PLUGIN_STORE_KEY.test(parts[0]!) && parts[1] === "generations") {
+    const skill = installedPluginSkill(path, globalRoot)
+    // Unlisted or stale-generation files in a package are managed, but never permitted.
+    return skill ? { key: skill.key, name: skill.name } : { key: parts[0]!, name: "" }
+  }
   if (isAbsolute(parts[0]!) || !/^skill--[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(parts[0]!) || parts[1] !== "generations" || parts.length < 4) return
   return { key: parts[0]!, name: parts[0]!.slice("skill--".length) }
 }

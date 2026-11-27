@@ -1,0 +1,115 @@
+# Adapted for Code Puppy, 2026-11-26, from excel-mcp-server 2.3.2 (MIT).
+"""Excel's operators on scalars, and their extension to arrays."""
+import math
+from collections.abc import Callable
+from excel_mcp.calc.values import DIV0, MAX_TEXT, NA, NUM, VALUE, ExcelError, FormulaError, Grid, RefGrid, Scalar, UncalculableError, Value, check_array_size, compare, flush, to_number, to_text
+_SNAP = 2.0 ** (-50)
+_INTEGER_POWER_LIMIT = 2 ** 32 - 1
+
+def apply_binary(op: str, left: Scalar, right: Scalar) -> Scalar:
+    if isinstance(left, ExcelError):
+        return left
+    if isinstance(right, ExcelError):
+        return right
+    try:
+        return _BINARY[op](left, right)
+    except FormulaError as error:
+        return error.error
+    except OverflowError:
+        return NUM
+
+def snap(op: str, left: Scalar, right: Scalar, result: Scalar) -> Scalar:
+    """Apply Excel's zero snapping to the result of the outermost + or - of a formula."""
+    if op not in ('+', '-') or not isinstance(result, float) or result == 0:
+        return result
+    try:
+        scale = max(abs(to_number(left)), abs(to_number(right)))
+    except FormulaError:
+        return result
+    return 0.0 if abs(result) < scale * _SNAP else result
+
+def apply_unary(op: str, operand: Scalar) -> Scalar:
+    if isinstance(operand, ExcelError) or op == '+':
+        return operand
+    try:
+        return 0.0 - to_number(operand)
+    except FormulaError as error:
+        return error.error
+
+def apply_percent(operand: Scalar) -> Scalar:
+    if isinstance(operand, ExcelError):
+        return operand
+    try:
+        return flush(to_number(operand) / 100)
+    except FormulaError as error:
+        return error.error
+
+def elementwise(function: Callable[..., Scalar], *values: Value) -> Value:
+    """Apply a scalar function to scalars and grids; grids broadcast like Excel's arrays."""
+    grids = [value for value in values if isinstance(value, Grid)]
+    if not grids:
+        return function(*values)
+    height = max((grid.height for grid in grids))
+    width = max((grid.width for grid in grids))
+    check_array_size(height, width)
+    if any((isinstance(g, RefGrid) and (g.clipped_rows or g.clipped_cols) and (g.height != height or g.width != width) for g in grids)):
+        raise UncalculableError('whole row or column reference combined with a different size')
+    rows: list[list[Value]] = []
+    for row in range(height):
+        out: list[Value] = []
+        for col in range(width):
+            elements = [_element(value, row, col) for value in values]
+            out.append(NA if any((e is _MISSING for e in elements)) else function(*elements))
+        rows.append(out)
+    return Grid(rows)
+_MISSING = ExcelError('missing')
+
+def _element(value: Value, row: int, col: int) -> Scalar:
+    if not isinstance(value, Grid):
+        return value
+    row = 0 if value.height == 1 else row
+    col = 0 if value.width == 1 else col
+    if row >= value.height or col >= value.width:
+        return _MISSING
+    return value.rows[row][col]
+
+def _arithmetic(function: Callable[[float, float], float], *, flushing: bool=True) -> Callable[[Scalar, Scalar], Scalar]:
+
+    def apply(left: Scalar, right: Scalar) -> Scalar:
+        result = function(to_number(left), to_number(right))
+        if not math.isfinite(result):
+            return NUM
+        return flush(result) if flushing else result + 0.0
+    return apply
+
+def _divide(left: float, right: float) -> float:
+    if right == 0:
+        raise FormulaError(DIV0)
+    return left / right
+
+def _power(left: float, right: float) -> float:
+    if left == 0 and right == 0:
+        raise FormulaError(NUM)
+    if left == 0 and right < 0:
+        raise FormulaError(DIV0)
+    if left < 0 and right != int(right):
+        return _odd_root(left, right)
+    if left < 0 and abs(right) >= _INTEGER_POWER_LIMIT:
+        raise FormulaError(NUM)
+    return left ** right
+
+def _odd_root(base: float, exponent: float) -> float:
+    """Excel gives a real result for a negative base raised to 1/n with n odd."""
+    n = round(1 / exponent)
+    if n % 2 == 0 or abs(1 / exponent - n) > 1e-09:
+        raise FormulaError(NUM)
+    return -(-base) ** exponent
+
+def _concatenate(left: Scalar, right: Scalar) -> Scalar:
+    if len((text := (to_text(left) + to_text(right)))) > MAX_TEXT:
+        raise FormulaError(VALUE)
+    return text
+
+def _comparison(test: Callable[[int], bool]) -> Callable[[Scalar, Scalar], Scalar]:
+    return lambda left, right: test(compare(left, right))
+_BINARY: dict[str, Callable[[Scalar, Scalar], Scalar]] = {'+': _arithmetic(lambda a, b: a + b, flushing=False), '-': _arithmetic(lambda a, b: a - b, flushing=False), '*': _arithmetic(lambda a, b: a * b), '/': _arithmetic(_divide), '^': _arithmetic(_power), '&': _concatenate, '=': _comparison(lambda c: c == 0), '<>': _comparison(lambda c: c != 0), '<': _comparison(lambda c: c < 0), '>': _comparison(lambda c: c > 0), '<=': _comparison(lambda c: c <= 0), '>=': _comparison(lambda c: c >= 0)}

@@ -20,31 +20,32 @@
 //   6. 每个 Mach-O 含目标架构片(与 beforePack 同一判据),没有任何文件带着构建机的 staging 路径,打印本架构的实际体积。
 // lock 与本脚本都没变时跳过 1–4(产物戳记),5–6 每次都跑。
 //
-// x64 产物在 arm64 宿主上用 `arch -x86_64`(Rosetta)执行同样的安装与验证;解释器跑不起来就响亮失败,不跳过。
-// 只在 darwin 上构建;别的平台打印一行并 no-op(随包运行时只进 mac 包)。
+// Build on the target host: darwin-arm64 or win32-x64. Node is owned by the launcher; this builder only ships Office Python.
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { CODEPUPPY_OFFICE_PYTHON_SLOT, CODEPUPPY_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, codepuppyOfficeInstallCommand } from "../src/shared/office-advisories"
+import { CODEPUPPY_OFFICE_PYTHON_SLOT, CODEPUPPY_OFFICE_SERVER_SLOT, WORKSPACE_MARKER, codepuppyOfficeInstallCommand, type CodePuppyOfficeFormat } from "../src/shared/office-advisories"
 import { OFFICE_RUNTIME_BUILD_DIR, checkOfficeRuntime, machOArchs, resolveTargetArch, type TargetArch } from "./target-arch"
 
 const scriptPath = fileURLToPath(import.meta.url)
 const packageDir = resolve(dirname(scriptPath), "..")
 export const OFFICE_RUNTIME_LOCK_DIR = join(packageDir, "resources", "office-runtime")
+import { officePythonPath } from "../src/main/document-resources"
+
 const SERVER = join(packageDir, "resources", "office-mcp", "server.py")
 /** 运行时下载缓存,本机所有 worktree 共用(新 worktree 第一次构建不必再经代理下载);命中仍按 lock 的 sha256 核验。 */
 export const OFFICE_RUNTIME_DOWNLOAD_CACHE = join(homedir(), "Library", "Caches", "codepuppy", "office-runtime")
 const STAMP = ".office-runtime-stamp"
 const TRIMMED = ["test", "tkinter", "idlelib", "ensurepip"]
 
-export const officeRuntimeDir = (arch: TargetArch) => join(packageDir, OFFICE_RUNTIME_BUILD_DIR, arch)
+export const officeRuntimeDir = (arch: TargetArch) => join(packageDir, OFFICE_RUNTIME_BUILD_DIR, process.platform === "win32" ? "win32-x64" : arch)
 
 export type OfficeRuntimeLock = {
-  python: { version: string; release: string } & Record<TargetArch, { url: string; sha256: string }>
+  python: { version: string; release: string } & Record<"arm64" | "win32-x64", { url: string; sha256: string }>
   requires: Record<string, string[]>
 }
 
@@ -105,11 +106,13 @@ export function lockClosureProblems(requirementsIn: string, lockText: string, re
 export type OfficeRuntimeBuild = { dir: string; arch: TargetArch; reused: boolean; bytes: number; files: number; machO: number; modules: string[] }
 
 export function buildOfficeRuntime(options: { arch?: TargetArch } = {}): OfficeRuntimeBuild {
-  if (process.platform !== "darwin") throw new Error("the bundled Office runtime builds on darwin only")
+  if (process.platform !== "darwin" && process.platform !== "win32") throw new Error("Office runtime targets darwin-arm64 and win32-x64")
   const arch = options.arch ?? resolveTargetArch()
+  if ((process.platform === "darwin" && arch !== "arm64") || (process.platform === "win32" && arch !== "x64")) throw new Error(`unsupported Office target: ${process.platform}-${arch}`)
+  const target = process.platform === "win32" ? "win32-x64" : "arm64"
   const dir = officeRuntimeDir(arch)
   const lock = readOfficeRuntimeLock()
-  const requirementsPath = join(OFFICE_RUNTIME_LOCK_DIR, `requirements-${arch}.lock`)
+  const requirementsPath = join(OFFICE_RUNTIME_LOCK_DIR, `requirements-${target}.lock`)
   const lockText = readFileSync(requirementsPath, "utf8")
   const closure = lockClosureProblems(readFileSync(join(OFFICE_RUNTIME_LOCK_DIR, "requirements.in"), "utf8"), lockText, lock.requires)
   if (closure.length) throw new Error(`requirements-${arch}.lock is not the closure of requirements.in:\n  - ${closure.join("\n  - ")}`)
@@ -121,12 +124,37 @@ export function buildOfficeRuntime(options: { arch?: TargetArch } = {}): OfficeR
     .digest("hex")
   const reused = readText(join(dir, STAMP)) === stamp
   if (!reused) install({ arch, dir, lock, requirementsPath, locked, stamp })
+  installOfficeExcel(dir)
   const modules = verify(dir, arch, locked)
   const size = measure(dir)
   console.log(
     `[alpha:office-runtime] ${arch}: ${(size.bytes / 1024 / 1024).toFixed(1)} MB (${size.files} files, ${size.machO} Mach-O, ${modules.length} top-level modules imported, 4 formats round-tripped)${reused ? " [reused]" : ""} at ${dir}`,
   )
   return { dir, arch, reused, ...size, modules }
+}
+
+/** App modules share the Office interpreter; the community MCP distribution is never installed. */
+export function installOfficeExcel(dir: string) {
+  const source = join(packageDir, "resources/office-excel")
+  const files = [...new Bun.Glob("**/*").scanSync({ cwd: source, onlyFiles: true })].filter((file) => !file.includes("__pycache__/")).sort()
+  const manifest = JSON.parse(readFileSync(join(source, "sources.json"), "utf8")) as { files: { path: string; sha256: string }[] }
+  for (const file of manifest.files)
+    if (createHash("sha256").update(readFileSync(join(source, file.path))).digest("hex") !== file.sha256) throw Error(`Excel source digest mismatch: ${file.path}`)
+  const stampPath = join(dir, ".office-excel-stamp")
+  const stamp = createHash("sha256").update(files.map((file) => `${file}:${createHash("sha256").update(readFileSync(join(source, file))).digest("hex")}`).join("\n")).digest("hex")
+  if (readText(stampPath) === stamp) return
+  const site = run(officePythonPath(dir, process.platform), ["-I", "-B", "-c", "import sysconfig;print(sysconfig.get_path('purelib'))"]).trim()
+  for (const name of ["excel_mcp", "codepuppy_office"]) {
+    const destination = join(site, name)
+    if (existsSync(destination)) rmSync(destination, { recursive: true, force: true })
+    cpSync(join(source, name), destination, { recursive: true })
+  }
+  const license = join(site, "codepuppy_office", "licenses")
+  mkdirSync(license, { recursive: true })
+  cpSync(join(source, "LICENSE"), join(license, "excel-mcp-server-LICENSE"))
+  cpSync(join(source, "sources.json"), join(license, "excel-mcp-server-sources.json"))
+  run(officePythonPath(dir, process.platform), ["-I", "-B", "-c", "from codepuppy_office import OfficeExcel; assert OfficeExcel.object_schema('create_pivot_table')['inputSchema']['required']"])
+  writeFileSync(stampPath, stamp)
 }
 
 function install(input: {
@@ -141,21 +169,23 @@ function install(input: {
   rmSync(staging, { recursive: true, force: true })
   mkdirSync(staging, { recursive: true })
   try {
-    run("tar", ["-xzf", download(input.lock.python[input.arch]), "-C", staging])
+    run("tar", ["-xzf", downloadOfficeBuildFile(input.lock.python[process.platform === "win32" ? "win32-x64" : "arm64"]), "-C", staging])
     const root = join(staging, "python")
-    const python = [...interpreter(input.arch), join(root, "bin", "python3"), "-I"]
+    const python = [...interpreter(input.arch), officePythonPath(root, process.platform), "-I"]
     // pip 往 bin/ 写的控制台脚本把 staging 解释器路径写进 shebang,包里也用不到 —— 装完只留运行时原包的 bin/。
-    const shippedBin = new Set(readdirSync(join(root, "bin")))
+    const bin = join(root, process.platform === "win32" ? "Scripts" : "bin")
+    mkdirSync(bin, { recursive: true })
+    const shippedBin = new Set(readdirSync(bin))
     const pipInstall = [...python, "-m", "pip", "--isolated", "install", "--disable-pip-version-check", "--no-input", "--no-compile", "--require-hashes", "--only-binary=:all:", "-r", input.requirementsPath]
     retry(3, () => run(pipInstall[0]!, pipInstall.slice(1)))
     run(python[0]!, [...python.slice(1), "-m", "pip", "--isolated", "check"])
     assertInstalledMatchesLock(python, input.locked, input.lock.requires)
-    const stdlib = join(root, "lib", "python3.11")
+    const stdlib = process.platform === "win32" ? join(root, "Lib") : join(root, "lib", "python3.11")
     for (const name of TRIMMED) rmSync(join(stdlib, name), { recursive: true, force: true })
     for (const entry of readdirSync(join(stdlib, "site-packages")))
       if (entry === "pip" || /^pip-.*\.dist-info$/.test(entry)) rmSync(join(stdlib, "site-packages", entry), { recursive: true, force: true })
-    for (const entry of readdirSync(join(root, "bin")))
-      if (!shippedBin.has(entry) || /^pip(3(\.\d+)?)?$/.test(entry)) rmSync(join(root, "bin", entry), { recursive: true, force: true })
+    for (const entry of readdirSync(join(root, process.platform === "win32" ? "Scripts" : "bin")))
+      if (!shippedBin.has(entry) || /^pip(3(\.\d+)?)?$/.test(entry)) rmSync(join(bin, entry), { recursive: true, force: true })
     // -f:全部重编(含运行时原包自带的几个 .pyc);-s:co_filename 去掉 staging 前缀,包里不留构建机路径。
     run(python[0]!, [...python.slice(1), "-m", "compileall", "-q", "-f", "-j", "0", "-s", root, "--invalidation-mode", "unchecked-hash", stdlib])
     writeFileSync(join(root, STAMP), input.stamp)
@@ -210,13 +240,16 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
   const workspace = realpathSync(mkdtempSync(join(tmpdir(), "codepuppy-office-runtime-verify-")))
   try {
     // 干净环境:没有用户的 PATH / HOME,证明不靠本机装的 python、uv 或缓存。
-    const env = { PATH: "/usr/bin:/bin", HOME: workspace, TMPDIR: workspace, LANG: "en_US.UTF-8" }
-    const python = [...interpreter(arch), join(dir, "bin", "python3"), "-I", "-B"]
+    const env = { PATH: process.platform === "win32" ? join(process.env.SystemRoot!, "System32") : "/usr/bin:/bin", HOME: workspace, TMPDIR: workspace, TEMP: workspace, LANG: "en_US.UTF-8", ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot! } : {}) }
+    const python = [...interpreter(arch), officePythonPath(dir, process.platform), "-I", "-B"]
     const importScript = [
       "import importlib, importlib.metadata as md, json, sys",
       "mods = []",
       "for name in json.loads(sys.argv[1]):",
       "    tops = set()",
+      "    dist = md.distribution(name)",
+      "    licences = [f for f in dist.files or [] if any(word in str(f).lower() for word in ('license', 'licence', 'copying', 'notice'))]",
+      "    if not licences or any(not dist.locate_file(f).is_file() for f in licences): raise SystemExit(f'{name}: missing distribution licence')",
       "    for f in md.distribution(name).files or []:",
       "        head = f.parts[0]",
       "        if head.endswith(('.dist-info', '.data')) or head in ('..', '__pycache__', 'bin'): continue",
@@ -230,18 +263,18 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
       "print(json.dumps(mods))",
     ].join("\n")
     const modules = JSON.parse(run(python[0]!, [...python.slice(1), "-c", importScript, JSON.stringify([...locked.keys()].sort())], { env, cwd: workspace })) as string[]
+    createOfficeReaderSamples(officePythonPath(dir, process.platform), workspace, ["word", "excel", "powerpoint", "pdf"], env)
     for (const sample of roundTrips(workspace)) {
       const requests = [
         { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "build-office-runtime", version: "1" } } },
         { jsonrpc: "2.0", method: "notifications/initialized" },
-        { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: sample.write[0], arguments: sample.write[1] } },
         { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: sample.read[0], arguments: sample.read[1] } },
       ]
       // 生产命令本身(main 模板,三个槽按 main 的方式替换),不是手写的一份近似。
       const command = [
         ...interpreter(arch),
         ...codepuppyOfficeInstallCommand(sample.format).map((argument) =>
-          argument === CODEPUPPY_OFFICE_PYTHON_SLOT ? join(dir, "bin", "python3") : argument === CODEPUPPY_OFFICE_SERVER_SLOT ? SERVER : argument === WORKSPACE_MARKER ? workspace : argument,
+          argument === CODEPUPPY_OFFICE_PYTHON_SLOT ? officePythonPath(dir, process.platform) : argument === CODEPUPPY_OFFICE_SERVER_SLOT ? SERVER : argument === WORKSPACE_MARKER ? workspace : argument,
         ),
       ]
       const stdout = run(command[0]!, command.slice(1), {
@@ -252,10 +285,9 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
       const replies = stdout.trim().split("\n").map((line) => JSON.parse(line) as { id?: number; result?: { isError?: boolean; content?: Array<{ text: string }> } })
       const result = (id: number) => {
         const reply = replies.find((candidate) => candidate.id === id)
-        if (!reply?.result || reply.result.isError) throw new Error(`${sample.format} ${id === 2 ? sample.write[0] : sample.read[0]} failed: ${JSON.stringify(reply)}`)
+        if (!reply?.result || reply.result.isError) throw new Error(`${sample.format} ${sample.read[0]} failed: ${JSON.stringify(reply)}`)
         return JSON.parse(reply.result.content?.[0]?.text ?? "null") as Record<string, unknown>
       }
-      result(2)
       const read = JSON.stringify(result(3))
       for (const text of sample.expect) if (!read.includes(text)) throw new Error(`${sample.format} read back ${read} without ${JSON.stringify(text)}`)
     }
@@ -265,24 +297,48 @@ function verify(dir: string, arch: TargetArch, locked: Map<string, unknown>): st
   }
 }
 
-/** 与 office-mcp.test.ts 同形的工具参数;expect = 读回结果里必须出现的写入内容。 */
+/** Real samples for the bundled reader/build probes; authoring remains in the format skills. */
+export const OFFICE_READER_SAMPLE_SCRIPT = `
+import json,sys
+from pathlib import Path
+root=Path(sys.argv[1]);formats=json.loads(sys.argv[2])
+if 'word' in formats:
+    from docx import Document
+    document=Document();document.add_heading('Runtime check',0);document.add_paragraph('文档工具随包运行');document.save(root/'sample.docx')
+if 'excel' in formats:
+    from openpyxl import Workbook
+    from codepuppy_office import OfficeExcel
+    path=root/'sample.xlsx';book=Workbook();book.active.title='Data';book.create_sheet('Summary');book.save(path)
+    with OfficeExcel.edit(str(path)) as book:
+        for row in [('Region','Amount','Check'),('East','=2*6','=#REF!'),('West',4,None)]:book['Data'].append(row)
+if 'powerpoint' in formats:
+    from pptx import Presentation
+    deck=Presentation();slide=deck.slides.add_slide(deck.slide_layouts[1]);slide.shapes.title.text='Runtime check';slide.placeholders[1].text='Bundled';deck.save(root/'sample.pptx')
+if 'pdf' in formats:
+    from reportlab.pdfgen import canvas
+    document=canvas.Canvas(str(root/'sample.pdf'));document.drawString(54,780,'Runtime check page');document.save()
+`
+
+export function createOfficeReaderSamples(python: string, workspace: string, formats: CodePuppyOfficeFormat[], env: Record<string, string>) {
+  run(python, ["-I", "-B", "-c", OFFICE_READER_SAMPLE_SCRIPT, workspace, JSON.stringify(formats)], { env, cwd: workspace })
+}
+
 function roundTrips(workspace: string) {
   return [
-    { format: "word", write: ["write_docx", { path: join(workspace, "sample.docx"), title: "Runtime check", paragraphs: ["文档工具随包运行"] }], read: ["read_docx", { path: join(workspace, "sample.docx") }], expect: ["Runtime check", "文档工具随包运行"] },
-    { format: "excel", write: ["write_xlsx", { path: join(workspace, "sample.xlsx"), sheets: [{ name: "Data", cells: { A1: "Item", B1: 1564 } }] }], read: ["read_xlsx", { path: join(workspace, "sample.xlsx") }], expect: ['"Item"', "1564"] },
-    { format: "powerpoint", write: ["write_pptx", { path: join(workspace, "sample.pptx"), slides: [{ title: "Runtime check", body: ["Bundled"] }] }], read: ["read_pptx", { path: join(workspace, "sample.pptx") }], expect: ["Runtime check", "Bundled"] },
-    { format: "pdf", write: ["write_pdf", { path: join(workspace, "sample.pdf"), pages: ["Runtime check page"] }], read: ["read_pdf", { path: join(workspace, "sample.pdf") }], expect: ["Runtime check page"] },
+    { format: "word", read: ["read_docx", { path: join(workspace, "sample.docx") }], expect: ["Runtime check", "文档工具随包运行"] },
+    { format: "excel", read: ["read_xlsx", { path: join(workspace, "sample.xlsx") }], expect: ['"East"', "12"] },
+    { format: "powerpoint", read: ["read_pptx", { path: join(workspace, "sample.pptx") }], expect: ["Runtime check", "Bundled"] },
+    { format: "pdf", read: ["read_pdf", { path: join(workspace, "sample.pdf") }], expect: ["Runtime check page"] },
   ] as const
 }
 
-/** 目标架构在本机怎么执行:同架构直接跑;arm64 宿主上的 x64 走 Rosetta。别的组合跑不起来,响亮失败。 */
+/** The Office runtime is built and executed on its supported target host. */
 function interpreter(arch: TargetArch): string[] {
   if (arch === process.arch) return []
-  if (arch === "x64" && process.arch === "arm64") return ["arch", "-x86_64"]
   throw new Error(`cannot execute the ${arch} Office runtime on a ${process.arch} host`)
 }
 
-function download(pin: { url: string; sha256: string }): string {
+export function downloadOfficeBuildFile(pin: { url: string; sha256: string }): string {
   mkdirSync(OFFICE_RUNTIME_DOWNLOAD_CACHE, { recursive: true })
   const file = join(OFFICE_RUNTIME_DOWNLOAD_CACHE, `${pin.sha256}.tar.gz`)
   if (!existsSync(file) || sha256(file) !== pin.sha256) {
@@ -352,6 +408,6 @@ function readText(file: string) {
 }
 
 if (import.meta.main) {
-  if (process.platform !== "darwin") console.log(`[alpha:office-runtime] skipped on ${process.platform} — the bundled Office runtime ships in mac packages only`)
+  if (process.platform !== "darwin" && process.platform !== "win32") console.log(`[alpha:office-runtime] unsupported build host ${process.platform}`)
   else buildOfficeRuntime()
 }

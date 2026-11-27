@@ -41,6 +41,7 @@ const LOCK = "alpha-web-extension-package.lock.json"
  * ran, which is the failure mode this whole file is about.
  */
 const NO_SOURCES = {
+  CODEPUPPY_PLATFORM_VIDEO_CONTRACT_SOURCE: "/nonexistent-769/platform-video",
   CODEPUPPY_PLATFORM_CONTRACT_SOURCE: "/nonexistent-769/platform",
   CODEPUPPY_PLATFORM_MODEL_CATALOG_SOURCE: "/nonexistent-769/model-catalog",
   CODEPUPPY_PLATFORM_CLOUD_MCP_SOURCE: "/nonexistent-769/cloud-mcp",
@@ -58,6 +59,7 @@ beforeEach(() => {
   cpSync(join(packageRoot, "vendor"), join(pkg, "vendor"), { recursive: true })
   for (const lock of [
     "alpha-platform-contract.lock.json",
+    "alpha-platform-video-understanding.lock.json",
     "alpha-platform-model-catalog.lock.json",
     "alpha-platform-cloud-mcp.lock.json",
     "alpha-web-contract.lock.json",
@@ -93,15 +95,14 @@ describe("#769 · check:vendor degrades without a producer checkout instead of b
     // Naming the pin is the point: "provenance unverified" without saying *which* commit went
     // unproven is not a usable statement.
     expect(clean.stdout).toContain("PROVENANCE NOT VERIFIED this run")
-    // alpha-web#283:两份 alpha-web pin 今天恰好钉同一个 commit,所以按 lock 名把这一行认出来,
-    // 免得「另一份 pin 的降级行」顶替了 extension-package 这一份。
+    // Match the extension-package lock so another upstream pin cannot satisfy this assertion.
     expect(
       clean.stdout
         .split("\n")
         .some(
           (line) =>
             line.includes(`against ${LOCK}`) &&
-            line.includes("no staged checkout of jinjunnn/alpha-web@a7f79c667c71b03a4ae54350dd061a116a2c4080"),
+            line.includes("no staged checkout of jinjunnn/alpha-web@a5db3e343eb4162c78bd5f84c408052a26e7adf4"),
         ),
     ).toBe(true)
     expect(clean.stdout).not.toContain("verified 36 contract artifacts from")

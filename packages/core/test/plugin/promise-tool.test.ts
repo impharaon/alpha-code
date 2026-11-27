@@ -1,4 +1,5 @@
 import { expect } from "bun:test"
+import { ProtectedFiles } from "@opencode/schema/codepuppy-protected-files"
 import { Agent } from "@opencode/core/agent"
 import { Permission } from "@opencode/core/permission"
 import { Plugin } from "@opencode/core/plugin"
@@ -136,3 +137,21 @@ it.live("Promise tools that rethrow a decline attach it to the tool failure", ()
     expect(Option.getOrUndefined(Exit.findErrorOption(exit))?.error).toBe(declined)
   }),
 )
+
+
+it.live("Promise progress rejection hides output without aborting the executor", () => Effect.gen(function* () {
+  const plugins = yield* Plugin.Service
+  const tools = yield* Tool.Service
+  let ran = false
+  const updates: unknown[] = []
+  yield* PluginPromise.fromPromise({ id: "reject-progress", async setup(context) {
+    await context.tool.hook("execute.progress", async () => { throw new Error("fixture reject") })
+    await context.tool.transform((editor) => editor.add({ name: "progress", description: "fixture", options: { codemode: false }, input: { type: "object", properties: {} }, execute: async (_input, context) => {
+      await context.progress({ output: "raw fixture" }); ran = true; return { content: "raw fixture" }
+    } }))
+  } }).effect(yield* PluginHost.make(plugins, "test"))
+  const result = yield* (yield* tools.snapshot()).execute({ sessionID: Session.ID.make("ses_progress"), agent: Agent.ID.make("build"), messageID: SessionMessage.ID.make("msg_progress"), call: { type: "tool-call", id: "progress", name: "progress", input: {} }, progress: (update) => Effect.sync(() => { updates.push(update) }) })
+  expect(ran).toBe(true)
+  expect(updates).toEqual([{ output: ProtectedFiles.MASKING_FAILED_TEXT }])
+  expect(result.content).toEqual([{ type: "text", text: ProtectedFiles.MASKING_FAILED_TEXT }])
+}))

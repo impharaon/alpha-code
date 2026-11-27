@@ -1,6 +1,11 @@
 import { stopPackageManagerExecutions } from "./package-manager-execution"
 import { createDirectoryWriteApproval } from "./directory-write-approval"
 import type { WorkspaceWritableChanged } from "./workspace-write-probe"
+import { createNetworkEgressApproval } from "./network-egress-approval"
+import { createEgressSiteStore, createEgressPassStore } from "./egress-grant-records"
+import { networkEgressActivity } from "./network-egress-activity"
+import { configureEgressGrantApproval } from "./network-egress-grants"
+import { registerNetworkEgressIpcHandlers } from "./network-egress-ipc"
 import { clearOfficialConnectorRuntimeOnExit } from "./official-connector-resources"
 import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
@@ -1023,6 +1028,13 @@ const main = Effect.gen(function* () {
     current: (sessionID, requestID) => server?.permissionRequest(sessionID, requestID) ?? Promise.resolve(undefined),
   })
   const updater = setupAutoUpdater(stopSidecars)
+  const networkEgress = process.platform === "darwin" ? createNetworkEgressApproval({
+    available: true, activity: networkEgressActivity,
+    store: createEgressSiteStore((line) => logger.warn(line)), log: (line) => logger.warn(line),
+    passes: createEgressPassStore((line) => logger.warn(line)),
+  }) : undefined
+  if (networkEgress) configureEgressGrantApproval(networkEgress)
+  registerNetworkEgressIpcHandlers({ ipc: ipcMain, windows: productWindows, service: networkEgress })
   registerIpcHandlers({
     directoryWrites,
     isAppRenderer: (id) => BrowserWindow.getAllWindows().some((window) => window.webContents.id === id),

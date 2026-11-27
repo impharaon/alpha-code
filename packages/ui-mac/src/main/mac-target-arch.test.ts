@@ -18,6 +18,7 @@ import path from "node:path"
 import { Arch } from "electron-builder"
 import { buildPackageManagerHelper } from "../../scripts/build-package-manager-helper"
 import { PACKAGE_MANAGER_HELPER } from "./package-manager-helper"
+import { writeVideoRuntimeFixture } from "./fixtures/video/runtime"
 
 import {
   ENGINE_ASSETS_DIR,
@@ -286,8 +287,9 @@ describe("生产 electron-builder.config.ts 的 beforePack", () => {
       await expect(beforePack({ electronPlatformName: "darwin", arch: Arch[crossArch] })).rejects.toThrow(
         new RegExp(`拒绝打 mac-${crossArch} 包[\\s\\S]*正在打 ${crossArch} 包`),
       )
-      // 非 mac 平台不受影响(win/linux 打包照旧)。
-      await expect(beforePack({ electronPlatformName: "win32", arch: Arch.x64 })).resolves.toBeUndefined()
+      // Windows now validates its Office target; unrelated Linux packaging remains unchanged.
+      await expect(beforePack({ electronPlatformName: "win32", arch: Arch.arm64 })).rejects.toThrow("win32-x64")
+      await expect(beforePack({ electronPlatformName: "linux", arch: Arch.x64 })).resolves.toBeUndefined()
     } finally {
       if (saved === undefined) delete process.env[TARGET_ARCH_ENV]
       else process.env[TARGET_ARCH_ENV] = saved
@@ -324,11 +326,12 @@ describe("#1570 生产 electron-builder.config.ts 拒绝退役的签名变量名
 })
 
 describe("#1564 生产 electron-builder.config.ts 把随包 Office 运行时装进包", () => {
-  test("darwin extraResources:目标架构那一份 → <Resources>/office-runtime/(main 模板的命令头所在);别的平台不带", async () => {
+  test("darwin extraResources:目标架构那一份 → <Resources>/office-runtime/(main 模板的命令头所在);Windows 复制对应目标", async () => {
     const { getConfig } = await import("../../electron-builder.config")
-    const entries = (getConfig("prod").extraResources ?? []) as Array<{ from: string; to: string }>
+    const config = getConfig("prod")
+    const entries = [...(config.extraResources ?? []), ...(config.mac?.extraResources ?? [])] as Array<{ from: string; to: string }>
     expect(entries.filter((entry) => entry.to === "office-runtime/")).toEqual(
-      process.platform === "darwin" ? [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/${resolveTargetArch()}/`, to: "office-runtime/" }] : [],
+      [{ from: `${OFFICE_RUNTIME_BUILD_DIR}/${resolveTargetArch()}/`, to: "office-runtime/" }],
     )
   })
 })
@@ -439,6 +442,7 @@ async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode
   }
   const resources = path.join(dir, "app", "Code Puppy.app", "Contents", "Resources")
   fs.mkdirSync(resources, { recursive: true })
+  fs.cpSync(path.join(import.meta.dir, "fixtures/document-assets"), path.join(resources, "document-assets"), { recursive: true })
   const { createPackageWithOptions } = await import(createRequire(require.resolve("electron-builder")).resolve("@electron/asar"))
   await createPackageWithOptions(path.join(dir, "source"), path.join(resources, "app.asar"), opts.unpack ? { unpackDir: ENGINE_ASSETS_DIR } : {})
   // DESIGN-domestic-cloud-connectivity §4.8:随包 ripgrep 落 <Resources>/ripgrep/rg(extraResources,不进 asar)。
@@ -447,6 +451,8 @@ async function packagedResources(opts: { arch: TargetArch; unpack: boolean; mode
     fs.writeFileSync(path.join(resources, "ripgrep", "rg"), opts.ripgrep?.bytes ?? thin(opts.arch), { mode: opts.ripgrep?.mode ?? 0o755 })
   }
   if (process.platform === "darwin") buildPackageManagerHelper(path.join(resources, "codepuppy-fence", PACKAGE_MANAGER_HELPER))
+  await writeVideoRuntimeFixture(path.join(resources, "video-mcp"), "darwin-arm64")
+  await writeVideoRuntimeFixture(path.join(dir, "app/resources/video-mcp"), "win32-x64")
   return { resources, appOutDir: path.join(dir, "app") }
 }
 
@@ -489,7 +495,7 @@ describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
     ])
   })
 
-  test("生产 electron-builder.config.ts:asarUnpack 解包引擎资源目录;afterPack 对今天的形状拒绝出包、对解包的形状放行,非 mac 平台不受影响", async () => {
+  test("生产 electron-builder.config.ts:asarUnpack 解包引擎资源目录;afterPack 对今天的形状拒绝出包、对解包的形状放行,Windows 核对自己的视频资源", async () => {
     const { getConfig } = await import("../../electron-builder.config")
     const config = getConfig("prod")
     expect(config.asarUnpack).toEqual([`${ENGINE_ASSETS_DIR}/**`])
@@ -503,14 +509,14 @@ describe("#1669 checkPackagedEngineAssets(afterPack 的核对)", () => {
     )
     const unpacked = await packagedResources({ arch: "arm64", unpack: true })
     await expect(afterPack(context(unpacked.appOutDir))).resolves.toBeUndefined()
-    await expect(afterPack({ ...context(packed.appOutDir), electronPlatformName: "win32" })).resolves.toBeUndefined()
+    await expect(afterPack({ ...context(packed.appOutDir), electronPlatformName: "linux" })).resolves.toBeUndefined()
   })
 })
 
 // DESIGN-domestic-cloud-connectivity §4.8:搜索工具随包带 ripgrep。构建产物 native/ripgrep/build/<arch>/ 经 darwin 的 extraResources
 // 装成 <Resources>/ripgrep/;afterPack 把 <Resources>/ripgrep/rg 当作必需的可执行文件核对(在、带执行位、含目标架构片)。
 describe("§4.8 随包 ripgrep", () => {
-  test("darwin extraResources:目标架构那一份 → <Resources>/ripgrep/;别的平台不带", async () => {
+  test("darwin extraResources:目标架构那一份 → <Resources>/ripgrep/;Windows 复制对应目标", async () => {
     const { getConfig } = await import("../../electron-builder.config")
     const entries = (getConfig("prod").extraResources ?? []) as Array<{ from: string; to: string }>
     expect(entries.filter((entry) => entry.to === "ripgrep/")).toEqual(
@@ -542,10 +548,8 @@ describe("§4.8 随包 ripgrep", () => {
   })
 })
 
-// I-14:没有签名材料时打出的本机包,electron-builder 不签(identity null 是「跳过签名」,不是 ad-hoc);而 fuses 改写了
-// Electron 可执行文件,原签名随之失效,macOS 启动即杀。所以本机包的 ad-hoc 签名由 fuses 翻转之后紧接着补
-// (@electron/fuses 的 resetAdHocDarwinSignature:`codesign --sign - --force --deep`,不查钥匙串身份);有签名材料的
-// 正式包配置逐字不变。去掉这一项 ⇒ 未签名一臂红;把它也加到正式包 ⇒ 签名一臂红。真打包启动的证据见交付记录。
+// 本机与正式包沿同一个 signer：子文件签名后刷新视频摘要，再签父 app。
+// 不能让 fuse 深签在摘要封装以后再次改写原生文件。实际签名探针是一次性证据。
 describe("I-14 本机包的本机签名", () => {
   const configOf = (sign: string | undefined) => {
     const env: Record<string, string | undefined> = { ...process.env, [TARGET_ARCH_ENV]: "arm64", GITHUB_ACTIONS: "false" }
@@ -559,10 +563,10 @@ describe("I-14 本机包的本机签名", () => {
   }
   const releaseFuses = { runAsNode: false, enableNodeOptionsEnvironmentVariable: false, enableNodeCliInspectArguments: false, enableEmbeddedAsarIntegrityValidation: true, onlyLoadAppFromAsar: true, enableCookieEncryption: true }
 
-  test("没有签名材料:不按钥匙串找身份,fuses 翻转后补 ad-hoc 签名;正式签名包的 fuse 配置与身份来源不变", () => {
+  test("没有签名材料:同一 signer 使用 ad-hoc 身份;正式签名包仍自动找身份且不重复 fuse 深签", () => {
     const local = configOf(undefined)
-    expect(local.identity).toBe("skip")
-    expect(local.fuses).toEqual({ ...releaseFuses, resetAdHocDarwinSignature: true })
+    expect(local.identity).toBe("-")
+    expect(local.fuses).toEqual(releaseFuses)
     const release = configOf("1")
     expect(release.identity).toBe("auto")
     expect(release.fuses).toEqual(releaseFuses)

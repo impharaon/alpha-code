@@ -33,60 +33,8 @@ export function __setWorkspaceFileElectron(e: ElectronFacade | null) {
 
 // ---- 路径守卫(main 侧;与 renderer files-core 的 isSafeRelPath 同语义)----
 
-function isSafeRelPath(rel: string): boolean {
-  if (typeof rel !== "string" || rel.length === 0) return false
-  if (rel.includes("\u0000")) return false
-  if (rel.includes("\\")) return false
-  if (rel.startsWith("/")) return false
-  if (/^[A-Za-z]:/.test(rel)) return false
-  return rel.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
-}
-
-export type ResolvedWorkspaceFile = {
-  abs: string
-  size: number
-  dev: number
-  ino: number
-}
-
-export type ResolveResult = { ok: true; file: ResolvedWorkspaceFile } | { ok: false; code: FileViewerRefusal }
-
-/**
- * 把 (workspaceDir, relPath) 解析为一个已证明的普通文件:
- * 相对性 → join → lstat(拒 symlink 叶子、拒目录)→ realpath 全路径圈禁(拒父级 symlink 逃逸)。
- * 绝不返回散文原因 —— 拒绝码是枚举,绝对路径不出本模块。
- */
-export function resolveWorkspaceFile(workspaceDir: string, relPath: string): ResolveResult {
-  if (typeof workspaceDir !== "string" || workspaceDir.length === 0 || !path.isAbsolute(workspaceDir))
-    return { ok: false, code: "invalid-path" }
-  if (!isSafeRelPath(relPath)) return { ok: false, code: "invalid-path" }
-  const abs = path.resolve(workspaceDir, ...relPath.split("/"))
-  // join 后仍必须在 workspaceDir 词法范围内(防御性;safe rel 已保证,再钉一道)。
-  if (abs !== workspaceDir && !abs.startsWith(workspaceDir + path.sep)) return { ok: false, code: "invalid-path" }
-
-  let st: fs.Stats
-  try {
-    st = fs.lstatSync(abs)
-  } catch {
-    return { ok: false, code: "not-found" }
-  }
-  if (st.isSymbolicLink()) return { ok: false, code: "symlink" }
-  if (st.isDirectory()) return { ok: false, code: "not-a-file" }
-  if (!st.isFile()) return { ok: false, code: "not-a-file" }
-
-  let realRoot: string
-  let real: string
-  try {
-    realRoot = fs.realpathSync(workspaceDir)
-    real = fs.realpathSync(abs)
-  } catch {
-    return { ok: false, code: "not-found" }
-  }
-  // 叶子已证非 symlink;这一步拒的是**父目录**经 symlink 指出 workspace 之外。
-  if (real !== realRoot && !real.startsWith(realRoot + path.sep)) return { ok: false, code: "escapes-workspace" }
-
-  return { ok: true, file: { abs, size: st.size, dev: st.dev, ino: st.ino } }
-}
+export { resolveWorkspaceFile, type ResolvedWorkspaceFile, type ResolveResult } from "../shared/workspace-file"
+import { resolveWorkspaceFile } from "../shared/workspace-file"
 
 /** 逐项 = resolveWorkspaceFile(workspaceDir, rel);非字符串项 → invalid-path。与入参同序同长。不读内容、不开 fd。 */
 export function statWorkspaceFiles(workspaceDir: string, relPaths: readonly unknown[]): WorkspaceFileStatResult[] {

@@ -172,3 +172,8 @@ export function pluginInstallFailureKey(code: Extract<import("../../shared/plugi
 export function pluginSourceFailureKey(reason: Extract<import("../../main/plugin-sources").SourceStatusV1, { status: "failed" }>["reason"]) {
   return ({ network: "codepuppy.ext.sourceNetworkFailed", http: "codepuppy.ext.sourceHttpFailed", format: "codepuppy.ext.sourceFormatFailed" } as const)[reason]
 }
+
+/** A package tree root owns resources; only its entries are displayed as components. */
+export function packageComponentEntries<T extends { kind: string }>(items: readonly T[]): T[] {
+  return items.filter(item => item.kind !== "bundle")
+}

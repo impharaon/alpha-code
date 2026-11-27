@@ -262,6 +262,10 @@ export type AccountStatusV1 = {
 }
 
 export type ContractValues = {
+  VideoUnderstandingInputV1: VideoUnderstandingInputV1
+  VideoModelsV1: VideoModelsV1
+  VideoUnderstandingResultV1: VideoUnderstandingResultV1
+  VideoJobResultV1: VideoJobResultV1
   TokenClaimsV1: TokenClaimsV1
   UploadManifestV1: UploadManifestV1
   LedgerPageV1: LedgerPageV1
@@ -275,3 +279,17 @@ export type ContractValues = {
   ArtifactDescriptorV1: ArtifactDescriptorV1
   AccountStatusV1: AccountStatusV1
 }
+
+
+// Consumer types for the pinned VideoUnderstandingV1 schema (runtime authority: decodeContract).
+export type VideoModelKey = "gemini"
+export type VideoSourceRange = { start_ms: number; end_ms: number }
+export type VideoUnderstandingInputV1 = { schema_version: 1; question: string; model?: VideoModelKey; source_range: VideoSourceRange }
+export type VideoModelsV1 = { schema_version: 1; default_model: VideoModelKey; models: Array<{
+  key: VideoModelKey; label: string; revision: string; mimes: string[]
+  inline_media_bytes_exclusive: number; upload_request_bytes_limit: number; upload_media_bytes_exclusive: number
+  upstream_request_bytes_limit: number; context_tokens: number; output_tokens: number
+  price: { input_fen_per_million: string; output_fen_per_million: string }
+}> }
+export type VideoUnderstandingResultV1 = { schema_version: 1; text: string; model: VideoModelKey; model_revision: string; source_range: VideoSourceRange; usage: { input_tokens: number; output_tokens: number } }
+export type VideoJobResultV1 = Omit<VideoUnderstandingResultV1, "text"> & { response: {kind: "inline"; text: string} | {kind: "artifact"; artifact_id: string} }

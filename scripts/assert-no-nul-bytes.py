@@ -62,13 +62,20 @@ BINARY_SUFFIXES = frozenset(
     {
         ".png", ".jpg", ".ico", ".icns",  # 位图与图标
         ".woff2", ".ttf",                 # 字体
-        ".mp3", ".aac", ".mp4",           # 音视频
+        ".docx", ".pptx", ".xlsx", ".pdf",       # 本票真实 OOXML 模板与 LO 重算 fixture
+        ".mp3", ".aac", ".mp4", ".wav",           # 音视频
         ".zip", ".tgz", ".gz",            # 归档及真实 gzip 采样(含 .tar.gz/.json.gz)
     }
 )
 
 # 目录级豁免。仓库相对路径前缀,写成显式清单而不是模式匹配。
 EXCLUDED_PREFIXES = (
+    # 真实 Mach-O/PE 解释器头采样，用于双平台入口核验；不把源文本或整个 fixture 目录豁免。
+    "packages/ui-mac/src/main/fixtures/office-python-darwin-arm64.header.bin",
+    "packages/ui-mac/src/main/fixtures/office-python-win32-x64.header.bin",
+    # #1775: real Mach-O / PE header samples extracted from the built native libraries;
+    # provenance and digest are recorded beside these binary-only fixtures.
+    "packages/ui-mac/src/main/fixtures/video/native-headers/",
     # 内容寻址的 vendored 载荷:**文件名就是内容的 sha256**,完整性由文件名本身与
     # seed.lock.json 一起保证,内容也不是本仓作者写的(实测含 TrueType 字体与 UTF-8 文本)。
     # 它既不是「源文件」,也没人能在不改文件名的前提下往里塞东西。

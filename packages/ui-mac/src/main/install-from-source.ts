@@ -1,12 +1,11 @@
+import { buildPluginPackageTxItems, pluginHostName, pluginComponentId, pluginMcpConfig, needsPluginFiles } from "./plugin-package-install"
 import { convertCreatedPlugin } from "./created-plugin"
-import { posix } from "node:path"
 import { renderInstalledSkill } from "../shared/host-extension-package-contract/plugin-conversion.mjs"
 import type { Capture, Entry, Text } from "../shared/host-extension-package-contract/plugin-conversion"
 import {
   diagnosticNotRunning,
   type InstallOutcomeV1,
   type InstallRequestV1,
-  type McpConfigLeafV1,
   type PackageDeclarationV1,
   type PackageSourceV1,
 } from "../shared/plugin-install"
@@ -90,6 +89,7 @@ export function createSourceInstaller(deps: Dependencies) {
       if (!projectMatches())
         return { ok: false, code: "transaction-failed", detail: "Project identity changed during source capture" }
       const captured = { capture: converted.capture }
+      const wholePackage = captured.capture.source.kind === "marketplace" && (captured.capture.source.ecosystem === "claude" || captured.capture.source.ecosystem === "codex")
       const before = readPackageLedgerStateV1(deps.globalRoot(), { sideEffectFree: true })
       if (!before.ok)
         return { ok: false, code: "transaction-failed", detail: "Package installation state is unreadable" }
@@ -156,7 +156,7 @@ export function createSourceInstaller(deps: Dependencies) {
             return []
           }
           if (
-            needsPluginFiles(
+            (!wholePackage || entry.kind === "mcp") && needsPluginFiles(
               entry,
               converted.package.tree.map((node) => node.path),
             )
@@ -164,29 +164,23 @@ export function createSourceInstaller(deps: Dependencies) {
             notRunning.push({ kind: entry.kind, sourceName: entry.sourceName, reason: "needs-plugin-files" })
             return []
           }
-          const safe =
-            entry.sourceName
-              .replace(/[^a-zA-Z0-9._-]/g, "-")
-              .replace(/^[^a-zA-Z0-9]+/, "")
-              .slice(0, 64) || "component"
-          const hostName =
-            names.has(entry.kind + ":" + safe) ||
-            (entry.kind === "skill" && !sameSource && !uncuratedSkillFreshGate(deps.globalRoot(), safe).ok)
-              ? safe.slice(0, 55) + "-" + sha256Hex(packageId + entry.kind + entry.sourcePath).slice(0, 8)
-              : safe
-          names.add(entry.kind + ":" + hostName)
+          const hostName = pluginHostName(entry, packageId, names, name => entry.kind !== "skill" || !!sameSource || uncuratedSkillFreshGate(deps.globalRoot(), name).ok)
           return [{ entry, hostName }]
         })
       if (!mapped.length)
         return { ok: false, code: "nothing-runnable", detail: "No runnable components in this source", notRunning }
       const builds: PackageTxBuildV1[] = []
+      const skillReceipts: UpsertInput[] = []
+      const rootName = "plugin-" + sha256Hex(packageId).slice(0, 24)
+      const rootKey = "bundle--" + rootName
+      const installedNames = new Map(mapped.map(item => [item.entry.id, item.hostName]))
       const declarations: PackageDeclarationV1[] = []
       const nodes: PackageGraphNodeV1[] = []
       const version = converted.package.version ?? "content." + converted.package.treeDigest.slice(7, 23)
       for (const item of mapped) {
-        const componentId = "user:" + item.hostName.toLowerCase()
+        const componentId = wholePackage ? pluginComponentId(packageId, item.entry) : "user:" + item.hostName.toLowerCase()
         const receipt: UpsertInput = {
-          id: componentId,
+          id: "user:" + item.hostName.toLowerCase(),
           kind: item.entry.kind,
           name: item.hostName,
           scope: { kind: "global" },
@@ -211,7 +205,8 @@ export function createSourceInstaller(deps: Dependencies) {
           sourceName: item.entry.sourceName,
           secretNeeds: [],
         }
-        if (item.entry.kind === "skill") {
+        if (item.entry.kind === "skill" && wholePackage) skillReceipts.push(receipt)
+        if (item.entry.kind === "skill" && !wholePackage) {
           const prefix = item.entry.directory ? item.entry.directory + "/" : ""
           const files = await Promise.all(
             converted.package.tree
@@ -249,38 +244,7 @@ export function createSourceInstaller(deps: Dependencies) {
         }
         if (item.entry.kind === "mcp") {
           const entry = item.entry
-          const leaf: McpConfigLeafV1 =
-            entry.transport === "stdio"
-              ? {
-                  type: "local",
-                  command: entry.command.map(renderText),
-                  environment: Object.fromEntries(
-                    Object.entries(entry.environment).map(([key, value]) => [key, renderText(value)]),
-                  ),
-                  ...(entry.cwd ? { cwd: renderText(entry.cwd) } : {}),
-                  ...(entry.timeoutMs === undefined ? {} : { timeout: entry.timeoutMs }),
-                }
-              : {
-                  type: "remote",
-                  url: renderText(entry.url),
-                  headers: Object.fromEntries(
-                    Object.entries(entry.headers).map(([key, value]) => [key, renderText(value)]),
-                  ),
-                  ...(entry.timeoutMs === undefined ? {} : { timeout: entry.timeoutMs }),
-                  ...(entry.oauth === false
-                    ? { oauth: false }
-                    : entry.oauth?.oauth
-                      ? {
-                          oauth: {
-                            ...(entry.oauth.oauth.clientId ? { clientId: entry.oauth.oauth.clientId } : {}),
-                            ...(entry.oauth.oauth.clientSecret
-                              ? { clientSecret: renderText(entry.oauth.oauth.clientSecret) }
-                              : {}),
-                            ...(entry.oauth.oauth.scopes ? { scope: entry.oauth.oauth.scopes.join(" ") } : {}),
-                          },
-                        }
-                      : {}),
-                }
+          const leaf = pluginMcpConfig(entry)
           declaration.mcp = leaf
           declaration.secretNeeds = converted.package.secrets
             .filter((need) => need.componentId === entry.id)
@@ -315,13 +279,22 @@ export function createSourceInstaller(deps: Dependencies) {
           manifestDigest: converted.package.treeDigest,
         })
       }
+      const rootBuild = wholePackage ? await buildPluginPackageTxItems({
+        root: deps.globalRoot(), casBaseRoot: deps.casBaseRoot(), key: rootKey,
+        description: converted.package, hostNames: installedNames, skillReceipts,
+        readFile: async path => converted.replacements.get(path) ?? captured.capture.readFile(path),
+        receipt: { id: "user:" + rootName, kind: "bundle", name: rootName, scope: { kind: "global" }, environment: deps.environment(), origin: converted.package.provider === "claude-code" ? "imported-claude" : "imported", desiredState: "disabled", version, installedAt: new Date().toISOString() },
+      }) : undefined
+      if (rootBuild && !rootBuild.ok) return { ok: false, code: "transaction-failed", detail: rootBuild.reason }
+      if (rootBuild?.ok) builds.unshift(rootBuild.build)
       const graph: PackageGraphV1 = {
         packageId,
         envelopeDigest: converted.package.treeDigest,
         displayName: converted.package.name,
         installedGraphDigest: "",
-        root: nodes[0]!,
-        children: nodes.slice(1),
+        root: rootBuild?.ok ? { componentId: "bundle:" + sha256Hex(packageId).slice(0, 32), kind: "bundle", name: rootName, required: true, manifestDigest: rootBuild.manifestDigest } : nodes[0]!,
+        children: rootBuild?.ok ? nodes : nodes.slice(1),
+        ...(rootBuild?.ok ? { pluginTree: { storeKey: rootKey, treeDigest: rootBuild.description.treeDigest } } : {}),
         source,
         ...(project?.ok ? { effect: project.scope } : {}),
         notRunning,
@@ -415,7 +388,7 @@ export function createSourceInstaller(deps: Dependencies) {
             return { ok: false, code: "transaction-failed", detail: "Installed connector could not be published" }
         }
       }
-      if (departing.length) await deps.removeDeparting(departing)
+      if (departing.length) await deps.removeDeparting(departing.filter(child => !sameSource?.pluginTree || child.kind !== "skill"))
       const enabled = await setPackageStateV1({ packageId, state: "enabled" }, deps)
       if (enabled.ok) await deps.activateMcp(packageId).catch(() => undefined)
       if (mapped.some((item) => item.entry.kind === "skill")) deps.reloadSkills(packageId)
@@ -497,32 +470,6 @@ function outcomeOf(graph: PackageGraphV1, alreadyInstalled?: true): InstallOutco
     ...(alreadyInstalled ? { alreadyInstalled } : {}),
   }
 }
-function needsPluginFiles(entry: Extract<Entry, { kind: "mcp" | "skill" }>, paths: string[]): boolean {
-  const binding = (text: Text) =>
-    text.some((part) => typeof part !== "string" && "binding" in part && part.binding !== "projectDir")
-  if (entry.kind === "mcp")
-    return entry.transport === "stdio"
-      ? entry.command.some(binding) ||
-          Object.values(entry.environment).some(binding) ||
-          (!!entry.cwd && binding(entry.cwd)) ||
-          entry.command.some(
-            (text) => typeof text[0] === "string" && text[0].startsWith("./") && paths.includes(text[0].slice(2)),
-          )
-      : binding(entry.url) || Object.values(entry.headers).some(binding)
-  return (
-    binding(entry.instruction) ||
-    entry.instruction.some(
-      (part) =>
-        typeof part === "string" &&
-        [...part.matchAll(/\]\(([^)]+)\)/g)].some((match) => {
-          const target = posix.normalize(posix.join(entry.directory, match[1]!))
-          return paths.includes(target) && !target.startsWith(entry.directory + "/")
-        }),
-    )
-  )
-}
-
-
 /** The entry's catalog arm: global storage and one graph admission, including native catalog items. */
 export async function installCatalogFromSource(
   catalogId: string,

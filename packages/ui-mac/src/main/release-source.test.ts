@@ -23,7 +23,7 @@ function fixture() {
   git(dir, "clone", path.join(dir, "origin.git"), "work")
   const cwd = path.join(dir, "work")
   git(cwd, "switch", "-c", "alpha")
-  for (const file of ["electron-builder.config.ts", "scripts/target-arch.ts", "scripts/release-source.ts", "scripts/build-identity.ts", "src/shared/route-manifest.ts", "src/main/release-sbom.ts"]) {
+  for (const file of ["electron-builder.config.ts", "scripts/target-arch.ts", "scripts/release-source.ts", "scripts/build-identity.ts", "src/shared/route-manifest.ts", "src/main/release-sbom.ts", "src/main/document-resources.ts", "src/shared/document-resources.ts"]) {
     fs.mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true })
     fs.copyFileSync(path.join(packageDir, file), path.join(cwd, file))
   }
@@ -83,7 +83,7 @@ describe("#1631 真实 beforePack", () => {
           Object.defineProperty(process, "platform", { value: "darwin" })
           const { Arch } = await import("electron-builder")
           const config = (await import(${JSON.stringify(path.join(cwd, "electron-builder.config.ts"))})).default
-          await config.beforePack({ electronPlatformName: "win32", arch: Arch.x64 })
+          await config.beforePack({ electronPlatformName: "linux", arch: Arch.x64 })
           await config.beforePack({ electronPlatformName: "darwin", arch: Arch.x64 })
         `], { cwd, encoding: "utf8", env: { ...process.env, OPENCODE_CHANNEL: channel, CODEPUPPY_SIGN: sign, GITHUB_ACTIONS: "false", CODEPUPPY_TARGET_ARCH: "arm64" } })
         expect(result.status).toBe(1)

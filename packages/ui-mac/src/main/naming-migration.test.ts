@@ -316,7 +316,7 @@ describe("AC1 / AC5 —— 首次启动把旧名持久化项改到新名", () =>
     const prod = join(f.dstBase, "env", "prod")
 
     // userData:改名项在新名下、旧名不在;加密文件字节不变
-    for (const [item, name] of Object.entries(USER_DATA_LAYOUT)) {
+    for (const [item, name] of Object.entries(USER_DATA_LAYOUT).filter(([item]) => item !== "documentRuntime")) {
       if (item === "appliedCatalog" || item === "discoveredEndpoints") continue
       expect(existsSync(join(U, name)), `${name} 应在`).toBe(true)
     }

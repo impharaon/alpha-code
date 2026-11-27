@@ -378,7 +378,7 @@ status.
 | `SPEC-stored-credentials-fence` | [specs/stored-credentials-fence/spec.md](specs/stored-credentials-fence/spec.md) | 被围栏的进程树读不到、拷不走、挪不走、改不了 Code Puppy 存在本机的凭据文件；引擎只从主进程交来的内存表取值；改写配置把凭据引到别处由 SPEC-engine-config-fence 关闭。 | approved |
 | `SPEC-cloud-job-desktop-notifications` | [specs/cloud-job-desktop-notifications/spec.md](specs/cloud-job-desktop-notifications/spec.md) | 用户能收到任务结果并在桌面设置里关闭通知。 | approved |
 | `PLAN-cloud-job-form-preflight` | [specs/cloud-job-form-preflight/plan.md](specs/cloud-job-form-preflight/plan.md) | alpha-code#1686 一段:拷入 AccountStatusV1、主进程只读预检 IPC、组件库卡片与名称 — 值列表(账户弹层改用)、两种发送框的预检区与按钮行右移 | active |
-| `DESIGN-connector-launchers` | [specs/connector-launchers/design.md](specs/connector-launchers/design.md) | 随包提供 uv 与官方 Node/npm，主进程校验固定文件，围栏内准备连接器环境；准备和握手分开计时，持久化可离线启动的入口，并统一失败原因与动作。 | frozen |
+| `DESIGN-connector-launchers` | [specs/connector-launchers/design.md](specs/connector-launchers/design.md) | 统一连接器启动器与固定文件准备；v2 接纳两平台文档 Node 读取及受管第一方 MCP 的运行期按 ID 准备，核验声明身份与逐调用进度归属。 | frozen |
 | `SPEC-connector-workspace-following` | [specs/connector-workspace-following/spec.md](specs/connector-workspace-following/spec.md) | 连接器跟随当前会话所在项目目录，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-context-injection-budgets` | [specs/context-injection-budgets/spec.md](specs/context-injection-budgets/spec.md) | 应用注入的对话内容有明确大小上限，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-conversation-overlays` | [specs/conversation-overlays/spec.md](specs/conversation-overlays/spec.md) | 统一对话浮层交互，并让用户批准工具时还能翻看时间线。 | approved |
@@ -425,6 +425,8 @@ status.
 | `SPEC-resident-project-watchers` | [specs/resident-project-watchers/spec.md](specs/resident-project-watchers/spec.md) | 长期使用项目时监听与内存保持受控，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-responsive-session-rail` | [specs/responsive-session-rail/spec.md](specs/responsive-session-rail/spec.md) | 右栏可以调宽并为聊天区保留空间，按历史条文与实际证明登记范围。 | approved |
 | `SPEC-route-manifest-authority` | [specs/route-manifest-authority/spec.md](specs/route-manifest-authority/spec.md) | 应用导航由一份页面清单决定，保留历史条款、有效裁决和交付证据边界。 | approved |
+| `DESIGN-secrets-usable-not-visible` | [specs/secrets-usable-not-visible/design.md](specs/secrets-usable-not-visible/design.md) | 消费规格 v3；实时输出按匹配前缀保留尾部，故障终态只留隐藏说明；统一 ANSI、env 逐次写回和凭据字段规则，R2 修正后冻结。 | frozen |
+| `PLAN-secrets-usable-not-visible` | [specs/secrets-usable-not-visible/plan.md](specs/secrets-usable-not-visible/plan.md) | 五段实施；①②③及 SC-02 已核，④按 v3.3 接同一回调内流式发布与终态收口，⑤规划真引擎全部 AC。 | active |
 | `SPEC-session-results-workspace` | [specs/session-results-workspace/spec.md](specs/session-results-workspace/spec.md) | 会话右栏统一查看文件、产物和修改，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `SPEC-startup-model-availability` | [specs/startup-model-availability/spec.md](specs/startup-model-availability/spec.md) | 启动时及时出现可用模型且不显示虚假失败，保留历史条款、有效裁决和交付证据边界。 | approved |
 | `DESIGN-stored-credentials-fence` | [specs/stored-credentials-fence/design.md](specs/stored-credentials-fence/design.md) | 凭据文件留在原处;围栏对 Code Puppy 的凭据存放点与崩溃转储目录一律拒读拒写,连同它们的真实目标,并禁止改名其上的每一级目录(profile 最后的文件规则);引擎进程的值只来自主进程:启动消息带全表,续期后推全表,每次引擎配置装载各自向主进程拉全表再解析,只在一张封闭清单的凭据位置代入(内联文档 / 同名连接器条目);主进程不替别名读凭据;经可写引擎配置改变交付去向的一类残留由 INT-safety I-13 关闭;配置里的 {file:} 引用一字不变;用户无感 | approved |

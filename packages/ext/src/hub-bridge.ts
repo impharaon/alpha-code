@@ -1,3 +1,6 @@
+import { parseVideoBridgeReply, type VideoBridgeRequest, type VideoBridgeReply } from "../../ui-mac/src/shared/video-understanding"
+import { createNetworkEgress } from "./network-egress"
+import { parseNetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../../ui-mac/src/shared/package-admission"
 import type { PluginSourceIdV1, SourceSearchResultV1 } from "../../ui-mac/src/main/plugin-sources"
 import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/plugin-source-timing"
@@ -15,6 +18,7 @@ import { PLUGIN_SOURCE_SEARCH_REPLY_TIMEOUT_MS } from "../../ui-mac/src/shared/p
 // 取不到 parentPort(CLI / 测试宿主)⇒ `available: false`,三个工具如实说「本宿主不可用」,不猜。
 
 import { createUnattendedState } from "./policy/unattended"
+import { parseDocumentHostReply, isDeferredDocumentCheck, type DocumentHostRequest, type DocumentHostReplyMessage, type DeferredDocumentCheck, type DocumentCheckAdmission } from "../../util/src/codepuppy-document"
 import type { ToolPolicyWriter } from "./policy/resolver"
 import type { PackageManagerExecutionLease, PreparedShellExecution, PreparedShellDelegate } from "@opencode/plugin/codepuppy-package-manager"
 import {
@@ -48,6 +52,8 @@ import {
   type ReloadOutcome,
   type ReloadRequestMessage,
   type ReloadScope,
+  parseDocumentRuntimeMessage,
+  type DocumentRuntimeMessage,
 } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
 
 /** Electron utilityProcess 的 `process.parentPort` 里本模块用到的那两样。 */
@@ -61,11 +67,15 @@ export type BridgeFailure = { ok: false; reason: "unavailable" | "timeout" | "er
 /** BR-10:审批卡上「要装什么」—— main 在搜索结果里给出的名称与真实来源(自制插件为 `created`)。 */
 export type HubInstallSubject = { readonly name: string; readonly source: PluginSourceIdV1 | "created" }
 
+type VideoAction = VideoBridgeRequest extends infer Request ? Request extends VideoBridgeRequest ? Omit<Request,"type"|"id"> : never : never
+
 export type HubBridge = {
   authorizePackageManagerExecution(input: PreparedShellExecution): Promise<PackageManagerExecutionLease>
   bindPackageManagerShell(input: { executionID: string; pid: number }): Promise<void>
   finishPackageManagerExecution(input: { executionID: string }): Promise<void>
   cancelPackageManagerExecution(input: Omit<Extract<PackageManagerControl, { op: "cancel" }>, "op">): Promise<void>
+  video(input: VideoAction): Promise<VideoBridgeReply | BridgeFailure>
+  readonly network: ReturnType<typeof createNetworkEgress>
   readonly unattended: ReturnType<typeof createUnattendedState>
   readWriteScope(request: Pick<WriteScopeRequest, "access" | "targets">): Promise<WriteScopeReply["result"]>
   readonly available: boolean
@@ -79,6 +89,11 @@ export type HubBridge = {
   report(input: { generation: number; scope: ReloadScope; outcome: ReloadOutcome; directories: string[]; error?: string }): void
   /** main → ext 的重载请求交给谁。只能挂一个(调度器);挂上之前到达的请求按序缓存,挂上时补交。 */
   onReloadRequest(handler: (message: ReloadRequestMessage) => void): void
+  onDocumentRuntimeMessage(handler: (message: DocumentRuntimeMessage) => boolean): () => void
+  documentRuntimeReceipt(receipt: Extract<DocumentRuntimeMessage, { type: "codepuppy.document.runtime.verify.receipt" }>): void
+  documentCall(request: DocumentHostRequest, sidecarGeneration: number, signal?: AbortSignal): Promise<DocumentHostReplyMessage | BridgeFailure>
+  onDocumentReady(handler: (check: DeferredDocumentCheck, sidecarGeneration: number) => boolean): () => void
+  documentAdmission(check: DeferredDocumentCheck, sidecarGeneration: number, admission: DocumentCheckAdmission): void
   /**
    * SPEC-engine-config-fence BR-03(DESIGN-engine-config-fence §4.5):工具策略文档的写者 —— main 写、写完再回复,走本桥同一个监听、同一个 id 空间
    * 与超时。只在有 parentPort 时有;main 回 error、超时、应答形状不对或发不出去 ⇒ 记一行并抛(存储包成 ToolPolicyWriteError("io"))。
@@ -98,6 +113,10 @@ export function createHubBridge(
   const log = options.log ?? ((line: string) => console.error(line))
   const pending = new Map<number, { settle: (message: unknown) => void; timer: ReturnType<typeof setTimeout> }>()
   const early: ReloadRequestMessage[] = []
+  const documentHandlers = new Set<(message: DocumentRuntimeMessage) => boolean>()
+  const earlyDocument: DocumentRuntimeMessage[] = []
+  const readyHandlers = new Set<(check: DeferredDocumentCheck, sidecarGeneration: number) => boolean>()
+  const earlyReady: { check: DeferredDocumentCheck; sidecarGeneration: number }[] = []
   let reloadHandler: ((message: ReloadRequestMessage) => void) | undefined
   let seq = 0
   const unattended = createUnattendedState()
@@ -117,6 +136,23 @@ export function createHubBridge(
     const message = event?.data
     if (!isCodePuppySidecarMessage(message)) return
     const type = (message as { type: string }).type
+    if (type === "codepuppy.document.check-ready") {
+      const ready = message as { check?: unknown; sidecarGeneration?: unknown }
+      if (!isDeferredDocumentCheck(ready.check) || !Number.isSafeInteger(ready.sidecarGeneration) || Number(ready.sidecarGeneration) < 0) return log("[@codepuppy/ext] dropped malformed document ready notification")
+      if (![...readyHandlers].some((handler) => handler(ready.check as DeferredDocumentCheck, Number(ready.sidecarGeneration)))) earlyReady.push({ check: ready.check, sidecarGeneration: Number(ready.sidecarGeneration) })
+      return
+    }
+    if (type.startsWith("codepuppy.document.runtime.")) {
+      const parsed = parseDocumentRuntimeMessage(message)
+      if (!parsed) return log("[@codepuppy/ext] dropped malformed document runtime message")
+      if (![...documentHandlers].some((handler) => handler(parsed))) earlyDocument.push(parsed)
+      return
+    }
+    if (type.startsWith("codepuppy.network.")) {
+      const parsed = parseNetworkOutbound(message)
+      if (!parsed) return log("network egress: malformed runtime message")
+      if (network.receive(parsed)) return
+    }
     if (type === "codepuppy.unattended.live") {
       const parsed = parseUnattendedLive(message)
       if (!parsed) return log(`[@codepuppy/ext] dropped a malformed unattended snapshot`)
@@ -138,17 +174,28 @@ export function createHubBridge(
     entry.settle(message)
   })
 
-  const ask = <T>(build: (id: number) => unknown, parse: (message: unknown) => T | undefined, budget = timeoutMs): Promise<T | BridgeFailure> => {
+  const ask = <T>(build: (id: number) => unknown, parse: (message: unknown) => T | undefined, budget = timeoutMs, signal?: AbortSignal, onCancel?: (id: number) => void): Promise<T | BridgeFailure> => {
     if (!port) return Promise.resolve({ ok: false, reason: "unavailable", detail: "no parent port in this engine host" })
+    if (signal?.aborted) return Promise.resolve({ ok: false, reason: "error", detail: "request cancelled" })
     const id = ++seq
     return new Promise((resolve) => {
+      const aborted = () => {
+        if (!pending.delete(id)) return
+        clearTimeout(timer)
+        onCancel?.(id)
+        resolve({ ok: false, reason: "error", detail: "request cancelled" })
+      }
+
       const timer = setTimeout(() => {
         pending.delete(id)
+        signal?.removeEventListener("abort", aborted)
+        onCancel?.(id)
         resolve({ ok: false, reason: "timeout", detail: "the app did not answer in time" })
       }, budget)
       pending.set(id, {
         timer,
         settle: (message) => {
+          signal?.removeEventListener("abort", aborted)
           const parsed = parse(message)
           if (parsed === undefined) {
             log(`[@codepuppy/ext] hub bridge: dropped a malformed reply to request ${id}`)
@@ -157,16 +204,29 @@ export function createHubBridge(
           resolve(parsed)
         },
       })
+      signal?.addEventListener("abort", aborted, { once: true })
       try {
         port.postMessage(build(id))
       } catch (error) {
         pending.delete(id)
         clearTimeout(timer)
+        signal?.removeEventListener("abort", aborted)
         log(`[@codepuppy/ext] hub bridge: request ${id} could not be posted: ${error instanceof Error ? error.message : String(error)}`)
         resolve({ ok: false, reason: "unavailable", detail: "the app could not be reached" })
       }
     })
   }
+
+  const network = createNetworkEgress({
+    log,
+    send: async (build) => {
+      const reply = await ask(build, (message) => {
+        const parsed = parseNetworkOutbound(message)
+        return parsed?.type === "codepuppy.network.activity.reply" ? parsed : undefined
+      })
+      return "type" in reply ? reply : undefined
+    },
+  })
 
   const writeToolPolicy = async (build: (id: number) => unknown): Promise<{ backup?: string }> => {
     const result = await ask(build, (message) => {
@@ -198,12 +258,30 @@ export function createHubBridge(
     bindPackageManagerShell: async (input) => { await packageManagerControl({ op: "bind", ...input }) },
     finishPackageManagerExecution: async (input) => { await packageManagerControl({ op: "finish", ...input }) },
     cancelPackageManagerExecution: async (input) => { await packageManagerControl({ op: "cancel", ...input }) },
+    video: (input) => ask((id)=>({type:"codepuppy.video.understand",id,...input}),parseVideoBridgeReply),
+    network,
     unattended,
     readWriteScope: async (request) => {
       const result = await ask((id) => buildWriteScopeRequest(id, request), (message) => parseWriteScopeReply(message)?.result)
       return "ok" in result ? { error: "unavailable" } : result
     },
     available: !!port,
+    onDocumentRuntimeMessage(handler) {
+      documentHandlers.add(handler)
+      for (const message of earlyDocument.splice(0)) if (!handler(message)) earlyDocument.push(message)
+      return () => { documentHandlers.delete(handler) }
+    },
+    documentRuntimeReceipt(message) { try { port?.postMessage(message) } catch { log("[@codepuppy/ext] document receipt could not reach the stopped host") } },
+    documentCall: (request, sidecarGeneration, signal) => ask((id) => ({ type: "codepuppy.document.host.request", id, sidecarGeneration, request }), (message) => {
+      const reply = parseDocumentHostReply(message)
+      return reply?.sidecarGeneration === sidecarGeneration ? reply : undefined
+    }, 180_000, signal, (id) => { try { port?.postMessage({ type: "codepuppy.document.host.cancel", id, sidecarGeneration }) } catch { log("[@codepuppy/ext] document cancellation could not reach the stopped host") } }),
+    onDocumentReady(handler) {
+      readyHandlers.add(handler)
+      for (const ready of earlyReady.splice(0)) if (!handler(ready.check, ready.sidecarGeneration)) earlyReady.push(ready)
+      return () => { readyHandlers.delete(handler) }
+    },
+    documentAdmission(check, sidecarGeneration, admission) { try { port?.postMessage({ type: "codepuppy.document.check-admission", sidecarGeneration, location: check.location, admission }) } catch { log("[@codepuppy/ext] document admission could not reach the stopped host") } },
     ...(port
       ? {
           toolPolicy: {

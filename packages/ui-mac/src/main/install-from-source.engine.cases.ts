@@ -164,6 +164,7 @@ test('A2 real engine startup failure keeps the enabled package and exposes faile
  if(Date.now()>end)throw Error('failed MCP did not settle')
  }
  expect(observed?.status.status).toBe('failed')
- expect(readPackageLedgerStateV1(root)).toMatchObject({ok:true,packageGraphs:[{packageId:'claude:playwright'}],records:[{kind:'mcp',name:'playwright',desiredState:'enabled'}]})
+ // Whole-tree installation owns a bundle root and its MCP, even when the runtime fails to start.
+ expect(readPackageLedgerStateV1(root)).toMatchObject({ok:true,packageGraphs:[{packageId:'claude:playwright',root:{kind:'bundle'},children:[{kind:'mcp',name:'playwright'}]}],records:[{kind:'bundle',desiredState:'enabled'},{kind:'mcp',name:'playwright',desiredState:'enabled'}]})
  } finally {await engine.close();process.chdir(previous)}
 },30000)

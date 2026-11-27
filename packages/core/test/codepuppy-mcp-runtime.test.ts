@@ -621,13 +621,22 @@ describe("#1565: the shipped Office manifest and server", () => {
 
   testEffect(Layer.empty).effect("the command main writes and the one after the folder substitution both get the declaration", () =>
     Effect.sync(() => {
-      expect(declaredNames(asWritten)).toEqual(["read_docx", "write_docx"])
-      expect(declaredNames(afterExtension)).toEqual(["read_docx", "write_docx"])
+      expect(declaredNames(asWritten)).toEqual(["read_docx"])
+      expect(declaredNames(afterExtension)).toEqual(["read_docx"])
       expect(declaredNames(asWritten.map((token) => (token === "{workspace}" ? "relative/folder" : token)))).toEqual([])
       expect(declaredNames(asWritten.map((token) => (token === "{workspace}" ? `${ROOT}/../elsewhere` : token)))).toEqual([])
       expect(declaredNames([...afterExtension, "--debug"])).toEqual([])
     }),
   )
+
+  testEffect(Layer.empty).effect("Office declarations bind the exact trusted Python environment", () => Effect.sync(() => {
+    const expected = { CODEPUPPY_DOCUMENT_HOST: "/private/python-host/7/registration/host.json" }
+    const entry = { type: "local", command: afterExtension, environment: expected }
+    expect(declaredListedTools("codepuppy-word", entry, manifest, fs.readFileSync, expected)?.length).toBeGreaterThan(0)
+    expect(declaredListedTools("codepuppy-word", entry, manifest, fs.readFileSync)).toBeUndefined()
+    expect(declaredListedTools("codepuppy-word", { ...entry, environment: { CODEPUPPY_DOCUMENT_HOST: "/foreign/host.json" } }, manifest, fs.readFileSync, expected)).toBeUndefined()
+    expect(declaredListedTools("codepuppy-word", { type: "local", command: afterExtension }, manifest, fs.readFileSync, expected)).toBeUndefined()
+  }))
 
   let previous: string | undefined
   beforeAll(() => {
@@ -643,7 +652,7 @@ describe("#1565: the shipped Office manifest and server", () => {
       yield* connected("codepuppy-word")
       const declared = declaredListedTools("codepuppy-word", word(afterExtension), manifest, fs.readFileSync)
       const listed = (yield* (yield* Mcp.Service).tools()).filter((tool: any) => tool.server === "codepuppy-word")
-      expect(listed.map((tool: any) => tool.name)).toEqual(["read_docx", "write_docx"])
+      expect(listed.map((tool: any) => tool.name)).toEqual(["read_docx"])
       expect(listsDeclaration(declared ?? [], listed)).toBe(true)
     }),
   )
@@ -700,5 +709,24 @@ describe("#1645: a failure's remote text stays out of logs and the failed status
         expect(localLogs.some((line) => line.includes("crash"))).toBe(true)
         expect(localLogs.filter((line) => line.includes(SECRET))).toEqual([])
       }),
+  )
+})
+
+
+describe("video progress", () => {
+  const definitions = toolsFile([{ name: "video_progress", description: "progress wire fixture", inputSchema: { type: "object", properties: { completed: { type: "number" } } } }])
+  testEffect(mcpLayer({ progress: local({ CODEPUPPY_MCP_TOOLS_FILE: definitions }) })).live("video progress follows each real SDK request instead of the connection's last caller", () =>
+    Effect.gen(function* () {
+      yield* connected("progress")
+      const mcp = yield* Mcp.Service
+      const first: unknown[] = []
+      const second: unknown[] = []
+      yield* Effect.all([
+        mcp.callTool({ server: "progress", name: "video_progress", args: { completed: 1000 } }, async (update) => { first.push(update) }),
+        mcp.callTool({ server: "progress", name: "video_progress", args: { completed: 2000 } }, async (update) => { second.push(update) }),
+      ], { concurrency: 2 })
+      expect(first).toEqual([{ phase: "decoding", completed: 1000, total: 10000, unit: "ms" }, { phase: "transcribing", completed: 1000, total: 10000, unit: "ms" }])
+      expect(second).toEqual([{ phase: "decoding", completed: 2000, total: 10000, unit: "ms" }, { phase: "transcribing", completed: 2000, total: 10000, unit: "ms" }])
+    }),
   )
 })

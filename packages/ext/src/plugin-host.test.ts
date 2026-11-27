@@ -1,11 +1,15 @@
+import { publishDocumentPythonEnvironment } from "../../util/src/codepuppy-document"
 // `#1665`:ext 在 OpenCode 2 真插件宿主里(plugin-host.harness.ts)—— 每条用例装的是生产的默认导出 `CodePuppyExt`,
 // 经上游真的钩子链 / 工具注册表 / transform 服务判结果。「权威保持」类用例都带反向臂:同一个输入在**不装 ext** 的宿主里
 // 走上游默认,结论必须相反 —— 去掉我们的钩子 ⇒ 这条用例红。
 import { publishTestBootstrap, testCloudMcp, unpublishTestBootstrap, type TestBootstrapInput } from "../../ui-mac/test-component/codepuppy-bootstrap-fixture"
-import { fixtureRoot } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
+import { allInstalledPluginSkills } from "./plugin-package-skills"
+import { skillGenerationLiveDirs } from "./gen-skill-paths"
+import { convertPluginTree } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"
+import { fixtureRoot, captureWholeFixture } from "../../ui-mac/test-fixtures/plugin-helper/fixture"
 import { afterEach, beforeAll, expect } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { LoadAPIKeyError } from "@ai-sdk/provider"
@@ -29,6 +33,9 @@ import { WebSearch } from "../../core/src/websearch.ts"
 import { Session } from "../../schema/src/session.ts"
 import { SessionMessage } from "../../schema/src/session-message.ts"
 import type { Plugin } from "@opencode/plugin"
+import { subscribeDocumentChecks } from "./document-check"
+import type { DeferredDocumentCheck, DocumentHost } from "../../util/src/codepuppy-document"
+import { codepuppyOfficeInstallCommand } from "../../ui-mac/src/shared/office-advisories"
 import CodePuppyExt, { PROCESS_STATE_KEY } from "./plugin"
 import { codePuppyWebSearchFailureOf } from "./exa-websearch"
 import { buildHubInstallReply, buildHubRequestReply, buildHubViewReply, buildSourcesSearchReply } from "../../ui-mac/src/main/codepuppy-sidecar-messages"
@@ -1022,7 +1029,6 @@ itWithPermission.live("权威 · 项目 agent 的权限(0.1.26 同意后生效):
     const { exit, text, rules } = yield* readerEdits(true)
     expect(rules).toEqual(expect.arrayContaining([{ action: "edit", resource: "*", effect: "deny" }, { action: "shell", resource: "*", effect: "deny" }]))
     expect(Exit.isFailure(exit)).toBe(true)
-    // 拒它的是项目 agent 的 `edit: deny`(真权限服务的 BlockedError,断言的动作是 edit、资源是 a.txt)
     expect(JSON.stringify(exit)).toContain('"_tag":"Permission.BlockedError"')
     expect(JSON.stringify(exit)).toContain('{"action":"edit","resource":"*","effect":"deny"}')
     expect(text).toBe("hello\n")
@@ -1424,6 +1430,65 @@ it.live("权威 · 网页抓取失败的原因(#1702):Unable to fetch 的失败�
 )
 
 
+it.live("installed plugin skill bindings stay package-local in the real SkillEditor", () =>
+  Effect.gen(function* () {
+    env({})
+    const root = join(scratch, "codepuppy-state", "env", "dev")
+    const directory = realpathSync((yield* Location.Service).directory)
+    // Two copies of the pinned real S2 tree retain identical source skill directories.
+    // Host names differ exactly as installation collision handling requires.
+    const capture = yield* Effect.promise(() => captureWholeFixture("claude-security"))
+    const converted = yield* Effect.promise(() => convertPluginTree(capture))
+    const entry = converted.package.entries.find(entry => entry.kind === "skill")!
+    for (const name of ["security-one", "security-two"]) {
+      const store = join(root, "ext-store", "bundle--" + name)
+      const live = join(store, "generations", "gen-000001-abcdef")
+      mkdirSync(live, { recursive: true })
+      cpSync(join(fixtureRoot, "whole/claude/plugins/claude-security"), join(live, "tree"), { recursive: true })
+      writeFileSync(join(live, "plugin-package.json"), JSON.stringify({ description: converted.package, hostNames: { [entry.id]: name } }))
+      writeFileSync(join(store, "current.json"), JSON.stringify({ v: 1, generation: "gen-000001-abcdef", txId: "binding-fixture", switchedAt: "2026-11-26T00:00:00Z" }))
+    }
+    const projection = join(root, "skills-enabled.json")
+    writeFileSync(projection, JSON.stringify({ v: 3, keys: ["skill--security-two"], scoped: [{ kind: "skill", name: "security-one", projectPath: directory }], mcp: [] }))
+    yield* activate({ id: "test.native-skill", async setup(context) {
+      await context.skill.transform(editor => {
+        for (const [id, name] of [["claude-security", "native-security"], ["security-one", "native-host-name"], ["skill--security-two", "native-managed-key"]]) {
+          editor.add({ id: id as never, name: name as never, path: join(fixtureRoot, "whole/claude/plugins/claude-security/skills/claude-security/SKILL.md") as never, content: "native skill" })
+        }
+      })
+    } })
+    const ext = yield* activateExtUntilFinished
+    const plugins = yield* Plugins.Service
+    yield* ConfigSkillPlugin.Plugin.effect(yield* PluginHost.make(plugins, ConfigSkillPlugin.Plugin.id)).pipe(
+      Effect.provide(Config.testLayer([configDocument({ skills: skillGenerationLiveDirs(root) })])),
+    )
+    const skills = yield* Skill.Service
+    yield* ext.finish(skills.list().pipe(Effect.map(items => items.filter(skill => skill.name.startsWith("security-")).length === 2)))
+    const registered = (yield* skills.list()).filter(skill => skill.name.startsWith("security-"))
+    expect(registered).toHaveLength(2)
+    expect((yield* skills.list()).find(skill => skill.id === "claude-security")?.name).toBe("native-security")
+    expect((yield* skills.list()).find(skill => skill.id === "security-one")?.name).toBe("native-host-name")
+    expect((yield* skills.list()).find(skill => skill.id === "skill--security-two")?.name).toBe("native-managed-key")
+    for (const skill of registered) {
+      const installed = allInstalledPluginSkills(root).find(item => item.name === skill.name)!
+      expect(skill.path).toBe(installed.path)
+      expect(skill.content).toContain("(" + installed.pluginRoot + "/scripts)")
+      expect(skill.content).toContain("(" + installed.directory + "/jobs/scan-codebase.md)")
+      expect(skill.content).not.toContain("${CLAUDE_")
+      expect(readFileSync(join(installed.directory, "specs/report-spec.md"), "utf8")).toContain("report")
+      expect(readFileSync(join(installed.directory, "role.md"), "utf8").length).toBeGreaterThan(0)
+      const other = allInstalledPluginSkills(root).find(item => item.name !== skill.name)!
+      expect(skill.content).not.toContain(other.pluginRoot)
+    }
+    writeFileSync(projection, JSON.stringify({ v: 3, keys: ["skill--security-two"], scoped: [{ kind: "skill", name: "security-one", projectPath: join(directory, "another-project") }], mcp: [] }))
+    yield* skills.reload()
+    expect((yield* skills.list()).filter(skill => skill.name.startsWith("security-")).map(skill => skill.name)).toEqual(["security-two"])
+    writeFileSync(projection, JSON.stringify({ v: 3, keys: [], scoped: [], mcp: [] }))
+    yield* skills.reload()
+    expect((yield* skills.list()).filter(skill => skill.name.startsWith("security-"))).toEqual([])
+  }),
+)
+
 it.live("scope · parsed managed skills use positive membership before and after the post tail", () =>
   Effect.gen(function* () {
     env({})
@@ -1552,4 +1617,61 @@ itWithPermission.live("D3/I-10 installing the user's own plugin asks once in eve
   expect(automation.asks).toEqual([])
   expect(Exit.isFailure(automation.exit)).toBe(true)
   expect(JSON.stringify(automation.exit)).toContain("Permission denied: codepuppy_hub_create")
+}))
+
+it.effect("shell uses only its Location's document projection and removes inherited host keys", () => Effect.gen(function* () {
+  env({})
+  yield* activate(CodePuppyExt)
+  const location = yield* Location.Service
+  const hooks = yield* PluginHooks.Service
+  const event = { command: "python -I script.py", cwd: location.directory, timeout: 1000, shell: "/bin/sh", env: { CODEPUPPY_DOCUMENT_HOST: "/old/host.json" } as Record<string, string | undefined> }
+  yield* hooks.trigger("shell", "create.before", event)
+  expect(event.env.CODEPUPPY_DOCUMENT_HOST).toBeUndefined()
+  const clear = publishDocumentPythonEnvironment(location, { CODEPUPPY_DOCUMENT_HOST: "/current/host.json" })
+  yield* hooks.trigger("shell", "create.before", event).pipe(Effect.ensuring(Effect.sync(clear)))
+  expect(event.env.CODEPUPPY_DOCUMENT_HOST).toBe("/current/host.json")
+}))
+
+it.live("document ready admission uses the real promise plugin Session API and exact queued synthetic retry", () =>
+  Effect.gen(function* () {
+    const sessions = yield* Sessions.Service
+    let listener!: Parameters<DocumentHost["subscribeReady"]>[1]
+    let location!: Plugin.Context["location"]
+    yield* activate({
+      id: "test.document-admission",
+      setup: async (context) => {
+        location = context.location
+        subscribeDocumentChecks(context, { subscribeReady: (_location, receive) => { listener = receive; return () => {} } } as DocumentHost)
+      },
+    })
+    const session = yield* sessions.create({ location })
+    const notificationID = SessionMessage.ID.create()
+    const path = join(location.directory, "report.docx")
+    const check: DeferredDocumentCheck = { id: "check-admission", location, sessionID: session.id, notificationID, request: { kind: "docx", path }, sourceSha256: "a".repeat(64), artifact: { checkId: "check-admission", kind: "docx", sourcePath: path, artifactPath: path, sourceSha256: "a".repeat(64), artifactSha256: "a".repeat(64) }, revision: 0, state: "admitting" }
+    expect(yield* Effect.promise(() => listener(check))).toEqual({ status: "admitted", checkId: check.id, notificationID })
+    expect(yield* Effect.promise(() => listener(check))).toEqual({ status: "admitted", checkId: check.id, notificationID })
+    yield* sessions.remove(session.id)
+    expect(yield* Effect.promise(() => listener({ ...check, notificationID: SessionMessage.ID.create() }))).toEqual({ status: "session-missing", checkId: check.id })
+  }),
+)
+
+
+it.live("an unavailable document projection cannot invalidate a successfully merged MCP ownership", () => Effect.gen(function* () {
+  const token = join(scratch, "document-unavailable-token")
+  writeFileSync(token, "fixture-token")
+  handOver(token, "fixture-token")
+  const resources = realpathSync(join(import.meta.dir, "../../ui-mac/resources"))
+  env({}, { killSwitch: true, officeMcpManifest: join(resources, "office-mcp/tools.json"), cloudMcp: testCloudMcp("https://cloud.example/mcp", token, "cloud") })
+  const location = yield* Location.Service
+  mkdirSync(join(location.directory, ".codepuppy"), { recursive: true })
+  const command = codepuppyOfficeInstallCommand("word").map((value) => value.replaceAll("{codepuppyResources}", resources).replaceAll("{workspace}", location.directory))
+  writeFileSync(join(location.directory, ".codepuppy/codepuppy.jsonc"), JSON.stringify({ mcp: { "codepuppy-word": { type: "local", command } } }))
+  decide(location.directory, true)
+  const mcp = recordingMcp({ cloud: { type: "remote", url: "http://127.0.0.1:1/withheld", disabled: true } })
+  yield* registered("cloud_web_search")
+  yield* activate(CodePuppyExt, { mcp })
+  const governed = yield* before("cloud_web_search")
+  expect(Exit.isFailure(governed)).toBe(true)
+  expect(JSON.stringify(governed)).not.toContain("by name")
+  expect(mcp.servers.get("codepuppy-word")).toMatchObject({ type: "local", command })
 }))

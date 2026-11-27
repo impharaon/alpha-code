@@ -203,6 +203,11 @@ beforeAll(async () => {
     baseRoot: environmentFromMutableRoot(root)!.casBaseRoot,
     homeDir: sandbox.home,
   })
+  // main creates the default workspace before every fork (server.ts, the fence planner's `defaultWorkspace`). Managed MCP
+  // convergence addresses that directory; without it the engine holds a Location it cannot rebuild, and a location reload
+  // in that window fails (503 "Directory not found") with no later event to retry it.
+  const { ensureUserWorkspaceDir } = await import("./codepuppy-user-workspace")
+  expect(ensureUserWorkspaceDir()).not.toBeNull()
   const { injectCodePuppyConfig } = await import("./codepuppy-config-injection")
   const { publishInProcessEngine } = await import("./in-process-engine")
   publishInProcessEngine((request) => {

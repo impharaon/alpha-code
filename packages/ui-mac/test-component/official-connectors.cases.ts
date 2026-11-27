@@ -8,7 +8,6 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
-  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -54,19 +53,8 @@ const { initCodePuppyEnvironment, getCodePuppyEnvironment, __resetCodePuppyEnvir
   "../src/main/codepuppy-environment"
 )
 const { officialNodeCommand, DBHUB_READONLY_TOML } = await import("../src/main/official-connector-recipes")
-const { planProcessFence } = await import("../src/main/process-fence-plan")
-const { trialCompileProfile } = await import("../src/main/process-fence-compile")
-const { useGenerationFence } = await import("../src/main/shell-env")
 // Production projects a local connector only after an engine generation was planned; its Node check runs under that profile.
-function installGenerationFence(base: string) {
-  if (process.platform !== "darwin") return
-  const fenceHome = join(base, "fence-home"), state = join(base, "fence-state"), userData = join(base, "fence-userData"), project = join(base, "fence-project")
-  for (const dir of [fenceHome, state, userData, project]) mkdirSync(dir, { recursive: true })
-  const plan = planProcessFence({ userDataPath: userData, sidecarEnv: { HOME: fenceHome },
-    addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../out/main"), exists: existsSync }, egressProxyPort: 4443, carriedWorkspaces: [], engineConfigDirectory: join(fenceHome, ".config/opencode"), homebrewFence: [], credentialStores: [],
-  }, { homeDir: () => fenceHome, codepuppyGlobalRoot: () => join(state, "env/dev"), appStateRoot: () => state, realpath: realpathSync.native, defaultWorkspace: () => project, readWorkspaces: () => [], isDirectory: (p) => statSync(p).isDirectory(), mkdirp: (p) => void mkdirSync(p, { recursive: true }), compile: trialCompileProfile, log: () => {} })
-  useGenerationFence({ profile: plan.profile, roots: { ...plan.roots, engineConfigDirectory: join(fenceHome, ".config/opencode") }, env: { HOME: fenceHome, PATH: "/usr/bin:/bin" } })
-}
+const { installGenerationFence } = await import("./generation-fence")
 const {
   releaseOfficialConnectorResources,
   restoreCommittedOfficialConnectors,

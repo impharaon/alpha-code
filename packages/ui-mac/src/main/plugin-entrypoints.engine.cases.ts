@@ -153,6 +153,10 @@ beforeAll(async () => {
   const { initCodePuppyEnvironment, environmentFromMutableRoot } = await import("./codepuppy-environment")
   delete process.env.CODEPUPPY_GLOBAL_DIR
   initCodePuppyEnvironment({ isPackaged: false, channel: "dev", appDataDir: sandbox.root, baseRoot: environmentFromMutableRoot(root)!.casBaseRoot, homeDir: sandbox.home })
+  // main creates the default workspace before every fork (server.ts, the fence planner's `defaultWorkspace`); its managed MCP
+  // convergence (ext-ipc) addresses that directory, and a location reload cannot rebuild a Location whose directory is missing.
+  const { ensureUserWorkspaceDir } = await import("./codepuppy-user-workspace")
+  expect(ensureUserWorkspaceDir()).not.toBeNull()
   const { publishInProcessEngine } = await import("./in-process-engine")
   publishInProcessEngine(request => running!.fetch(request))
   const { registerExtIpcHandlers } = await import("./ext-ipc")

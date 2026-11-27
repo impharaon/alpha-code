@@ -176,6 +176,8 @@ type SpawnLocalServerOptions = {
   codepuppySidecar?: CodePuppySidecarHost
   /** #1760: the effective catalog the pre-spawn dependency read resolves installed declarations against (ext-ipc's resolver). */
   connectorCatalog?: () => Promise<{ entries: readonly CatalogEntry[]; version: string }>
+  /** R8: rewrite an explicit connector cwd through its existing writer; `location` means the chosen folder is the reconnect Location. */
+  connectorWorkspace?: (server: string, folder: string) => import("./connector-workspace-binding").ConnectorWorkspaceBinding
   /**
    * DESIGN-stored-credentials-fence §4.2:引擎拉取凭据表超时(`credentials.unavailable`)或主进程读不出表时,请求既有的 `credential-change` 重启
    * (index.ts 接到 requestSidecarRespawn:既有队列与自愈阶梯,有界)。
@@ -973,13 +975,17 @@ export async function spawnLocalServer(
     diagnostic: (identity) => connectorMain?.diagnostic(identity) ?? Promise.resolve({ ok: false, error: "unavailable" }),
     // R6: the approval authority keeps no refusal memory (#1757 v3), so a restarted attempt asks again through the same card.
     openNetworkApproval: (identity) => reconnect(identity.server, identity.directory),
-    // R8: the system folder picker; the declaration's {workspace} follows the chosen Location (engine projection), cancel keeps the fact.
+    // R8: the system folder picker; an explicit cwd is rewritten by its existing writer and the reload restarts
+    // the connector, otherwise {workspace} follows the chosen Location (engine projection). Cancel keeps the fact.
     chooseWorkspace: async (identity) => {
       const focused = electronNs.BrowserWindow.getFocusedWindow()
       const dialogOptions: Electron.OpenDialogOptions = { properties: ["openDirectory", "createDirectory"], defaultPath: identity.directory }
       const picked = await (focused ? electronNs.dialog.showOpenDialog(focused, dialogOptions) : electronNs.dialog.showOpenDialog(dialogOptions))
       const directory = picked.canceled ? undefined : picked.filePaths[0]
-      return directory ? reconnect(identity.server, directory) : { ok: false, error: "cancelled" }
+      if (!directory) return { ok: false, error: "cancelled" }
+      const bound = options.connectorWorkspace?.(identity.server, directory) ?? { kind: "location" }
+      if (bound.kind === "failed") return { ok: false, error: "unavailable", detail: bound.detail }
+      return bound.kind === "cwd" ? { ok: true } : reconnect(identity.server, directory)
     },
   })
   const uninstallLaunches = installConnectorLaunchState(launches)

@@ -77,6 +77,7 @@ import { buildGatedWriteChannels, buildJournalAdminChannels, GATED_WRITE_CHANNEL
 // REQ-234 `#1529`:三档状态的唯一权威 + 重载请求方/记录方 + parentPort `codepuppy.*` 分发(基线 §2.2 / §2.5 / §2.6)。
 import { createCodePuppySidecarHost, createHubRequestStages, createHubViewService, type CodePuppySidecarHost } from "./hub-view"
 import { createReloadCoordinator } from "./reload-coordinator"
+import { bindConnectorWorkspace } from "./connector-workspace-binding"
 import type { CatalogPackageViewV1 } from "../shared/catalog-package-view"
 import { isHubRequestId, parseReloadScope, type ReloadItem } from "./codepuppy-sidecar-messages"
 import { packageVersionFromRecordsV1 } from "./ext-package-lifecycle"
@@ -1562,6 +1563,8 @@ export function registerExtIpcHandlers(
   // #390:同时交出恢复-gate 包装的 global 技能安装器,供 ecosystem gate 走事务安装(不绕恢复准入)。
   // REQ-234 `#1529`:codepuppySidecar 交给 composition root —— spawnLocalServer 在 `child.on("message")` 旁挂它的 receive,
   // ready 时 attach;onViewChanged 接 `ext-hub-view-changed` 推送。
-  // #1760: the pre-spawn dependency read resolves installed declarations from this same effective catalog.
-  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1, resolveEffectiveCatalog }
+  // #1760: the pre-spawn dependency read resolves installed declarations from this same effective catalog;
+  // R8 rebinds an explicit connector cwd through the existing writer and this coordinator's reload.
+  const connectorWorkspace = (server: string, folder: string) => bindConnectorWorkspace({ server, folder }, reloads.request)
+  return { ledgerReady, ecosystemGlobalSkillInstaller, codepuppySidecar, pluginSources, installFromSource, resolvePackageDeclarationsV1, resolveEffectiveCatalog, connectorWorkspace }
 }

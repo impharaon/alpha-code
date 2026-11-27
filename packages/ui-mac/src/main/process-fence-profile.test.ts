@@ -100,6 +100,8 @@ describe("package manager locations", () => {
   })
 
   test("homebrew installation nodes stay protected while ordinary global bins remain writable", () => {
+    // A fresh clone has no node_modules/.cache until some other test makes one (net-failure-real-stack.test.ts does the same).
+    mkdirSync(join(import.meta.dir, "../../node_modules/.cache"), { recursive: true })
     const root = realpathSync(mkdtempSync(join(import.meta.dir, "../../node_modules/.cache/homebrew-identity-")))
     try {
       // Filesystem-only markers at the launcher/Library paths from frozen H1's real Homebrew layout.

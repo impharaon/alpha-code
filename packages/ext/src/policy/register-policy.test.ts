@@ -129,6 +129,10 @@ const setup = (options: Setup = {}) =>
         return { content: `${name} ran` }
       },
     })
+    // The MCP layer registers its transform from a forked fiber when the location builds; plugin modules load after it.
+    // Inline test plugins activate fast enough to overtake that fiber under load, so wait for it: registry order follows
+    // registration order, and the E2 forgery premises need the servers' tools visible to later plugins' transforms.
+    yield* (yield* McpTool.Service).flush
     yield* plugins.activate([
       // OpenCode internal plugins activate before configured ones: builtin tools and the configured MCP servers.
       promisePlugin("builtins", async (ctx: any) => {

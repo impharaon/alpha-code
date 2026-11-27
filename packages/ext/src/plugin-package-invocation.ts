@@ -5,7 +5,9 @@ import type { Plugin } from "@opencode/plugin"
 import type { AgentEditor } from "@opencode/plugin/promise/agent"
 import type { Info, ToolContext } from "@opencode/plugin/promise/tool"
 import type { PackageHookRuntime } from "./plugin-package-hooks"
-import { SessionMessage } from "../../schema/src/session-message"
+// Package specifier, as document-render.ts: a runtime relative import pulls schema/src/tool.ts in as a second module, whose
+// Tool.Error is not the engine's, and the unattended denial metadata is lost (#1812 root cause).
+import { SessionMessage } from "@opencode/schema/session-message"
 import type { PolicyRegistration } from "./policy/index"
 import { renderPackageInstruction } from "@opencode/plugin/codepuppy-package-runtime"
 import { pluginInstructionDefinition } from "../../ui-mac/src/shared/host-extension-package-contract/plugin-conversion.mjs"

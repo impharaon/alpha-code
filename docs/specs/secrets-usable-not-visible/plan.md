@@ -884,3 +884,14 @@ b 的依据是 design §4.1 的明确接口变更：classifyPermissionRequest �
 - 绿：ext 逐文件 secret-values 6、secret-read 5、secret-diff 2、secret-mutations 12、secret-mask 11、secret-files 10、register-policy 100；Schema 8；ui-mac gate-file-registry 25；场景 `gate slot -- … -t 'protected files ordinary env values stay visible'` 1 pass / 49 filtered。均 exit 0。
 - 移除臂（临时改写后 `git restore` 回到已暂存的修正）：`urlPasswords` 恒为空 → 上述四个文件的具名例各红（1+1+3+1 FAIL）；写回不认内嵌占位符 → secret-mutations 三条全红。第一次还原时修正尚未暂存，`git restore` 连带撤回了 `secret-values.ts` 的修正；已按原文重做、暂存后重跑全部改动文件，结果同上，之后的臂都还原到暂存版本。
 - 静态：schema、ext、ui-mac `bun typecheck` 均 exit 0；8 个改动 TS 的 oxlint 0 warnings / 0 errors。
+
+### ⑥ 审查 R1 修正（FIX-THEN-MERGE）
+
+- 依据：独立审查 R1（Claude Opus 5.5）7 项，编排器全部接受；规格 v5 BR-06 补「值里以 `Password=`、`?password=` 这类键写出的密码同样只遮这一段」，其余不变。设计同步另由编排器派单。
+- 红例 `099c3ec893`（当前实现上全红）：Schema `public values preserve credential names` 加 PGPASSWORD/APIKEY/SECRETKEY/ACCESSTOKEN/oauth/Pwd（第 3 项）；secret-values 同名例改为表例，逐行在旧实现上取得：多主机 []、`BOTH` 只得 p1、空密码形状 []、`%9A` 抛 URIError、ADO/ODBC/查询参数 []（第 1、5、6 项）；secret-read 多主机、两地址、`Password=` 段、`?password=`（第 1、6 项）；secret-mutations 写回循环加改主机 write/edit/patch（第 2 项）与 `longer embedded views keep later occurrence positions` edit/patch（第 4 项）。旧实现逐行输出 `/tmp/secrets-r1-rows-before.log`。
+- 修 `fc825e9e6d`：逐处提取 `scheme://用户:密码@`（授权段止于 `/ ? #` 或空白，用户信息到最后一个 `@`），形状匹配而无密码时整值遮；凭据名键的 key=value 段只遮其值；解码失败保留书写形；名字片段以凭据词结尾即算凭据名，词表加 `PWD`（审查所列 `Pwd` 需要）；写回按位置换回每个遮盖符；`position()` 按实际替换长度计偏移。夹具重采 `c41cc44272`（Schema 改动使引擎身份失效，CLI 路径 21 行不变）。
+- 第 7 项（核实，非缺陷）：`packages/ext` 下临时用例经真实 Code Mode 执行 `tools.read(<另一项目 .env>)`，输出 `{"readInDirect":true,"readInCodeMode":false,"success":true,"containsValue":false,"containsPort":false,"excerpt":"caught: Error: Unknown tool 'read'."}`（`/tmp/secrets-r1-codemode-probe.log`）。内置 read、grep、glob 均 `codemode: false`（`packages/core/src/tool/plugin/read.ts:47` 等），子调用读不到文件；临时用例已删，不入测试集。
+- 绿：Schema 8；ext secret-values 6、secret-read 5、secret-mutations 17、secret-diff 2、secret-mask 11、secret-files 10、risk 23、register-policy 100；经 slot 的 fixture-identity、old-name-scan、14 个夹具消费者与 PermissionDialog、permission-risk、RiskTag 共 275。均 exit 0。
+- 移除臂（临时改写，`git restore` 回到已暂存的修正）：只取第一个地址 → secret-values `BOTH` 行、secret-read 各红；整段 `URL.parse` 门 → `MONGO_URL` 行、secret-read 各红（首次按逗号截断的臂不忠实、未变红，已改为整段解析后重做）；不加保护的解码 → URIError 红；跳过键值段 → `CONN` 行、secret-read 各红；精确词匹配 → Schema `PGPASSWORD` 红；仅相等时还原 → 改主机三例红；旧偏移公式 → 长视图两例红。日志 `/tmp/secrets-r1-arm-*.log`。
+- 静态：schema、ext、ui-mac `bun typecheck` 均 exit 0；7 个改动 TS 的 oxlint 0 warnings / 0 errors。
+- 偏离：Schema 词表加 `PWD`、名字片段以凭据词结尾即算——均为审查裁定所需，冻结设计 §4.1 的词表正文随设计同步更新。

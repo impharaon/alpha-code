@@ -935,6 +935,52 @@ AC-01..03 的测量 runner 不在本轮落代码：它要驱动已组合好的�
 
 AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口下载的 LO、以及 Windows（AC-15）仍 pending。
 
+### AC-01..03 实测
+
+- 依据：[spec v1](spec.md) @ `31cd182e09` AC-01..03 与「待决」（owner U-12「授权」：默认模型 W/P/X 各 3 次，上限 50 元）；本节「现状」算出的剩余授权 ≤3590 分；调度方本轮上限 3000 分。Issue #1761。基线 origin/alpha `aedea8af9f`（含 #1830）。
+- 核对：本节提交时未经调度方核对；runner 的宿主形状待调度方定（见下「宿主」），定之前不写 runner、不花钱。
+
+#### 调用链核对（2026-11-27）
+
+- 文档宿主在 Electron main，不在 sidecar：ext 在 sidecar 里只登记工具并发布一个经 parentPort 的桥（`packages/ext/src/plugin.ts:597-615`，`document-register.ts:63-71`）；宿主由 main 的 `spawnLocalServer` 组装（`packages/ui-mac/src/main/server.ts:1047-1064` → `document-generation.ts`），`OfficeExcel.recalculate` 读的 `CODEPUPPY_DOCUMENT_HOST` 投影也由它写（`resources/office-excel/codepuppy_office/recalculate.py:23-57`）。CLI/测试宿主没有 parentPort（`packages/ext/src/hub-bridge.ts:447-450`），只起 sidecar/引擎进程走不到制作、渲染、自查和重算。
+- 产品没有无窗口的 main：`index.ts:1566` 无条件建主窗口，`windows.ts:271-273` 在 ready-to-show 时 `show()`。
+- 长期测试账号是 service-only 的 API key（alpha-platform `docs/runbooks/production-test-account.md`），产品登录用不了它：`applyAuthEnv` 对每个凭据做 `requireTokenPurpose`（`codepuppy-auth.ts:388-395`，`packages/codepuppy-contracts-consumer/src/decode.ts:172-181`），开发短路 `DEV_PLATFORM_TOKEN` 同样要 purpose JWT。所以即使 owner 离开时开窗，真实 dev 应用也不能用这把 key 跑平台默认模型。
+
+#### 宿主（推荐做法，待调度方确认）
+
+runner 本身是一个不开窗口的 Electron main 进程：用 `packages/ui-mac/node_modules/electron` 的 Electron.app 在证据目录里的副本（Info.plist 加 `LSUIElement`，不进 Dock 和菜单栏；结束后 `lsregister -u`），不建 BrowserWindow，不注册 `codepuppy://`。它按 `index.ts` 的顺序调用产品自己的启动函数中与这条链有关的部分（环境快照、入口地址、shell 环境、出厂技能 reconcile、模型目录刷新与钉住、悬挂引用清扫），在 fork 之前把测试 key 读进本进程，写进 `CODEPUPPY_API_KEY`、`CODEPUPPY_MCP_TOKEN`，地址取香港入口；然后调用产品的 `spawnLocalServer`，也就是真的 utilityProcess sidecar、进程围栏与出网代理、`openDocumentGeneration`、启动器的 Node 和固定文件入口。会话经引擎 HTTP 接口创建，发送任务文本，等到空闲；权限询问按「本次允许」作答并逐条记录。userData、HOME、XDG、工作区都放在本次证据目录下。
+
+不改产品代码，也不自己组装 DocumentHost。但有两处和真实应用不同，需要调度方判断它们是否仍算「已组合的产品引擎」：一是 `index.ts` 的启动只重放其中一部分，DB 预检、扩展台账、桌面 IPC 这些与本链无关的步骤不跑；二是 key 不经 auth 模块，直接进入凭据文件通道。
+
+#### 改动（按推荐做法）
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/scripts/document-quality-run.ts`（新增） | 上述无窗口宿主与驱动：余额前后读数（account summary，进程内读 key）、累计上限、单次运行、成品取回、调用评分；参数为任务（W/P/X）与运行编号 |
+| `packages/ui-mac/scripts/document-quality/`（新增） | pilot 的 `tasks.json`（sha256 前缀 `eaec636d31188410`）、`score_docx.py`（`3cab3058aefbcd7f`）、`score_pptx.py`（`66911f1d0bed30f0`）、`check_xlsx.py`（`440e2da69b84d1a2`）与任务素材 `content.json`（`0d8d4e1a02d7106a`）、`chart.png`（`92dc0a8d9c4ef656`）、`img_market.png`（`882990d996eaf4c6`）、`img_ui.png`（`8a1415cf0eb3fcb1`）、`sales.json`（`72e180cafd6b8139`）；出处写在目录的 `SOURCES.md`。入库时的改动：去掉写死的本机路径；`check_xlsx.py` 不再自己起 LO，改为评已由 `OfficeExcel.recalculate` 重算过的副本，并按任务的 12 项要求给出逐项结论（pilot 只输出事实，没有 12 项判定）；`score_pptx.py` 第 10 项「风格统一」由脚本判母版与字体一致，另附页图供人工复核 |
+| `docs/specs/document-output-quality/plan.md` | 本节与实测记录 |
+
+#### 顺序
+
+1. 构建 dev 前置（`gate slot -- bun ./scripts/prebuild.ts` 中文档链用到的各步与 `electron-vite build`），宿主与评分脚本入库，类型检查用临时 tsconfig 跑 tsgo（`scripts/` 不在包的 tsconfig 里）。
+2. 不花钱的空跑：网关地址指一个不可达地址，runner 必须在第一次模型调用前报错退出（非零）；余额读不到时同样不启动。
+3. 付费样本 W1：前后读余额，算出单次费用，按九次推算总额；超过 3000 分就带着数字返回，不继续。
+4. 其余八次逐次跑，每次开跑前检查「累计 + 已见单次最大值 ≤ 3000 分」，不满足就停；运行中按余额轮询，累计到 3000 分时中止会话。记录成品路径、逐项评分、Excel 重算后的公式错误数与汇总比对、每次费用和余额。
+
+#### 风险
+
+- 工作量与时长：宿主的启动子集需要逐步调通（围栏、代理、目录、出厂技能），预计 3–6 小时；LibreOffice 首次从 GitHub v0.2.8 下载约 300 MB，走产品的原始来源回退；pilot 单次 19–61 分钟，九次顺序跑约 3–9 小时。合计约 7–15 小时，超过本轮预计 2–4 小时的两倍。
+- 费用：pilot 单次 92–247 分，九次约 1400 分，在 3000 分以内；产品链多了渲染与自查，以 W1 样本为准。
+- 读图自查走云端识图并按张计费，费用都计入同一账号；该账号另有其它生产检查，读数可能混入与本次无关的变化，按时间窗口如实记录。
+
+#### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-01 | 3 次 W 的成品经 `score_docx.py` 逐项核对（页数取自产品 LO 渲染） | 一次性付费实测，记命令与输出 | 现有写入工具作为对照臂只有 4 项（pilot 记录），达不到每次 ≥9 项 |
+| AC-02 | 3 次 P 的成品经 `score_pptx.py` 逐项核对 | 同上 | 对照臂 4 项 |
+| AC-03 | 3 次 X 的成品先经产品 `OfficeExcel.recalculate` 重算，再经 `check_xlsx.py` 判 12 项、公式错误数和汇总与 `sales.json` 独立结果的比对 | 同上 | 对照臂 12 项里只做到 4 项；重算没执行时公式单元格没有值，比对失败 |
+
 ### 偏离记录
 
 2026-11-27 · 计划外两处：没有为脚本新增套件测试（它需要真实 LibreOffice，按 test-layers 记为一次性证据）；`scripts/` 不在 ui-mac 的 tsconfig 里，新驱动另用临时配置单独做了类型检查（tsgo exit 0）。

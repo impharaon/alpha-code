@@ -324,7 +324,7 @@ test("one published rule reaches all rule consumers", () => {
 
 test("published credential fields exclude ordinary values", () => {
   const fields = ProtectedFiles.CredentialFields
-  expect(fields.env.assignments).toBe("all")
+  expect(fields.env.names).toBe("credential")
   expect(fields["credential-document"].names).toBe("credential")
   expect(fields["private-key"].raw).toBe("private-key")
   expect(fields["encrypted-store"].raw).toBe("bytes")

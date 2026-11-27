@@ -11,7 +11,7 @@ import path from "node:path"
 import { Schema } from "effect"
 import type { ToolFacts } from "./policy/identity"
 import { AUTOMATION_PROFILES, type UnattendedProfile } from "../../schema/src/codepuppy-unattended"
-import { credentialValues, envAssignments } from "./secret-values"
+import { credentialValues, envAssignments, envSecret } from "./secret-values"
 import { projectSecretRead } from "./secret-read"
 import { isUtf8 } from "node:buffer"
 import { fileURLToPath } from "node:url"
@@ -292,7 +292,7 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots) {
       try {
         await files.refresh()
         if (state?.failed) throw new Error("Hidden tool output")
-        if (state?.mutations?.some((snapshot) => [snapshot.before, snapshot.after].some((source) => source !== undefined && envAssignments(source).some((record) => !ProtectedFiles.isPublicValue(record) && record.rhs.split(/\r?\n/).some((part) => {
+        if (state?.mutations?.some((snapshot) => [snapshot.before, snapshot.after].some((source) => source !== undefined && envAssignments(source).some((record) => envSecret(record) && record.rhs.split(/\r?\n/).some((part) => {
           const fragment = part.replace(/^["'`]|["'`]$/g, "")
           return fragment.length > 0 && input.error.message.includes(fragment)
         }))))) throw new Error("Restored env excerpt in error")

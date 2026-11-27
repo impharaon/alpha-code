@@ -29,9 +29,9 @@ async function setup() {
 }
 const contains = (files: ReturnType<typeof createSecretFiles>, value: string) =>
   files.values().some((bytes) => Buffer.from(bytes).equals(Buffer.from(value)))
-// Grammar taken from Node's official dotenv fixture; test substitution changes only its RHS.
+// Grammar taken from Node's official dotenv fixture; the key gains a credential word (spec v5 BR-06), the RHS is generated.
 const env = async (value: string) =>
-  (await Bun.file(fixture("node-env.txt")).text()).split("\n")[0].replace(/=.*/, `=${value}`) + "\n"
+  (await Bun.file(fixture("node-env.txt")).text()).split("\n")[0].replace(/=.*/, `_TOKEN=${value}`) + "\n"
 
 test("cache identity includes every stat axis", () => {
   const original = { dev: 1n, ino: 2n, size: 3n, mtimeNs: 4n, ctimeNs: 5n }

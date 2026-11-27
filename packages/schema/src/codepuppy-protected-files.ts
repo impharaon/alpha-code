@@ -80,7 +80,8 @@ const GCP_FIELDS = [
 
 // Selectors are release data, not parsers. * selects one object/array member; ** selects any depth, including zero.
 export const CredentialFields = {
-  env: { assignments: "all" },
+  // Spec v5 BR-06: env-style files take the same credential-name rule as structured credential documents.
+  env: { names: "credential" },
   "credential-document": { names: "credential" },
   "private-key": { raw: "private-key" },
   "encrypted-store": { raw: "bytes" },

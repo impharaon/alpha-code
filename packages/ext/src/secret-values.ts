@@ -30,6 +30,11 @@ export function envAssignments(text: string) {
   )
 }
 
+/** `CredentialFields.env` selects credential names, as for structured credential documents (spec v5 BR-06). */
+export function envSecret(record: { name: string }) {
+  return ProtectedFiles.isCredentialName(record.name)
+}
+
 /** Collect only published credential fields; callers own IO and failure handling. */
 export function credentialValues(file: ProtectedFiles.ProtectedFile, bytes: Uint8Array): Uint8Array[] {
   const selection = ProtectedFiles.CredentialFields[file.profile]
@@ -45,7 +50,7 @@ export function credentialValues(file: ProtectedFiles.ProtectedFile, bytes: Uint
     ].filter((value) => value.length > 0)
   }
   const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
-  if (file.profile === "env") return envAssignments(text).flatMap((item) => secretScalar(item.name, item.value))
+  if (file.profile === "env") return envAssignments(text).flatMap((item) => (envSecret(item) ? secretScalar(item.name, item.value) : []))
   if (file.format === "json") return documentValues(file.profile, JSON.parse(text))
   if (file.format === "credential-url")
     return text
@@ -72,8 +77,7 @@ export function credentialValues(file: ProtectedFiles.ProtectedFile, bytes: Uint
   }
   if (file.profile === "kube" || file.profile === "credential-document")
     return documentValues(file.profile, staticDocument(text))
-  if (!("assignments" in selection) || typeof selection.assignments === "string")
-    throw new Error("Invalid protected profile")
+  if (!("assignments" in selection)) throw new Error("Invalid protected profile")
   const values: Uint8Array[] = []
   const lines = text.split(/\r?\n/)
   for (let index = 0; index < lines.length; index++) {

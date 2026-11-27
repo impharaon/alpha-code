@@ -962,3 +962,13 @@ Schema 的 `codepuppy-protected-files.test.ts` 不在任何 `.gate-tests` 根下
 - 第 2 项 `fbcb8e47fa`：secret-files 已登记分支（read 与命令登记共用）在 stat/采集前先过同一 `literalTarget`，软链逐级按字面算出的目标离开所有来源即跳过；不是软链的项目外名单文件照常采集。红：既有 secret-files「links whose literal target leaves every source are not followed, also through several hops」加入经 `resolveProtectedFile` 登记的项目 `.env.link`（指向来源外）与另一项目真实 `.env`，修正前 0/1（`.env.link` 被 stat 两次、readFile 一次，链外值被采集；真实文件已采集）；修正后 12/12。日志 `/tmp/secrets-i54-r1-2-*.log`。
 - 相关检查：ext register-policy、secret-mask/values/read/mutations/diff/stream/spool/files、risk 共 194；ui-mac gate-file-registry + permission-risk 30；场景（`gate slot -- … -t 'protected files (outside project read shell and card|ordinary env values stay visible|shell model records and card)'`）3 pass / 47 filtered / 0 fail。均 exit 0。AC-13 没有场景行，其证据为 register-policy 表例四行。schema、ext、ui-mac `bun typecheck` exit 0；改动 TS 的 oxlint 0/0；`affected-tests --list`：`affected tests: 124 of 752 test files`。
 - 设计待同步（交编排器）：§4.1 `named` 的路径词说明补「以及按 POSIX shell 规则还原的整词（去引号、还原反斜杠转义、相邻段相接）」；§4.3 已登记来源补「同样经 SPEC5-04 的逐级字面软链边界，目标离开所有来源的软链不采集」；§10 SPEC5-04 依据里「经软链的 shell 打印同属 INT-safety I-54 已登记的边界」在 v6 后仍成立（命令经指向来源外的软链打印时不遮），可写成规格 v6 限制表的一句，需编排器定是否回流。
+
+### ⑦ 编排器裁决：命令里写出的软链
+
+- 依据：编排器 2026-11-27 裁决（属 I-54 已批准范围）：命令字面写出的路径是软链时，按同一 `literalTarget` 逐级求字面目标，最终目标是名单文件就登记并读出，否则跳过；项目扫描的 SPEC5-04 不变；规格 v6 限制表软链行改为收窄后的事实，设计 §4.3 由本车道补句。
+- 实现 `5b2200ca31`：Schema 把 `named` 的候选提为 `ProtectedFiles.literalPaths`（`named`、`probe` 结果不变，对照仍 83/84）；secret-files 新增 `trackLink`；`SecretMask.command` 改为异步，对每个字面路径调用它。
+- 偏离（交编排器）：逐级查找只读采集来源之内、或本身是名单文件的那一跳。原因：stored-credentials-fence 生产臂（`packages/ui-mac/src/main/stored-credentials-fence.engine.scenario.test.ts:87`）要求引擎进程在凭据存放点上零拒绝，而攻击脚本在第二档运行前，工作区已经有指向存放点的 `link-auth`；不加限制时，登记会对存放点 readlink 一次，判据就红了。加了限制以后，指向来源之外普通位置的软链一跳也不碰。代价是：经来源之外、且不是名单文件的中间链接，才指到名单文件的软链链条不登记；已写进规格限制表。
+- 红：register-policy AC-13 表例「project link to the file」修正前 0/1，值出现在实时输出。另一项目放在主目录之外：在主目录下时，现有扫描已经顺着软链采集（主目录是 `.netrc` 等规则的来源根），那一行在旧实现上本来就通过。绿：表例 5/5。
+- 拒绝上限：secret-files 链接例加三条经 `trackLink` 的登记，并审计来源外的 readlink。指向来源外 store 的软链零触碰；读不了的名单目标（父目录 chmod 0）在两次 refresh 中总共恰好 readlink 一次、不登记；来源外真实 `.env` 采集到。移除臂：`trackLink` 不做事 → 该例与 register-policy 软链行都红；逐跳不限制 → 该例红（readlink 到 `outside/store.json`）。日志 `/tmp/secrets-i54-link-*.log`。
+- 相关检查：ext register-policy（106）、secret-*、risk、plugin-host、no-shell-layer 共 253，Schema 8；场景（`gate slot`，AC-11、AC-12、AC-02 shell 行）3 pass / 47 filtered / 0 fail；schema/ext/ui-mac `bun typecheck` 均 exit 0；改动 TS 的 oxlint 0/0；文档链接 17 条可解析；`affected-tests --list`：`affected tests: 124 of 752 test files`。stored-credentials-fence 场景是夜间层的重例，本轮未跑；零拒绝的论证见上面的偏离与审计例。
+- 文档：规格 v6 限制表软链行（`2a15ee14a6` 所加）改为收窄后的事实；设计 §4.3 在 SPEC5-04 句旁补登记软链的规则，§4.1 声明加 `literalPaths` 一行（同一同步所需的公开签名）。

@@ -1,7 +1,7 @@
 import { expect, spyOn, test } from "bun:test"
 import { createNetworkEgressActivity } from "./network-egress-activity"
 import { createNetworkEgressApproval } from "./network-egress-approval"
-import type { EgressApproval, NetworkActivity, NetworkOutbound, RememberedSite, SessionRef } from "../shared/network-egress-wire"
+import type { EgressApproval, EgressChange, NetworkActivity, NetworkOutbound, RememberedSite, SessionRef } from "../shared/network-egress-wire"
 
 test("通放只取非空完整的全 allow 快照，等待窗口恢复后无用户点击也能继续", async () => {
   const f = await approvalFixture()
@@ -166,13 +166,13 @@ test("连接过期保留晚到允许，但新连接使用新请求，不重用�
   } finally { f.service.close() }
 })
 
-test("空集合在原窗口等待后加入活动，换代失效，不为私网发卡", async () => {
+test("空集合在原窗口等待时拉取方成为观看者，之后加入活动，换代失效，不为私网发卡", async () => {
   const f = await approvalFixture({ timeoutMs: 20 })
   try {
     await f.setActivities([])
     const first = f.service.request("empty.example.com", 443)
-    expect(await f.cards()).toEqual([])
-    expect(await first).toBe("approval-unavailable")
+    expect((await f.cards()).map((card) => [card.destination.host, card.recipients])).toEqual([["empty.example.com", []]])
+    expect(await first).toBe("approval-timeout")
     const next = f.service.request("pending.example.com", 443)
     await f.setActivities(["ses_a"])
     expect((await f.cards()).some((card) => card.destination.host === "pending.example.com")).toBe(true)
@@ -221,6 +221,64 @@ test("已决结果读取一次后退休，重复点击仍取原回执，后续�
     expect((await f.cards()).map((item) => item.destination.host)).toEqual(["b.example.com"])
     f.service.close()
     await next
+  } finally { f.service.close() }
+})
+
+test("没有对话运行工具时投给正在拉取的会话：切到 B 是同一请求，B 决定后 A 不能再选，观看者不收说明", async () => {
+  const f = await approvalFixture()
+  try {
+    await f.setActivities([])
+    const waiting = f.service.request("connector.example.com", 443)
+    const [a] = await f.cards("ses_a")
+    expect(a).toMatchObject({ destination: { host: "connector.example.com", port: 443 }, state: "pending", recipients: [] })
+    expect((await f.cards("ses_b")).map((card) => card.requestID)).toEqual([a!.requestID])
+    expect((await f.cards("ses_a")).map((card) => card.requestID)).toEqual([a!.requestID])
+    expect(await f.service.api.decide({ requestID: a!.requestID, decision: "deny" })).toMatchObject({ ok: true, value: { decision: "deny" } })
+    expect(await waiting).toBe("user-denied")
+    expect((await f.cards("ses_a")).filter((card) => card.state !== "resolved")).toEqual([])
+    expect(await f.service.api.decide({ requestID: a!.requestID, decision: "allow-session" })).toEqual({ ok: false, code: "not-found" })
+    expect(f.service.authorized("connector.example.com", 443)).toBe(false)
+    expect(f.messages.filter((message) => message.type === "codepuppy.network.notice")).toEqual([])
+  } finally { f.service.close() }
+})
+
+test("到期：没人看过的请求为 approval-unavailable 且不留下；看过后离开的为 approval-timeout，卡片留在原对话，晚到允许放行下一次连接", async () => {
+  const f = await approvalFixture({ timeoutMs: 20 })
+  try {
+    await f.setActivities([])
+    expect(await f.service.request("unseen.example.com", 443)).toBe("approval-unavailable")
+    // Revoking a site retires every unanswered request it still holds; an expired request nobody saw is not held.
+    const held: EgressChange["kind"][] = []
+    const stop = f.service.api.subscribe((change) => { held.push(change.kind) })
+    await f.service.api.revoke({ site: { kind: "domain", value: "example.com" } })
+    stop()
+    expect(held).toEqual(["settings"])
+    const seen = f.service.request("seen.example.com", 443)
+    const [card] = await f.cards("ses_a")
+    expect(await seen).toBe("approval-timeout")
+    expect(await f.cards("ses_b")).toEqual([])
+    expect((await f.cards("ses_a")).map((item) => [item.requestID, item.state])).toEqual([[card!.requestID, "connection-expired"]])
+    expect(await f.service.api.decide({ requestID: card!.requestID, decision: "allow-session" })).toMatchObject({ ok: true })
+    expect(await f.service.request("seen.example.com", 443)).toBe("granted")
+    expect(f.messages.filter((message) => message.type === "codepuppy.network.notice")).toEqual([])
+  } finally { f.service.close() }
+})
+
+test("有收件人时不投给观看者；观看后出现收件人仍是同一张卡，此后不再接纳新观看者", async () => {
+  const f = await approvalFixture()
+  try {
+    const running = f.service.request("running.example.com", 443)
+    expect(await f.cards("ses_b")).toEqual([])
+    expect((await f.cards("ses_a")).map((card) => card.destination.host)).toEqual(["running.example.com"])
+    await f.setActivities([])
+    const idle = f.service.request("idle.example.com", 443)
+    const [viewed] = await f.cards("ses_b")
+    expect(viewed).toMatchObject({ destination: { host: "idle.example.com" }, recipients: [] })
+    await f.setActivities(["ses_c"])
+    expect(await f.cards("ses_b")).toMatchObject([{ requestID: viewed!.requestID, recipients: [f.session("ses_c")] }])
+    expect(await f.cards("ses_d")).toEqual([])
+    f.service.close()
+    await Promise.all([running, idle])
   } finally { f.service.close() }
 })
 

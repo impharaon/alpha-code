@@ -4,13 +4,13 @@ title: 连接器启动器与失败处理 技术设计
 summary: 统一连接器启动器与固定文件准备；v2 接纳两平台文档 Node 读取及受管第一方 MCP 的运行期按 ID 准备，核验声明身份与逐调用进度归属。
 kind: tech-design
 status: frozen
-version: "2.2"
+version: "2.3"
 spec: SPEC-connector-launchers
 spec_version: 1
 review:
   rounds: 0
   reviewed_sha: ""
-  verdict: "not-required; v2.2 reuses v2.1 host-only command-slot expansion per orchestrator r6"
+  verdict: "not-required; v2.3 records #1760 orchestrator rulings only; v2.2 reuses v2.1 host-only command-slot expansion per orchestrator r6"
   v2_1: # 基线原字段归档；最终独立 R1 裁决保留于 v2.1 §10
     rounds: 0
     reviewed_sha: ""
@@ -24,7 +24,7 @@ review:
     reviewed_sha: ceeee7d4df
     verdict: "fix-then-merge; R1 5 Major 2 Minor accepted and corrected"
 owners: [owner]
-last_reviewed: 2026-11-26
+last_reviewed: 2026-11-27
 ---
 
 # DESIGN-connector-launchers｜连接器启动器与失败处理 技术设计
@@ -140,7 +140,7 @@ type LauncherEnvironment = {
 | `npm_config_prefer_offline`、`npm_config_ignore_scripts`、`npm_config_update_notifier` | `"true"`、`"true"`、`"false"` | npm-exec 准备、已准备入口及派生进程；语义继承已读的 [npm exec 文档](https://docs.npmjs.com/cli/v11/commands/npm-exec/) |
 | `TMPDIR`、`TMP`、`TEMP` | `<runtimeRoot>/tmp` | 两类运行器准备及派生进程 |
 | `XDG_CACHE_HOME`、`XDG_DATA_HOME` | `<runtimeRoot>/cache`、`<runtimeRoot>/data` | 仅两类运行器准备及派生进程；XDG_CONFIG_HOME 不覆盖，用户 uv.toml 的读取位置保留 |
-| `PATH` | 平台 delimiter：已准备包 bin → 随包 uv/Node bin → 钉住 Python bin → 连接器声明 PATH → 宿主继承 PATH（含原 rg 后备），按出现顺序去重 | 仅两类运行器；准备阶段尚无包 bin 时省略该项 |
+| `PATH` | 平台 delimiter：已准备包 bin → 随包 uv/Node bin → 钉住 Python bin → 连接器声明 PATH → 宿主继承 PATH（含原 rg 后备），按出现顺序去重 | 仅两类运行器；准备阶段尚无包 bin 时省略该项；Mac 的 `uv python install` 一步在开发者工具缺席时只用随包工具目录，见 §4.4 第 1 项（v2.3 V23-R1） |
 | 出网代理变量 | 既有策略代理目的地与协议，附 §4.5 的 attempt 归属标记 | 仍连同一代理，不改放行判定 |
 
 合并顺序固定为：宿主继承环境（已取得 #1759 R1 默认）→ 连接器当前声明的环境/业务密钥 → **仅两类运行器**的启动器专用覆盖及上述 PATH 合并 → **#1759 R2 在最终真实 spawn 再投影同一 R1.env 的缓存键**。R2 不动 PATH、代理、registry 或凭据；启动器层也不覆写它拥有的位置键。npm 按 §4.4 的显式 `--prefix` 安装，不设另一份 npm_config_prefix。shell/PTY/LSP 的通用位置由 #1759 接线，本文不扩其作用域。
@@ -175,7 +175,7 @@ declare function prepareConnectorLaunch(input: {
 
 这里的 `Effect`、`Environment`、`Scope` 为仓内既有导出命名空间，执行需求由调用位置已有服务提供；没有新增 HTTP API 或用户 MCP 配置键。现有 `ConfigMCP` 仍是唯一配置 schema。
 
-1. **Python**：main 取得 §4.2 的本平台 Python entry；build date 取 originUrl 的 release tag，文件名取 URL 最后一个路径段恰好 percent-decode 一次，得到磁盘上的字面 `+`，不保留 `%2B`、不做 form 解码。把已验文件放到 `<本地镜像根>/<build-date>/<解码后文件名>`（同文件可硬链接或复制）。sidecar 依共享契约的 build 参数，用随包 `uv python install 3.12.16 --no-bin --mirror <file镜像>` 安装；uv 内建下载元数据必须与应用 pin 的版本、构建、文件和摘要相符。uv 再次验其内建摘要，不允许转向其它在线镜像。之后以 uv 的持久 tool 环境准备当前声明：`uvx` 与 `uv tool run` 等价；隐式 `tool@version`、显式 `--from`、extras、`--with`、源与解析选项转换为同一需求，`uv tool install` 放在该 launch key 的 `UV_TOOL_DIR` 下。保存它给出的真实 bin 路径；服务参数原样交服务，准备不调用服务、不发送 MCP 消息。解释包名/命令名和选项的适配是本次明确新增能力，不能只支持目录里的名字；不能把解析不了的合法声明归成「不支持第三方」。
+1. **Python**：main 取得 §4.2 的本平台 Python entry；build date 取 originUrl 的 release tag，文件名取 URL 最后一个路径段恰好 percent-decode 一次，得到磁盘上的字面 `+`，不保留 `%2B`、不做 form 解码。把已验文件放到 `<本地镜像根>/<build-date>/<解码后文件名>`（同文件可硬链接或复制）。sidecar 依共享契约的 build 参数，用随包 `uv python install 3.12.16 --no-bin --mirror <file镜像>` 安装；uv 内建下载元数据必须与应用 pin 的版本、构建、文件和摘要相符。uv 再次验其内建摘要，不允许转向其它在线镜像。**仅此一步（Mac，v2.3 V23-R1）**先运行真实二进制 `/usr/bin/xcode-select -p` 并核对其打印的目录存在：开发者工具在 → 用上表正常 PATH，uv 照常做 install-name 修补；缺席 → 该步 PATH 只含随包工具目录（不含 `/usr/bin`、`/Library/Developer`），uv 找不到 `install_name_tool`，系统 xcrun shim 永不执行，uv 记警告后继续。不放 stub/no-op 脚本，无新增用户步骤；其余阶段仍用正常 PATH，Windows 不做此探测。之后以 uv 的持久 tool 环境准备当前声明：`uvx` 与 `uv tool run` 等价；隐式 `tool@version`、显式 `--from`、extras、`--with`、源与解析选项转换为同一需求，`uv tool install` 放在该 launch key 的 `UV_TOOL_DIR` 下。保存它给出的真实 bin 路径；服务参数原样交服务，准备不调用服务、不发送 MCP 消息。解释包名/命令名和选项的适配是本次明确新增能力，不能只支持目录里的名字；不能把解析不了的合法声明归成「不支持第三方」。
 2. **Node**：用官方 npx / npm exec 规则归一包 spec、重复 `--package` 与服务 argv/原有 `--call`，解析仍在随包 node 进程消费 npm 的 `npm-package-arg`、`@npmcli/config` 与 `get-bin-from-manifest`。准备改为官方 `npm install --prefix <runtimeRoot>/prepared/<key> --ignore-scripts --prefer-offline <归一的包 specs>`，完整保留解析相关选项；缓存仍是 #1759 R1 的 npm_config_cache，不为该 key 重定向缓存。安装完成后从该 prefix 的真实 package manifests 用 `get-bin-from-manifest` 选择默认 bin，或按原声明的显式 bin 选择，得到其中的绝对入口；不靠 npm exec 的共享 `_npx/<hash>` 树作为本票持久入口。服务 argv 每次重新绑定，原有 `--call` 使用已有平台 shell 语义；准备只安装/选入口，不启动服务。包入口、node_modules 和 lock 均留在 prefix，JS 入口用随包 node 执行，不以 Bun 替代 npm。
 3. **持久就绪**：结果与收据位于 `<userData>/connector-runtime/prepared/<key>/`。key = SHA-256(平台、启动器/运行时 pin、规范化包需求/解析选项、**仅影响包解析的非秘密配置内容指纹**)。指纹从实际生效的 registry/source、约束/依赖文件与解析配置中提取内容并规范化；过滤认证字段、URL 凭据/签名信息，不 hash 整份环境或配置文件。**cwd、项目目录、Location/Session/连接器实例 ID、服务参数中展开的工作区路径、密钥值/引用/版本号及任何密钥派生 hash 均不进 key**；它们在每次执行从当前定义绑定。若解析读取项目中的配置/源文件，只纳入影响解析的非秘密内容，不用该文件的项目绝对路径作盐。收据只存 schema 版本、上述指纹、真实包版本、绝对入口/所需 bin 与成功事实，不写业务环境或秘密；环境与入口存在才发布 ready。同一解析内容换项目、轮换密钥或更新其引用仍命中同一准备结果，执行时用当前 cwd/参数/密钥。
 4. **再启动**：命中有效收据后直接执行准备好的包入口，带同一份受控环境，完全跳过 npm/uv 的 registry 检查、latest 解析、Python 下载和后台更新。启动器的 prefer-offline 只是首次准备优化；AC-10 依赖的是这条无包解析路径。没有自动到期、TTL、启动时刷新或清缓存行为。只有包需求/解析内容改变或所需文件缺失才重新准备；cwd、服务参数、密钥变化只重新绑定执行输入，不迁移旧记录、不要求用户操作。
@@ -725,7 +725,7 @@ expandFirstPartyCommand 将首项的保留槽替换为 `launchers.node`，resour
 
 ### 4.2 身份、尚未 ready 与实际启动
 
-v2 R1 的 type、command、environment 键和值、cwd 精确核验继续成立；不匹配仍是普通服务器，不清掉额外配置后冒认首方。main 在 entryFor 重验时从自己的同代 launchers 调用同一声明者；core 不能把自报 node/path 塞入 binding 来替换它。codeSha256 仍验证 resources 内的服务代码/依赖；Node 自身的 pin、签名与可执行完整性由唯一 launcher authority 的 resolveAssets 核验，不在每个服务清单复制 Node 摘要或要求 Node 位于 codeSha256 的 resources 树内。声明摘要仍散列原始模板（含槽），不加入展开绝对路径或 ready 状态；recipe 摘要规则不变。
+v2 R1 的 type、command、environment 键和值、cwd 精确核验继续成立；不匹配仍是普通服务器，不清掉额外配置后冒认首方。main 在 entryFor 重验时从自己的同代 launchers 调用同一声明者；core 不能把自报 node/path 塞入 binding 来替换它。codeSha256 仍验证 resources 内的服务代码/依赖；Node 自身的 pin、签名与可执行完整性由唯一 launcher authority 的 resolveAssets 核验，不在每个服务清单复制 Node 摘要或要求 Node 位于 codeSha256 的 resources 树内。声明摘要仍散列原始模板（含槽），不加入展开绝对路径或 ready 状态；recipe 摘要规则不变。策略记录所存的 `mcpBindingDigest` 同样对声明的 command 计算，宿主专用槽 `{codepuppyNode}`、`{codepuppyCacheRoot}` 保持未展开，开机重锚 Node 后已保存的 enabled 不变为 ask/binding-changed；展开结果仍由可信首方 Node 身份与精确身份匹配核验，声明的其它变化照常改变摘要并重新询问（v2.3 V23-R2）。
 
 bootstrap 的 node 是主进程按包内清单推导的确定绝对路径，归档尚未展开时也可供逐字比较，**不能以 exists/realpath 失败抹掉首方声明**。受保护服务代码、显式配置和摘要核验成功就保留 declaredFirstParty/首方 authority；其文件 handler 仍遵守 v2 的真实 tools/list 与活跃调用关联值约束，不因 Node 未就绪提前下载模型。
 
@@ -856,3 +856,26 @@ K1/K2 不变；未新增包、下载器、包管理器、运行上下文 RPC 或
 **作者回执**：Codex / GPT-6；依据为本轮输入、v2.1 已审槽机制、W3/拒写行与可失败的规则探针。没有待 owner 决策。真实 MCP 进程取得参数、跨升级重用、Mac 内核围栏下写入和 Windows 产物尚未验证，留作实施集成证据；不能把规则覆盖探针当作这些断言已通过。
 
 **本轮验证回执**：v1/v2/v2.1 正文逐字保留（版本适用说明除外），历史审查字段和 v2.2 frozen/not-required 核对通过。ui-mac 的 `bun test src/main/old-name-scan.test.ts` exit 0（10 pass / 0 fail，2347 assertions），`git diff --check` exit 0；官方文档检查函数对本文 0 finding，仓级另有 69 errors / 253 warnings，均在本轮未改范围，未顺修。按指令仅改 design.md，未改索引、实现或消费者产物。
+
+# v2.3 增量｜#1760 实施期编排裁决
+
+继承 v2.2 冻结契约及其以前全部收据（本轮文档基线 `88c88edcee`）。本增量只把 #1760 实施中已作出的两项编排器裁决（Claude Opus 5.5，2026-11-27，r4/r6 派发）写入 §10，并最小同步 v1 §4.3 PATH 行、v1 §4.4 第 1 项与 v2.1 §4.2 的对应句子；不改 AC、平台、L1、缓存或其它接缝，§5/§6/§8/§9 不变。
+
+## 10. v2.3 裁决与接收回执
+
+| 接收回执 | 决定 | 依据 / 状态 |
+| --- | --- | --- |
+| **MANAGED-PYTHON-XCODE-v2.3（V23-R1）** | **裁决** #1760 r3 的 managed Python SEAM-CHANGE-NEEDED：仅 Mac 的 `uv python install` 一步先探 `/usr/bin/xcode-select -p` 并核对打印目录存在；工具在 → 正常 PATH；缺席 → 该步只用随包工具目录的 PATH，系统 xcrun shim 永不执行，uv 警告后继续 | 车道证据：uv 对 install-name 修补失败只记警告，钉住的 Python 3.12.16 仍可运行；系统 `/usr/bin/install_name_tool` 与 `/usr/bin/git` 同为含 `__xcrun_shim` 的 118880 B shim（#1760 plan.md:324-328）。v1 §4.3 PATH 行、§4.4 第 1 项同步。**frozen**；review 为 not-required |
+| **FIRST-PARTY-BINDING-v2.3（V23-R2）** | **裁决** #1760 r5 的 Node 重锚 / 已保存批准 SEAM-CHANGE-NEEDED：`mcpBindingDigest` 对声明的 command 计算，宿主专用槽 `{codepuppyNode}`、`{codepuppyCacheRoot}` 原样不展开，已保存批准跨开机重锚保留；展开结果仍由可信首方 Node 身份（v2.1）与精确身份匹配核验；声明的其它变化仍重新询问 | 否则每次应用更新都把已保存的 enabled 变为 ask/binding-changed，是规格没有的用户步骤。车道证据：用户记录存的是 `mcpBindingDigest`（`ext/src/policy/identity.ts:174`），其证据含原样 command/cwd（`resolver.ts:40-45`），digest 不等即回 ask（`resolver.ts:139`）；真实磁盘探针 before=enabled、after=ask/binding-changed（#1760 plan.md:480-482）。v2.1 §4.2 同步。**frozen**；review 为 not-required |
+
+**裁决理由**：V23-R1 只让缺工具的机器不碰系统 shim，有工具时行为不变，不加 stub、开关或用户步骤；V23-R2 只稳定宿主自己展开、自己核验的两个槽在策略摘要中的表示，安全边界仍是 v2.1 的可信 Node 身份与 v2 R1 的精确身份核验，不放宽匹配、不迁移已存记录。这两项均为闭合已批准能力的落地缺口，不是新的产品选择。
+
+**否决的替代**：V23-R1 不用放在 PATH 前部的 no-op `install_name_tool` 冒充修补，不在安装时执行 xcrun shim 试探（可能弹出安装对话框），也不假设 uv 有未核实的禁用开关（`uv python install --help` 只有 no-bin/no-registry/mirror）。V23-R2 不放宽首方 Node 精确匹配，不对已保存记录做迁移/重写，也不接受每次更新重新询问。
+
+**残余（留档，不变成门槛）**：开发者工具缺席时钉住的 Python 不做 install-name 修补，只影响针对该解释器构建原生扩展；基于 wheel 的连接器不受影响。V23-R2 的「声明的其它变化重新询问」覆盖进入该去密摘要的 command/args/cwd；environment 本就不进 `mcpBindingEvidence`（`resolver.ts:38-45`），其变化由首方精确身份核验使条目按普通服务器运行，而非经摘要重新询问——这是现有代码观察，不是本次新决定。
+
+**传播核对**：`rg -n 'mcpBindingDigest|install_name_tool|xcode-select' docs/specs` 在 `88c88edcee` 上仅命中本设计 :255/:425（git 前检的同一 xcode-select 谓词及其 R1 处置，与 V23-R1 一致）；`docs/specs/video-understanding/plan.md` 与 `docs/specs/document-output-quality/design.md` 均 0 hits；补查 `rg -n 'mcpBindingDigest|codepuppyNode'` 仅命中视频 plan :689（「已持久条目重锚」断言待 #1760 集成后核实），V23-R2 正是该断言的落点，消费者的 `{codepuppyNode}`/`{codepuppyCacheRoot}` 槽形状不变，无须修改。v2.1 §10 末尾「实施时确认没有按它持久化的状态因此失效」的注意事项由 V23-R2 闭合，原文作历史收据保留。
+
+**作者回执**：Claude Opus 5.5（designer 车道）；依据为编排器 r4/r6 派发原文与 #1760 plan.md 的车道证据。本次只记录已作裁决，无新设计决定，无待 owner 决策。实际缺工具 Mac 上的运行、真实 `uv python install` 在受限 PATH 下产出可用 3.12.16、重锚后 enabled 保持及改参仍重问，均由 #1760 实施的红先行用例证明，本文不冒称已通过。
+
+**本轮验证回执**：v1/v2/v2.1/v2.2 正文只改上述三处句子，其余逐字保留；`python3 scripts/check-doc-links.py docs/specs/connector-launchers/design.md` exit 0（3 个相对链接），`git diff --check` exit 0；文档检查函数（仅 alpha-code profile，`--changed-since origin/alpha`）对本文 0 finding，删去 kind 的负例被检出，仓级另有 56 errors / 251 warnings，均在本轮未改范围，未顺修。按指令仅改 design.md，未改索引、实现或消费者产物。

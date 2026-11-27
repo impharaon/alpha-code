@@ -5,11 +5,11 @@
 // 与已装发行包的 METADATA(按随包解释器求值 marker)逐项比对,不一致即拒绝出产物。判据函数 lockClosureProblems
 // 是构建脚本安装前跑的同一个函数。先证明它能红:从真 lock 里删掉一个传递依赖、或塞进一个闭包外的包,它都点名。
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { homedir } from "node:os"
-import { OFFICE_RUNTIME_DOWNLOAD_CACHE, OFFICE_RUNTIME_LOCK_DIR, lockClosureProblems, parseRequirementsLock, readOfficeRuntimeLock } from "../../scripts/build-office-runtime"
+import { homedir, tmpdir } from "node:os"
+import { OFFICE_RUNTIME_DOWNLOAD_CACHE, OFFICE_RUNTIME_LOCK_DIR, holdingOfficeRuntimeBuild, lockClosureProblems, parseRequirementsLock, readOfficeRuntimeLock } from "../../scripts/build-office-runtime"
 
 const read = (name: string) => readFileSync(join(OFFICE_RUNTIME_LOCK_DIR, name), "utf8")
 const requirementsIn = read("requirements.in")
@@ -76,5 +76,47 @@ describe("document runtime locks", () => {
     // 下载缓存本机所有 worktree 共用,不在任何一个 checkout 里(新 worktree 不必再经代理下载一遍)。
     expect(OFFICE_RUNTIME_DOWNLOAD_CACHE).toBe(join(homedir(), "Library", "Caches", "codepuppy", "office-runtime"))
     expect(OFFICE_RUNTIME_DOWNLOAD_CACHE.startsWith(join(OFFICE_RUNTIME_LOCK_DIR, "..", ".."))).toBe(false)
+  })
+})
+
+// The PR gate runs the files that build this runtime in parallel workers; two builders of one target share
+// `<dir>.staging`, and without exclusion the second deletes the first one's tree mid-pip or mid-compileall.
+describe("office runtime build exclusion", () => {
+  const holder = `
+    import { appendFileSync } from "node:fs"
+    import { holdingOfficeRuntimeBuild } from ${JSON.stringify(join(import.meta.dir, "../../scripts/build-office-runtime.ts"))}
+    const [dir, log, name] = process.argv.slice(-3)
+    holdingOfficeRuntimeBuild(dir, () => {
+      appendFileSync(log, "enter " + name + "\\n")
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400)
+      appendFileSync(log, "exit " + name + "\\n")
+    })`
+
+  test("two builder processes of one target never mutate it at the same time", async () => {
+    const root = mkdtempSync(join(tmpdir(), "office-runtime-exclusion-"))
+    try {
+      const log = join(root, "log")
+      const builders = ["a", "b"].map((name) => Bun.spawn([process.execPath, "-e", holder, join(root, "arm64"), log, name], { stderr: "pipe" }))
+      expect(await Promise.all(builders.map((builder) => builder.exited))).toEqual([0, 0])
+      const lines = readFileSync(log, "utf8").trim().split("\n")
+      expect(lines.map((line) => line.split(" ")[0])).toEqual(["enter", "exit", "enter", "exit"])
+      expect(lines[0]!.split(" ")[1]).toBe(lines[1]!.split(" ")[1])
+      expect(existsSync(join(root, "arm64.lock"))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("a lock left by a builder that no longer runs is taken over", async () => {
+    const root = mkdtempSync(join(tmpdir(), "office-runtime-exclusion-"))
+    try {
+      const gone = Bun.spawn(["true"])
+      await gone.exited
+      writeFileSync(join(root, "arm64.lock"), String(gone.pid))
+      expect(holdingOfficeRuntimeBuild(join(root, "arm64"), () => readFileSync(join(root, "arm64.lock"), "utf8"))).toBe(String(process.pid))
+      expect(existsSync(join(root, "arm64.lock"))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

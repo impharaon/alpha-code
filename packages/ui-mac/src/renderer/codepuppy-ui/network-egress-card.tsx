@@ -54,9 +54,10 @@ export function NetworkEgressCard(props: { request: EgressApproval; api: Network
     <header class="a-permission-panel-header"><strong class="a-permission-panel-title">{t("codepuppy.network.title")}</strong><RiskTag level="unknown" /></header>
     <div class="a-permission-panel-body">
       <div class="a-permission-resources"><code>{props.request.destination.host}:{props.request.destination.port}</code></div>
-      <p>{t("codepuppy.network.unknown")}</p>
+      {/* No recipients: no conversation was running tools, so main showed it to the viewed conversation (design §4.9). */}
+      <p>{t(props.request.recipients.length ? "codepuppy.network.unknown" : "codepuppy.network.viewed")}</p>
       <p>{t(props.request.site.kind === "domain" ? "codepuppy.network.scope" : "codepuppy.network.hostScope", { site: props.request.site.value })}</p>
-      <Show when={props.request.state === "connection-expired"}><p role="status">{t("codepuppy.network.expired")}</p></Show>
+      <Show when={props.request.state === "connection-expired"}><p role="status">{t(props.request.recipients.length ? "codepuppy.network.expired" : "codepuppy.network.viewedExpired")}</p></Show>
       <Show when={failed()}><p role="alert">{t("codepuppy.network.decideFailed")}</p></Show>
     </div>
     <Show when={props.request.state !== "resolved"}>

@@ -942,3 +942,23 @@ r13 执行：新 worktree 无随包 native/runtime 目录，原声明生成器�
 ### 偏离记录
 
 2026-11-27 · 时长实施提交：改动表之外的必要同链文件——`src/main/connector-launch-generation.ts` 只把清单 `formats` 的类型放宽到含 `recipe`（同一读取，launcher authority 已持有）；`resources/office-mcp/tools.json` 因 `assets.ts` 提取两个导出改变 `server.js` 字节，只用原生成器 `renderOfficeMcpTools` 的结果同步 `video-mcp/server.js` 摘要，两项原生摘要保持安装包 producer 的值（本机重建字节不同，见上节）；新增夹具 `src/main/fixtures/video/speech-en.ffprobe.json` 是 pinned ffprobe 9.1 对同目录 `speech-en.wav` 的真实输出，来源记入同目录 `provenance.json`。
+
+2026-11-27 · 收据提交：旧名扫描发现上述捕获的 `format.filename` 带本机绝对路径；只把该字段换成夹具相对名，其余字节为原输出，provenance 写明此处理并更新摘要。未改扫描规则或登记表。
+
+### 实跑证据（一次性，未加入套件）
+
+装配：空的临时 userData 与组件缓存；本 worktree 的 dev 构建产物（`native/connector-launchers/build/mac-arm64`、`dist-video/`、`bun scripts/build-video-runtime.ts darwin-arm64` 产出的 `native/video-runtime/build/mac-arm64`）按安装包同形合并到临时资源根，清单由原生成器 `renderOfficeMcpTools` 按本机字节生成。生产 `McpConnection` + `connectorLocalLaunch` + `declaredFirstPartyTools`，sidecar 端 `createConnectorLaunchSidecarHost`（如 `sidecar.ts` 一样 `publishConnectorLaunchHost`）经 structuredClone 与 main 端 `createPinnedFileMainBridge`/`createConnectorLaunchMainBridge` 互通，main 端为真实 `createLauncherAssetAuthority` 与 `pinnedFileAuthority`（真实网络下载）。preparation report 与 `tool/mcp.ts` 绑定的回调同位；卡片行用 `toolStepLineOf` 投影同一 metadata（display 快照按已核验随包服务的形状给出，ext 身份链未在此运行）。HOME/XDG 指向临时目录，未启动 Electron 窗口。命令（`packages/ui-mac`）：`gate slot -- bun <临时 harness> <tool-first|duration-first> <info|transcript>`，日志 `/tmp/video-1775-dur/run-*.log`。
+
+| 运行 | 观察 |
+| --- | --- |
+| 首次调用 `info`（冷） | 首方声明成立；同一次调用内 88 条 preparation（download 85 条至 22089752/22089752 B → unpack → verify → ready，sequence 递增），随后原调用返回 `durationMs:10140`，3.8 s。卡片行依次为「正在准备视频组件 0 B / 22089752 B」…「11499328 B / 22089752 B」…最后回到「读取媒体信息」。之后 main 时长入口 21 ms 得 10140，未再下载 |
+| 先附件后调用（冷） | main 时长入口 3.4 s 内经同一 launcher 配方下载并展开 ffmpeg 得 10140；随后 `info` 78 ms，仅 5 条 preparation（无字节下载），同一已准备根（单个 `ready.json`） |
+| 首次调用 `transcript`（冷） | 同一次调用内 2419 条 preparation，六个固定文件全部下载/展开/核验（ffmpeg 22089752、SenseVoice 163002883、Whisper tiny LID 116204861、pyannote 6958444、3D-Speaker 39593762、Silero 643854 B，共 348493556 B），286 s 后原调用返回英文逐字稿两段（含毫秒时间与 speaker-1），未超出原调用执行预算、未重发 |
+
+第一次装配未发布 host 时，core handler 回 `connector launch host was not published before engine startup`，视频服务把它归为 processing_failed；这是 harness 漏了 `sidecar.ts:217` 的发布，不是产品缺陷。
+
+### 删除对照与相关检查
+
+各臂只改一处生产行为，跑具名 case 后 `git restore`：去掉 composer 回写 → `codepuppy-composer-model.cases.ts -t "media duration fills"` exit 1（`toContain` 红）；时长入口不查登记改查当前文件 → `composer-media-attachment.test.ts -t "duration comes from"` exit 1（未登记路径得 10140）；main 方法改用另一配方摘要 → `connector-launchers.test.ts -t "main prepares a bundled recipe entry"` exit 1（根路径不同）。
+
+相关集（`packages/ui-mac`，`--max-concurrency 2`）：composer-media-attachment、connector-launchers、connector-launch-generation、codepuppy-sidecar-wiring、office-mcp-tools-snapshot、video-assets(.fast)、video-service、video-tools、video-runtime-artifacts、video-source、ipc-channel-binding-census、ext-security-boundaries、codepuppy-bootstrap-build、cloud-artifact-guard.fast、codepuppy-video-cloud、codepuppy-video-call、old-name-scan、tool-card-model、composer-attachments-core、shared/media-attachment 共 21 文件 → 202 pass / 1 fail（old-name-scan，见上条偏离；修正后与 media 测试合跑 13 pass）。`codepuppy-composer-model.cases.ts -t "media attachments in the production composer"` 4 pass；ext `src/policy/identity.test.ts` 26 pass；core `test/codepuppy-local-launch.test.ts test/codepuppy-mcp-runtime.test.ts -t "pinned|managed|bundled|declar|first-party"` 15 pass。ui-mac `bun typecheck`、core `bun run typecheck` exit 0；`scripts/north-star-guard.sh` zero upstream package edits；`affected-tests --list`：`affected tests: 308 of 772 test files`。

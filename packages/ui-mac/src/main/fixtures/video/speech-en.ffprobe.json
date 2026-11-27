@@ -43,7 +43,7 @@
         }
     ],
     "format": {
-        "filename": "/Users/pharaon/app/wt/alpha-code-feat-1775-attachment-duration-readiness/packages/ui-mac/src/main/fixtures/video/speech-en.wav",
+        "filename": "speech-en.wav",
         "nb_streams": 1,
         "nb_programs": 0,
         "nb_stream_groups": 0,

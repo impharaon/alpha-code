@@ -1,5 +1,7 @@
 import { verifyVideoCall } from "./codepuppy-video-call"
 import { videoCacheRoot } from "./codepuppy-video-environment"
+import { checkConnectorRuntimeDependencies } from "./connector-runtime-dependencies"
+import { connectorPackageRunner } from "@opencode/util/codepuppy-command-head"
 import { engineClient } from "./engine-client"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { projectExecutableRows } from "./codepuppy-ext-trust"
@@ -13,7 +15,6 @@ import { removeOfficialConnector, releaseOfficialConnectorResources } from "./of
 
 import { listAdvisoryBlockedFacts, makeAdvisoryGate } from "./ext-advisory-gate"
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from "electron"
-import { execFile } from "node:child_process"
 import * as fs from "node:fs"
 import { homedir } from "node:os"
 import * as path from "node:path"
@@ -101,20 +102,12 @@ import type { PackageAcceptedFactsV1 } from "./package-installability"
 import { evaluatePackageForHost, validateCatalogPackageShape } from "./package-installability"
 import { PROJECT_HIDDEN_DIR } from "../shared/project-hidden-dir"
 
-// REQ-076 T2(阻断②):原实现硬编码 `which` + `:` 拼接的 unix PATH,Windows 上恒报「未安装」
-// (MCP 安装预检全线误报)。改经 platform seam:posix = which + 补包管理器目录(原 mac 行为
-// 逐字保留,GUI 启动 PATH 不全);win32 = where + 原样 PATH(ADR-026)。
-function checkRuntime(tool: string): Promise<{ ok: boolean }> {
-  return new Promise((resolve) => {
-    if (!/^[a-zA-Z0-9._-]+$/.test(tool)) {
-      resolve({ ok: false })
-      return
-    }
-    const probe = toolProbe()
-    execFile(probe.cmd, [tool], { env: { ...process.env, PATH: probe.probePath } }, (err, stdout) => {
-      resolve({ ok: !err && Boolean(stdout && stdout.trim()) })
-    })
-  })
+// REQ-076 T2 的探测 PATH(posix 补包管理器目录,GUI 启动 PATH 不全;win32 原样)不变。#1760 R5(design F-02):判定改用启动前
+// 同一个谓词 —— 两类运行器的 uv/Node 由随包启动器提供,git 不再以 /usr/bin 下的开发者工具 shim 存在为可用,且从不执行被判定的程序。
+function checkRuntime(tool: unknown, command: unknown): Promise<{ ok: boolean }> {
+  if (typeof tool !== "string") return Promise.resolve({ ok: false })
+  const environment = Object.fromEntries(Object.entries({ ...process.env, PATH: toolProbe().probePath }).filter((entry): entry is [string, string] => entry[1] !== undefined))
+  return checkConnectorRuntimeDependencies({ runtimeDep: [tool], runner: Array.isArray(command) ? connectorPackageRunner(command) : undefined, environment }).then((facts) => ({ ok: facts.missing.length === 0 }))
 }
 
 const hiddenDirConflictsShown = new Set<string>()
@@ -209,7 +202,7 @@ export function registerExtIpcHandlers(
   ipcMain.handle("ext-config-health", () => configHealth())
   // `#1687`:云服务是否被 kill-switch 扣下 —— 只读最近一次注入写配置时的判决,不另算。
   ipcMain.handle("ext-cloud-withheld", () => isCloudMcpWithheld())
-  ipcMain.handle("ext-check-runtime", (_event: IpcMainInvokeEvent, tool: string) => checkRuntime(tool))
+  ipcMain.handle("ext-check-runtime", (_event: IpcMainInvokeEvent, tool: unknown, command?: unknown) => checkRuntime(tool, command))
   // #1564 AC3:四个第一方 Office 条目的准备检查读这条随包运行时事实,不读卡片 runtimeDep(uv)。
   ipcMain.handle("ext-office-runtime", () => officeRuntimeReadiness())
   // REQ-036:创建表单已移除(创建走技能:skill-creator/agent-creator 出厂注入),原

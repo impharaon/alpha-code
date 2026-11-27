@@ -903,3 +903,5 @@ r9远端红先：pinned UV真实 --show-settings（online/offline两份）和 pi
 ### 偏离记录
 
 2026-11-27 · Q2/Q3（本提交）：bootstrap 新增可选 `sidecarGeneration` 与 `documents`；构建器入参类型要求代号，但对类型检查范围外仍不传代号的 harness（`native/codepuppy-fence/test/packaged-main.ts` 属 #1759、`test-live` 包测）输出不含该键的文档，避免改 #1759 所属文件。`shared/document-resources.ts` 把不依赖 Node 的部分提为 `documentAssetResources`，`documentResources` 改为组合它，原返回形状不变；这是投影复用同一解析的必要同链改动（#1761 所属共享文件，原用例覆盖）。
+
+2026-11-27 · R5 谓词（本提交）：运行器判定 `connectorPackageRunner` 落在已有的 `util/codepuppy-command-head.ts`（其注释即「桌面检查与 Location 运行器选择的同一归一」），不放 core，main 预检与 core 共用。开发者工具 shim 按文件内容里的 `__xcrun_shim` 标记认定（r3 已核 `/usr/bin/git` 与 `install_name_tool` 同为该 shim），只读不执行；shim 仅在 `xcode-select -p` 给出存在的目录时可用并解析为该目录的 `usr/bin/<程序>`。PATH 上非 shim 的真实 git（如 Homebrew）不依赖开发者工具即算可用——按 §4.5「找不到可用真实 git 才记 missing」的目的理解，避免对已装 git 的用户误报「需要先安装 git」（新增限制）。运行器角色提供的程序既不算缺失也不列入 executables，其入口只归 resolveAssets。安装预检 IPC `ext-check-runtime` 增加可选 command 参数，两处渲染调用传条目声明的 command；未改 #1759 所属文件。

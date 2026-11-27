@@ -945,7 +945,7 @@ export function useExtensions(
     const tools = entry.installSpec?.kind === "mcp" ? entry.installSpec.runtimeDep : undefined
     if (!tools || tools.length === 0) return { ok: true }
     for (const tool of tools) {
-      const r = await extIpc.checkRuntime(tool)
+      const r = await extIpc.checkRuntime(tool, entry.installSpec?.kind === "mcp" ? entry.installSpec.command : undefined)
       if (!r.ok) return { ok: false, missing: tool }
     }
     return { ok: true }

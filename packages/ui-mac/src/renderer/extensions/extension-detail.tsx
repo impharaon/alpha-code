@@ -866,12 +866,12 @@ export function ExtensionDetail(props: {
     () => {
       const e = entry()
       const deps = runtimeDepList()
-      return e && deps.length ? { id: e.id, deps } : undefined
+      return e && deps.length ? { id: e.id, deps, command: mcpSpec(e)?.command } : undefined
     },
     async (src) => {
       const results: { dep: string; ok: boolean }[] = []
       for (const dep of src.deps) {
-        const r = await extIpc.checkRuntime(dep)
+        const r = await extIpc.checkRuntime(dep, src.command)
         results.push({ dep, ok: r.ok })
       }
       return results

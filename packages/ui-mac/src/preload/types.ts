@@ -810,6 +810,10 @@ export type ElectronAPI = {
    *  `attachments/<uuid>/<净化后的文件名>`;只在用户选择、拖入、粘贴时调用。`path` 相对隐藏目录根。 */
   attachments: {
     media: (file: File) => Promise<MediaAttachmentResult>
+    /** #1775: the registered media source's duration from the pinned ffprobe, or null while unknown; never gates sending.
+     *  `request` names the asking attachment; cancelling it ends that request's waits. */
+    mediaDuration: (request: string, path: string, bytes: number) => Promise<number | null>
+    cancelMediaDuration: (request: string) => void
     stage: (directory: string, name: string, reader: AttachmentReader, bytes: ArrayBuffer) => Promise<AttachmentStageResult>
   }
   /** REQ-098:App 环境快照(只读)。main 启动时解析后冻结;此 IPC 无参数、无对应写面 —— renderer

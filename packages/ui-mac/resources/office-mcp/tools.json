@@ -588,7 +588,7 @@
       "environment": {},
       "cwd": null,
       "codeSha256": {
-        "video-mcp/server.js": "26d107f3ae4c718052de378674347ebc6a4f2426698bccfd1608cd02dbf0aad8",
+        "video-mcp/server.js": "da69a6819932a96a76bbdf16c0c9bebd224947abbded6fb46d1b5324517f184c",
         "video-mcp/speech-worker.js": "26473728b39b2eefe761559460e6cf3fd942a03113a7455302709dde9153e86e",
         "video-mcp/runtime.json": "693d90cba5063be84c4265bc4e1c82e9e253aa3bb90f062760a90baebc7d787e",
         "video-mcp/build.lock.json": "1bf6f0f80560c0f99ff1def0241fef4cd0c76cba12ba43927fcb8b5654f3fa86",

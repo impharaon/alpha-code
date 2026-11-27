@@ -1447,3 +1447,39 @@ test("external write scope uses the actual rendered rules for files and keeps pr
     expect(await result.listener.readWriteScope({ access: "write", targets: [] })).toMatchObject({ revision: (before as { revision: number }).revision, targets: [] })
   } finally { await result.listener.stop() }
 })
+
+// SPEC child-process-write-fence v7 BR-11 (design v6 §4.2): the real directory is resolved with filesystem semantics, and a
+// directory R4 could never grant (HOME, the app state root) answers `ineligible`. Real directories outside every writable root
+// of the rendered profile (not under the tmp roots the profile writes).
+test("external write scope resolves the real directory on disk and marks folders R4 cannot grant as ineligible", async () => {
+  const { renderProcessFenceProfile } = await import("./process-fence-profile")
+  const { statSync, symlinkSync } = await import("node:fs")
+  const base = join(import.meta.dir, "../../node_modules/.cache")
+  mkdirSync(base, { recursive: true })
+  const root = realpathSync.native(mkdtempSync(join(base, "write-scope-real-")))
+  const [home, state, project, outside] = ["home", "state", "project", "outside"].map((name) => join(root, name)) as [string, string, string, string]
+  for (const directory of [home, state, project, join(outside, "sub")]) mkdirSync(directory, { recursive: true })
+  symlinkSync(join(outside, "sub"), join(project, "link"))
+  const profile = renderProcessFenceProfile({ roots: { home, configHome: join(home, ".config"), dataHome: join(home, ".local/share"), cacheHome: join(home, ".cache") }, workspaces: [project], userWritableLocations: [], userDataPath: join(root, "data"), stateHome: join(root, "state-home"), codepuppyGlobalRoot: join(root, "global"), egressProxyPort: 4443, configFence: [{ kind: "literal", path: join(project, "protected") }], homebrewFence: [], credentialStores: [] })
+  const eligibility = { homeDir: home, appStateRoot: state, configFenceRoots: () => [], realpath: realpathSync.native, isDirectory: (path: string) => statSync(path).isDirectory() }
+  creditDanglingSweepForSpawn()
+  const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: () => ({ ...fakePlanFence(), profile, eligibility }), fork: fakeFork })
+  try {
+    await result.health.wait
+    const targets = [join(project, "file"), join(outside, "file"), `${project}/link/../b.txt`, join(outside, "new", "file"), join(home, "file"), join(state, "file"), join(project, "protected")]
+    const reply = await result.listener.readWriteScope({ access: "write", targets: targets.map((absolute) => ({ absolute, directory: absolute.slice(0, absolute.lastIndexOf("/")) })) })
+    expect(reply).toMatchObject({ targets: [
+      { absolute: targets[0], outcome: "writable", realDirectory: project },
+      { absolute: targets[1], outcome: "needs-approval", realDirectory: outside },
+      // `link/..` is the link target's parent on disk, not the project: the folder to approve is `outside`.
+      { absolute: targets[2], outcome: "needs-approval", realDirectory: outside },
+      { absolute: targets[3], outcome: "needs-approval", realDirectory: join(outside, "new") },
+      { absolute: targets[4], outcome: "ineligible", realDirectory: home },
+      { absolute: targets[5], outcome: "ineligible", realDirectory: state },
+      { absolute: targets[6], outcome: "protected", realDirectory: project },
+    ] })
+  } finally {
+    await result.listener.stop()
+    rmSync(root, { recursive: true, force: true })
+  }
+})

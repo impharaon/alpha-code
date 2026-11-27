@@ -349,12 +349,12 @@ test("external write scope uses the existing parent port and has no registration
   const input = { access: "write" as const, targets: [{ absolute: "/outside/file", directory: "/outside" }] }
   const promise = bridge.readWriteScope(input)
   expect(parseCodePuppySidecarInbound(wire.sent[0])).toEqual({ type: "codepuppy.write-scope.request", id: 1, ...input })
-  wire.deliver(buildWriteScopeReply(1, { revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable" }] }))
-  expect(await promise).toEqual({ revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable" }] })
+  wire.deliver(buildWriteScopeReply(1, { revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable", realDirectory: "/outside" }] }))
+  expect(await promise).toEqual({ revision: 1, targets: [{ absolute: "/outside/file", outcome: "writable", realDirectory: "/outside" }] })
   // C-1: a fixed global/user-config target crosses the same R6 reply.
   const fixed = bridge.readWriteScope(input)
-  wire.deliver(buildWriteScopeReply(2, { revision: 1, targets: [{ absolute: "/outside/file", outcome: "fixed" }] }))
-  expect(await fixed).toEqual({ revision: 1, targets: [{ absolute: "/outside/file", outcome: "fixed" }] })
+  wire.deliver(buildWriteScopeReply(2, { revision: 1, targets: [{ absolute: "/outside/file", outcome: "fixed", realDirectory: "/outside" }] }))
+  expect(await fixed).toEqual({ revision: 1, targets: [{ absolute: "/outside/file", outcome: "fixed", realDirectory: "/outside" }] })
   expect(await createHubBridge(undefined, { log: () => {} }).readWriteScope(input)).toEqual({ error: "unavailable" })
 })
 import { bindDocumentRuntimeVerification } from "./document-runtime-bridge"

@@ -748,10 +748,10 @@ test("external write scope dispatch reads main's projection without any install 
   const queries: unknown[] = [], posted: unknown[] = []
   const host = createCodePuppySidecarHost({ installName: () => undefined, packageAuthorization: async () => ({ ok: false, reason: "not installed" }), view: w.service, requests: createHubRequestStages({ log: () => {} }), searchSources: async () => ({ searchId: "search", query: "", sources: [], candidates: [] }), install: async () => { throw Error("query must not install") }, reloads: w.coordinator, log: () => {} })
   const request = buildWriteScopeRequest(1, { access: "write", targets: [{ absolute: "/outside/a", directory: "/outside" }] })
-  expect(host.receive(request, (message) => void posted.push(message), async (input) => { queries.push(input); return { revision: 4, targets: input.targets.map((target) => ({ absolute: target.absolute, outcome: "needs-approval" })) } })).toBe(true)
+  expect(host.receive(request, (message) => void posted.push(message), async (input) => { queries.push(input); return { revision: 4, targets: input.targets.map((target) => ({ absolute: target.absolute, outcome: "needs-approval", realDirectory: target.directory })) } })).toBe(true)
   await Promise.resolve()
   expect(queries).toHaveLength(1)
-  expect(parseWriteScopeReply(posted[0])?.result).toEqual({ revision: 4, targets: [{ absolute: "/outside/a", outcome: "needs-approval" }] })
+  expect(parseWriteScopeReply(posted[0])?.result).toEqual({ revision: 4, targets: [{ absolute: "/outside/a", outcome: "needs-approval", realDirectory: "/outside" }] })
 })
 
 test("package-manager control dispatch uses only the handler of the sending generation", async () => {

@@ -9,7 +9,7 @@ spec_version: 1
 review:
   rounds: 1
   reviewed_sha: d07c5aa8a8
-  verdict: "fix-then-freeze; R1 4 Major 4 Minor accepted and corrected"
+  verdict: "fix-then-freeze; R1 4 Major 4 Minor accepted and corrected; r5 increment (LibreOffice pipe N5, runtime not registered) R1 Codex gpt-6.1-sol xhigh fix-then-freeze on 39858d12a6, 1 Major + 1 Minor corrected in f4e082ff38, orchestrator verified and froze 2026-11-27"
 owners: [owner]
 last_reviewed: 2026-11-27
 ---

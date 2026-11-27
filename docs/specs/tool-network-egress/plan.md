@@ -347,3 +347,56 @@ R1-5 的有效移除证据：`python3 /tmp/egress-r8-controls.py` 退出 0；包
 一次较宽相关集：U `bun test --max-concurrency 2 src/main/egress-grant-truth.test.ts src/main/net-failure-real-stack.test.ts src/main/network-egress-fence.test.ts src/main/network-egress-grants.test.ts src/main/network-egress-ipc.test.ts src/main/network-egress-registry.test.ts src/main/process-fence-engine.test.ts src/main/process-fence-wiring.test.ts src/main/process-fence-write-sites.test.ts src/main/gate-file-registry.test.ts src/renderer/codepuppy-ui/network-egress-card.test.ts src/renderer/codepuppy-ui/settings-tools.test.ts src/shared/egress-denial.test.ts` 退出 0，13 文件 118 pass / 0 fail，187.60 s（`/tmp/egress-r8-related.log`）。由 rg 列出修改模块的导入消费者并补齐写点/计数登记判据；进程围栏接线使用 Electron mock，没有启动 Electron。测试准备下载依赖二进制与隔离 Office 缓存均由既有夹具执行，不改变产品或本机系统代理；没有重跑整层/整包。
 
 本轮偏离仅上文两个必要同调用链文件；公开 N3/N7、spec、design 与 §10 都未改。核对：Codex（GPT-6）按 r8 接受项与冻结输入完成，六项均有具名证据；原审计未接受的 OPTIONAL/ARCH 不扩修。下一步交编排器 ship；AC-13 实机系统代理证明与基线缺 `.gate-tests`/既有文档检查问题继续交编排器，无新增产品遗留。core.hooksPath 保持 `.githooks`，未 push/PR/merge/rebase，前台命令均已结束。
+
+## 切片三：没有对话在运行工具时，卡片投到正看着的对话（I-46）
+
+- 依据：[规格 v3 / BR-11、AC-14](spec.md) 及「用户会碰到的限制」v3 一行 @ `d95580c825`；[冻结设计 v2.1 §2 末表、§4.1、§4.3、§4.9、§5、§10](design.md) @ `d95580c825`；#1757 本轮 I-46 派发。代码基线 `d95580c825`，切片一、二已合入。界面依据为设计 §4.9 的复用现有卡片、只加两条文案。
+- 核对：待填（首个实施提交按本轮派发填写）。
+
+路径 U 为 `packages/ui-mac/`。
+
+### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| U `src/main/network-egress-approval.ts` | 私有批准组加观看者集合；`listApprovals` 在既有串行段内按 §4.9 接纳观看者、按收件人或观看者判可见；到期按有无收件人/观看者分 timeout/unavailable，最后一条连接结束时从未出过卡的组移出。线上类型、`decide`、notice 与档位判定不变。 |
+| U `src/main/network-egress-approval.test.ts` | 按 §4.9 证明 3 替换 `:169` 用例里「空集合时拉取为空」的断言，并新增切换、到期两分支、有收件人不投、观看后出现收件人四类用例。 |
+| U `src/renderer/codepuppy-ui/network-egress-card.tsx`、`src/renderer/i18n/{zh,en}.ts` | 卡片只按 `request.recipients` 是否为空选新文案 `viewed` / `viewedExpired` 或既有 `unknown` / `expired`；两条文案逐字取 §4.9。无新组件、按钮或步骤。 |
+| U `src/renderer/codepuppy-ui/network-egress-card.test.ts` | 夹具可给空活动集合；新增文案选择用例，走真实 main 服务，以连接取消结束等待，不靠计时。 |
+| U `test-component/network-egress-engine-peer.ts` | 经既有 `codepuppyEngine({ mcp })` 给真引擎配置一个本地 stdio 连接器：正常 MCP 握手、无工具，由引擎在 Location 启动时拉起；空闲时读取 main 写入项目目录的触发行，用继承来的 `HTTPS_PROXY` 发 CONNECT，把结果写回项目目录。不改生产 profile 或代理。 |
+| U `src/main/network-egress.engine.cases.ts` | 两条 AC-14 用例（正看着与切换；没有在看），用例前先卸载前面用例挂上的卡片区。 |
+| U `src/main/network-egress.engine.scenario.test.ts`、`scripts/gate-files.tsv` | 内层用例数 9→11 的机械同步（宿主 `pass` 与登记说明）。 |
+
+**入口可达性（计划期一次性探针，不进 suite）。** `/tmp/egress-i46-probe/connector-probe.test.ts` 以 `codepuppyEngine({ mcp: { connector } })` 起真引擎（无围栏，假代理只记首行），从 U 运行 `bun test --max-concurrency 2 --timeout 100000 <该文件>`：退出 0，1 pass。会话列表为空、没有 prompt、未调用 `/api/mcp` 之前，引擎已拉起该 stdio 连接器；连接器读到继承的 `HTTPS_PROXY` 并发出 `CONNECT 198.18.0.14:80 HTTP/1.1`。日志 `/tmp/egress-i46-probe/probe2.log`。首次运行因等待条件写错（被引擎其它请求提前满足）退出 1，不计为结果（`probe.log`）。围栏下的同一入口由下述真引擎用例证明。
+
+### 顺序
+
+1. **先红。** 一个提交只加服务层与卡片的新用例和替换断言，不改生产代码；运行 U `bun test --max-concurrency 2 src/main/network-egress-approval.test.ts src/renderer/codepuppy-ui/network-egress-card.test.ts`，预期新用例红、其余绿。
+2. **服务与卡片。** 改 approval、card 与两份文案；同一命令转绿，再加 `src/renderer/i18n/locale-regression.test.ts` 独立进程一次。
+3. **真引擎与对照。** 改 peer、cases、宿主数与登记；`gate slot --` 内运行一次 `./src/main/network-egress.engine.cases.ts -t 'AC-14'`。对照臂在本工作树临时去掉 `openToViewer` 分支，同一 slot 方式只跑「正看着」那条一次，结束后 `git restore` 该文件；不在 `/tmp` 副本跑（r7 的 W11 陷阱）。
+4. **返回前一次。** 较宽相关集按 rg 找消费者：`network-egress-ipc.test.ts`、`network-egress-proxy.test.ts`、`network-egress.test.ts`（renderer feed）、`settings-tools.test.ts`；U `bun typecheck`、`old-name-scan`、`affected-tests --list`、文档链接与 `git diff --check`。
+
+### 风险
+
+- **测试自己成为观看者。** 任何 `listApprovals` 调用都等于正看着；「没有在看」一臂到期前不挂载、不调用列表，前面用例的挂载先卸载（§4.9 实施提示）。
+- **影响既有场景。** 连接器只在 AC-14 写触发行后联网、无工具，之前的用例没有额外 CONNECT；既有用例的请求都有收件人，可见规则不变。
+- **围栏内连接器。** 它是引擎子进程，继承同一围栏；只写项目目录（围栏可写根），探针已证实代理变量随 `extendEnv` 到达。
+- **真实 45 秒。** 「没有在看」一臂与对照臂各需一次真实到期；scenario 宿主上限 240 s 足够（原约 52 s）。服务层沿用 `timeoutMs: 20`，卡片用例用取消，不加计时断言。
+- 预计约 150 分钟，翻倍即按规则返回。
+
+### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-14 正看着 | `network-egress.engine.cases.ts`「AC-14 没有对话在运行工具时」：围栏内连接器 CONNECT，A 的真实卡片区出卡，含地址与「此时没有对话在运行工具」；点「允许（到应用退出为止）」后连接器收到靶站正文，再连成功且没有新的批准请求；没有任何 notice | scenario：夜间；本轮 `gate slot` 一次 | 对照臂去掉 `openToViewer`：A 无卡，连接以 403 `approval-unavailable` 结束，用例在「必须出卡」处红并打印原因 |
+| AC-14 切换 | 同一用例：A 离开、打开 B 出同一 requestID 的卡，A 回来仍在；在 B 决定后连接按该决定结束，A 的卡消失 | 同上 | 不保留观看者或不同步结算时，B 无卡、A 回来无卡或在 B 决定后仍可选 |
+| AC-14 没有在看 | 同文件「AC-14 没有在看任何对话」：不挂载、不列卡，连接等待期满后 403，代理记录 `approval-unavailable`；之后打开 A 没有这张卡，也没有 notice | 同上 | 若期满后仍投给新打开的对话，A 出卡而红；若原因不对，记录断言红 |
+| AC-14 服务层 | `network-egress-approval.test.ts`：切换与 B 决定后 A 已无可选卡；从未被看过的组为 `approval-unavailable` 且被移出；看过后离开为 `approval-timeout`、卡片留在 A、晚到允许放行下一次连接；有收件人时观看者拉不到；观看后出现收件人仍是同一张卡、不再接纳新观看者；`:169` 改为断言拉取方成为观看者 | integration：受影响 PR 与夜间 | 去掉接纳、到期分支或移出时，对应断言分别红 |
+| AC-14 文案 | `network-egress-card.test.ts`「收件人为空时卡片说明没有对话在运行工具」：同一 requestID 的卡片随收件人变化在 viewed↔unknown、viewedExpired↔expired 间切换 | integration | 文案不按收件人选择时显示错句而红 |
+| AC-14 无系统对话框 | 一次性命令：`rg -n showMessageBox packages/ui-mac/src/main` 无联网路径命中，联网批准唯一出口是 `configureEgressGrantApproval(service)` | 一次性，记录命令与输出 | — |
+
+隐藏或最小化窗口算正看着、多窗口 Electron 原生 IPC 属设计 §2 代码事实，本轮无窗口证据，不声称已实机验证。
+
+### 偏离记录
+
+暂无。

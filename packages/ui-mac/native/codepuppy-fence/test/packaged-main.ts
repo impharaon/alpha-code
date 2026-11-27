@@ -210,6 +210,35 @@ async function runGate() {
   assert(await control.probe(control.B) === "denied", "forged token must not make B writable")
   await control.stop()
 
+  // SPEC v8 BR-08 (design v7 §6 evidence 16): the production .node issues to paths directly in HOME that do not exist yet — a
+  // folder (C1) and a file (C2) — and the production utilityProcess consumes them; its children create and write both, the
+  // sidecar's own Node writes in the folder, and the sibling and an unissued control stay refused.
+  const fresh = await boot("newPath")
+  const home = join(fresh.root, "home")
+  const folder = join(home, "newfolder"), file = join(home, "note.txt"), sibling = join(home, "sibling.txt"), unissued = join(home, "unissued")
+  const exitOf = async (name: string, command: string) => {
+    const marker = join(fresh.A, `${name}.exit`)
+    await fresh.shell(`${command}; echo $? > ${quote(marker)}`)
+    await waitFor(() => existsSync(marker), `${name} exit`)
+    return Number(readFileSync(marker, "utf8"))
+  }
+  const controlExit = await exitOf("new-path-control", `mkdir ${quote(folder)}`)
+  const issuedNew: Record<string, unknown> = {}
+  for (const path of [folder, file]) {
+    const issue = addon.issueFileExtensionToProcess(WORKSPACE_WRITE_EXTENSION_CLASS, path, fresh.child.pid!)
+    if (issue.token === null) throw new Error(`G0 new path issue failed: step=${issue.step} errno=${issue.errno}`)
+    issuedNew[path === folder ? "folder" : "file"] = (await fresh.grants.request(issue.token)).outcome
+  }
+  const exit = await exitOf("new-path", `mkdir ${quote(folder)} && mkdir -p ${quote(join(folder, "a"))} && echo x > ${quote(join(folder, "a", "b"))} && echo y > ${quote(file)}`)
+  const siblingExit = await exitOf("new-path-sibling", `echo s > ${quote(sibling)}`)
+  const unissuedExit = await exitOf("new-path-unissued", `mkdir ${quote(unissued)}`)
+  arms.newPath = {
+    pid: fresh.child.pid, controlExit, issued: issuedNew, exit, siblingExit, unissuedExit,
+    created: { folder: existsSync(join(folder, "a", "b")) ? readFileSync(join(folder, "a", "b"), "utf8") : null, file: existsSync(file) ? readFileSync(file, "utf8") : null, sibling: existsSync(sibling), unissued: existsSync(unissued) },
+    probes: { folder: await fresh.probe(folder), home: await fresh.probe(home) },
+  }
+  await fresh.stop()
+
   for (const [name, variant, kind] of [["selfIssue", "production", "all"], ["badFileOnly", "file-only", "generic"], ["badNoDeny", "no-deny", "file"]]) {
     const attack = await boot(name!, variant)
     const output = join(attack.A, "attack.jsonl")

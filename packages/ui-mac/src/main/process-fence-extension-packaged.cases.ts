@@ -107,6 +107,14 @@ test("G0 production addon, signed Electron main, production sidecar, positive an
   expect(report.arms.selfIssue.files.C).toEqual([])
   expect(report.arms.badFileOnly.files.C.length).toBeGreaterThan(0)
   expect(report.arms.badNoDeny.files.C.length).toBeGreaterThan(0)
+  // SPEC v8 BR-08 (design v7 §6 evidence 16): issued to a folder and a file directly in HOME before either exists.
+  expect(report.arms.newPath.controlExit).not.toBe(0)
+  expect(report.arms.newPath.issued).toEqual({ folder: "granted", file: "granted" })
+  expect(report.arms.newPath.exit).toBe(0)
+  expect(report.arms.newPath.siblingExit).not.toBe(0)
+  expect(report.arms.newPath.unissuedExit).not.toBe(0)
+  expect(report.arms.newPath.created).toEqual({ folder: "x\n", file: "y\n", sibling: false, unissued: false })
+  expect(report.arms.newPath.probes).toEqual({ folder: "writable", home: "denied" })
   writeFileSync(join(run, "signing.json"), JSON.stringify({ identityHash: identity, verifyExit: 0, runtimeFlag: "0x10000", appDir }, null, 2))
   prepared = { appDir, run, identityHash: identity! }
   console.log(`G0 PASS evidence=${run}`)

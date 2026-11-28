@@ -1018,6 +1018,8 @@ AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口�
 
 2026-11-27 · 宿主第一版 unix 探针在 bind 得 EADDRINUSE 后仍会删 socket 文件，把用户 LO 的活管道删掉，导致第二次启动自己另起实例（`report-proof4-probe-unlinked.log`）；改为只删自己建的文件后重跑即为上面的证明 4。这说明围栏内进程本就能删掉 `/private/tmp` 里用户 LO 的管道文件（W11 可写，F-21 已记），作为设计观察交回，不在本轮改。（2026-11-28：代码审查 R1-2 采纳，已改，见下节。）
 
+2026-11-28 · ship 门 `codepuppy-sidecar-wiring.test.ts`「#1760: the fork carries this generation…」在本树红（`start.bootstrap.documents` 不是 undefined）。原因是本节一次性证据前在本树构建的 `native/office-runtime`、`native/document-assets`、`native/ripgrep`（bin/setup 不建它们）：有随包文档资源时 `forkDocumentBootstrap`（`server.ts:493-500`）照设计交出 documents，而该用例按「没有文档资源的构建」写。产品与本票改动都不涉及；已删除这三个构建产物，复跑该文件 6 pass / 0 fail。
+
 ### 代码审查 R1 修正（2026-11-28）
 
 依据：Codex / gpt-6.1-sol（xhigh）对 `7358658f18` 的 R1，结论 FIX-THEN-MERGE；编排器采纳两项 Major 与一项 OPTIONAL，并授权改正设计 §4.11 一句、§10 加注。证明 5 的正式签名包与 Spotlight 条件仍按上节转为发布验收。

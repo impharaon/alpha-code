@@ -10,6 +10,7 @@ import { toV1PermissionRequest } from "../engine-adapter/opencode2/v1-shapes"
 import type { WriteScopeOutcome, WriteScopeRequest, WriteScopeReply } from "./codepuppy-sidecar-messages"
 import { parsePackageManagerEnvironmentRequest, type PackageManagerEnvironmentReply } from "../shared/package-manager-environment"
 import { publishVideoEnvironment } from "./codepuppy-video-environment"
+import { VIDEO_DECLARATION_ID } from "../shared/video-service"
 import { engineClient } from "./engine-client"
 import { configurePluginMcpProxy, attachPluginMcpProxyPublisher, pluginMcpProxySnapshot } from "./plugin-mcp-proxy"
 import type { PluginMcpProxies } from "@opencode/util/codepuppy-plugin-mcp"
@@ -824,7 +825,8 @@ export async function spawnLocalServer(
     documents: forkDocumentBootstrap(options.userDataPath),
     ...(launcher ? { launchers: launcher.environment } : {}),
   })
-  publishVideoEnvironment(bootstrap) // #1775 consumes FIRST-PARTY-CACHE-v2.2; #1760 owns its producer.
+  // #1775 consumes FIRST-PARTY-CACHE-v2.2 and, for the attachment duration, the same launcher recipe entry; #1760 owns both producers.
+  publishVideoEnvironment(bootstrap, launcher && ((id, signal) => launcher.prepareBundledEntry(pinnedFileAuthority(options.userDataPath), VIDEO_DECLARATION_ID, id, signal)))
 
   const packageManagerEnvironment = { ...sidecarEnv, ...fence?.cacheEnv }
   for (const [key, value] of Object.entries(originalProxies)) {

@@ -149,7 +149,7 @@ async function managedAsset(archive: PinnedEntryRecipe["archive"] = "file", payl
   await writeFile(join(f.resources, "owned.js"), code)
   const manifestPath = join(f.resources, "office-mcp/tools.json")
   await writeFile(manifestPath, JSON.stringify({ formats: { own: { command: ["{codepuppyNode}", "{codepuppyResources}/owned.js"], environment: {}, cwd: null, codeSha256: { "owned.js": createHash("sha256").update(code).digest("hex") }, tools: [], recipe: [recipe] } } }))
-  const host = createLauncherAssetAuthority({ ...f.input, pins: manifest })
+  const host = createLauncherAssetAuthority({ ...f.input, pins: manifest, declarations: { ...f.input.declarations, own: { command: ["{codepuppyNode}", "{codepuppyResources}/owned.js"], recipe: [recipe] } } })
   const entry = { type: "local" as const, command: [host.environment.node, join(f.resources, "owned.js")] }
   const declared = declaredFirstPartyTools("own", entry, manifestPath, readFileSync, undefined, host.environment)!
   const binding: ManagedFirstPartyBinding = { identity: { directory: f.root, server: "own", attempt: "own-attempt" }, sidecarGeneration: "owned-generation", entry, declarationSha256: declared.declarationSha256, recipeSha256: declared.recipeSha256 }
@@ -175,6 +175,19 @@ test("managed entry preparation uses the pinned authority and reuses only comple
   await rm(first.files[0]!.path)
   expect(await f.run()).toEqual(first)
   expect(await readFile(first.files[0]!.path)).toEqual(f.bytes)
+  expect(f.downloads()).toBe(1)
+})
+
+test("main prepares a bundled recipe entry at the same root the managed service later reuses", async () => {
+  const f = await managedAsset()
+  const signal = new AbortController().signal
+  const own = await f.host.prepareBundledEntry(f.context.files, "own", f.recipe.id, signal)
+  if (!own.ok) throw Error(own.error)
+  expect(await readFile(own.files[0]!.path)).toEqual(f.bytes)
+  expect(await f.run()).toEqual(own)
+  expect(f.downloads()).toBe(1)
+  expect(await f.host.prepareBundledEntry(f.context.files, "own", "speech-model/any/not-in-recipe", signal)).toEqual({ ok: false, error: "unknown-file" })
+  expect(await f.host.prepareBundledEntry(f.context.files, "not-declared", f.recipe.id, signal)).toEqual({ ok: false, error: "unknown-file" })
   expect(f.downloads()).toBe(1)
 })
 
@@ -246,7 +259,7 @@ test("system archive extraction does not write through a link outside its stagin
   expect(await readdir(outside)).toEqual([])
 })
 
-test("cancelling a managed download detaches one waiter while another prepares the entry", async () => {
+test.each(["managed service", "main's bundled entry"])("cancelling a %s download detaches one waiter while another prepares the entry", async (first) => {
   const f = await managedAsset()
   let release: () => void = () => {}
   const wait = new Promise<void>((resolve) => { release = resolve })
@@ -260,12 +273,14 @@ test("cancelling a managed download detaches one waiter while another prepares t
   let joined = 0
   const context = { ...f.context, files: { ensureFile: (...args: Parameters<typeof authority.ensureFile>) => { const result = authority.ensureFile(...args); if (++joined === 2) both(); return result } } }
   const cancelled = new AbortController()
-  const first = f.host.prepareFiles(context, { binding: f.binding, ids: [f.recipe.id] }, cancelled.signal, () => {})
+  const waiter = first === "managed service"
+    ? f.host.prepareFiles(context, { binding: f.binding, ids: [f.recipe.id] }, cancelled.signal, () => {})
+    : f.host.prepareBundledEntry(context.files, "own", f.recipe.id, cancelled.signal)
   const second = f.host.prepareFiles(context, { binding: f.binding, ids: [f.recipe.id] }, new AbortController().signal, () => {})
   await entered
   cancelled.abort()
   release()
-  expect(await first).toEqual({ ok: false, error: "cancelled" })
+  expect(await waiter).toEqual({ ok: false, error: "cancelled" })
   const result = await second
   expect(result.ok).toBe(true)
   if (result.ok) expect(await readFile(result.files[0]!.path)).toEqual(f.bytes)

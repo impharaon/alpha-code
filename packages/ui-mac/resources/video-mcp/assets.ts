@@ -31,6 +31,14 @@ export function videoInvocation(args: readonly string[], bundleDirectory: string
   return { directory: args[0]!, cacheRoot: args[2]!, bundleDirectory }
 }
 
+/** The pinned codec archive of a platform; the host prepares the same recipe entry for its own duration probe. */
+export function codecRecipeId(platform: string) {
+  return videoRecipes.find((recipe) => recipe.id.startsWith(`ffmpeg/${platform}/`))?.id
+}
+export function codecExecutable(entry: string, name: "ffmpeg" | "ffprobe", platform: string) {
+  return path.join(entry, "bin", name + (platform === "win32-x64" ? ".exe" : ""))
+}
+
 /** Tesseract OSD pseudo-scripts and Unicode scripts share the existing pinned model authority. */
 export function ocrScript(script: string | undefined){
   const canonical=script === "Korean" ? "Hangul" : script === "Hiragana" || script === "Katakana" ? "Japanese" : script
@@ -123,17 +131,12 @@ export async function createVideoRuntime(
     if (name === "ocr-model" || typeof name === "object")
       return ocrModels(typeof name === "object" ? name.script : undefined)
     if (name === "ffmpeg" || name === "ffprobe") {
-      const id =
-        videoRecipes.find((recipe) => recipe.id.startsWith(`ffmpeg/${platform}/`))?.id ??
-        fail("component_download_failed", "The codec recipe is missing.")
+      const id = codecRecipeId(platform) ?? fail("component_download_failed", "The codec recipe is missing.")
       const pin =
         pins.files.find((pin) => pin.id === id) ??
         fail("component_download_failed", "The pinned video codec archive is absent from this build.")
       const files = await ensure([id])
-      return {
-        path: path.join(files[0]!.path, "bin", name + (platform === "win32-x64" ? ".exe" : "")),
-        digest: digest(`${pin.sha256}:${name}`),
-      }
+      return { path: codecExecutable(files[0]!.path, name, platform), digest: digest(`${pin.sha256}:${name}`) }
     }
     if (name === "python") {
       const id =

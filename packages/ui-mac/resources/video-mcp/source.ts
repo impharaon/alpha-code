@@ -12,6 +12,8 @@ export type Source = { sourceId: string; path: string; name: string; bytes: numb
 type FileIndex = { identity: string; sourceId: string }
 const identity = (value: Awaited<ReturnType<typeof sourceStat>>) => [value.dev, value.ino, value.size, value.mtimeNs, value.ctimeNs].join(":")
 const sourceStat = (file: string) => stat(file, { bigint: true })
+/** The same file identity/version the persistent result index uses; the host checks attachment probes with it. */
+export const sourceIdentity = async (file: string) => identity(await sourceStat(file))
 
 export async function updateSource(sourceId:string,runtime:VideoRuntime,change:(current:Source|undefined)=>Promise<Source>){
   return withMediaLock(runtime,`source:${sourceId}`,async()=>{

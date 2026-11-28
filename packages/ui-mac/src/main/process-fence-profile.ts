@@ -200,14 +200,15 @@ export type FenceUnixListen = {
   kind: "libreoffice-single-instance"
   /** 非负安全整数,管道名里的 <uid> */
   uid: number
-  /** 用户自己 LibreOffice 使用的 UserInstallation 绝对系统路径;每条推出一个确切管道名,在放行行之后拒绝 bind/accept */
+  /** 用户自己 LibreOffice 使用的 UserInstallation 绝对系统路径(已像 LibreOffice 那样解析软链);每条推出一个确切管道名,在放行行之后拒绝 bind/accept */
   userInstallations: readonly string[]
 }
 
 /**
  * LibreOffice 26.8.3.1 给某个 UserInstallation 建的单实例管道名(§4.11,F-21/F-23 逐字):`file://` 加上路径 UTF-8 字节逐个编码
  * (``!$&'()*+,-./0-9:=@A-Z_a-z~`` 原样,其余写成大写 `%XX`,`sal/osl/unx/file_url.cxx`);对这个 URL 的 UTF-16LE 码元取 MD5,
- * 16 个字节各自写成小写十六进制、不补零(`dp_misc.cxx`)。路径按原样用,不做 realpath(与 LibreOffice 读到的 HOME 一致)。
+ * 16 个字节各自写成小写十六进制、不补零(`dp_misc.cxx`)。这里只推算:LibreOffice 先解析软链,所以调用方给的必须是已按它的方式解析的路径
+ * (计划器:已存在部分的真实路径 + 尚未创建的后缀)。
  */
 export function libreOfficeSingleInstancePipe(uid: number, userInstallation: string): string {
   let url = "file://"

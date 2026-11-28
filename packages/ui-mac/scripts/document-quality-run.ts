@@ -11,6 +11,7 @@
 import { spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
+import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import { parseArgs } from "node:util"
 import type { HostInput } from "./document-quality/host"
@@ -46,6 +47,7 @@ const input: HostInput = {
   runTimeoutMinutes: Number(values["run-timeout-minutes"]),
   endpoints: discovered,
   dryRun: values["dry-run"],
+  foreignAgentRoots: [".claude", ".agents"].map((name) => path.join(homedir(), name)),
 }
 const inputFile = path.join(evidence, "input.json")
 writeFileSync(inputFile, JSON.stringify(input, null, 1))
@@ -72,7 +74,10 @@ const roots = {
   XDG_CONFIG_HOME: path.join(evidence, "xdg", "config"),
   XDG_CACHE_HOME: path.join(evidence, "xdg", "cache"),
   XDG_STATE_HOME: path.join(evidence, "xdg", "state"),
-  CODEPUPPY_USER_WORKSPACE_DIR: path.join(evidence, "workspace"),
+  // The engine discovers .claude/.agents/AGENTS.md in every ancestor of a Location. Under the real home that reaches the
+  // operator's own skills and instructions, so the workspace lives under the system temp directory and is copied into the
+  // evidence when the host exits.
+  CODEPUPPY_USER_WORKSPACE_DIR: path.join(realpathSync(tmpdir()), `document-quality-${path.basename(evidence)}`, "workspace"),
   CODEPUPPY_OPENCODE_HOME: path.join(evidence, "opencode-home"),
 }
 for (const directory of Object.values(roots)) mkdirSync(directory, { recursive: true })
@@ -99,4 +104,5 @@ for (const bundle of [host, ...readdirSync(frameworks).filter((name) => name.end
   spawnSync(lsregister, ["-u", bundle], { stdio: "ignore" })
 const registered = spawnSync(lsregister, ["-dump"], { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 }).stdout.split("\n").filter((line) => line.startsWith("path:") && line.includes(host))
 console.log(registered.length ? `WARNING: still registered: ${registered.join(" | ")}` : "host copy is not registered with LaunchServices")
+spawnSync("/usr/bin/rsync", ["-a", "--exclude", "node_modules", `${roots.CODEPUPPY_USER_WORKSPACE_DIR}/`, path.join(evidence, "workspace")], { stdio: "inherit" })
 process.exit(code)

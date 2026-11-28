@@ -63,6 +63,8 @@ export type HostInput = {
   /** The desktop's discovered endpoints (non-secret); what a login persists. */
   endpoints: { schema_version: 1; web: string; platform: string; account: string; cloud: string; mcp: string }
   dryRun: boolean
+  /** The operator's own agent configuration; a run whose transcript reaches it did not use only the product's skills. */
+  foreignAgentRoots: string[]
 }
 
 type Task = { assets: string[]; assets_note: string; user: string }
@@ -236,6 +238,11 @@ async function converse(client: EngineClient, directory: string, text: string, r
   const model = (await client.model.default({ location: { directory } })).data
   if (!model || model.providerID !== "codepuppy" || model.id !== platformModels.defaultPlatformModel)
     throw new Stop(2, `default model is ${model ? `${model.providerID}/${model.id}` : "none"}, expected codepuppy/${platformModels.defaultPlatformModel}`)
+  // Free check before any model call: the skills this Location offers the model come from the product only.
+  const skills = (await client.skill.list({ location: { directory } })).data
+  record.skillsVisible = skills.map((skill) => ({ id: skill.id, path: skill.path }))
+  const foreignSkills = skills.filter((skill) => input.foreignAgentRoots.some((root) => skill.path.startsWith(root + "/")))
+  if (foreignSkills.length) throw new Stop(2, `${record.run}: the Location offers the operator's own skills (${foreignSkills.map((skill) => skill.path).join(", ")})`)
   const session = await client.session.create({ location: { directory }, model: { id: model.id, providerID: model.providerID } })
   record.sessionID = session.id
   record.model = `${model.providerID}/${model.id}`
@@ -317,6 +324,9 @@ async function converse(client: EngineClient, directory: string, text: string, r
     if (!cursor || !page.data.length) break
   }
   record.transcript = summarize(messages)
+  writeJson(join(E, "runs", `${record.run}.messages.json`), messages)
+  const foreign = input.foreignAgentRoots.filter((root) => JSON.stringify(messages).includes(root + "/"))
+  if (foreign.length) throw new Stop(2, `${record.run} reached the operator's own agent configuration (${foreign.join(", ")}): not a product-only run`)
   if (stopped) throw stopped
   return messages
 }
@@ -325,6 +335,7 @@ function summarize(messages: unknown[]) {
   const tools: Record<string, number> = {}
   const documentActions: Record<string, number> = {}
   const errors: string[] = []
+  const skills: string[] = []
   let assistantTurns = 0
   let finalText = ""
   let inputTokens = 0
@@ -341,13 +352,14 @@ function summarize(messages: unknown[]) {
       if (part.type !== "tool") continue
       tools[part.name] = (tools[part.name] ?? 0) + 1
       if (part.state?.status === "error") errors.push(`${part.name}: ${JSON.stringify(part.state.error ?? part.state).slice(0, 300)}`)
+      if (part.name === "skill") skills.push(JSON.stringify(part.state?.input ?? {}).slice(0, 200))
       if (part.name === "codepuppy_document") {
         const action = String(part.state?.input?.action ?? "?")
         documentActions[action] = (documentActions[action] ?? 0) + 1
       }
     }
   }
-  return { assistantTurns, tools, documentActions, errors, inputTokens, outputTokens, finalText: finalText.slice(-1500) }
+  return { assistantTurns, tools, skills, documentActions, errors, inputTokens, outputTokens, finalText: finalText.slice(-1500) }
 }
 
 // ── scoring: product LO render (page count, page images), product OfficeExcel.recalculate, the committed scorers ─────

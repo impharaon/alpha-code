@@ -483,6 +483,27 @@ describeDarwin("planProcessFence", () => {
     expect(lines[n4 + 3]).toBe("(deny file-write*")
   })
 
+  // 代码审查 R1-1:LibreOffice 推算前先解析软链(bootstrap.cxx、file_url.cxx),计划器给的路径 = 已存在部分的真实路径 + 尚未创建的后缀。
+  // 两个真实采样(plan.md r5 采集记录 2026-11-28):HOME 经系统软链 /tmp、HOME 本身是软链;假盘复现采样时的软链,profile 目录尚未创建
+  test.each([
+    { home: "/tmp/lo1761-cap2/home", link: ["/tmp", "/private/tmp"], pipe: "9dfde0baa068139ee9d12a3b8a3f96" },
+    { home: "/private/tmp/lo1761-cap2/link-home", link: ["/private/tmp/lo1761-cap2/link-home", "/private/tmp/lo1761-cap2/real-home"], pipe: "b72d7575b186695ff1c06bc77a3f51d5" },
+  ])("`#1761` N5:HOME 经软链($home)⇒ 拒绝行是 LibreOffice 解析软链后的那个管道名", ({ home, link, pipe }) => {
+    const [from, to] = link as [string, string]
+    const resolve = (p: string) => (p === from || p.startsWith(`${from}/`) ? to + p.slice(from.length) : p)
+    const h = harness({
+      homeDir: () => home,
+      realpath: (p) => {
+        if (p.startsWith(`${home}/Library`)) throw enoent(p) // the default profile is not created yet
+        return resolve(p)
+      },
+    })
+    h.input.sidecarEnv = { HOME: home }
+    const uid = process.getuid!()
+    const profile = planProcessFence(h.input, h.deps).profile
+    expect(profile).toContain(`(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_${pipe}")))`)
+  })
+
   test("用户导出 XDG_STATE_HOME ⇒ 多建 <state>/opencode,profile 多一行 W3;XDG_DATA_HOME 跟着 env", () => {
     const h = harness()
     h.input.sidecarEnv = { HOME, XDG_STATE_HOME: "/Volumes/s", XDG_DATA_HOME: "/Volumes/d" }

@@ -74,6 +74,8 @@ import { ReadTool } from "../../core/src/tool/plugin/read"
 import { ShellTool } from "../../core/src/tool/plugin/shell"
 import { TestLLM } from "../../ai/src/testing"
 import { dirname } from "node:path"
+import { definition } from "../../core/src/tool/runtime"
+import { separatelyBundledEngine } from "./engine-runtime.harness"
 
 let scratch = ""
 beforeAll(() => {
@@ -1954,6 +1956,53 @@ packageIt.live("package YAML dependencies resolve to a real connected MCP tool",
     await context.agent.transform(editor => editor.update("build", agent => agent.permissions.push({ action: "mcp:" + host + ":echo", resource: "*", effect: "ask" })))
   } })
 }))
+
+// The composed product engine (2026-11-28 document-quality run, opencode-dev.db) failed `skill {"id":"docx"}` and
+// `skill {"id":"pptx"}` with "Cannot convert a Symbol value to a string": the engine there has its own Effect.
+packageIt.live("skill and subagent with package arguments decode the model's arguments in an engine with its own Effect", () => packageJourney(Effect.gen(function* () {
+  yield* invocationNativeServices
+  const ext = yield* activateExtUntilFinished
+  const tools = yield* Tool.Service
+  const takesArguments = (tool: Parameters<typeof definition>[0]) => "arguments" in ((definition(tool).inputSchema.properties as object | undefined) ?? {})
+  yield* ext.finish(tools.list().pipe(Effect.map(list => ["skill", "subagent"].every(id => list.some(tool => tool.id === id && takesArguments(tool))))))
+  const engine = yield* Effect.promise(separatelyBundledEngine)
+  const call = (id: string, args: Record<string, unknown>) => Effect.gen(function* () {
+    const tool = (yield* tools.list()).find(item => item.id === id)!
+    const seen: unknown[] = []
+    const probe = { name: tool.name, description: tool.description, input: tool.input, execute: (value: unknown) => Effect.sync(() => (seen.push(value), { content: "decoded" })) }
+    const exit = yield* Effect.promise(() => Effect.runPromiseExit(engine.execute(probe as never, args, { sessionID: "ses_decode", agent: "build", messageID: "msg_decode", id: "call_decode", progress: () => Effect.void } as never)))
+    return { seen, refused: Exit.isSuccess(exit) ? undefined : String(exit.cause) }
+  })
+  const delegation = { agent: "general", description: "Review package", prompt: "review source", background: false, arguments: "src" }
+  const outcomes: unknown[] = []
+  const expected: unknown[] = []
+  // Accepted calls reach the executor decoded; unknown keys are dropped, as the native schemas drop them.
+  for (const [id, args, decoded] of [
+    ["skill", { id: "docx" }, { id: "docx" }],
+    ["skill", { id: "pptx", arguments: '"two words"' }, { id: "pptx", arguments: '"two words"' }],
+    ["skill", { id: "docx", extra: 1 }, { id: "docx" }],
+    ["subagent", delegation, delegation],
+    ["subagent", { ...delegation, extra: 1 }, delegation],
+  ] as const) {
+    const result = yield* call(id, args)
+    outcomes.push({ id, args, seen: result.seen, refused: result.refused })
+    expected.push({ id, args, seen: [decoded], refused: undefined })
+  }
+  // Invalid calls are refused before the executor, naming the field (the native schemas' constraints plus `arguments`).
+  for (const [id, args, field] of [
+    ["skill", {}, "id"],
+    ["skill", { id: 5 }, "id"],
+    ["skill", { id: "docx", arguments: 3 }, "arguments"],
+    ["subagent", { agent: "general" }, "description"],
+    ["subagent", { ...delegation, prompt: 42 }, "prompt"],
+    ["subagent", { ...delegation, sessionID: "not-a-session" }, "sessionID"],
+  ] as const) {
+    const result = yield* call(id, args)
+    outcomes.push({ id, args, seen: result.seen, refused: result.refused?.includes(`Invalid arguments for tool "${id}"`) && result.refused.includes(`- ${field}:`) })
+    expected.push({ id, args, seen: [], refused: true })
+  }
+  expect(outcomes).toEqual(expected)
+})))
 
 packageIt.live("package skill arguments and denies expire at the next user prompt", () => packageJourney(Effect.gen(function* () {
   const capture = yield* Effect.promise(() => captureStandardFixture("claude:plugin-dev"))

@@ -12,6 +12,9 @@ import { buildUnattendedLive } from "../../../ui-mac/src/main/codepuppy-sidecar-
 import { registerPolicy } from "./index"
 import { createUnattendedState } from "./unattended"
 import { createToolPolicyStore, defaultPolicyBaseDir, mcpBindingEvidence } from "./resolver"
+import * as sourceGate from "./gate"
+import { separatelyBundledExtPolicy } from "../engine-runtime.harness"
+import { toSessionError } from "../../../core/src/session/to-session-error"
 import {
   Bus,
   E,
@@ -382,3 +385,55 @@ it.effect("T1 allow 对无工具调用的原始 ask 与直接 return 不等价",
     expect(host.counts.writes).toBe(0)
   }),
 )
+
+// The shipped ext bundle carries its own Tool.Error class (scripts/build.ts, ADR-006). 2026-11-28 packaged-layout probe
+// (embedded engine + packages/ext/dist/server.js): a policy-disabled tool came back as type "unknown" with no
+// codepuppyDisplay, where the source layout gives "tool.execution" with it.
+for (const layout of ["source", "separately bundled"] as const)
+  for (const denial of ["policy-disabled", "unattended readonly"] as const)
+    it.effect(`${layout} ext: the ${denial} denial reaches the engine as tool.execution with its metadata`, () =>
+      Effect.gen(function* () {
+        const gate = layout === "source" ? { ...sourceGate, createToolPolicyStore } : yield* Effect.promise(separatelyBundledExtPolicy)
+        const plugins = yield* Plugin.Service
+        const location = yield* Location.Service
+        const facts = { technicalId: "gated", permission: "gated", identity: { source: "plugin", origin: "", name: "gated" }, authority: { kind: "not-asserted" } }
+        const store = gate.createToolPolicyStore({ baseDir: path.join(ROOT, "gate", crypto.randomUUID()), account: () => "acct:gate", workspace: () => location.directory })
+        if (denial === "policy-disabled") yield* Effect.promise(() => store.setRecord({ selector: { level: "tool", canonical: "plugin::gated" }, state: "disabled" }))
+        const deps = {
+          protectedRoots: undefined as never,
+          profile: async () => (denial === "unattended readonly" ? ("readonly" as const) : undefined),
+          denied: () => {},
+          store,
+          facts: async () => facts as never,
+          ruleset: async () => [{ action: "plugin::gated", resource: "*", effect: "ask" as const }],
+          directory: () => location.directory,
+          assert: async () => {},
+        }
+        yield* plugins.activate([
+          promisePlugin(`gated-${layout}-${denial}`, async (ctx: Context) => {
+            await ctx.tool.transform((editor) =>
+              editor.add({
+                name: "gated",
+                description: "gated",
+                input: { type: "object", properties: {} },
+                options: { codemode: false },
+                execute: async (_input, context) => {
+                  await gate.decide(deps, { tool: "gated", sessionID: context.sessionID, agent: context.agent, id: context.id, messageID: context.messageID })
+                  return { content: "ran" }
+                },
+              }),
+            )
+          }),
+        ])
+        yield* plugins.awaitActivation
+        const snapshot = yield* (yield* Tool.Service).snapshot([allow])
+        const result = yield* snapshot
+          .execute({ sessionID: "ses_gate", agent: "build", messageID: "msg_gate", call: { type: "tool-call", id: "call_gate", name: "gated", input: {} } })
+          .pipe(Effect.exit)
+        expect(Exit.isFailure(result)).toBe(true)
+        const failure = Cause.squash((result as { cause: never }).cause) as InstanceType<typeof Tool.Error>
+        expect(toSessionError(failure).type).toBe("tool.execution")
+        expect(failure.metadata?.codepuppyDisplay).toMatchObject({ identity: facts.identity })
+        if (denial === "unattended readonly") expect(failure.metadata?.[UNATTENDED_DENIAL_KEY]).toMatchObject({ version: 1, reason: "readonly", tool: "gated" })
+      }),
+    )

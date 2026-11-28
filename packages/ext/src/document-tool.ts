@@ -11,6 +11,9 @@ import {
   type RenderResult,
 } from "../../util/src/codepuppy-document"
 import { TOOL_TEXT } from "./context-injection"
+import { engineToolInput } from "./engine-tool-input"
+
+const engineInput = engineToolInput(DocumentToolInputSchema)
 
 export function createDocumentTool(input: {
   host: () => DocumentHost
@@ -27,7 +30,7 @@ export function createDocumentTool(input: {
   return {
     name: "codepuppy_document",
     description: TOOL_TEXT.codepuppy_document.description,
-    input: DocumentToolInputSchema,
+    input: engineInput,
     options: { codemode: false },
     async execute(value: unknown, context) {
       let args: typeof DocumentToolInputSchema.Type

@@ -25,6 +25,7 @@
 //   tmpdirConnect  connect 测试进程(围栏外)在 $TMPDIR 的监听者 ⇒ EPERM。
 //   userPipeConnect connect 测试进程冒充用户默认管道名的监听者 ⇒ EPERM。
 //   mdnsConnect    connect /var/run/mDNSResponder ⇒ EPERM。
+//   userPipeUnlink (只在 fenced 臂)删冒充用户默认管道的那个活 socket 文件 ⇒ 拒(代码审查 R1-2:删掉它用户下次启动会另起实例)。
 import { createRequire } from "node:module"
 import dgram from "node:dgram"
 import dns from "node:dns"
@@ -198,6 +199,12 @@ out.steps.otherTmpBind = await timed(() => unixListen(unixProbes.otherTmp))
 out.steps.tmpdirConnect = await timed(() => unixConnect(unixProbes.tmpdirListener))
 out.steps.userPipeConnect = await timed(() => unixConnect(unixProbes.userPipeListener))
 out.steps.mdnsConnect = await timed(() => unixConnect(unixProbes.mdns))
+if (mode === "fenced")
+  out.steps.userPipeUnlink = await timed(async () => {
+    if (!unixProbes.userPipeListener) throw Object.assign(new Error("no probe path"), { code: "NO_PATH" })
+    fs.unlinkSync(unixProbes.userPipeListener)
+    return { unlinked: true }
+  })
 
 emit()
 process.exit(0)

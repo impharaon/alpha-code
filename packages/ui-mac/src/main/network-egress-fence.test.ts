@@ -285,12 +285,18 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
     for (const name of connects) expect(fenced[name], name).toMatchObject({ ok: false, code: "EPERM" })
     for (const name of binds) expect(bare[name], name).toMatchObject({ ok: true, bound: true })
     for (const name of connects) expect(bare[name], name).toMatchObject({ ok: true, connected: true })
+    // 代码审查 R1-2:用户 LibreOffice 的活管道文件在围栏内删不掉(W11 允许写 /private/tmp,拒绝的只是这一个文件的 unlink)
+    expect(fenced.userPipeUnlink).toMatchObject({ ok: false, code: "EPERM" })
+    expect(existsSync(unix.userPipeListener!)).toBe(true)
   })
 
-  test("A5 `#1761` 拒绝行的对照:同一 N5 去掉用户默认 profile 的拒绝行(userInstallations 为空)⇒ 围栏内能 bind 那个名字 —— A4 的拒绝来自拒绝行", async () => {
+  test("A5 `#1761` 拒绝行的对照:同一 N5 去掉用户默认 profile 的拒绝行(userInstallations 为空)⇒ 围栏内能 bind 那个名字、能删它的活管道文件 —— A4 的拒绝来自拒绝行", async () => {
     const run = await runDriver("fenced", proxyPort, noDenyProfileFile)
     expect(run.out.apply).toEqual({ rc: 0, error: "" })
     expect(run.out.steps.loPipeBind).toMatchObject({ ok: true, bound: true })
     expect(run.out.steps.userPipeBind).toMatchObject({ ok: true, bound: true })
+    // 同一对照下 unlink 也不再被拒:A4 里删不掉活管道文件,来自那一行 file-write-unlink 拒绝
+    expect(run.out.steps.userPipeUnlink).toMatchObject({ ok: true, unlinked: true })
+    expect(existsSync(unix.userPipeListener!)).toBe(false)
   })
 })

@@ -476,11 +476,13 @@ describeDarwin("planProcessFence", () => {
     const uid = process.getuid!()
     const lines = planProcessFence(h.input, h.deps).profile.split("\n").map((line) => line.replace(/\s*;.*$/, "").trim())
     const n4 = lines.findIndex((line) => line.startsWith("(allow network-outbound"))
-    expect(lines.slice(n4 + 1, n4 + 3)).toEqual([
+    expect(lines.slice(n4 + 1, n4 + 4)).toEqual([
       `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_[0-9a-f]+$")))`,
       `(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb")))`,
+      // 代码审查 R1-2:同一确切名字的活管道文件在围栏内删不掉
+      `(deny file-write-unlink (literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb"))`,
     ])
-    expect(lines[n4 + 3]).toBe("(deny file-write*")
+    expect(lines[n4 + 4]).toBe("(deny file-write*")
   })
 
   // 代码审查 R1-1:LibreOffice 推算前先解析软链(bootstrap.cxx、file_url.cxx),计划器给的路径 = 已存在部分的真实路径 + 尚未创建的后缀。

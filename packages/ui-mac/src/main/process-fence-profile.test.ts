@@ -419,23 +419,26 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     expect(renderProcessFenceProfile(base)).not.toContain("mDNSResponder")
   })
 
-  test("`#1761` N5:放行行紧接 N4,其后每条 userInstallations 一行拒绝(后写者胜),再接受保护集;只写推算出的管道名、不写用户路径;省略或空列表不渲染", () => {
+  test("`#1761` N5:放行行紧接 N4,其后每条 userInstallations 一行拒绝(后写者胜)与一行 unlink 拒绝,再接受保护集;只写推算出的管道名、不写用户路径;省略或空列表不渲染", () => {
     const home = (name: string) => `/Users/${name}/Library/Application Support/LibreOffice/4`
     const profile = renderProcessFenceProfile({ ...base, unixListen: [{ kind: "libreoffice-single-instance", uid: 501, userInstallations: [home("alpha"), home("beta")] }] })
     const lines = tokens(profile)
     const n4 = lines.indexOf(NETWORK_LINES(4443).at(-1)!)
-    expect(lines.slice(n4 + 1, n4 + 4)).toEqual([
+    const pipes = [home("alpha"), home("beta")].map((path) => `/private/tmp/${libreOfficeSingleInstancePipe(501, path)}`)
+    expect(lines.slice(n4 + 1, n4 + 6)).toEqual([
       `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_501_SingleOfficeIPC_[0-9a-f]+$")))`,
-      `(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/${libreOfficeSingleInstancePipe(501, home("alpha"))}")))`,
-      `(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/${libreOfficeSingleInstancePipe(501, home("beta"))}")))`,
+      ...pipes.map((pipe) => `(deny network-bind network-inbound (local unix-socket (path-literal "${pipe}")))`),
+      // 代码审查 R1-2:这些活管道文件在 W11 之下,单独拒绝它们的 unlink(其它写与产品 job 管道的清理不受影响)
+      ...pipes.map((pipe) => `(deny file-write-unlink (literal "${pipe}"))`),
     ])
-    expect(lines.slice(n4 + 4)).toEqual([...CF_LINES, ...C1_LINES])
+    expect(lines.slice(n4 + 6)).toEqual([...CF_LINES, ...C1_LINES])
     expect(lines.some((line) => line.includes("LibreOffice/4"))).toBe(false)
     // 只监听:没有 network-outbound 的加法,也没有 /tmp 写法(seatbelt 按解析后的 /private/tmp 匹配,F-21)
     expect(lines.filter((l) => /network-outbound/.test(l))).toEqual([`(allow network-outbound (remote ip "localhost:4443"))`])
     expect(lines.some((line) => line.includes('"/tmp/') || line.includes("#\"^/tmp/"))).toBe(false)
-    // 渲染进 profile 的写规则不变(签发判定只读文件写规则)
-    expect(processFenceWriteRules(profile)).toEqual(processFenceWriteRules(renderProcessFenceProfile(base)))
+    // 签发判定的解析认得 unlink 拒绝行:放行不变,deny 在受保护集之前多出这两条 literal
+    const plain = processFenceWriteRules(renderProcessFenceProfile(base))
+    expect(processFenceWriteRules(profile)).toEqual({ allow: plain.allow, deny: [...pipes.map((value) => ({ kind: "literal" as const, value })), ...plain.deny] })
     expect(tokens(renderProcessFenceProfile({ ...base, unixListen: [] }))).toEqual(tokens(renderProcessFenceProfile(base)))
     expect(tokens(renderProcessFenceProfile({ ...base, unixListen: [{ kind: "libreoffice-single-instance", uid: 0, userInstallations: [] }] })).slice(n4 + 1, n4 + 2)).toEqual([
       `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_0_SingleOfficeIPC_[0-9a-f]+$")))`,

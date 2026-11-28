@@ -10,6 +10,18 @@ import { activitySession, networkActivityKey, parseNetworkActivity, sessionRefKe
 // boundary and metadata spreads, without a serializable field or a shared-callID collision.
 const RESULT_NOTICE = Symbol("network.egress.result")
 type ResultNotice = { session: SessionRef; requests: string[]; hadMetadata: boolean }
+// A failure reaches execute.after as the engine's own Tool.Error, rebuilt from the thrown one's message and metadata when
+// the ext carries its own copy of the class (the shipped bundle, ADR-006); a symbol key does not survive that copy. The
+// failure marker is a plain metadata entry, removed by `attachResult` before the engine records the failure.
+const FAILURE_NOTICE = "codepuppyNetworkEgressNotice"
+const failureNotice = (value: unknown): ResultNotice | undefined => {
+  if (typeof value !== "object" || value === null) return undefined
+  const notice = value as Partial<ResultNotice>
+  const session = notice.session as Partial<SessionRef> | undefined
+  if (typeof session?.generation !== "number" || typeof session.directory !== "string" || typeof session.sessionID !== "string") return undefined
+  if (!Array.isArray(notice.requests) || !notice.requests.every((id) => typeof id === "string") || typeof notice.hadMetadata !== "boolean") return undefined
+  return { session: { generation: session.generation, directory: session.directory, sessionID: session.sessionID }, requests: notice.requests, hadMetadata: notice.hadMetadata }
+}
 type Terminal =
   | { status: "completed"; result: { content?: unknown; metadata?: Record<string, unknown> } & Record<string, unknown> }
   | { status: "error"; error: Tool.Error }
@@ -19,7 +31,6 @@ export function createNetworkEgress(deps: {
   log(line: string): void
 }) {
   const activities = new Map<string, NetworkActivity>()
-  const failures = new WeakMap<Tool.Error, ResultNotice>()
   const notices = new Map<string, Map<string, EgressNotice>>()
   const endedShells = new Set<string>()
   const locations = new Map<string, AbortController>()
@@ -64,13 +75,15 @@ export function createNetworkEgress(deps: {
       .filter((notice) => notice.activities.some((item) => networkActivityKey(item) === networkActivityKey(wireActivity(activity))))
       .map((notice) => notice.requestID)
     if (!requests.length) return value
-    const result = failed ? value instanceof Error ? value : new Error({ message: value instanceof globalThis.Error ? value.message : String(value), error: value }) : value
-    if (!result || typeof result !== "object") return result
-    const original = "metadata" in result ? result.metadata as Record<string, unknown> | undefined : undefined
-    const marker = { session, requests, hadMetadata: original !== undefined }
-    if (result instanceof Error) { failures.set(result, marker); return result }
-    const metadata = { ...original, [RESULT_NOTICE]: marker }
-    return { ...result, metadata }
+    if (failed) {
+      const error = value instanceof Error ? value : new Error({ message: value instanceof globalThis.Error ? value.message : String(value), error: value })
+      const marker: ResultNotice = { session, requests, hadMetadata: error.metadata !== undefined }
+      return new Error({ message: error.message, ...(error.error === undefined ? {} : { error: error.error }), metadata: { ...error.metadata, [FAILURE_NOTICE]: marker } })
+    }
+    if (!value || typeof value !== "object") return value
+    const original = "metadata" in value ? value.metadata as Record<string, unknown> | undefined : undefined
+    const metadata = { ...original, [RESULT_NOTICE]: { session, requests, hadMetadata: original !== undefined } }
+    return { ...value, metadata }
   }
   const shell = (directory: string, sessionID: string, shellID: string) => parseNetworkActivity({ kind: "shell", session: { generation: generation ?? 0, directory, sessionID }, shellID })
   return {
@@ -105,22 +118,31 @@ export function createNetworkEgress(deps: {
       return false
     },
     attachResult(event: Terminal) {
-      const result = event.status === "error" ? event.error : event.result
-      const metadata = result.metadata as (Record<string, unknown> & { [RESULT_NOTICE]?: ResultNotice }) | undefined
-      const marker = event.status === "error" ? failures.get(event.error) : metadata?.[RESULT_NOTICE]
-      if (!marker) return false
-      if (event.status === "error") failures.delete(event.error)
-      if (event.status === "completed") {
-        delete metadata![RESULT_NOTICE]
-        if (!marker.hadMetadata && !Object.keys(metadata!).length) delete event.result.metadata
+      if (event.status === "error") {
+        const { [FAILURE_NOTICE]: carried, ...rest } = event.error.metadata ?? {}
+        const marker = failureNotice(carried)
+        if (!marker) return false
+        const requests = marker.requests.filter((id) => notices.get(sessionRefKey(marker.session))?.has(id))
+        // The incoming class: Core recognises its errors by class (as policy/display.ts and secret-mask.ts rebuild them).
+        const Constructor = event.error.constructor as typeof Error
+        event.error = new Constructor({
+          message: requests.length ? `${event.error.message}\n\n${NETWORK_EGRESS_NOTE}` : event.error.message,
+          ...(event.error.error === undefined ? {} : { error: event.error.error }),
+          ...(marker.hadMetadata || Object.keys(rest).length ? { metadata: rest } : {}),
+        })
+        if (!requests.length) return false
+        consume(marker.session, requests)
+        return true
       }
+      const metadata = event.result.metadata as (Record<string, unknown> & { [RESULT_NOTICE]?: ResultNotice }) | undefined
+      const marker = metadata?.[RESULT_NOTICE]
+      if (!marker) return false
+      delete metadata![RESULT_NOTICE]
+      if (!marker.hadMetadata && !Object.keys(metadata!).length) delete event.result.metadata
       const requests = marker.requests.filter((id) => notices.get(sessionRefKey(marker.session))?.has(id))
       if (!requests.length) return false
-      if (event.status === "error") event.error = new Error({ message: `${event.error.message}\n\n${NETWORK_EGRESS_NOTE}`, ...(event.error.error === undefined ? {} : { error: event.error.error }), ...(event.error.metadata === undefined ? {} : { metadata: event.error.metadata }) })
-      if (event.status === "completed") {
-        const content = event.result.content
-        event.result = { ...event.result, content: Array.isArray(content) ? [...content, { type: "text", text: NETWORK_EGRESS_NOTE }] : typeof content === "string" ? `${content}\n\n${NETWORK_EGRESS_NOTE}` : [{ type: "text", text: NETWORK_EGRESS_NOTE }] }
-      }
+      const content = event.result.content
+      event.result = { ...event.result, content: Array.isArray(content) ? [...content, { type: "text", text: NETWORK_EGRESS_NOTE }] : typeof content === "string" ? `${content}\n\n${NETWORK_EGRESS_NOTE}` : [{ type: "text", text: NETWORK_EGRESS_NOTE }] }
       consume(marker.session, requests)
       return true
     },

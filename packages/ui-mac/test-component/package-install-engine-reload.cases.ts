@@ -391,6 +391,8 @@ const extBridge: Record<string, unknown> = {
   persistMcp: (name: unknown, server: unknown, secrets: unknown) => call("ext-persist-mcp", name, server, secrets),
   listInstalls: async (projectDir?: unknown) => (lastInstalls = await call("ext-list-installs", projectDir) as typeof lastInstalls),
   inventoryView: (projectDir?: unknown) => call("ext-inventory-view", projectDir),
+  // `#1825`:定制中心列本机原生文件(extension-hub.tsx 的 nativeSources),同样走生产 handler。
+  nativeSources: (projectDir?: unknown) => call("ext-native-sources", projectDir),
   factorySkillIds: () => call("ext-factory-skill-ids"),
   sessionGrants: () => call("ext-session-grants"),
   advisoryActive: () => call("ext-advisory-active"),
@@ -799,7 +801,8 @@ test("busy package switch forces the existing scheduler without a second reload 
   const detach = codepuppySidecar.attach((message) => { requests.push(message as { items?: Array<{ id: string }> }) })
   try {
     expect(await call("ext-install-package", "package:supabase")).toMatchObject({ ok: true })
-    expect(requests.at(-1)?.items?.map((item) => item.id)).toEqual(expect.arrayContaining(["package:supabase", "skill:supabase", "mcp:supabase", "skill:supabase-postgres-best-practices"]))
+    // Activation and its reload are published one event turn after the install returns (plan r3 AC-14, design §4.2).
+    await waitFor(() => expect(requests.at(-1)?.items?.map((item) => item.id)).toEqual(expect.arrayContaining(["package:supabase", "skill:supabase", "mcp:supabase", "skill:supabase-postgres-best-practices"])))
   } finally { detach() }
 })
 

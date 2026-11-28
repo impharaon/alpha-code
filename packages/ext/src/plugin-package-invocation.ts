@@ -23,6 +23,7 @@ import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, realpathSync, watchFile, unwatchFile } from "node:fs"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { PACKAGE_MEMORY_ID, PACKAGE_PARTIAL_ID, renderTemplate, renderWrapper } from "./context-injection"
+import { engineToolInput } from "./engine-tool-input"
 
 type Instruction = ReturnType<typeof allInstalledPluginInstructions>[number]
 type Scope = {
@@ -437,10 +438,12 @@ export async function registerPackageInvocations(
           input.log("runtime-failed: native " + name + " input schema unavailable")
           return
         }
-        tool.input = Schema.Struct({
-          ...(tool.input.fields as Record<string, Schema.Top>),
-          arguments: Schema.optionalKey(Schema.String),
-        })
+        tool.input = engineToolInput(
+          Schema.Struct({
+            ...(tool.input.fields as Record<string, Schema.Top>),
+            arguments: Schema.optionalKey(Schema.String),
+          }),
+        )
         tool.execute = async (value, frame) => {
           const data = record(value) ? value : {}
           const parent = [...(scopes.get(frame.sessionID)?.values() ?? [])].at(-1)?.item

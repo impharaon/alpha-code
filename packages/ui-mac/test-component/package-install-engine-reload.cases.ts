@@ -391,6 +391,8 @@ const extBridge: Record<string, unknown> = {
   persistMcp: (name: unknown, server: unknown, secrets: unknown) => call("ext-persist-mcp", name, server, secrets),
   listInstalls: async (projectDir?: unknown) => (lastInstalls = await call("ext-list-installs", projectDir) as typeof lastInstalls),
   inventoryView: (projectDir?: unknown) => call("ext-inventory-view", projectDir),
+  // `#1825`:定制中心列本机原生文件(extension-hub.tsx 的 nativeSources),同样走生产 handler。
+  nativeSources: (projectDir?: unknown) => call("ext-native-sources", projectDir),
   factorySkillIds: () => call("ext-factory-skill-ids"),
   sessionGrants: () => call("ext-session-grants"),
   advisoryActive: () => call("ext-advisory-active"),

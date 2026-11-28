@@ -65,10 +65,13 @@ export function createDocumentRenderer(input: {
       try {
         previous = await readDocumentCheck(caller, checkId)
       } catch {
+        // The tool allocates checkId (design §4.4); an unknown one is still rejected, but the detail is what the model needs
+        // to recover on its next call.
         return {
           status: "failed",
           code: "invalid-input",
-          detail: "checkId does not belong to this session, Location and artifact",
+          detail:
+            "unknown checkId: the tool assigns it. For the first render of a file, omit checkId and revision; reuse the returned receipt.checkId only for its revision 1 correction render in this session",
         }
       }
       if (

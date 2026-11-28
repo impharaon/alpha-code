@@ -11,7 +11,7 @@ import { join, resolve } from "node:path"
 import { planConfigFence, planPackageManagerCaches, planUserWritableLocations, planProcessFence, planWritableLocations, planWriteApproval, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
 import { writableLocationTruthPath } from "./process-fence-workspaces"
 import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
-import { renderProcessFenceProfile, processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
+import { libreOfficeSingleInstancePipe, renderProcessFenceProfile, processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
 import { credentialStores } from "./codepuppy-secret-files"
 
@@ -573,6 +573,44 @@ describeDarwin("planProcessFence", () => {
     expect(h.made.some((d) => d.endsWith("/.opencode") || d.endsWith("/.zsh_sessions") || d.includes("bun"))).toBe(false)
   })
 
+  test("`#1761` N5:计划的 profile 在 N4 之后、受保护集之前放行本用户 LibreOffice 单实例管道族的 bind/accept,紧跟拒绝这个 HOME 的默认 profile($HOME/Library/Application Support/LibreOffice/4)的确切管道名", () => {
+    // HOME 取一个真实采样:LibreOffice 26.8.3.1 以这个 HOME 的默认 profile 启动时建的管道名就是下面的 hash(plan.md r5 证明 3 的采集记录)
+    const home = "/private/tmp/lo1761-cap/home-ascii"
+    const h = harness({ homeDir: () => home })
+    h.input.sidecarEnv = { HOME: home }
+    const uid = process.getuid!()
+    const lines = planProcessFence(h.input, h.deps).profile.split("\n").map((line) => line.replace(/\s*;.*$/, "").trim())
+    const n4 = lines.findIndex((line) => line.startsWith("(allow network-outbound"))
+    expect(lines.slice(n4 + 1, n4 + 4)).toEqual([
+      `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_[0-9a-f]+$")))`,
+      `(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb")))`,
+      // 代码审查 R1-2:同一确切名字的活管道文件在围栏内删不掉
+      `(deny file-write-unlink (literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb"))`,
+    ])
+    expect(lines[n4 + 4]).toBe("(deny file-write*")
+  })
+
+  // 代码审查 R1-1:LibreOffice 推算前先解析软链(bootstrap.cxx、file_url.cxx),计划器给的路径 = 已存在部分的真实路径 + 尚未创建的后缀。
+  // 两个真实采样(plan.md r5 采集记录 2026-11-28):HOME 经系统软链 /tmp、HOME 本身是软链;假盘复现采样时的软链,profile 目录尚未创建
+  test.each([
+    { home: "/tmp/lo1761-cap2/home", link: ["/tmp", "/private/tmp"], pipe: "9dfde0baa068139ee9d12a3b8a3f96" },
+    { home: "/private/tmp/lo1761-cap2/link-home", link: ["/private/tmp/lo1761-cap2/link-home", "/private/tmp/lo1761-cap2/real-home"], pipe: "b72d7575b186695ff1c06bc77a3f51d5" },
+  ])("`#1761` N5:HOME 经软链($home)⇒ 拒绝行是 LibreOffice 解析软链后的那个管道名", ({ home, link, pipe }) => {
+    const [from, to] = link as [string, string]
+    const resolve = (p: string) => (p === from || p.startsWith(`${from}/`) ? to + p.slice(from.length) : p)
+    const h = harness({
+      homeDir: () => home,
+      realpath: (p) => {
+        if (p.startsWith(`${home}/Library`)) throw enoent(p) // the default profile is not created yet
+        return resolve(p)
+      },
+    })
+    h.input.sidecarEnv = { HOME: home }
+    const uid = process.getuid!()
+    const profile = planProcessFence(h.input, h.deps).profile
+    expect(profile).toContain(`(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_${pipe}")))`)
+  })
+
   test("用户导出 XDG_STATE_HOME ⇒ 多建 <state>/opencode,profile 多一行 W3;XDG_DATA_HOME 跟着 env", () => {
     const h = harness()
     h.input.sidecarEnv = { HOME, XDG_STATE_HOME: "/Volumes/s", XDG_DATA_HOME: "/Volumes/d" }
@@ -669,7 +707,9 @@ describeDarwin("planProcessFence", () => {
     const asRule = (rule: (typeof cf.configFence)[number]): ProcessFenceWriteRule =>
       rule.kind === "dat-files" ? { kind: "regex", value: `^${rule.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/[^/]+\\.[dD][aA][tT]$` } : { kind: rule.kind, value: rule.path }
     const anchors = cf.configFence.map((rule) => (rule.kind === "dat-files" ? `${rule.dir}/x` : rule.path))
-    expect(processFenceWriteRules(plan.profile).deny).toEqual([...cf.configFence.map(asRule), ...ancestorsOf(anchors).map((value) => ({ kind: "literal" as const, value }))])
+    // 代码审查 R1-2(#1761):N5 的 unlink 拒绝行(这个 HOME 默认 profile 的活管道文件)排在受保护集之前
+    const userPipe = `/private/tmp/${libreOfficeSingleInstancePipe(process.getuid!(), `${HOME}/Library/Application Support/LibreOffice/4`)}`
+    expect(processFenceWriteRules(plan.profile).deny).toEqual([{ kind: "literal", value: userPipe }, ...cf.configFence.map(asRule), ...ancestorsOf(anchors).map((value) => ({ kind: "literal" as const, value }))])
     expect(plan.profile.indexOf("(deny file-write*\n", plan.profile.indexOf("(allow network-outbound"))).toBeGreaterThan(0)
     expect(plan.configFenceRoots).toEqual([STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`, `${HOME}/.opencode`, `${HOME}/.local/share/opencode/codepuppy-tool-policy`])
     expect(plan.configFenceRoots).toEqual(cf.configFenceRoots)

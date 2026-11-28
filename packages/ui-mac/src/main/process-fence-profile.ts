@@ -31,6 +31,8 @@
 // (mDNSResponder 的 unix socket,Q2)—— 刻意不放行:走代理的客户端由代理解析,想直连的死在解析这一步(Q3);
 // ④字节余量 39 倍(Q5),不为它做任何优化。代理跑在 Electron main(围栏外,`#1073` 裁决三),端口由 server.ts
 // 在 fork 之前给出;策略(目的地授权)在 network-egress-proxy.ts / network-egress-registry.ts,不在这里。
+// `#1761` N5(DESIGN-document-output-quality §4.11):N4 之后只加「本用户 LibreOffice 单实例管道名可 bind/accept」一行,紧跟拒绝
+// 用户自己默认 profile 那个确切管道名的行;unix socket 的 connect 仍由 N1 全拒。
 //
 // ── 不要手写 `(subpath …)` 的 TypeScript 替身 ────────────────────────────────────────
 // U2 裁决 §5.2 实测 seatbelt 的 subpath 按路径分段、解析软链、随卷的大小写策略匹配,字符串
@@ -38,6 +40,7 @@
 // **排除**规则(HOME / 根 / HOME 的祖先 / 与应用状态根相关的路径),以及运行期签发前的静态包含判定(见「签发判定」一节,
 // 只用来决定**不**签发,判据偏向判「覆盖」)。
 
+import { createHash } from "node:crypto"
 import { statSync } from "node:fs"
 import { dirname, isAbsolute, join, posix, resolve, win32 } from "node:path"
 import { SETTINGS_STORE, UPDATER_STORE } from "./store-keys"
@@ -190,6 +193,54 @@ export type ProcessFenceProfileInput = {
    * 渲染成全文最后两块 —— 拒读拒写的存放点一块、它们每一级上级目录节点拒写一块(挡住把 userData / 临时目录整个改名搬走)。空列表两块都不渲染。
    */
   credentialStores: readonly CredentialStoreRule[]
+  /**
+   * N5(DESIGN-document-output-quality §4.11,`#1761`):围栏内允许监听的 unix socket 汇合点。省略或 [] 时不渲染任何 N5 行;
+   * 生产计划器在 darwin 上恒给 LibreOffice 单实例管道这一条。
+   */
+  unixListen?: readonly FenceUnixListen[]
+}
+
+/** N5:围栏内进程可以创建并接受连接的本机 unix socket 汇合点;绝不放行 connect(出站仍归 N1)。 */
+export type FenceUnixListen = {
+  kind: "libreoffice-single-instance"
+  /** 非负安全整数,管道名里的 <uid> */
+  uid: number
+  /** 用户自己 LibreOffice 使用的 UserInstallation 绝对系统路径(已像 LibreOffice 那样解析软链);每条推出一个确切管道名,在放行行之后拒绝 bind/accept */
+  userInstallations: readonly string[]
+}
+
+/**
+ * LibreOffice 26.8.3.1 给某个 UserInstallation 建的单实例管道名(§4.11,F-21/F-23 逐字):`file://` 加上路径 UTF-8 字节逐个编码
+ * (``!$&'()*+,-./0-9:=@A-Z_a-z~`` 原样,其余写成大写 `%XX`,`sal/osl/unx/file_url.cxx`);对这个 URL 的 UTF-16LE 码元取 MD5,
+ * 16 个字节各自写成小写十六进制、不补零(`dp_misc.cxx`)。这里只推算:LibreOffice 先解析软链,所以调用方给的必须是已按它的方式解析的路径
+ * (计划器:已存在部分的真实路径 + 尚未创建的后缀)。
+ */
+export function libreOfficeSingleInstancePipe(uid: number, userInstallation: string): string {
+  let url = "file://"
+  for (const byte of Buffer.from(userInstallation, "utf8"))
+    url += byte < 0x80 && /[!$&'()*+,\-./0-9:=@A-Z_a-z~]/.test(String.fromCharCode(byte)) ? String.fromCharCode(byte) : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`
+  const hash = [...createHash("md5").update(Buffer.from(url, "utf16le")).digest()].map((byte) => byte.toString(16)).join("")
+  return `OSL_PIPE_${uid}_SingleOfficeIPC_${hash}`
+}
+
+/**
+ * N5 的行:放行本用户 LO 单实例管道族的 bind/accept,紧跟每条用户 profile 的确切管道名拒绝行(后写者胜);再对同样的名字各一行
+ * `file-write-unlink` 拒绝 —— 那个活管道文件在 W11 之下,删掉它用户下次启动会另起实例(代码审查 R1-2)。只拒这几个文件的删除,
+ * 产品 job 管道的创建与清理不受影响。只写 hash,不写用户路径。
+ */
+function renderUnixListen(entries: readonly FenceUnixListen[]): string[] {
+  return entries.flatMap((entry) => {
+    if (!Number.isSafeInteger(entry.uid) || entry.uid < 0) throw new Error(`process fence: unix listen uid must be a non-negative safe integer, got ${JSON.stringify(entry.uid)}`)
+    entry.userInstallations.forEach((path, i) => {
+      if (typeof path !== "string" || !isAbsolute(path)) throw new Error(`process fence: unixListen userInstallations[${i}] must be absolute, got ${JSON.stringify(path)}`)
+    })
+    const pipes = entry.userInstallations.map((path) => `/private/tmp/${libreOfficeSingleInstancePipe(entry.uid, path)}`)
+    return [
+      `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_${entry.uid}_SingleOfficeIPC_[0-9a-f]+$"))) ; N5 LibreOffice 单实例管道:只 bind/accept,不 connect`,
+      ...pipes.map((pipe) => `(deny network-bind network-inbound (local unix-socket (path-literal "${pipe}"))) ; N5 用户自己 LibreOffice 的管道`),
+      ...pipes.map((pipe) => `(deny file-write-unlink (literal "${pipe}")) ; N5 用户自己 LibreOffice 的活管道文件不可删`),
+    ]
+  })
 }
 
 /** C1 的一条:存放点目录(subpath)或文件(literal),真实路径。 */
@@ -388,6 +439,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     '(allow network-bind (local ip "localhost:*"))             ; N2 sidecar 自己的 HTTP 服务器要 bind',
     '(allow network-inbound (local ip "localhost:*"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)',
     `(allow network-outbound (remote ip "localhost:${egressProxyPort}"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)`,
+    ...renderUnixListen(input.unixListen ?? []),
     ...renderConfigFence(input.homebrewFence),
     ...renderConfigFence(configFence),
     ...renderCredentialFence(credentialStores),
@@ -478,8 +530,11 @@ export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; val
 export type ProcessFenceWriteRules = { allow: ProcessFenceWriteRule[]; deny: ProcessFenceWriteRule[] }
 
 const WRITE_RULE = /\((subpath|literal) "([^"]*)"\)|\(regex #"([^"]*)"\)/g
-/** 渲染点写出的两种拒写表头(受保护集与上级目录块、C1 的上级目录块;C1 的读写块)。必须在行首,后面紧跟空格或行尾。 */
-const DENY_HEADERS = ["(deny file-write*", "(deny file-read* file-write*"] as const
+/**
+ * 渲染点写出的拒写表头(受保护集与上级目录块、C1 的上级目录块;C1 的读写块;N5 的 unlink 拒绝行)。必须在行首,后面紧跟空格或行尾。
+ * unlink 只是写操作的一种,按「拒」记进 deny 偏向判「不覆盖」,那几个 /private/tmp 下的 socket 文件不会是签发对象。
+ */
+const DENY_HEADERS = ["(deny file-write*", "(deny file-read* file-write*", "(deny file-write-unlink"] as const
 /** 通配操作 `file*`(含写)出现在任何 allow / deny 形式里:渲染点从不写它(审查 B 第 3 条)。 */
 const WILDCARD_FILE_OPERATION = /\((?:allow|deny)(?:\s+[\w*-]+)*?\s+file\*(?=[\s)]|$)/
 

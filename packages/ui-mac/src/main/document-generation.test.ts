@@ -55,7 +55,7 @@ test("one generation answers the ext host, shows its preparation as one launch r
       progress(1, 1)
       return { result: { ok: true, path: join(root, "fixture.dmg"), via: "cache" } }
     },
-    extract: async ({ destination }) => { const file = join(destination, "LibreOffice.app/Contents/MacOS/soffice"); mkdirSync(join(file, ".."), { recursive: true }); writeFileSync(file, "extracted candidate") },
+    extract: async ({ destination }) => { const file = join(destination, "LibreOffice/Contents/MacOS/soffice"); mkdirSync(join(file, ".."), { recursive: true }); writeFileSync(file, "extracted candidate") },
     writable: (directory) => directory === workspace,
     launches,
     chromium: async () => { throw Error("not an HTML case") },

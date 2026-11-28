@@ -351,6 +351,16 @@ export function planConfigFence(
   return planProtectedLocations(locations, envFile, deps)
 }
 
+/** 一个路径的真实路径;不在盘上 = 最深一级已存在祖先的真实路径接上余下部分。 */
+function realPathWithin(path: string, realpath: (p: string) => string): string {
+  try {
+    return realpath(path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT" || dirname(path) === path) throw error
+    return join(realPathWithin(dirname(path), realpath), basename(path))
+  }
+}
+
 /** The same canonical/alias-node protection for CF and Homebrew installation identities. */
 export function planProtectedLocations(
   locations: readonly ConfigFenceRule[],
@@ -376,15 +386,7 @@ export function planProtectedLocations(
     for (let node = dirname(anchor); node !== dirname(node); node = dirname(node)) nodes.push(node)
     return nodes
   }
-  /** 一个目录的真实路径;不在盘上 = 最深一级已存在祖先的真实路径接上余下部分。 */
-  const within = (directory: string): string => {
-    try {
-      return deps.realpath(directory)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code !== "ENOENT" || dirname(directory) === directory) throw error
-      return join(within(dirname(directory)), basename(directory))
-    }
-  }
+  const within = (directory: string) => realPathWithin(directory, deps.realpath)
   const lstat = deps.lstat ?? ((path: string) => lstatSync(path, { bigint: true }))
   /** 节点本身(不跟软链)的 device + inode;拿不到为空。 */
   const identity = (path: string) => {
@@ -553,8 +555,13 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
 
   // DESIGN-stored-credentials-fence §4.5:存放点落到真实路径(userData 的真实路径求不出 ⇒ 抛 ⇒ 拒 fork)
   const credentialRules = planCredentialStores(input.credentialStores, deps)
+  // `#1761` N5(DESIGN-document-output-quality §4.11):LibreOffice 的单实例管道;用户自己 LibreOffice 的默认 profile 是发布版 bootstraprc 的
+  // `$SYSUSERCONFIG/LibreOffice/4`,home 与引擎根同一个。LibreOffice 推算管道名前先解析软链,所以这里给已存在部分的真实路径 + 尚未创建的后缀
+  // (代码审查 R1-1)。不看 LO 是否已就绪:profile 只在 sidecar 启动时渲染一次。
+  const userInstallation = realPathWithin(join(home, "Library", "Application Support", "LibreOffice", "4"), deps.realpath)
+  const unixListen = [{ kind: "libreoffice-single-instance" as const, uid: process.getuid!(), userInstallations: [userInstallation] }]
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, newPaths, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
+    { workspaces: union.selected, newPaths, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules, unixListen },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)

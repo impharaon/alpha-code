@@ -14,7 +14,9 @@ import { createDocumentPythonProjections } from "./document-python"
 import { USER_DATA_LAYOUT } from "./user-data-layout"
 
 const execute = promisify(execFile)
-const executable = (root: string, platform: LauncherPlatform) => join(root, platform === "darwin-arm64" ? "LibreOffice.app/Contents/MacOS/soffice" : "program/soffice.com")
+// The mac bundle directory has no .app extension: executing a .app copy registers it and its QuickLook extensions with
+// LaunchServices/pluginkit, a bare directory with the same bytes and signature is not registered (design §4.11 decision two).
+const executable = (root: string, platform: LauncherPlatform) => join(root, platform === "darwin-arm64" ? "LibreOffice/Contents/MacOS/soffice" : "program/soffice.com")
 const key = (location: Location.Ref) => JSON.stringify([location.directory, location.workspaceID ?? null])
 
 /** Consumers supply #1760's validated manifest and ID-only acquisition/classification authorities. */
@@ -204,7 +206,7 @@ export async function extractDocumentRuntime(input: { archive: string; destinati
   try {
     await execute("/usr/bin/hdiutil", ["attach", "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount, input.archive], { signal: input.signal })
     attached = true
-    await cp(join(mount, "LibreOffice.app"), join(input.destination, "LibreOffice.app"), { recursive: true, dereference: false, verbatimSymlinks: true, preserveTimestamps: true })
+    await cp(join(mount, "LibreOffice.app"), join(input.destination, "LibreOffice"), { recursive: true, dereference: false, verbatimSymlinks: true, preserveTimestamps: true })
   } finally {
     if (attached) await execute("/usr/bin/hdiutil", ["detach", mount])
   }

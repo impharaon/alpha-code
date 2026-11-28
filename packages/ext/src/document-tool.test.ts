@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Effect, Exit } from "effect"
 import { createDocumentInspection } from "./document-check"
 import { createDocumentTool } from "./document-tool"
-import { separatelyBundledEngineRuntime } from "./engine-runtime.harness"
+import { separatelyBundledEngine } from "./engine-runtime.harness"
 import type { DocumentCaller, DocumentHost, RenderResult } from "../../util/src/codepuppy-document"
 
 describe("document tool", () => {
@@ -40,7 +40,7 @@ describe("document tool", () => {
     { action: "render", checkId: "q3-report-1", revision: 0, request: { kind: "docx", path: "/workspace/report.docx", dpi: 110 } },
     { action: "render", checkId: "q3-report-1", request: { kind: "docx", path: "/workspace/report.docx" }, revision: 0 },
   ])("an engine with its own Effect runs $action with the model's arguments", async (args) => {
-    const engine = await separatelyBundledEngineRuntime()
+    const engine = await separatelyBundledEngine()
     const calls: unknown[] = []
     const tool = createDocumentTool({
       location: { directory: "/workspace" } as DocumentCaller["location"],

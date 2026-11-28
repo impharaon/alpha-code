@@ -10,6 +10,7 @@ import { Tool } from "../../schema/src/tool"
 import { ProtectedFiles } from "../../schema/src/codepuppy-protected-files"
 import { UNATTENDED_DENIAL_KEY, unattendedDenialCopy } from "../../schema/src/codepuppy-unattended"
 import { createSecretMask, replaceSecretBytes } from "./secret-mask"
+import { separatelyBundledEngine } from "./engine-runtime.harness"
 
 const owned: string[] = []
 afterEach(async () => {
@@ -370,4 +371,29 @@ test("line-wise output masks each multiline credential fragment", async () => {
     expect(JSON.stringify(result).includes(line)).toBe(false)
     expect(JSON.stringify(result).includes(ProtectedFiles.REDACTED)).toBe(true)
   }
+})
+
+// The packaged layout (2026-11-28 probe: shipped ext bundle in the engine, AWS credentials read): the read failed with
+// "Expected an integer at [offset]" instead of returning the notice, because the ext's Effect decoded the engine's output schema.
+test("a protected notice read settles in an engine with its own Effect", async () => {
+  const { roots, mask } = await setup()
+  await mkdir(path.join(roots.home, ".ssh"))
+  const key = path.join(roots.home, ".ssh", "fixture")
+  await copyFile(new URL("./fixtures/secret-files/private-key.txt", import.meta.url), key)
+  const engine = await separatelyBundledEngine()
+  const { FileContent, TextPage, ListPage } = engine.ReadToolFileSystem
+  let inner = 0
+  // The engine's read tool as it registers (core tool/plugin/read.ts `Output`), built by the engine's Effect.
+  const tool = { id: "read", name: "read", description: "read", input: { type: "object", properties: {} }, output: engine.Schema.Union([FileContent, TextPage, ListPage]), execute: async () => (inner++, { content: "unmasked" }) }
+  mask.wrap({ list: () => [tool], update: (_id: string, update: (draft: typeof tool) => void) => update(tool) } as never, {
+    facts: async () => ({ identity: { source: "builtin", name: "read" } }) as never,
+    profile: async () => undefined,
+    protect: () => {},
+  })
+  // The engine adapts a promise plugin's tool to an Effect one (plugin promise adapter `executePromiseTool`).
+  const engineTool = { ...tool, execute: (input: unknown, context: object) => engine.Effect.promise((signal) => tool.execute(input as never, { ...context, signal, progress: async () => {} } as never)) }
+  const exit = await engine.Effect.runPromiseExit(engine.execute(engineTool as never, { path: key }, { ...call, agent: "build", progress: () => engine.Effect.void } as never))
+  expect(exit._tag === "Success" ? "settled" : String(exit.cause)).toBe("settled")
+  expect(exit._tag === "Success" && exit.value).toMatchObject({ content: [{ type: "text", text: ProtectedFiles.PROTECTED_FILE_TEXT }], output: { type: "text-page", content: ProtectedFiles.PROTECTED_FILE_TEXT } })
+  expect(inner).toBe(0)
 })

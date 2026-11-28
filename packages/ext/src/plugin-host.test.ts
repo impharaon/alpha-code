@@ -75,7 +75,7 @@ import { ShellTool } from "../../core/src/tool/plugin/shell"
 import { TestLLM } from "../../ai/src/testing"
 import { dirname } from "node:path"
 import { definition } from "../../core/src/tool/runtime"
-import { separatelyBundledEngineRuntime } from "./engine-runtime.harness"
+import { separatelyBundledEngine } from "./engine-runtime.harness"
 
 let scratch = ""
 beforeAll(() => {
@@ -1965,7 +1965,7 @@ packageIt.live("skill and subagent with package arguments decode the model's arg
   const tools = yield* Tool.Service
   const takesArguments = (tool: Parameters<typeof definition>[0]) => "arguments" in ((definition(tool).inputSchema.properties as object | undefined) ?? {})
   yield* ext.finish(tools.list().pipe(Effect.map(list => ["skill", "subagent"].every(id => list.some(tool => tool.id === id && takesArguments(tool))))))
-  const engine = yield* Effect.promise(separatelyBundledEngineRuntime)
+  const engine = yield* Effect.promise(separatelyBundledEngine)
   const decoded = (id: string, args: Record<string, unknown>) => Effect.gen(function* () {
     const tool = (yield* tools.list()).find(item => item.id === id)!
     const seen: unknown[] = []

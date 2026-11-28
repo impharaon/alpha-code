@@ -22,4 +22,3 @@
 # `cd packages/ui-mac && bun test src` ⇒ Ran 4430 tests across 307 files,4430 pass / 0 fail。
 # #1094 修绿了此前登记的全部 3 条(gate-file-registry ⑤ / extension-seed-snapshot 互钉 /
 # ext-package-detail-wiring 宿主),清单现为空 —— 棘轮只朝收紧方向走,新红不得运行时收编。
-src/renderer/engine-cases.test.ts	REQ-128 `#810` 三个生产安装入口经同一个 useExtensions 方法出站并接引擎重扫	origin/alpha 上既有：#1825 后 supabase 安装带 connectorChange，测试只收到 codepuppy.unattended.live、没有带 items 的重载请求；此前被 nativeSources 桩缺失导致的整文件退出遮住；修复归 #1776（编排器 2026-11-28）。外层可归因的失败单位是宿主这一行：子进程 test-component/package-install-engine-reload.cases.ts 里红的是「package reload requests address graph component identities」(11 pass / 1 fail)

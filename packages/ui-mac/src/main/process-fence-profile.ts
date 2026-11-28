@@ -218,18 +218,22 @@ export function libreOfficeSingleInstancePipe(uid: number, userInstallation: str
   return `OSL_PIPE_${uid}_SingleOfficeIPC_${hash}`
 }
 
-/** N5 两种行:放行本用户 LO 单实例管道族的 bind/accept,紧跟每条用户 profile 的确切管道名拒绝行(后写者胜)。只写 hash,不写用户路径。 */
+/**
+ * N5 的行:放行本用户 LO 单实例管道族的 bind/accept,紧跟每条用户 profile 的确切管道名拒绝行(后写者胜);再对同样的名字各一行
+ * `file-write-unlink` 拒绝 —— 那个活管道文件在 W11 之下,删掉它用户下次启动会另起实例(代码审查 R1-2)。只拒这几个文件的删除,
+ * 产品 job 管道的创建与清理不受影响。只写 hash,不写用户路径。
+ */
 function renderUnixListen(entries: readonly FenceUnixListen[]): string[] {
   return entries.flatMap((entry) => {
     if (!Number.isSafeInteger(entry.uid) || entry.uid < 0) throw new Error(`process fence: unix listen uid must be a non-negative safe integer, got ${JSON.stringify(entry.uid)}`)
     entry.userInstallations.forEach((path, i) => {
       if (typeof path !== "string" || !isAbsolute(path)) throw new Error(`process fence: unixListen userInstallations[${i}] must be absolute, got ${JSON.stringify(path)}`)
     })
+    const pipes = entry.userInstallations.map((path) => `/private/tmp/${libreOfficeSingleInstancePipe(entry.uid, path)}`)
     return [
       `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_${entry.uid}_SingleOfficeIPC_[0-9a-f]+$"))) ; N5 LibreOffice 单实例管道:只 bind/accept,不 connect`,
-      ...entry.userInstallations.map(
-        (path) => `(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/${libreOfficeSingleInstancePipe(entry.uid, path)}"))) ; N5 用户自己 LibreOffice 的管道`,
-      ),
+      ...pipes.map((pipe) => `(deny network-bind network-inbound (local unix-socket (path-literal "${pipe}"))) ; N5 用户自己 LibreOffice 的管道`),
+      ...pipes.map((pipe) => `(deny file-write-unlink (literal "${pipe}")) ; N5 用户自己 LibreOffice 的活管道文件不可删`),
     ]
   })
 }
@@ -520,8 +524,11 @@ export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; val
 export type ProcessFenceWriteRules = { allow: ProcessFenceWriteRule[]; deny: ProcessFenceWriteRule[] }
 
 const WRITE_RULE = /\((subpath|literal) "([^"]*)"\)|\(regex #"([^"]*)"\)/g
-/** 渲染点写出的两种拒写表头(受保护集与上级目录块、C1 的上级目录块;C1 的读写块)。必须在行首,后面紧跟空格或行尾。 */
-const DENY_HEADERS = ["(deny file-write*", "(deny file-read* file-write*"] as const
+/**
+ * 渲染点写出的拒写表头(受保护集与上级目录块、C1 的上级目录块;C1 的读写块;N5 的 unlink 拒绝行)。必须在行首,后面紧跟空格或行尾。
+ * unlink 只是写操作的一种,按「拒」记进 deny 偏向判「不覆盖」,那几个 /private/tmp 下的 socket 文件不会是签发对象。
+ */
+const DENY_HEADERS = ["(deny file-write*", "(deny file-read* file-write*", "(deny file-write-unlink"] as const
 /** 通配操作 `file*`(含写)出现在任何 allow / deny 形式里:渲染点从不写它(审查 B 第 3 条)。 */
 const WILDCARD_FILE_OPERATION = /\((?:allow|deny)(?:\s+[\w*-]+)*?\s+file\*(?=[\s)]|$)/
 

@@ -1026,6 +1026,48 @@ runner 本身是一个不开窗口的 Electron main 进程：用 `packages/ui-ma
 
 **状态**：AC-01..03 仍 pending，等 `skill` 加载与 `codepuppy_document render` 在组合引擎里不再报 Symbol 错误。续跑：剩余授权 ≤3273 分，本轮上限还剩 2683 分（`--cap-fen 2683`）。
 
+#### 第三轮实测（2026-11-28，#1837 合入后，宿主 `28946621c4` 的构建，代码 `0c286218c3`）
+
+先在 `gate slot --` 下重建 predev 与宿主（ext 已带 #1837 的 Standard JSON Schema 输入）。免费空跑 `r3-dry-run` exit 2（`provider.transport`），余额 96693→96693；跑前检查列出的 19 个技能全部来自产品（`skill://` 内置与 `packages/ui-mac/resources`）。
+
+付费：`… --evidence …/r3-paid --runs W1,P1,X1,W2,P2,X2,W3,P3,X3 --sample W1 --cap-fen 2683 --prior-max-run-fen 251 --run-timeout-minutes 90`，exit 0，九次全部跑完。宿主退出后，副本与 helper 都没有留在 LaunchServices，凭据文件已删。
+- LibreOffice：11:01:41Z 开始下载，11:04:02Z ready，围栏内验证一次通过。来源推断为香港 relay（11:01:44Z 对 relay 做 HEAD 返回 200，此时已落盘 70 MB）。
+- 样本 W1 后的推算为 209 + 8 × 251 = 2217 ≤ 2683，宿主自动继续。
+- 每次运行的费用就是余额差，与账本窗口的 `usage_settled` 逐次相等；九次是顺序跑的。
+- 九次之间都经香港入口（route preferred），没有超时，跑后检查都没有碰到操作者的 `~/.claude` 或 `~/.agents`。
+
+W1 的记录（`r3-paid/runs/W1.messages.json`）确认走的是产品路径：`skill {"id":"docx"}` 成功；`codepuppy_document` 调用了 environment 1 次、render 5 次；逐页读取了渲染出的页图（54 次云端识图）；最后提交了 `check`（final，inspectedPages 1–5，uninspected 为空）。另外八次都加载了对应的产品技能（X3 除外，见下）、做了渲染并读图。
+
+| 次 | 成品（`r3-paid/runs/<次>/score/`） | 逐项 | 费用（分） | 余额 | 用时 |
+| --- | --- | --- | --- | --- | --- |
+| 预热 | — | — | 8 | 96693→96685 | — |
+| W1 | `report.docx`，5 页 | 10/10（评分器修正后；运行时 9/10，目录误判） | 201 | 96685→96484 | 7.8 min |
+| P1 | `deck.pptx`，10 页 | 11/11 | 212 | 96484→96272 | 7.2 min |
+| X1 | `sales.xlsx` | 12/12；产品重算 663 个公式、0 错；区域 4/4、月份 12/12、环比 11/11 | 294 | 96272→95978 | 12.0 min |
+| W2 | `report.docx`，6 页 | 9/10（修正后；运行时 8/10）：封面标题 partial | 336 | 95978→95642 | 10.6 min |
+| P2 | `deck.pptx`，10 页 | 11/11 | 211 | 95642→95431 | 6.0 min |
+| X2 | `sales.xlsx` | 12/12；288 个公式、0 错；4/4、12/12、11/11 | 272 | 95431→95159 | 13.9 min |
+| W3 | `report.docx`，6 页 | 9/10：封面标题 partial | 114 | 95159→95045 | 4.2 min |
+| P3 | `deck.pptx`，10 页 | 11/11 | 176 | 95045→94869 | 5.5 min |
+| X3 | `sales.xlsx` | 12/12；474 个公式、0 错；4/4、12/12、11/11 | 127 | 94869→94742 | 5.8 min |
+
+合计：本轮 1951 分（96693→94742）；U-12 授权累计 9 + 308 + 1951 = 2268 分。
+
+评分说明：
+- 修正评分器（`score_docx.py` 第 9 项，见 `scripts/document-quality/SOURCES.md`）：W1、W2 的目录页标题写作「目　录」（全角空格），pilot 评分器判为没有目录；页图上两份都有带页码的目录页。修正后重评的结果存为 `checklist-toc-fix.json`，运行时的 `checklist.json` 原样保留。
+- 未改评分规则、需要定夺的一处：W2、W3 的封面标题拆成两个段落（「2026 年第三季度」+「经营分析」），页图上就是封面上分两行的标题。评分器沿用 pilot 的规则，要求「2026」与「第三季度经营分析」在同一段，因此判 partial（pilot 当时对拆行标题也判不通过）。
+- PPT 第 10 项：脚本判定与人工看页图（`runs/P1..P3/score/contact.png`，三套都是深色首尾页、统一配色与字体）一致，均通过。
+
+AC 结论：
+- **AC-01**：按评分器（含目录修正）为 10、9、9，每次 ≥9 成立，「3 次里至少 2 次 10 项齐全」不成立（只有 1 次）。两次 9/10 缺的都是同一项：封面标题拆成两行。如果封面标题允许跨两段，三次都是 10/10，AC-01 成立。这条规则要不要放宽，交调度方 / owner 定。
+- **AC-02**：三次都是 11/11，成立。
+- **AC-03**：三次都是 12/12；经产品 `OfficeExcel.recalculate` 重算后公式错误 0，汇总与 `sales.json` 的独立结果一致，成立。
+
+观察：
+- X2、X3 没有提交 `check` 报告（渲染并读图了，但没有走完自查回执）；X3 没有调用 `skill` 加载 xlsx 技能，直接读了 WORKFLOW 与模板。这属于 BR-03 / AC-05 的范围，本节不判。
+- 运行时出现过两次模型侧错误，模型都自行恢复了：P3 一次「document source changed since rendering」，X3 一次 `codepuppy_vision` 找不到图片。
+- 宿主不处理 SIGTERM，11-28 第二轮只能用 SIGKILL 停。
+
 ### 偏离记录
 
 2026-11-27 · 计划外两处：没有为脚本新增套件测试（它需要真实 LibreOffice，按 test-layers 记为一次性证据）；`scripts/` 不在 ui-mac 的 tsconfig 里，新驱动另用临时配置单独做了类型检查（tsgo exit 0）。

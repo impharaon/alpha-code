@@ -91,7 +91,8 @@ res("08 footer with page numbers", "pass" if ftr_page and ftr_ref else ("partial
 # 9 TOC
 toc_field = bool(re.search(r"<w:instrText[^>]*>\s*TOC\b|fldSimple[^>]*instr=\"\s*TOC", doc_xml))
 toc_sdt = "Table of Contents" in doc_xml
-toc_title = [p.text.strip() for p in paras if p.text.strip() in ("目录", "目 录", "目  录")]
+# Any whitespace between the two characters, including the ideographic space (U+3000) of Chinese typesetting.
+toc_title = [p.text.strip() for p in paras if re.sub(r"\s", "", p.text) == "目录"]
 toc_entries = [p.text.strip()[:25] for p in paras if p.style is not None and re.match(r"(?i)toc\s*\d", p.style.name or "") and p.text.strip()]
 res("09 short table of contents", "pass" if (toc_field or toc_sdt or toc_title) else "fail",
     f"TOC field={toc_field} sdt={toc_sdt} title={toc_title[:1]} cached TOC entries in file={len(toc_entries)} {toc_entries[:3]} (rendered content judged on the page images)")

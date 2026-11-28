@@ -1330,6 +1330,21 @@ test("external directory card shows the real target and waits for the human gran
   expect(replies).toBe(1)
 })
 
+// SPEC v8 BR-08 (design v7 NP6, §6 evidence 11): the write tool's request for a new path in HOME lists HOME itself; once R4
+// has described the card, the resources row names the one path approval makes writable, as the real-path row does.
+test("a new path in HOME: the resources row names the path the card grants, not HOME from the engine's request", async () => {
+  const origin = "http://127.0.0.1:47003"
+  const external = { ...request, action: "external_directory", resources: ["/Users/me/*"], metadata: { directoryAccess: { access: "write", targets: [{ absolute: "/Users/me/note.txt", directory: "/Users/me" }] } } }
+  Object.assign(window.api, {
+    describeDirectoryAccess: async () => ({ snapshotID: "shown", targets: [{ absolute: "/Users/me/note.txt", directory: "/Users/me", realTarget: "/Users/me/note.txt", realDirectory: "/Users/me/note.txt", dev: "1", ino: "2" }] }),
+    approveDirectoryWrite: async () => ({ outcome: "granted" }),
+  })
+  mount(async (command) => receipt(command, external), "project", external, { directoryContext: { server: "sidecar", origin } })
+  await flush()
+  expect(document.querySelector("[data-permission-real-directory]")?.textContent).toBe("/Users/me/note.txt")
+  expect([...document.querySelectorAll('[data-permission-fact="resources"] code')].map((node) => node.textContent)).toEqual(["/Users/me/note.txt"])
+})
+
 test("external directory rejection never calls the main grant", async () => {
   const origin = "http://127.0.0.1:47003"
   const external = { ...request, action: "external_directory", metadata: { directoryAccess: { access: "write", targets: [{ absolute: "/outside/a", directory: "/outside" }] } } }

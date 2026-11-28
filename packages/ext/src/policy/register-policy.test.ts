@@ -2370,13 +2370,19 @@ for (const action of [ID_BUILTIN_WRITE, ALIAS_WRITE]) {
 describe("v7 BR-11: after-the-fact approval of a write refused mid-command", () => {
   const { WRITE_APPROVED_RETRY_NOTE, WRITE_REFUSED_NOTE } = require("../context-injection") as typeof import("../context-injection")
   const refusedIn = (folder: string) => ({ command: `echo "touch: ${folder}/b.txt: Operation not permitted" >&2; exit 1` })
-  const fakeWriteScope = (outcomes: Record<string, "ineligible" | "protected" | "unavailable"> = {}) => {
+  // `"new-path"` marks a HOME stand-in: a path directly in it is approved as itself (v8 BR-08), as main's NP1 answers.
+  const fakeWriteScope = (outcomes: Record<string, "ineligible" | "protected" | "unavailable" | "new-path"> = {}) => {
     const granted = new Set<string>()
     const queries: { targets: readonly { absolute: string; directory: string }[] }[] = []
     const scope = async (request: { access: "read" | "write"; targets: readonly { absolute: string; directory: string }[] }) => {
       queries.push(request)
       if (request.targets.some((target) => outcomes[target.directory] === "unavailable")) return { error: "unavailable" as const }
-      return { revision: 1, targets: request.targets.map((target) => ({ absolute: target.absolute, realDirectory: target.directory, outcome: granted.has(target.directory) ? "writable" as const : (outcomes[target.directory] as "ineligible" | "protected" | undefined) ?? "needs-approval" as const })) }
+      return { revision: 1, targets: request.targets.map((target) => {
+        const kind = outcomes[target.directory] === "new-path" ? "new-path" as const : "directory" as const
+        const realDirectory = kind === "new-path" ? target.absolute : target.directory
+        const refused = kind === "directory" ? outcomes[target.directory] as "ineligible" | "protected" | undefined : undefined
+        return { absolute: target.absolute, realDirectory, kind, outcome: granted.has(realDirectory) ? "writable" as const : refused ?? "needs-approval" as const }
+      }) }
     }
     return { scope, granted, queries }
   }
@@ -2413,6 +2419,22 @@ describe("v7 BR-11: after-the-fact approval of a write refused mid-command", () 
     expect(texts(exit).join("\n")).toContain("touch: /outside-a/b.txt: Operation not permitted")
   }))
 
+  // v8 BR-08 (design v7 §4.2, R1-F1): `mkdir ~/newfolder` refused directly in HOME asks for that path itself, and the card
+  // carries `{ P, HOME }` — main's real paths — so R4 judges it as a new path again, never as a folder P.
+  it.live("a new path directly in HOME asks for that path, carried to R4 as { P, HOME }", () => Effect.gen(function* () {
+    const r6 = fakeWriteScope({ "/home-n": "new-path" })
+    const { session } = yield* setup({ internal: [ShellTool.Plugin], records: NEUTRAL, readWriteScope: r6.scope })
+    const fiber = yield* Effect.forkChild(shellCall(session.id, { command: `echo "mkdir: /home-n/newfolder: Operation not permitted" >&2; exit 1` }, "call_n"))
+    const [request] = yield* pending
+    expect(request).toMatchObject({ action: "external_directory", resources: ["/home-n/newfolder/*"], save: ["/home-n/newfolder/*"] })
+    expect(request!.metadata?.directoryAccess).toEqual({ access: "write", targets: [{ absolute: "/home-n/newfolder", directory: "/home-n" }] })
+    r6.granted.add("/home-n/newfolder")
+    yield* (yield* Permission.Service).reply({ requestID: request!.id, reply: "once" })
+    expect(texts(yield* E.Fiber.join(fiber)).at(-1)).toBe(WRITE_APPROVED_RETRY_NOTE)
+    // The re-read after the decision asks about the card's own target.
+    expect(r6.queries.at(-1)?.targets).toEqual([{ absolute: "/home-n/newfolder", directory: "/home-n" }])
+  }))
+
   // Review R1 #2: fenced code can re-point a link between main's first reading and the card. The card's folder is the one
   // main resolved first, so the card, the merge and the grant name one directory, and HOME never gets a card.
   it.live("the card names the folder main resolved first, even when the link in the refused path is re-pointed to HOME", () => Effect.gen(function* () {
@@ -2423,7 +2445,7 @@ describe("v7 BR-11: after-the-fact approval of a write refused mid-command", () 
       const targets = request.targets.map((target) => {
         asked.push(target.directory)
         const realDirectory = target.directory === linked ? resolved : target.directory
-        return { absolute: target.absolute, realDirectory, outcome: realDirectory === "/home-like" ? "ineligible" as const : "needs-approval" as const }
+        return { absolute: target.absolute, realDirectory, kind: "directory" as const, outcome: realDirectory === "/home-like" ? "ineligible" as const : "needs-approval" as const }
       })
       // The link is swapped to HOME right after main's first reading of it.
       if (asked.length === 1) resolved = "/home-like"

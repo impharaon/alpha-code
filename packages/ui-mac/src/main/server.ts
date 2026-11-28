@@ -68,7 +68,7 @@ import type { CodePuppySidecarOutbound } from "./codepuppy-sidecar-messages"
 import { consumeDanglingSweepCredit } from "./dangling-sweep-latch"
 // REQ-159 `#1321`:进程围栏计划 —— fork 之前渲染 + 试编译可写集、解析原生模块路径,经 StartCommand 交给
 // sidecar 在 import 引擎之前 apply。计划做不出来 = 拒绝 fork(fail-closed,原因可读),不静默无围栏。
-import { checkWritableTarget, planCredentialStores, plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, type ProcessFencePlan } from "./process-fence-plan"
+import { planCredentialStores, plannedWritableTarget, planPackageManagerCaches, planUserWritableLocations, planProtectedLocations, planProcessFence, planWriteApproval, type ProcessFencePlan, type WriteApprovalKind } from "./process-fence-plan"
 import { configureCommandSourceFence } from "./plugin-command-source"
 import { trialCompileProfile } from "./process-fence-compile"
 import type { ProcessFenceStartInput } from "./process-fence-apply"
@@ -88,12 +88,12 @@ import { createProjectConfigViewRequester } from "./project-config-view-message"
 import type { ProjectConfigView } from "@opencode/schema/codepuppy-project-config"
 import { createWriteGrantRequester, createWriteProbeRequester, type WorkspaceWriteGrantReply, type WorkspaceWriteProbeFact } from "./workspace-write-probe"
 import { loadFenceAddon } from "./process-fence-apply"
-import { configFenceLocations, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule, type ProcessFenceWriteRules, type WorkspaceDirectoryInput } from "./process-fence-profile"
+import { configFenceLocations, fenceNameKey, processFenceRulesCover, processFenceWriteRules, resolveEngineRoots, WORKSPACE_WRITE_EXTENSION_CLASS, type ProcessFenceWriteRule, type ProcessFenceWriteRules, type WorkspaceDirectoryInput } from "./process-fence-profile"
 import { codepuppyGlobalRoot, codepuppyJsoncPath } from "./engine-config-truth"
 import { ensureUserWorkspaceDir } from "./codepuppy-user-workspace"
 import { fenceWorkspaceTruthPath, readWorkspaceTruthOrThrow, writableLocationTruthPath, type FenceRunWritable } from "./process-fence-workspaces"
 import { homedir } from "node:os"
-import { mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
+import { lstatSync, mkdirSync, readFileSync, realpathSync, statSync } from "node:fs"
 import { defaultPolicyBaseDir } from "../../../ext/src/policy/resolver"
 import { receiveToolPolicyWrite } from "../../../ext/src/policy/store"
 import { createPinnedFileMainBridge, pinnedFileAuthority } from "./connector-launch-host"
@@ -138,8 +138,11 @@ export type SidecarListener = {
    */
   probeWrite: (directory: string) => Promise<WorkspaceWriteProbeFact>
   readonly fenced: boolean
-  /** Main's eligibility consumer is the sole caller; successful grants live only in this listener. */
-  grantWrite: (directory: string) => Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>
+  /**
+   * Main's eligibility consumer is the sole caller; successful grants live only in this listener. `"new-path"`: a path
+   * directly in HOME that does not exist yet (SPEC v8 BR-08), issued as itself without being created.
+   */
+  grantWrite: (path: string, kind?: WriteApprovalKind) => Promise<Omit<WorkspaceWriteGrantReply, "type" | "id">>
   /**
    * Whether this generation's sandbox already writes `directory` (or an ancestor) by main's own knowledge: the
    * rules of the profile main rendered and applied, plus this generation's finished and in-flight grants. String
@@ -333,13 +336,15 @@ function capturePackageManagerUserEnvironment(userDataPath: string, source: Reco
 }
 
 /** `eligibility`: the planner's identity/eligibility input (the same one R4 uses); R6 answers `ineligible` from it. */
-type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; eligibility?: WorkspaceDirectoryInput; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; configFence?: ProcessFencePlan["configFence"]; roots?: ProcessFencePlan["roots"] }
+type PlannedFence = ProcessFenceStartInput & { workspaces?: readonly string[]; newPaths?: readonly string[]; configFenceRoots?: readonly string[]; fixedWritable?: readonly ProcessFenceWriteRule[]; eligibility?: WorkspaceDirectoryInput; cacheEnv?: Readonly<Record<string, string>>; refreshGoEnvironment?: () => Promise<Readonly<Record<string, string>>>; cancelGoQuery?: () => void; homebrewInstallations?: readonly HomebrewInstallation[]; configFence?: ProcessFencePlan["configFence"]; roots?: ProcessFencePlan["roots"] }
 
 type ProductionFenceInput = {
   userDataPath: string
   sidecarEnv: Record<string, string>
   egressProxyPort: number | undefined
   carriedWorkspaces: readonly string[]
+  /** SPEC v8 BR-08 (design v7 NP5): new paths in HOME the user approved during this run (the tracker's run-lifetime set). */
+  carriedNewPaths: readonly string[]
   /** SPEC-engine-config-fence CF-8:the start document's engineConfigDirectory (the same value). */
   engineConfigDirectory: string
   /** CF-4 (实现期修订 2 A):the env file main reads at start (codepuppy-secrets.ts userEnvFile — the one authority); unset = absent. */
@@ -406,6 +411,7 @@ async function planProductionFence(input: ProductionFenceInput): Promise<Planned
       addon: { packaged: electronNs.app.isPackaged, resourcesPath: process.resourcesPath, moduleDir, exists: existsSync },
       egressProxyPort,
       carriedWorkspaces: input.carriedWorkspaces,
+      carriedNewPaths: input.carriedNewPaths,
       engineConfigDirectory: input.engineConfigDirectory,
       ...(input.envFile ? { envFile: input.envFile } : {}),
       // DESIGN-stored-credentials-fence §4.5:C1 的存放点与 T1 / P / T2 的表同一份清单
@@ -542,7 +548,7 @@ export async function prepareShellProbeFence(): Promise<ShellProbeFenceContext> 
   const snapshot = resolveShellProbeRoots({ env: { ...process.env }, home: homedir(), userDataPath })
   const port = process.platform === "darwin" ? (await ensureEgressPolicyProxy()).port : undefined
   const env = { ...snapshot.env, ...(port === undefined ? {} : sidecarEgressProxyEnv(port)) }
-  const fence = await planProductionFence({ userDataPath, sidecarEnv: env, egressProxyPort: port, carriedWorkspaces: [], engineConfigDirectory: snapshot.roots.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
+  const fence = await planProductionFence({ userDataPath, sidecarEnv: env, egressProxyPort: port, carriedWorkspaces: [], carriedNewPaths: [], engineConfigDirectory: snapshot.roots.engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
   return { ...snapshot, env, profile: fence?.profile ?? "" }
 }
 
@@ -768,7 +774,7 @@ export async function spawnLocalServer(
 
   let fence: PlannedFence | undefined
   try {
-    fence = await (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
+    fence = await (options.planFence ?? planProductionFence)({ userDataPath: options.userDataPath, sidecarEnv, egressProxyPort, carriedWorkspaces: options.fenceRun?.carriedWorkspaces() ?? [], carriedNewPaths: options.fenceRun?.carriedNewPaths() ?? [], engineConfigDirectory, ...(userEnvFile(process.env) ? { envFile: userEnvFile(process.env) } : {}) })
   } catch (error) {
     getLogger()?.error("process fence plan FAILED — refusing to fork the sidecar (fail closed; an unfenced engine must not start)", error)
     throw new Error(`process fence plan failed — sidecar fork refused: ${serializeError(error).message}`)
@@ -921,21 +927,34 @@ export async function spawnLocalServer(
     getLogger()?.warn(`process fence: cannot read this generation's write rules — runtime grants are disabled for it: ${serializeError(error).message}`)
   }
   // Another directory's grant in flight counts too: once consumed, its subtree is fenced-writable before main hears
-  // back. The same directory's own in-flight grant is joined instead (grantWrite coalesces; nothing new is issued).
+  // back. The same directory's own in-flight grant — in any spelling naming the same entry (fenceNameKey) — is joined
+  // instead (grantWrite coalesces; nothing new is issued, nothing reads as granted before it settles).
+  const inFlight = (path: string) => [...granting].find(([pending]) => fenceNameKey(pending) === fenceNameKey(path))?.[1]
   const generationWrites: SidecarListener["generationWrites"] = (directory) =>
-    !writeRules || processFenceRulesCover({ allow: [...writeRules.allow, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => pending !== directory)].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules.deny }, directory)
-  const grantWrite: SidecarListener["grantWrite"] = (directory) => {
+    !writeRules || processFenceRulesCover({ allow: [...writeRules.allow, ...[...grantedDirectories, ...possiblyConsumed, ...[...granting.keys()].filter((pending) => fenceNameKey(pending) !== fenceNameKey(directory))].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules.deny }, directory)
+  const grantWrite: SidecarListener["grantWrite"] = (directory, kind = "directory") => {
     if (exited || !child.pid) return Promise.resolve({ outcome: "failed", detail: "engine not running" })
     if (!fence) return Promise.resolve({ outcome: "failed", detail: "engine has no fence" })
+    // The tracker supplies its freshly validated canonical identity. Never follow a later rebind. A new path: its parent is
+    // still itself and nothing is there yet — the kernel would issue for whatever a link there points at (design v7 NP-P07 C9).
+    const unchanged = () => {
+      if (kind === "directory") return realpathSync.native(directory) === directory
+      if (realpathSync.native(dirname(directory)) !== dirname(directory)) return false
+      try {
+        lstatSync(directory)
+        return false
+      } catch (error) {
+        return (error as NodeJS.ErrnoException)?.code === "ENOENT"
+      }
+    }
     try {
-      // The tracker supplies its freshly validated canonical identity. Never follow a later rebind.
-      if (realpathSync.native(directory) !== directory) throw new Error("workspace path changed")
+      if (!unchanged()) throw new Error("workspace path changed")
     } catch {
       getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=realpath errno=unknown`)
       return Promise.resolve({ outcome: "failed", detail: "workspace path changed" })
     }
     if (grantedDirectories.has(directory)) return Promise.resolve({ outcome: "granted" })
-    const pending = granting.get(directory)
+    const pending = inFlight(directory)
     if (pending) return pending
     const started = performance.now()
     const grant = (async (): ReturnType<SidecarListener["grantWrite"]> => {
@@ -946,8 +965,9 @@ export async function spawnLocalServer(
           return { outcome: "failed", detail: `${issued.step} errno=${issued.errno}` }
         }
         // Assertion, not the protection: the tracker issues only for an identity outside every root this generation
-        // writes, just re-validated by stillSelf; fenced code cannot rename components of such a path.
-        if (realpathSync.native(directory) !== directory) {
+        // writes, just re-validated by stillSelf (a new path: by planWriteApproval); fenced code cannot rename components of
+        // such a path. An unfenced process swapping a link in and out between the two checks is residual risk R-f (NP4, R1-F2).
+        if (!unchanged()) {
           getLogger()?.warn(`process fence: grant failed directory=${JSON.stringify(directory)} step=realpath errno=unknown`)
           return { outcome: "failed", detail: "workspace path changed" }
         }
@@ -977,15 +997,18 @@ export async function spawnLocalServer(
     return { revision: writeScopeRevision, targets: request.targets.map((target): Extract<WriteScopeReply["result"], { targets: unknown }>["targets"][number] => {
       // Filesystem semantics, never lexical: `P/link/../b` is written in the link target's parent (design v6 §4.2, R1-F1).
       const directory = plannedWritableTarget(target.directory, realpathSync.native)
-      const answer = (outcome: WriteScopeOutcome) => ({ absolute: target.absolute, outcome, realDirectory: directory.target })
+      const answer = (outcome: WriteScopeOutcome, realDirectory = directory.target, kind: WriteApprovalKind = "directory") => ({ absolute: target.absolute, outcome, realDirectory, kind })
       if (!fence) return answer("no-fence")
       const actual = plannedWritableTarget(target.absolute, realpathSync.native).target
       if (processFenceRulesCover({ allow: writeRules!.deny, deny: [] }, actual, "file")) return answer("protected")
       if (processFenceRulesCover({ allow: [...(fence.fixedWritable ?? [])], deny: writeRules!.deny }, actual, "file")) return answer("fixed")
       if (processFenceRulesCover({ allow: [...writeRules!.allow, ...[...grantedDirectories].map((value) => ({ kind: "subpath" as const, value }))], deny: writeRules!.deny }, actual, "file")) return answer("writable")
-      // R4's own eligibility rule: a folder it would refuse to grant is never offered after the fact (BR-11).
-      if (fence.eligibility && !checkWritableTarget(fence.eligibility, directory).eligible) return answer("ineligible")
-      return answer("needs-approval")
+      if (!fence.eligibility) return answer("needs-approval")
+      // R4's own judgement (NP1): a target it would refuse is never offered (BR-11); a new path directly in HOME is offered as
+      // that path itself (BR-08 v8).
+      const scope = planWriteApproval(fence.eligibility, target)
+      if (!scope.eligible) return answer("ineligible", scope.directory)
+      return scope.kind === "new-path" ? answer("needs-approval", scope.root, "new-path") : answer("needs-approval")
     }) }
   }
   // REQ-234 `#1529`:`codepuppy.*` 分发与探针应答并列;不是本族的消息原样交还(返回 false)。
@@ -1294,8 +1317,8 @@ export async function spawnLocalServer(
         return stopping
       },
   }
-  // This generation's W1 (the plan's own list) joins the run's writable history before anything can ask about it.
-  if (fence?.workspaces) options.fenceRun?.noteGeneration(listener, fence.workspaces)
+  // This generation's W1 and approved new paths (the plan's own lists) join the run's writable history before anything can ask about it.
+  if (fence?.workspaces) options.fenceRun?.noteGeneration(listener, fence.workspaces, fence.newPaths ?? [])
 
   return {
     listener,

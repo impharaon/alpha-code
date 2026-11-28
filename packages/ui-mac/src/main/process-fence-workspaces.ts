@@ -39,6 +39,7 @@ import { dirname, isAbsolute, resolve } from "node:path"
 import type { AppEnvironment } from "./codepuppy-environment"
 import { checkWorkspaceDirectory, LOCAL_SIDECAR_SERVER_KEY, processFenceRulesCover, workspaceCandidatesFromStore, type WorkspaceDirectoryCheck, type WorkspaceDirectoryInput, type WorkspaceUnionSources } from "./process-fence-profile"
 import { codepuppyUserWorkspaceDir } from "./codepuppy-user-workspace"
+import { planWriteApproval, type WriteApprovalKind } from "./process-fence-plan"
 import type { SidecarListener } from "./server"
 import type { WorkspaceWritableChanged, WorkspaceWriteProbeFact, WorkspaceWriteProbeRequest, WorkspaceWriteProbeResult } from "./workspace-write-probe"
 import { GLOBAL_RENDERER_STORE, TABS_INFO_KEY, TABS_KEY, TABS_RECENT_KEY } from "./tabs-preclean"
@@ -200,14 +201,21 @@ export type FenceWorkspaceTracker = {
   noteRendererStoreDelete(name: string, key: string): void
   /** ipc.ts `store-clear`。 */
   noteRendererStoreClear(name: string): void
+  /**
+   * Only R4, after the user clicked the card naming this path (SPEC v8 BR-08): makes writable the one new path directly in
+   * HOME that planWriteApproval judged (`kind: "new-path"`). Nothing is created or registered as opened.
+   */
+  grantNewPath(input: { server: string; path: string }, sidecar: SidecarListener | null): Promise<Pick<WorkspaceWriteProbeResult, "grant" | "reason">>
   /** Planner input (server.ts): every directory this run's fenced code could write because the user opened it. */
   carriedWorkspaces(): string[]
-  /** server.ts, once per generation: the W1 members its applied profile renders. */
-  noteGeneration(generation: SidecarListener, workspaces: readonly string[]): void
+  /** Planner input (server.ts): every new path in HOME the user approved during this run (design v7 NP5). */
+  carriedNewPaths(): string[]
+  /** server.ts, once per generation: the W1 members and the new paths its applied profile renders. */
+  noteGeneration(generation: SidecarListener, workspaces: readonly string[], newPaths: readonly string[]): void
 }
 
 /** What spawnLocalServer needs from the tracker to carry this run's writable history into the next generation. */
-export type FenceRunWritable = Pick<FenceWorkspaceTracker, "carriedWorkspaces" | "noteGeneration">
+export type FenceRunWritable = Pick<FenceWorkspaceTracker, "carriedWorkspaces" | "carriedNewPaths" | "noteGeneration">
 
 export type WorkspaceEligibility =
   | { eligible: true; server: typeof LOCAL_SIDECAR_SERVER_KEY; directory: string }
@@ -281,15 +289,17 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
   // Run-lifetime carry (R3): canonical directories fenced code could write in some generation of this app run
   // because the user opened them — each generation's W1 and every issue attempt — with the generations that had
   // them. A survivor of an earlier generation keeps that sandbox, so such a directory is never issued again later
-  // in this run; the planner puts it back into W1 instead. Nothing here outlives the app process.
-  const carried = new Map<string, Set<SidecarListener>>()
-  const carry = (directory: string, generation: SidecarListener) => {
-    const generations = carried.get(directory) ?? new Set<SidecarListener>()
-    generations.add(generation)
-    carried.set(directory, generations)
+  // in this run; the planner puts it back into W1 instead. Nothing here outlives the app process. An approved new path in
+  // HOME (SPEC v8 BR-08) is carried the same way, as its own kind: the planner renders it beside W1, never as a workspace.
+  const carried = new Map<string, { kind: WriteApprovalKind; generations: Set<SidecarListener> }>()
+  const carry = (path: string, generation: SidecarListener, kind: WriteApprovalKind = "directory") => {
+    const entry = carried.get(path) ?? { kind, generations: new Set<SidecarListener>() }
+    entry.generations.add(generation)
+    carried.set(path, entry)
   }
   const carriedFromOtherGenerations = (directory: string, generation: SidecarListener) =>
-    processFenceRulesCover({ allow: [...carried].filter(([, generations]) => [...generations].some((other) => other !== generation)).map(([value]) => ({ kind: "subpath" as const, value })), deny: [] }, directory)
+    processFenceRulesCover({ allow: [...carried].filter(([, entry]) => [...entry.generations].some((other) => other !== generation)).map(([value]) => ({ kind: "subpath" as const, value })), deny: [] }, directory)
+  const carriedOf = (kind: WriteApprovalKind) => [...carried].flatMap(([path, entry]) => (entry.kind === kind ? [path] : []))
   let current: string[]
   let quarantined: string[] = []
   if (existing.ok) {
@@ -449,9 +459,29 @@ export function bootFenceWorkspaceTruth(input: BootFenceWorkspaceTruthInput): Fe
       return { grant, ...(reason ? { reason } : {}) }
     },
     probeWrite: (target, sidecar) => settle(target, sidecar, true),
-    carriedWorkspaces: () => [...carried.keys()],
-    noteGeneration(generation, workspaces) {
+    async grantNewPath(target, sidecar) {
+      if (sidecar ? !sidecar.fenced : process.platform !== "darwin") return { grant: "no-fence" }
+      if (target.server !== LOCAL_SIDECAR_SERVER_KEY) return { grant: "not-local" }
+      // Judged again now: created meanwhile (only by an unfenced process), a link, or a parent that is no longer HOME ends
+      // at HOME's sentence — never at P as a folder (design v7 NP1 rule 5, R1-F1).
+      const scope = planWriteApproval(input.eligibility, { absolute: target.path, directory: dirname(target.path) })
+      if (!scope.eligible || scope.kind !== "new-path" || scope.root !== target.path)
+        return { grant: "ineligible", reason: scope.eligible ? "not-opened-by-you" : ineligibleReason(scope.reason) }
+      if (!sidecar) return { grant: "failed", reason: "grant-failed" }
+      // The same issue rule as settle: what this generation writes, or another generation of this run could, is never issued.
+      // Only this generation's own coverage is granted; a path only history covers (its profile does not carry it, e.g.
+      // trimmed by the byte wall) cannot be written here — grant-failed (design v7 §5; code review R1 #3).
+      if (sidecar.generationWrites(target.path)) return { grant: "granted" }
+      if (carriedFromOtherGenerations(target.path, sidecar)) return { grant: "failed", reason: "grant-failed" }
+      carry(target.path, sidecar, "new-path") // an attempt may already have produced a consumed token in this generation
+      const result = await sidecar.grantWrite(target.path, "new-path")
+      return result.outcome === "failed" ? { grant: "failed", reason: "grant-failed" } : { grant: "granted" }
+    },
+    carriedWorkspaces: () => carriedOf("directory"),
+    carriedNewPaths: () => carriedOf("new-path"),
+    noteGeneration(generation, workspaces, newPaths) {
       for (const directory of workspaces) carry(directory, generation)
+      for (const path of newPaths) carry(path, generation, "new-path")
     },
     noteRendererStoreSet(name, key, value) {
       const field = tabKey(name, key)

@@ -101,6 +101,9 @@ The first resolution of a path on an unreachable volume blocks as the existing s
 `server.ts` 签发后的 realpath 比较保留为断言(变化即丢令牌、报 grant-failed),不是防护所依。
 本次应用运行里任何一代因用户打开而可写过的目录(每代 W1 取自该代计划对象自己的工作区清单,加每次签发尝试)记在 tracker 的运行内可写历史里:后来的代对它们一律不签发,
 planner 把它们并入下一代 W1 候选(经 `stored` 校验);只在内存,应用重启后只从真源开始。活过应用重启的孤儿进程是剩余风险 R-f(design §6)。
+可写集因此是文件夹,或本人在批准卡上批准的、直接位于主目录下、批准时尚不存在的那一个新路径(spec v8 BR-08,[design v7 增量](../specs/child-process-write-fence/design.md) NP1–NP5):
+判定只有 `process-fence-plan.ts` 的 `planWriteApproval` 一份;新路径不预建、不登记,main 直接对该路径签发(签发前后断言父目录仍是自身、路径仍不存在),
+同样记入运行内历史(带种类),下一代紧跟 W1 渲染为 `(subpath P)`,仍是自身且父节点仍是主目录才保留,软链或改指即排除并记一行。
 真源条目在启动时只是「此刻不在盘上」(未挂载的卷)不算改指:留在真源与 opened 里,出现后同次运行即可写;只有解析到别处或落进保护位置才排除。
 停机前先判资格。恢复、重载、SSE、深链接和 sidecar 消息只消费,不登记。
 main 保留登记,所以 renderer 重载不丢资格;不通过引擎换代、页面重载或取消其它会话完成放行。

@@ -600,6 +600,24 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
     expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/a" }], deny: [{ kind: "literal", value: "/a/b" }] }, "/a/b/c")).toBe(true)
     expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/a" }], deny: [{ kind: "literal", value: "/a/b" }] }, "/a/b")).toBe(false)
     expect(processFenceRulesCover({ allow: [], deny: [] }, "/a")).toBe(false)
+    // APFS treats another letter case and another Unicode normalization as the same name (code review R1 #1): an NFD
+    // spelling of an NFC root — or the reverse, or either in another case — is that root, on the allow and the deny side.
+    const [nfc, nfd] = ["/Users/alpha/caf\u00e9.txt", "/Users/alpha/cafe\u0301.txt"]
+    for (const [rule, spelled] of [[nfc, nfd], [nfd, nfc], [nfc, "/Users/alpha/CAFE\u0301.TXT"], [nfd, `${nfc}/inner`]] as const) {
+      expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: rule }], deny: [] }, spelled), spelled).toBe(true)
+      expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/Users" }], deny: [{ kind: "subpath", value: rule }] }, spelled), spelled).toBe(false)
+      expect(processFenceRulesCover({ allow: [{ kind: "literal", value: rule }], deny: [] }, spelled, "file"), spelled).toBe(spelled.endsWith("/inner") ? false : true)
+    }
+    expect(processFenceRulesCover({ allow: [{ kind: "regex", value: "^/Users/alpha/caf\u00e9\\.txt$" }], deny: [] }, nfd, "file")).toBe(true)
+    expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: nfc }], deny: [] }, "/Users/alpha/cafe.txt")).toBe(false)
+    // APFS folds case fully, beyond JS toLowerCase (fix verification Minor 1; plan.md records the APFS probe): final sigma,
+    // micro sign, sharp s and its capital, a ligature and the Kelvin sign name the same entry; dotless ı stays its own name.
+    for (const [root, spelled] of [["\u03c3", "\u03c2"], ["\u03c3", "\u03a3"], ["\u00b5", "\u03bc"], ["\u00b5", "\u039c"], ["\u00df", "ss"], ["\u00df", "\u1e9e"], ["\ufb01", "FI"], ["k", "\u212a"]] as const) {
+      const rule = { kind: "subpath" as const, value: `/Users/alpha/${root}.txt` }
+      expect(processFenceRulesCover({ allow: [rule], deny: [] }, `/Users/alpha/${spelled}.txt`), spelled).toBe(true)
+      expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/Users" }], deny: [rule] }, `/Users/alpha/${spelled}.txt`), spelled).toBe(false)
+    }
+    expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/Users/alpha/ix.txt" }], deny: [] }, "/Users/alpha/\u0131x.txt")).toBe(false)
   })
 })
 
@@ -930,6 +948,23 @@ describe("trimUntilCompiles —— 试编译封顶,从尾部丢,丢到底仍失�
     expect(tokens(r.profile)).not.toContain(`(subpath "/Users/alpha/b")`)
     // SPEC-engine-config-fence E9:裁剪只丢工作区,受保护集原样(每次试编译都带着);stored-credentials-fence §4.5:C1 同样原样、仍在最后
     expect(tokens(r.profile).slice(-(CF_LINES.length + C1_LINES.length))).toEqual([...CF_LINES, ...C1_LINES])
+  })
+
+  // SPEC v8 BR-08 (design v7 NP5): approved new paths in HOME render right after W1 in W1's shape and are trimmed before it.
+  test("本人批准的主目录下新路径:紧跟 W1 渲染为 subpath、写规则读得回;字节墙先裁新路径、再裁工作区", () => {
+    const newPaths = ["/Users/alpha/note.txt", "/Users/alpha/newfolder"]
+    const counting = (max: number) => (profile: string) =>
+      (profile.match(/; (W1|NP5 .*)$/gm)?.length ?? 0) <= max ? ({ ok: true } as const) : ({ ok: false, reason: "sandbox-exec: data object length 70173 exceeds maximum (65535)" } as const)
+    const all = trimUntilCompiles({ ...base, workspaces: ws, newPaths }, counting(99))
+    const lines = all.profile.split("\n")
+    const after = lines.findLastIndex((line) => line.endsWith("; W1"))
+    expect(lines.slice(after + 1, after + 3)).toEqual(newPaths.map((path) => `  (subpath "${path}") ; NP5 本人批准的主目录下新路径`))
+    expect(processFenceWriteRules(all.profile).allow.slice(ws.length, ws.length + 2)).toEqual(newPaths.map((value) => ({ kind: "subpath", value })))
+    const trimmed = trimUntilCompiles({ ...base, workspaces: ws, newPaths }, counting(3))
+    expect(trimmed.dropped).toEqual(["/Users/alpha/newfolder", "/Users/alpha/note.txt", "/Users/alpha/c"])
+    expect(trimmed.newPaths).toEqual([])
+    expect(trimmed.workspaces).toEqual(ws.slice(0, 3))
+    expect(() => renderProcessFenceProfile({ ...base, workspaces: ws, newPaths: ['/Users/alpha/"quoted'] })).toThrow()
   })
 
   test("默认工作区不可丢:字节墙丢到只剩 1 个仍失败 ⇒ 抛,消息带编译器原文与账目(fail-closed 到「引擎不起」)", () => {

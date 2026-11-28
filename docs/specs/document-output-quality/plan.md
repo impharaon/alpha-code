@@ -1016,4 +1016,16 @@ AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口�
 
 2026-11-27 · `document-runtime.test.ts` 的 dmg 用例用 UDRW 镜像：产品的 `hdiutil attach` 会校验压缩镜像（UDRO/UDZO 实测 3–7 s），UDRW 整条用例约 3.3 s，在 integration 的 5 s 预算内。
 
-2026-11-27 · 宿主第一版 unix 探针在 bind 得 EADDRINUSE 后仍会删 socket 文件，把用户 LO 的活管道删掉，导致第二次启动自己另起实例（`report-proof4-probe-unlinked.log`）；改为只删自己建的文件后重跑即为上面的证明 4。这说明围栏内进程本就能删掉 `/private/tmp` 里用户 LO 的管道文件（W11 可写，F-21 已记），作为设计观察交回，不在本轮改。
+2026-11-27 · 宿主第一版 unix 探针在 bind 得 EADDRINUSE 后仍会删 socket 文件，把用户 LO 的活管道删掉，导致第二次启动自己另起实例（`report-proof4-probe-unlinked.log`）；改为只删自己建的文件后重跑即为上面的证明 4。这说明围栏内进程本就能删掉 `/private/tmp` 里用户 LO 的管道文件（W11 可写，F-21 已记），作为设计观察交回，不在本轮改。（2026-11-28：代码审查 R1-2 采纳，已改，见下节。）
+
+### 代码审查 R1 修正（2026-11-28）
+
+依据：Codex / gpt-6.1-sol（xhigh）对 `7358658f18` 的 R1，结论 FIX-THEN-MERGE；编排器采纳两项 Major 与一项 OPTIONAL，并授权改正设计 §4.11 一句、§10 加注。证明 5 的正式签名包与 Spotlight 条件仍按上节转为发布验收。
+
+| 项 | 红（未修代码上的失败） | 修 | 证据 |
+| --- | --- | --- | --- |
+| R1-1 用户默认管道名没按 LibreOffice 解析软链后的路径推算 | `0492cb7f45`：`process-fence-plan.test.ts` 两个 HOME 经软链的用例 2 fail，拒绝行是原样路径的 hash（`…92c88eea…`、`…b0b0892e…`） | `77830f92f9`：计划器先取已存在部分的真实路径、接上未创建的后缀（复用原 `planProtectedLocations` 里的同一逻辑）；设计 §4.11「不做 realpath」一句改正，§10 r5 R1 残余行加注 | 真实样本（`proof3-capture.txt` 2026-11-28 段）：HOME 为 `/tmp/…`（系统软链）与 HOME 本身是软链两种，LibreOffice 26.8.3.1 首次与再次启动的管道名都等于解析后路径的推算；修后 49 pass / 0 fail |
+| R1-2 围栏内能删掉用户 LibreOffice 的活管道文件 | `6708264565`：`network-egress-fence` A4 fenced 臂 unlink 冒充用户默认管道的活 socket 成功（期望 EPERM），A5 随之 ENOENT；两个 N5 形状用例缺 unlink 行 | `5a5d0eb237`：拒绝行之后对同样的名字各一行 `(deny file-write-unlink (literal "…"))`；签发解析认得这个表头，读成受保护集之前的 literal deny；E9 往返的 deny 期望多这一条 | 修后三个文件 105 pass / 0 fail：A4 fenced 臂 unlink EPERM 且文件仍在，A5（去掉拒绝行的对照臂）能删 |
+| OPTIONAL 许可证构建的旧 `.app` 布局 | — | `6420e887bf`：`scripts/build-document-licenses.ts` 改取 `LibreOffice/Contents/Resources` | 该函数没有调用者，不加测试 |
+
+两次修正后 `tsgo -b` exit 0；gate-files 仅 `process-fence-plan.test.ts` 47→49（CODEPUPPY_TEST_FILES 限定的 `--update`），其余两行条数不变、只加注。相关集合（`gate slot -- bun test` 一次：server、process-fence-compile/wiring/apply/credential-stores/config-fence/zsh-startup/workspaces/engine、workspace-write-probe-fence、project-trust-truth-fence、custom-provider-truth-fence、codepuppy-credential-table、endpoint-route-fence.engine）14 个文件 135 pass / 0 fail（`tier3-r1.log`）。

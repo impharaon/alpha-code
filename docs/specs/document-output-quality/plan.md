@@ -935,9 +935,146 @@ AC-01..03 的测量 runner 不在本轮落代码：它要驱动已组合好的�
 
 AC-08 在 darwin-arm64 dev 构建上成立；安装包上由固定文件入口下载的 LO、以及 Windows（AC-15）仍 pending。
 
+### AC-01..03 实测
+
+- 依据：[spec v1](spec.md) @ `31cd182e09` AC-01..03 与「待决」（owner U-12「授权」：默认模型 W/P/X 各 3 次，上限 50 元）；本节「现状」算出的剩余授权 ≤3590 分；调度方本轮上限 3000 分。Issue #1761。基线 origin/alpha `aedea8af9f`（含 #1830）。
+- 核对：plan `3311931db4` · 调度方（Claude Opus 5.5）· 通过，附裁决：无窗口 Electron main 宿主算 AC-01..03 的已组合产品引擎；分两段，样本推算九次 ≤3000 分即连续跑完，累计 3000 分硬停；三个一组并行只在能按账本逐笔归属费用时允许，否则顺序跑。
+
+#### 调用链核对（2026-11-27）
+
+- 文档宿主在 Electron main，不在 sidecar：ext 在 sidecar 里只登记工具并发布一个经 parentPort 的桥（`packages/ext/src/plugin.ts:597-615`，`document-register.ts:63-71`）；宿主由 main 的 `spawnLocalServer` 组装（`packages/ui-mac/src/main/server.ts:1047-1064` → `document-generation.ts`），`OfficeExcel.recalculate` 读的 `CODEPUPPY_DOCUMENT_HOST` 投影也由它写（`resources/office-excel/codepuppy_office/recalculate.py:23-57`）。CLI/测试宿主没有 parentPort（`packages/ext/src/hub-bridge.ts:447-450`），只起 sidecar/引擎进程走不到制作、渲染、自查和重算。
+- 产品没有无窗口的 main：`index.ts:1566` 无条件建主窗口，`windows.ts:271-273` 在 ready-to-show 时 `show()`。
+- 长期测试账号是 service-only 的 API key（alpha-platform `docs/runbooks/production-test-account.md`），产品登录用不了它：`applyAuthEnv` 对每个凭据做 `requireTokenPurpose`（`codepuppy-auth.ts:388-395`，`packages/codepuppy-contracts-consumer/src/decode.ts:172-181`），开发短路 `DEV_PLATFORM_TOKEN` 同样要 purpose JWT。所以即使 owner 离开时开窗，真实 dev 应用也不能用这把 key 跑平台默认模型。
+
+#### 宿主（调度方已确认）
+
+runner 本身是一个不开窗口的 Electron main 进程：用 `packages/ui-mac/node_modules/electron` 的 Electron.app 在证据目录里的副本（Info.plist 加 `LSUIElement`，不进 Dock 和菜单栏；结束后 `lsregister -u`），不建 BrowserWindow，不注册 `codepuppy://`。它按 `index.ts` 的顺序调用产品自己的启动函数中与这条链有关的部分（环境快照、入口地址、shell 环境、出厂技能 reconcile、模型目录刷新与钉住、悬挂引用清扫），在 fork 之前把测试 key 读进本进程，写进 `CODEPUPPY_API_KEY`、`CODEPUPPY_MCP_TOKEN`，地址取香港入口；然后调用产品的 `spawnLocalServer`，也就是真的 utilityProcess sidecar、进程围栏与出网代理、`openDocumentGeneration`、启动器的 Node 和固定文件入口。会话经引擎 HTTP 接口创建，发送任务文本，等到空闲；权限询问按「本次允许」作答并逐条记录。userData、HOME、XDG、工作区都放在本次证据目录下。
+
+不改产品代码，也不自己组装 DocumentHost。测量宿主与真实应用有两处不同，属于宿主的偏离，不是产品的偏离（调度方裁决：这些 AC 量的是默认模型经产品技能、引擎和文档宿主做出的成品，这两处不参与成品）：一是 `index.ts` 的启动只重放其中一部分，DB 预检、扩展台账、桌面 IPC 不跑；二是 key 不经 auth 模块，直接进入凭据文件通道（同一网关、同一账号、同一计费）。
+
+这个宿主同时是 AC-04、05、12 等其它付费真引擎验收的测量宿主：任务文本与素材由 `tasks.json` 给出，评分按成品格式选同目录的脚本，换任务不改宿主。
+
+#### 改动
+
+| 文件 | 改什么 |
+| --- | --- |
+| `packages/ui-mac/scripts/document-quality/host.ts`（新增） | 无窗口宿主（Electron main 入口）：按 index.ts 顺序调用产品启动函数并 `spawnLocalServer`；LibreOffice 预热；逐次运行（建会话、发任务文本、按「本次允许」答询问、等结束、导出记录）；余额前后读数、账本窗口核对、样本推算与 3000 分硬停；评分（产品 LO 渲染取页数与页图、产品 `OfficeExcel.recalculate` 重算副本、调用同目录评分脚本） |
+| `packages/ui-mac/scripts/document-quality/electron.vite.config.ts`（新增） | 用产品 main 的同一构建配置（插件、define、externals）打包宿主，只换入口与输出目录 `out/document-quality/`（与 `out/main/` 同深度，产品的开发态路径推导不变） |
+| `packages/ui-mac/scripts/document-quality-run.ts`（新增） | 启动器：在证据目录里 APFS 克隆 dev 的 Electron.app（`LSUIElement`、独立 bundle id），把 HOME/XDG/工作区放到证据目录下，写输入文件，起宿主，退出后把副本与其 helper 全部 `lsregister -u` 并核对 |
+| `packages/ui-mac/scripts/document-quality/`（新增） | pilot 的 `tasks.json`（sha256 前缀 `eaec636d31188410`）、`score_docx.py`（`3cab3058aefbcd7f`）、`score_pptx.py`（`66911f1d0bed30f0`）、`check_xlsx.py`（`440e2da69b84d1a2`）与任务素材 `content.json`（`0d8d4e1a02d7106a`）、`chart.png`（`92dc0a8d9c4ef656`）、`img_market.png`（`882990d996eaf4c6`）、`img_ui.png`（`8a1415cf0eb3fcb1`）、`sales.json`（`72e180cafd6b8139`）；出处写在目录的 `SOURCES.md`。入库时的改动：去掉写死的本机路径；`check_xlsx.py` 不再自己起 LO，改为评已由 `OfficeExcel.recalculate` 重算过的副本，并按任务的 12 项要求给出逐项结论（pilot 只输出事实，没有 12 项判定）；`score_pptx.py` 第 10 项「风格统一」由脚本判母版与字体一致，另附页图供人工复核 |
+| `docs/specs/document-output-quality/plan.md` | 本节与实测记录 |
+
+#### 顺序
+
+1. 构建 dev 前置（`gate slot -- bun ./scripts/prebuild.ts` 中文档链用到的各步与 `electron-vite build`），宿主与评分脚本入库，类型检查用临时 tsconfig 跑 tsgo（`scripts/` 不在包的 tsconfig 里）。
+2. 不花钱的空跑：网关地址指一个不可达地址，runner 必须在第一次模型调用前报错退出（非零）；余额读不到时同样不启动。
+3. 付费样本 W1：前后读余额，算出单次费用，按九次推算总额；超过 3000 分就带着数字返回，不继续。
+4. 其余八次逐次跑，每次开跑前检查「累计 + 已见单次最大值 ≤ 3000 分」，不满足就停；运行中按余额轮询，累计到 3000 分时中止会话。记录成品路径、逐项评分、Excel 重算后的公式错误数与汇总比对、每次费用和余额。
+
+#### 风险
+
+- 工作量与时长：宿主的启动子集需要逐步调通（围栏、代理、目录、出厂技能），预计 3–6 小时；LibreOffice 首次从 GitHub v0.2.8 下载约 300 MB，走产品的原始来源回退；pilot 单次 19–61 分钟，九次顺序跑约 3–9 小时。合计约 7–15 小时，超过本轮预计 2–4 小时的两倍。
+- 费用：pilot 单次 92–247 分，九次约 1400 分，在 3000 分以内；产品链多了渲染与自查，以 W1 样本为准。
+- 读图自查走云端识图并按张计费，费用都计入同一账号；该账号另有其它生产检查，读数可能混入与本次无关的变化，按时间窗口如实记录。
+
+#### 证明
+
+| AC | 测试/证据 | 层与运行时机 | 缺少行为为什么会失败 |
+| --- | --- | --- | --- |
+| AC-01 | 3 次 W 的成品经 `score_docx.py` 逐项核对（页数取自产品 LO 渲染） | 一次性付费实测，记命令与输出 | 现有写入工具作为对照臂只有 4 项（pilot 记录），达不到每次 ≥9 项 |
+| AC-02 | 3 次 P 的成品经 `score_pptx.py` 逐项核对 | 同上 | 对照臂 4 项 |
+| AC-03 | 3 次 X 的成品先经产品 `OfficeExcel.recalculate` 重算，再经 `check_xlsx.py` 判 12 项、公式错误数和汇总与 `sales.json` 独立结果的比对 | 同上 | 对照臂 12 项里只做到 4 项；重算没执行时公式单元格没有值，比对失败 |
+
+#### 实测记录（2026-11-27，宿主 `ed39ff759e`）
+
+证据目录 `~/.cache/alpha-orch/2026-11-27/impl-1761-ac01-03/`（`logs/`、`dry-run-4/`、`paid/`、`diag/`）。构建：`gate slot -- bun ./scripts/predev.ts`、`build-connector-launchers.ts`、`build-office-runtime.ts`、`build-video-mcp.ts`、`build-document-assets.ts`、`build-ripgrep.ts`，再 `gate slot -- bunx electron-vite build --config scripts/document-quality/electron.vite.config.ts`。宿主、启动器与构建配置的类型检查用临时配置（含 bun 类型）跑 tsgo，新文件 0 错；在 host.ts 末尾加一行类型错误时报出 `host.ts(487,7) TS2322`，确认这个检查能失败。
+
+**空跑（不花钱，第 4 次）**：`bun ./scripts/document-quality-run.ts --evidence …/dry-run-4 --key <测试 key 文件> --endpoints <桌面端 discovered-endpoints> --runs W1 --run-timeout-minutes 8 --dry-run`，exit 2：`W1: the session ended with errors and no deliverable: {"type":"provider.transport","message":"fetch failed"}`；余额 97010→97010，账本没有新记录；宿主副本没有留在 LaunchServices。前三次空跑暴露的宿主问题都在 `ed39ff759e` 之前修好：ext 要 main 的 hub 宿主应答才会激活（缺它时 sidecar 报 `plugin inventory … was never published` 拒绝 ready）；首启要先下载平台模型目录，否则平台供应商没有模型；消息分页的 cursor 不能和 order 同传；`app.exit` 偶尔让进程停在 Electron 退出流程里，改由启动器按宿主写下的退出码收尾。
+
+**付费尝试**：`… --evidence …/paid --runs W1,P1,X1,W2,P2,X2,W3,P3,X3 --sample W1 --cap-fen 3000 --prior-max-run-fen 247 --run-timeout-minutes 90`，exit 2，没有进入 W1。
+- LibreOffice 预热那一轮（经香港入口 `alpha-gateway-hk`）花了 9 分：余额 97010→97001，账本 seq 10925 之后新增 15 条记录，全部是 `model.invoke.chat`，`usage_settled` 合计 −9。
+- LibreOffice 下载：10:09:56Z 对香港 GitHub 中转 `alpha-github-hk.tidelabs.click` 上同一路径做 HEAD，返回 200，长度 299927705，与 pin 一致；60 秒内落盘 201 MB。由此推断走的是 relay，而不是 brief 预计的 GitHub 原始来源。产品没有记录这次下载的 `via`，所以这是推断。
+- 随后产品的 LibreOffice 验证失败：`fixed LibreOffice verification exited unsuccessfully; exit=1`（`verify_runtime.py` 里的 `--convert-to pdf`）。宿主按设计在 W1 之前停下，没有量到任何一次。
+
+**原因（产品，围栏 × LibreOffice 的单实例管道）**：
+1. 同一个任务目录、profile 和 fonts.conf，在围栏外直接跑 `soffice --headless … --convert-to pdf`，rc=0，出 PDF。
+2. 在被围栏的引擎里用会话 shell 复现（`session.shell`，不调模型）：`verify_runtime.py` 退出 1，直接跑 soffice 转换也退出 1 且没有任何输出；`AF_UNIX` socket 在 `$TMPDIR` 和 `/tmp` 下 `bind` 都报 `PermissionError [Errno 1]`；改 HOME、改 TMPDIR 仍然退出 1。
+3. 用 `sandbox-exec` 只加一条规则做对照：`(allow default)` → 0；加上围栏的 N1 `(deny network*)` → 1、不出 PDF；再加 `(allow network* (local unix-socket) (remote unix-socket))` → 0；只放 `(path-regex #"/OSL_PIPE_")` → 0；只放 `/private/var/folders/` 下 → 1。
+
+结论：LibreOffice 启动时要建一个 `OSL_PIPE_*` 的 unix domain socket 作单实例管道；`packages/ui-mac/src/main/process-fence-profile.ts:381` 的 N1 `(deny network*)`（注释写明「含 DNS 的 unix socket」）把它拒掉了。产品设计要求验证只在被围栏的 Location 里跑（`resources/document-runtime/verify_runtime.py` 文件头），渲染和 `OfficeExcel.recalculate` 也都在同一围栏内起 soffice。所以在 darwin 上，组合好的产品引擎里 LibreOffice 永远到不了 ready：制作之后的渲染、自查和重算都做不成。先前片 3/4 的组件证据和本节 AC-08 实测都是在围栏外跑 LibreOffice，所以没有发现。
+
+**状态**：AC-01..03 仍 pending，等围栏放行 LibreOffice 的管道（例如只放 `OSL_PIPE_` 路径的 unix socket；这是围栏的安全决定，归围栏 / #1761 的拥有者），本轮不改产品代码。修好后在新的证据目录重跑同一条命令即可：剩余授权 ≤3581 分，本轮上限还剩 2991 分（`--cap-fen 2991`）。九次 W/P/X 一次都还没跑，评分脚本只在 pilot 成品上核对过：W2 9/10（目录项不过），P1 11/11；pilot X1 11/12（第 7 项有两格会被截断）、X2 12/12，这两份 X 用的是 pilot 自己的缓存值，不是产品重算的结果。
+
+#### 续跑记录（2026-11-28，#1836 合入后，宿主 `28946621c4`）
+
+先合入 origin/alpha（`b811482815`，plan 冲突两边都保留），在 `gate slot --` 下重建 predev、视频 MCP 与宿主；重建后的宿主不含临时诊断代码，`soffice` 入口为新布局 `LibreOffice/Contents/MacOS/soffice`。空跑 `dry-run-5` exit 2（`provider.transport fetch failed`），余额 97001→97001。
+
+付费：`… --evidence …/paid-r2 --runs W1,P1,X1,W2,P2,X2,W3,P3,X3 --sample W1 --cap-fen 2991 --prior-max-run-fen 247 --run-timeout-minutes 90`。
+- LibreOffice：07:52:22Z 开始下载，07:53:22Z 进入 verify，07:54:42Z ready（`…/document-runtime/libreoffice/darwin-arm64/26.8.3/LibreOffice/Contents/MacOS/soffice`）。#1836 之后，围栏内的验证第一次就通过。来源推断为香港 relay：07:52:23Z 对 `alpha-github-hk.tidelabs.click` 同一路径做 HEAD 返回 200，此时已落盘 64 MB，不到一分钟下完；产品不记录 `via`。
+- 预热 8 分。
+- W1：花 251 分（余额 96993→96742；账本窗口 `usage_settled` 251，267 次 `model.invoke.chat`、36 次 `tool.vision`），用时 18.9 分钟，经香港入口；`report.docx` 6 页，评分 9/10（目录项不过）。样本推算 259 + 8 × 251 = 2267 ≤ 2991，宿主自动继续 P1。
+- 08:15Z 我手动停止宿主（SIGTERM 无效，改用 SIGKILL），P1 已花 49 分，没有成品。本次续跑合计 308 分（余额 97001→96693）；连同 11-27 的 9 分，本授权共花 317 分。
+
+**停的原因（产品，组合引擎里的两处失败；输入取自证据库 `paid-r2/xdg/data/opencode/opencode-dev.db`）**：
+- `skill` 工具：输入是 `skill.list` 列出的合法 id，`{"id":"docx"}`（W1）和 `{"id":"pptx"}`（P1），都报 `{"type":"tool.execution","message":"Cannot convert a Symbol value to a string"}`。
+- `codepuppy_document` 的 `render`：`{"action":"render","checkId":"q3-report-1","revision":0,"request":{"kind":"docx","path":"…/W1/report.docx","dpi":110}}` 以及不带 dpi 的同一请求，两次都报 `{"type":"unknown","message":"Cannot convert a Symbol value to a number"}`。
+- `environment` 三次都成功。sidecar 日志里没有这两类错误的堆栈。
+
+后果：产品的 docx 技能没有加载，渲染与自查一次都没做成。模型于是在磁盘上找技能（`find /Users/pharaon -maxdepth 7 -name "SKILL.md" | grep -i docx`），找到并使用了操作者自己 `~/.claude/skills/synced/…/docx` 里的 Anthropic 原版技能脚本（4 次工具调用读写该目录）。所以 W1 的 9/10 不能计作「经产品技能」的 AC-01 证据。
+
+排查中排除的一个假设：我曾以为引擎会在 Location 的祖先目录里发现 `~/.claude`。用旧布局（工作区在主目录下）免费空跑，`skill.list` 只有 19 个产品技能，假设不成立；`28946621c4` 里把工作区移到临时目录的改动已在下一提交撤回。保留两道检查：跑前用 `skill.list` 核对技能来源；跑后查记录，碰到操作者的 `~/.claude` 或 `~/.agents` 即停（exit 2）。宿主从此也把每次运行的完整消息存为 `runs/<run>.messages.json`。
+
+**状态**：AC-01..03 仍 pending，等 `skill` 加载与 `codepuppy_document render` 在组合引擎里不再报 Symbol 错误。续跑：剩余授权 ≤3273 分，本轮上限还剩 2683 分（`--cap-fen 2683`）。
+
+#### 第三轮实测（2026-11-28，#1837 合入后，宿主 `28946621c4` 的构建，代码 `0c286218c3`）
+
+先在 `gate slot --` 下重建 predev 与宿主（ext 已带 #1837 的 Standard JSON Schema 输入）。免费空跑 `r3-dry-run` exit 2（`provider.transport`），余额 96693→96693；跑前检查列出的 19 个技能全部来自产品（`skill://` 内置与 `packages/ui-mac/resources`）。
+
+付费：`… --evidence …/r3-paid --runs W1,P1,X1,W2,P2,X2,W3,P3,X3 --sample W1 --cap-fen 2683 --prior-max-run-fen 251 --run-timeout-minutes 90`，exit 0，九次全部跑完。宿主退出后，副本与 helper 都没有留在 LaunchServices，凭据文件已删。
+- LibreOffice：11:01:41Z 开始下载，11:04:02Z ready，围栏内验证一次通过。来源推断为香港 relay（11:01:44Z 对 relay 做 HEAD 返回 200，此时已落盘 70 MB）。
+- 样本 W1 后的推算为 209 + 8 × 251 = 2217 ≤ 2683，宿主自动继续。
+- 每次运行的费用就是余额差，与账本窗口的 `usage_settled` 逐次相等；九次是顺序跑的。
+- 九次之间都经香港入口（route preferred），没有超时，跑后检查都没有碰到操作者的 `~/.claude` 或 `~/.agents`。
+
+W1 的记录（`r3-paid/runs/W1.messages.json`）确认走的是产品路径：`skill {"id":"docx"}` 成功；`codepuppy_document` 调用了 environment 1 次、render 5 次；逐页读取了渲染出的页图（54 次云端识图）；最后提交了 `check`（final，inspectedPages 1–5，uninspected 为空）。另外八次都加载了对应的产品技能（X3 除外，见下）、做了渲染并读图。
+
+| 次 | 成品（`r3-paid/runs/<次>/score/`） | 逐项 | 费用（分） | 余额 | 用时 |
+| --- | --- | --- | --- | --- | --- |
+| 预热 | — | — | 8 | 96693→96685 | — |
+| W1 | `report.docx`，5 页 | 10/10（现行评分器；运行时 9/10，目录误判） | 201 | 96685→96484 | 7.8 min |
+| P1 | `deck.pptx`，10 页 | 11/11 | 212 | 96484→96272 | 7.2 min |
+| X1 | `sales.xlsx` | 12/12；产品重算 663 个公式、0 错；区域 4/4、月份 12/12、环比 11/11 | 294 | 96272→95978 | 12.0 min |
+| W2 | `report.docx`，6 页 | 10/10（现行评分器；运行时 8/10：目录误判、封面标题 partial） | 336 | 95978→95642 | 10.6 min |
+| P2 | `deck.pptx`，10 页 | 11/11 | 211 | 95642→95431 | 6.0 min |
+| X2 | `sales.xlsx` | 12/12；288 个公式、0 错；4/4、12/12、11/11 | 272 | 95431→95159 | 13.9 min |
+| W3 | `report.docx`，6 页 | 10/10（现行评分器；运行时 9/10：封面标题 partial） | 114 | 95159→95045 | 4.2 min |
+| P3 | `deck.pptx`，10 页 | 11/11 | 176 | 95045→94869 | 5.5 min |
+| X3 | `sales.xlsx` | 12/12；474 个公式、0 错；4/4、12/12、11/11 | 127 | 94869→94742 | 5.8 min |
+
+合计：本轮 1951 分（96693→94742）；U-12 授权累计 9 + 308 + 1951 = 2268 分。
+
+评分说明（`score_docx.py` 两处改动，见 `scripts/document-quality/SOURCES.md`；三份运行时结果原样保留）：
+- 第 9 项目录：W1、W2 的目录页标题写作「目　录」（全角空格），pilot 评分器判为没有目录；页图上两份都有带页码的目录页。改为两个字之间任何空白都算。重评结果存为 `checklist-toc-fix.json`。
+- 第 1 项封面标题（调度方裁决，2026-11-28）：W 的任务文本（`tasks.json`）只要求「封面标题」，没有要求标题在同一段。页图第 1 页上：W2 封面把「2026 年第三季度」与「经营分析」排成同一样式的两行标题；W3 的「2026 年第三季度」是紧贴在大号「经营分析」上方的一行，字号明显更小。单段判定是 pilot 评分器写法留下的，与目录全角空格同属一类缺陷。现在的规则：取第一个 H1 之前、最多前六个非空封面段落，依次试连续一段或两段（去掉空白后拼接），含「2026」与「第三季度经营分析」即通过；partial 与 fail 的判法不变；证据里记下命中的段落（W1 命中一段「2026 年第三季度经营分析」，W2、W3 命中两段「2026 年第三季度」+「经营分析」）。重评结果存为 `checklist-r4.json`。
+- 改后的第 1 项仍会失败。对照样本取自 W2 已保存的 `report.docx` 的副本（构造脚本与结果在 `~/.cache/alpha-orch/2026-11-27/impl-1761-ac01-03/r4-controls/`，副本用完已按字面路径删除）：(a) 删掉两段标题 → fail，命中 None；(b) 封面只留「经营分析」→ partial，命中 None；(c) 在「2026 年第三季度」与「经营分析」之间插入无关段落「华曜科技有限公司」→ partial（不通过），命中 None。
+- PPT 第 10 项：脚本判定与人工看页图（`runs/P1..P3/score/contact.png`，三套都是深色首尾页、统一配色与字体）一致，均通过。
+
+W 在三种规则下的得分：运行时的 pilot 规则为 9、8、9；只修目录为 10、9、9（原规则下的封面判定）；两处都修（现行）为 10、10、10。
+
+AC 结论：
+- **AC-01**：按现行评分器三次都是 10/10，每次 ≥9 且三次都 10 项齐全，成立。（按目录修正、封面仍用原规则为 10、9、9，「至少 2 次 10 项齐全」不成立。）
+- **AC-02**：三次都是 11/11，成立。
+- **AC-03**：三次都是 12/12；经产品 `OfficeExcel.recalculate` 重算后公式错误 0，汇总与 `sales.json` 的独立结果一致，成立。
+
+观察：
+- X2、X3 没有提交自查报告，X3 没有加载 xlsx 技能；这些归 AC-05 的测量，本节不判。
+- 运行时出现过两次模型侧错误，模型都自行恢复了：P3 一次「document source changed since rendering」，X3 一次 `codepuppy_vision` 找不到图片。
+
 ### 偏离记录
 
 2026-11-27 · 计划外两处：没有为脚本新增套件测试（它需要真实 LibreOffice，按 test-layers 记为一次性证据）；`scripts/` 不在 ui-mac 的 tsconfig 里，新驱动另用临时配置单独做了类型检查（tsgo exit 0）。
+
+2026-11-27 · AC-01..03 实测，测量宿主的偏离（产品代码未改）：一，除计划列出的启动步骤外，宿主还调用了 `registerExtIpcHandlers` 拿 ext 的 hub 宿主（ext 激活要靠它应答），以及 `syncLiveAllowlist` 下载平台模型目录（未登录拉取，edition 为 cn，与测试租户相同）。二，产品的 shell 环境探测要先有 index.ts 从界面存储播种的围栏工作区记录，宿主没有这份记录，所以没有合并登录 shell 环境，PATH 取自启动器。三，在九次之前加了一轮 LibreOffice 预热（一次很短的模型调用，触发产品自己的准备路径），计入费用上限。四，空跑用产品的地址覆盖变量把模型代理和云 MCP 指向关闭的本机端口；覆盖变量同时关掉了 relay/direct 回退，所以空跑不会落到付费网关。五，宿主先写下退出码，再由启动器在宽限期后结束进程。没有为宿主或评分脚本新增套件测试：它们需要真实引擎、LibreOffice 和付费账号，按 test-layers 记为一次性证据。
 
 ## r5 修正：围栏内 LibreOffice 单实例管道与不被系统登记的运行时
 

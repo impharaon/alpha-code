@@ -417,7 +417,8 @@ export function createSecretMask(roots: ProtectedFiles.ProtectedRoots, credentia
                     throw new ToolError({ message: `${(cause as NodeJS.ErrnoException).code === "ENOENT" ? "File not found:" : "Unable to read"} ${request.path}` })
                   }
                   if (!Schema.isSchema(draft.output)) throw new ToolError({ message: ProtectedFiles.MASKING_FAILED_TEXT })
-                  return { output: Schema.decodeUnknownSync(draft.output)({ type: "text-page", content: ProtectedFiles.PROTECTED_FILE_TEXT, mime: "text/plain", offset: 1, truncated: false }), content: [{ type: "text", text: ProtectedFiles.PROTECTED_FILE_TEXT }], metadata: { truncated: false } }
+                  // The schema's own `make` runs the engine's Effect; this bundle's Effect cannot decode an engine schema.
+                  return { output: draft.output.make({ type: "text-page", content: ProtectedFiles.PROTECTED_FILE_TEXT, mime: "text/plain", offset: 1, truncated: false }), content: [{ type: "text", text: ProtectedFiles.PROTECTED_FILE_TEXT }], metadata: { truncated: false } }
                 }
                 const before = await readFile(file.path).then((bytes) => new TextDecoder("utf-8", { fatal: true }).decode(bytes)).catch(() => undefined)
                 if (state) state.read = { before, requested: request.path, target: file.path }

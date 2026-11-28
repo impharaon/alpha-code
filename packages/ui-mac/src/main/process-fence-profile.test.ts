@@ -23,6 +23,7 @@ import {
   WRITABLE_ROOT_IDS,
   assertEgressProxyPort,
   assertSeatbeltSafePath,
+  libreOfficeSingleInstancePipe,
   processFenceRulesCover,
   processFenceWriteRules,
   renderProcessFenceProfile,
@@ -418,6 +419,52 @@ describe("renderProcessFenceProfile —— 勘破 §8.2 的行(W10/W19 已删,D1
     expect(renderProcessFenceProfile(base)).not.toContain("mDNSResponder")
   })
 
+  test("`#1761` N5:放行行紧接 N4,其后每条 userInstallations 一行拒绝(后写者胜)与一行 unlink 拒绝,再接受保护集;只写推算出的管道名、不写用户路径;省略或空列表不渲染", () => {
+    const home = (name: string) => `/Users/${name}/Library/Application Support/LibreOffice/4`
+    const profile = renderProcessFenceProfile({ ...base, unixListen: [{ kind: "libreoffice-single-instance", uid: 501, userInstallations: [home("alpha"), home("beta")] }] })
+    const lines = tokens(profile)
+    const n4 = lines.indexOf(NETWORK_LINES(4443).at(-1)!)
+    const pipes = [home("alpha"), home("beta")].map((path) => `/private/tmp/${libreOfficeSingleInstancePipe(501, path)}`)
+    expect(lines.slice(n4 + 1, n4 + 6)).toEqual([
+      `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_501_SingleOfficeIPC_[0-9a-f]+$")))`,
+      ...pipes.map((pipe) => `(deny network-bind network-inbound (local unix-socket (path-literal "${pipe}")))`),
+      // 代码审查 R1-2:这些活管道文件在 W11 之下,单独拒绝它们的 unlink(其它写与产品 job 管道的清理不受影响)
+      ...pipes.map((pipe) => `(deny file-write-unlink (literal "${pipe}"))`),
+    ])
+    expect(lines.slice(n4 + 6)).toEqual([...CF_LINES, ...C1_LINES])
+    expect(lines.some((line) => line.includes("LibreOffice/4"))).toBe(false)
+    // 只监听:没有 network-outbound 的加法,也没有 /tmp 写法(seatbelt 按解析后的 /private/tmp 匹配,F-21)
+    expect(lines.filter((l) => /network-outbound/.test(l))).toEqual([`(allow network-outbound (remote ip "localhost:4443"))`])
+    expect(lines.some((line) => line.includes('"/tmp/') || line.includes("#\"^/tmp/"))).toBe(false)
+    // 签发判定的解析认得 unlink 拒绝行:放行不变,deny 在受保护集之前多出这两条 literal
+    const plain = processFenceWriteRules(renderProcessFenceProfile(base))
+    expect(processFenceWriteRules(profile)).toEqual({ allow: plain.allow, deny: [...pipes.map((value) => ({ kind: "literal" as const, value })), ...plain.deny] })
+    expect(tokens(renderProcessFenceProfile({ ...base, unixListen: [] }))).toEqual(tokens(renderProcessFenceProfile(base)))
+    expect(tokens(renderProcessFenceProfile({ ...base, unixListen: [{ kind: "libreoffice-single-instance", uid: 0, userInstallations: [] }] })).slice(n4 + 1, n4 + 2)).toEqual([
+      `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_0_SingleOfficeIPC_[0-9a-f]+$")))`,
+    ])
+  })
+
+  test("`#1761` N5 fail-closed:uid 不是非负安全整数、或 userInstallations 里有非绝对路径 ⇒ 拒绝渲染", () => {
+    const render = (uid: unknown, userInstallations: unknown[] = []) =>
+      renderProcessFenceProfile({ ...base, unixListen: [{ kind: "libreoffice-single-instance", uid: uid as number, userInstallations: userInstallations as string[] }] })
+    for (const bad of [-1, 1.5, Number.NaN, 2 ** 53, "501", undefined, null]) expect(() => render(bad), String(bad)).toThrow(/unix listen uid must be a non-negative safe integer/)
+    for (const bad of ["relative/LibreOffice/4", "", undefined]) expect(() => render(501, [bad]), String(bad)).toThrow(/userInstallations\[0\] must be absolute/)
+    // 用户路径不进 profile,所以引号、分号这类 seatbelt 字面量写不了的字符照样渲染
+    expect(() => render(501, ['/Users/a"b;c/Library/Application Support/LibreOffice/4'])).not.toThrow()
+  })
+
+  test("`#1761` 管道名推算 = 真实 LibreOffice 26.8.3.1 的管道名(以下 HOME 下无围栏启动默认 profile,/private/tmp 里实际出现的名字;plan.md r5 证明 3 的采集记录)", () => {
+    // 期望值是采样,不是从推算式抄来的:ASCII;含中文、空格与 `;`(UTF-8 逐字节 %XX);hash 里有小于 0x10 的字节(不补零,31 位)
+    const samples: Array<[home: string, pipe: string]> = [
+      ["/private/tmp/lo1761-cap/home-ascii", "OSL_PIPE_501_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb"],
+      ["/private/tmp/lo1761-cap/用户 目录;x/home", "OSL_PIPE_501_SingleOfficeIPC_d6c4244ec5cd23e4ee169d76abd7daee"],
+      ["/private/tmp/lo1761-cap/家 0;z", "OSL_PIPE_501_SingleOfficeIPC_d630e8a40bef033169add33ca795c25"],
+    ]
+    for (const [home, pipe] of samples) expect(libreOfficeSingleInstancePipe(501, `${home}/Library/Application Support/LibreOffice/4`), home).toBe(pipe)
+    expect(libreOfficeSingleInstancePipe(0, "/private/tmp/lo1761-cap/home-ascii/Library/Application Support/LibreOffice/4")).toBe("OSL_PIPE_0_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb")
+  })
+
   test("`#1337` fail-closed:代理端口不是 1..65535 的整数 ⇒ 拒绝渲染(没有那扇门就没有 profile)", () => {
     for (const bad of [0, 65536, -1, 1.5, Number.NaN, "4443", undefined, null]) {
       expect(() => assertEgressProxyPort(bad), String(bad)).toThrow(/egress proxy port must be an integer in 1\.\.65535/)
@@ -553,6 +600,24 @@ describe("签发判定的唯一来源:本代 apply 的 profile 解析回写规�
     expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/a" }], deny: [{ kind: "literal", value: "/a/b" }] }, "/a/b/c")).toBe(true)
     expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/a" }], deny: [{ kind: "literal", value: "/a/b" }] }, "/a/b")).toBe(false)
     expect(processFenceRulesCover({ allow: [], deny: [] }, "/a")).toBe(false)
+    // APFS treats another letter case and another Unicode normalization as the same name (code review R1 #1): an NFD
+    // spelling of an NFC root — or the reverse, or either in another case — is that root, on the allow and the deny side.
+    const [nfc, nfd] = ["/Users/alpha/caf\u00e9.txt", "/Users/alpha/cafe\u0301.txt"]
+    for (const [rule, spelled] of [[nfc, nfd], [nfd, nfc], [nfc, "/Users/alpha/CAFE\u0301.TXT"], [nfd, `${nfc}/inner`]] as const) {
+      expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: rule }], deny: [] }, spelled), spelled).toBe(true)
+      expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/Users" }], deny: [{ kind: "subpath", value: rule }] }, spelled), spelled).toBe(false)
+      expect(processFenceRulesCover({ allow: [{ kind: "literal", value: rule }], deny: [] }, spelled, "file"), spelled).toBe(spelled.endsWith("/inner") ? false : true)
+    }
+    expect(processFenceRulesCover({ allow: [{ kind: "regex", value: "^/Users/alpha/caf\u00e9\\.txt$" }], deny: [] }, nfd, "file")).toBe(true)
+    expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: nfc }], deny: [] }, "/Users/alpha/cafe.txt")).toBe(false)
+    // APFS folds case fully, beyond JS toLowerCase (fix verification Minor 1; plan.md records the APFS probe): final sigma,
+    // micro sign, sharp s and its capital, a ligature and the Kelvin sign name the same entry; dotless ı stays its own name.
+    for (const [root, spelled] of [["\u03c3", "\u03c2"], ["\u03c3", "\u03a3"], ["\u00b5", "\u03bc"], ["\u00b5", "\u039c"], ["\u00df", "ss"], ["\u00df", "\u1e9e"], ["\ufb01", "FI"], ["k", "\u212a"]] as const) {
+      const rule = { kind: "subpath" as const, value: `/Users/alpha/${root}.txt` }
+      expect(processFenceRulesCover({ allow: [rule], deny: [] }, `/Users/alpha/${spelled}.txt`), spelled).toBe(true)
+      expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/Users" }], deny: [rule] }, `/Users/alpha/${spelled}.txt`), spelled).toBe(false)
+    }
+    expect(processFenceRulesCover({ allow: [{ kind: "subpath", value: "/Users/alpha/ix.txt" }], deny: [] }, "/Users/alpha/\u0131x.txt")).toBe(false)
   })
 })
 
@@ -883,6 +948,23 @@ describe("trimUntilCompiles —— 试编译封顶,从尾部丢,丢到底仍失�
     expect(tokens(r.profile)).not.toContain(`(subpath "/Users/alpha/b")`)
     // SPEC-engine-config-fence E9:裁剪只丢工作区,受保护集原样(每次试编译都带着);stored-credentials-fence §4.5:C1 同样原样、仍在最后
     expect(tokens(r.profile).slice(-(CF_LINES.length + C1_LINES.length))).toEqual([...CF_LINES, ...C1_LINES])
+  })
+
+  // SPEC v8 BR-08 (design v7 NP5): approved new paths in HOME render right after W1 in W1's shape and are trimmed before it.
+  test("本人批准的主目录下新路径:紧跟 W1 渲染为 subpath、写规则读得回;字节墙先裁新路径、再裁工作区", () => {
+    const newPaths = ["/Users/alpha/note.txt", "/Users/alpha/newfolder"]
+    const counting = (max: number) => (profile: string) =>
+      (profile.match(/; (W1|NP5 .*)$/gm)?.length ?? 0) <= max ? ({ ok: true } as const) : ({ ok: false, reason: "sandbox-exec: data object length 70173 exceeds maximum (65535)" } as const)
+    const all = trimUntilCompiles({ ...base, workspaces: ws, newPaths }, counting(99))
+    const lines = all.profile.split("\n")
+    const after = lines.findLastIndex((line) => line.endsWith("; W1"))
+    expect(lines.slice(after + 1, after + 3)).toEqual(newPaths.map((path) => `  (subpath "${path}") ; NP5 本人批准的主目录下新路径`))
+    expect(processFenceWriteRules(all.profile).allow.slice(ws.length, ws.length + 2)).toEqual(newPaths.map((value) => ({ kind: "subpath", value })))
+    const trimmed = trimUntilCompiles({ ...base, workspaces: ws, newPaths }, counting(3))
+    expect(trimmed.dropped).toEqual(["/Users/alpha/newfolder", "/Users/alpha/note.txt", "/Users/alpha/c"])
+    expect(trimmed.newPaths).toEqual([])
+    expect(trimmed.workspaces).toEqual(ws.slice(0, 3))
+    expect(() => renderProcessFenceProfile({ ...base, workspaces: ws, newPaths: ['/Users/alpha/"quoted'] })).toThrow()
   })
 
   test("默认工作区不可丢:字节墙丢到只剩 1 个仍失败 ⇒ 抛,消息带编译器原文与账目(fail-closed 到「引擎不起」)", () => {

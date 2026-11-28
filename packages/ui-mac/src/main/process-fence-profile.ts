@@ -31,6 +31,8 @@
 // (mDNSResponder 的 unix socket,Q2)—— 刻意不放行:走代理的客户端由代理解析,想直连的死在解析这一步(Q3);
 // ④字节余量 39 倍(Q5),不为它做任何优化。代理跑在 Electron main(围栏外,`#1073` 裁决三),端口由 server.ts
 // 在 fork 之前给出;策略(目的地授权)在 network-egress-proxy.ts / network-egress-registry.ts,不在这里。
+// `#1761` N5(DESIGN-document-output-quality §4.11):N4 之后只加「本用户 LibreOffice 单实例管道名可 bind/accept」一行,紧跟拒绝
+// 用户自己默认 profile 那个确切管道名的行;unix socket 的 connect 仍由 N1 全拒。
 //
 // ── 不要手写 `(subpath …)` 的 TypeScript 替身 ────────────────────────────────────────
 // U2 裁决 §5.2 实测 seatbelt 的 subpath 按路径分段、解析软链、随卷的大小写策略匹配,字符串
@@ -38,6 +40,7 @@
 // **排除**规则(HOME / 根 / HOME 的祖先 / 与应用状态根相关的路径),以及运行期签发前的静态包含判定(见「签发判定」一节,
 // 只用来决定**不**签发,判据偏向判「覆盖」)。
 
+import { createHash } from "node:crypto"
 import { statSync } from "node:fs"
 import { dirname, isAbsolute, join, posix, resolve, win32 } from "node:path"
 import { SETTINGS_STORE, UPDATER_STORE } from "./store-keys"
@@ -160,6 +163,11 @@ export type ProcessFenceProfileInput = {
   userWritableLocations?: readonly ProcessFenceWriteRule[]
   /** W1:启动时并集,顺序即优先级(裁剪从尾部丢)。 */
   workspaces: readonly string[]
+  /**
+   * SPEC v8 BR-08 (design v7 NP5): new paths directly in HOME the user approved during this run (planner-validated, `stored`),
+   * each rendered right after W1 in the same shape — that one path and everything below it, whether it became a file or a folder.
+   */
+  newPaths?: readonly string[]
   packageManagerCaches?: readonly ProcessFenceWriteRule[]
   /** 当前环境根:W2 删掉之后不再渲染进放行块,它作为 CF-1 的一条由计划器放进 configFence(冻结设计「既有字段不变」)。 */
   codepuppyGlobalRoot: string
@@ -185,6 +193,54 @@ export type ProcessFenceProfileInput = {
    * 渲染成全文最后两块 —— 拒读拒写的存放点一块、它们每一级上级目录节点拒写一块(挡住把 userData / 临时目录整个改名搬走)。空列表两块都不渲染。
    */
   credentialStores: readonly CredentialStoreRule[]
+  /**
+   * N5(DESIGN-document-output-quality §4.11,`#1761`):围栏内允许监听的 unix socket 汇合点。省略或 [] 时不渲染任何 N5 行;
+   * 生产计划器在 darwin 上恒给 LibreOffice 单实例管道这一条。
+   */
+  unixListen?: readonly FenceUnixListen[]
+}
+
+/** N5:围栏内进程可以创建并接受连接的本机 unix socket 汇合点;绝不放行 connect(出站仍归 N1)。 */
+export type FenceUnixListen = {
+  kind: "libreoffice-single-instance"
+  /** 非负安全整数,管道名里的 <uid> */
+  uid: number
+  /** 用户自己 LibreOffice 使用的 UserInstallation 绝对系统路径(已像 LibreOffice 那样解析软链);每条推出一个确切管道名,在放行行之后拒绝 bind/accept */
+  userInstallations: readonly string[]
+}
+
+/**
+ * LibreOffice 26.8.3.1 给某个 UserInstallation 建的单实例管道名(§4.11,F-21/F-23 逐字):`file://` 加上路径 UTF-8 字节逐个编码
+ * (``!$&'()*+,-./0-9:=@A-Z_a-z~`` 原样,其余写成大写 `%XX`,`sal/osl/unx/file_url.cxx`);对这个 URL 的 UTF-16LE 码元取 MD5,
+ * 16 个字节各自写成小写十六进制、不补零(`dp_misc.cxx`)。这里只推算:LibreOffice 先解析软链,所以调用方给的必须是已按它的方式解析的路径
+ * (计划器:已存在部分的真实路径 + 尚未创建的后缀)。
+ */
+export function libreOfficeSingleInstancePipe(uid: number, userInstallation: string): string {
+  let url = "file://"
+  for (const byte of Buffer.from(userInstallation, "utf8"))
+    url += byte < 0x80 && /[!$&'()*+,\-./0-9:=@A-Z_a-z~]/.test(String.fromCharCode(byte)) ? String.fromCharCode(byte) : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`
+  const hash = [...createHash("md5").update(Buffer.from(url, "utf16le")).digest()].map((byte) => byte.toString(16)).join("")
+  return `OSL_PIPE_${uid}_SingleOfficeIPC_${hash}`
+}
+
+/**
+ * N5 的行:放行本用户 LO 单实例管道族的 bind/accept,紧跟每条用户 profile 的确切管道名拒绝行(后写者胜);再对同样的名字各一行
+ * `file-write-unlink` 拒绝 —— 那个活管道文件在 W11 之下,删掉它用户下次启动会另起实例(代码审查 R1-2)。只拒这几个文件的删除,
+ * 产品 job 管道的创建与清理不受影响。只写 hash,不写用户路径。
+ */
+function renderUnixListen(entries: readonly FenceUnixListen[]): string[] {
+  return entries.flatMap((entry) => {
+    if (!Number.isSafeInteger(entry.uid) || entry.uid < 0) throw new Error(`process fence: unix listen uid must be a non-negative safe integer, got ${JSON.stringify(entry.uid)}`)
+    entry.userInstallations.forEach((path, i) => {
+      if (typeof path !== "string" || !isAbsolute(path)) throw new Error(`process fence: unixListen userInstallations[${i}] must be absolute, got ${JSON.stringify(path)}`)
+    })
+    const pipes = entry.userInstallations.map((path) => `/private/tmp/${libreOfficeSingleInstancePipe(entry.uid, path)}`)
+    return [
+      `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_${entry.uid}_SingleOfficeIPC_[0-9a-f]+$"))) ; N5 LibreOffice 单实例管道:只 bind/accept,不 connect`,
+      ...pipes.map((pipe) => `(deny network-bind network-inbound (local unix-socket (path-literal "${pipe}"))) ; N5 用户自己 LibreOffice 的管道`),
+      ...pipes.map((pipe) => `(deny file-write-unlink (literal "${pipe}")) ; N5 用户自己 LibreOffice 的活管道文件不可删`),
+    ]
+  })
 }
 
 /** C1 的一条:存放点目录(subpath)或文件(literal),真实路径。 */
@@ -357,6 +413,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     "(deny file-write*)",
     "(allow file-write*",
     ...ws.map((w) => `  (subpath "${w}")                                  ; W1`),
+    ...(input.newPaths ?? []).map((path, i) => `  (subpath "${assertSeatbeltSafePath(path, `newPaths[${i}]`)}") ; NP5 本人批准的主目录下新路径`),
     ...(input.packageManagerCaches ?? []).map((rule) => `  (${rule.kind} ${rule.kind === "regex" ? "#" : ""}"${assertSeatbeltSafePath(rule.value, "package manager cache")}") ; W20`),
     ...(input.userWritableLocations ?? []).map((rule) => {
       if (rule.kind !== "regex") return `  (${rule.kind} "${assertSeatbeltSafePath(rule.value, "user writable location")}") ; W21`
@@ -382,6 +439,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     '(allow network-bind (local ip "localhost:*"))             ; N2 sidecar 自己的 HTTP 服务器要 bind',
     '(allow network-inbound (local ip "localhost:*"))          ; N3 …还要 accept —— 缺它 listen() EPERM(Q1.1)',
     `(allow network-outbound (remote ip "localhost:${egressProxyPort}"))     ; N4 唯一出口:loopback 上的策略代理(main 进程内)`,
+    ...renderUnixListen(input.unixListen ?? []),
     ...renderConfigFence(input.homebrewFence),
     ...renderConfigFence(configFence),
     ...renderCredentialFence(credentialStores),
@@ -472,8 +530,11 @@ export type ProcessFenceWriteRule = { kind: "subpath" | "literal" | "regex"; val
 export type ProcessFenceWriteRules = { allow: ProcessFenceWriteRule[]; deny: ProcessFenceWriteRule[] }
 
 const WRITE_RULE = /\((subpath|literal) "([^"]*)"\)|\(regex #"([^"]*)"\)/g
-/** 渲染点写出的两种拒写表头(受保护集与上级目录块、C1 的上级目录块;C1 的读写块)。必须在行首,后面紧跟空格或行尾。 */
-const DENY_HEADERS = ["(deny file-write*", "(deny file-read* file-write*"] as const
+/**
+ * 渲染点写出的拒写表头(受保护集与上级目录块、C1 的上级目录块;C1 的读写块;N5 的 unlink 拒绝行)。必须在行首,后面紧跟空格或行尾。
+ * unlink 只是写操作的一种,按「拒」记进 deny 偏向判「不覆盖」,那几个 /private/tmp 下的 socket 文件不会是签发对象。
+ */
+const DENY_HEADERS = ["(deny file-write*", "(deny file-read* file-write*", "(deny file-write-unlink"] as const
 /** 通配操作 `file*`(含写)出现在任何 allow / deny 形式里:渲染点从不写它(审查 B 第 3 条)。 */
 const WILDCARD_FILE_OPERATION = /\((?:allow|deny)(?:\s+[\w*-]+)*?\s+file\*(?=[\s)]|$)/
 
@@ -555,15 +616,28 @@ export function processFenceWriteRules(profile: string): ProcessFenceWriteRules 
 }
 
 /**
+ * The name APFS stores a path under: Unicode normalization (NFD) and full case folding, as measured on APFS (plan.md, slice
+ * seven, fix verification): `σ`/`ς`/`Σ`, `µ`/`μ`, `ß`/`ss`/`ẞ`, `ﬁ`/`fi` and the Kelvin sign/`k` are one name each, dotless
+ * `ı` stays its own. JS has no case fold: lowercase, then each character's upper → lower round trip (which lands `ς`, `µ`,
+ * `ß`, `ﬁ` on their fold) except `ı`, which APFS does not fold. Two paths with the same key are the same entry.
+ */
+export function fenceNameKey(path: string): string {
+  return path.normalize("NFD").toLowerCase().replace(/[^\u0131]/gu, (char) => char.toUpperCase().toLowerCase()).normalize("NFD")
+}
+
+/**
  * 已覆盖 = 某条 allow 盖住 directory 或其祖先(subpath / literal 等于、regex 命中;一个祖先上的 literal 让那个祖先可写,所以其下全算),
- * 且没有 deny 盖住它(subpath / regex 盖住 directory 或其祖先、literal 只在等于 directory 时算)。大小写折叠。
+ * 且没有 deny 盖住它(subpath / regex 盖住 directory 或其祖先、literal 只在等于 directory 时算)。按 APFS 折叠(fenceNameKey):
+ * 大小写与 Unicode 规范化不同的写法是同一个名字(代码审查 R1 #1:等价写法的已获准路径不得被判作未覆盖而再签一次)。
  * file 判具体写目标：只有 subpath 沿祖先匹配，literal/regex 都匹配目标本身。
  */
 export function processFenceRulesCover(rules: ProcessFenceWriteRules, directory: string, kind: "directory" | "file" = "directory"): boolean {
   const chain = [resolve(directory)]
   while (chain.at(-1) !== dirname(chain.at(-1)!)) chain.push(dirname(chain.at(-1)!))
   const hits = (rule: ProcessFenceWriteRule, path: string) =>
-    rule.kind === "regex" ? new RegExp(rule.value, "i").test(path) : resolve(rule.value).toLowerCase() === path.toLowerCase()
+    rule.kind === "regex"
+      ? [path, path.normalize("NFC"), path.normalize("NFD")].some((spelled) => new RegExp(rule.value, "i").test(spelled))
+      : fenceNameKey(resolve(rule.value)) === fenceNameKey(path)
   if (kind === "file") {
     const matches = (rule: ProcessFenceWriteRule) => rule.kind === "subpath" ? chain.some((path) => hits(rule, path)) : hits(rule, chain[0]!)
     return rules.allow.some(matches) && !rules.deny.some(matches)
@@ -734,6 +808,20 @@ export type WorkspaceDirectoryCheck =
 /** APFS Data volume. Electron Node's realpath(3) keeps this spelling for firmlinked paths (`/Users/...`). */
 const DATA_VOLUME = "/System/Volumes/Data"
 
+/** The identity spelling below: the `realpath` result, the Data-volume spelling collapsed only onto the same device + inode. */
+export function canonicalWorkspacePath(input: Pick<WorkspaceDirectoryInput, "realpath" | "stat">, path: string): string {
+  const stat = input.stat ?? ((p: string) => statSync(p, { bigint: true }))
+  const directory = resolve(input.realpath(path))
+  if (directory !== DATA_VOLUME && !directory.startsWith(`${DATA_VOLUME}/`)) return directory
+  const plain = directory.slice(DATA_VOLUME.length) || "/"
+  try {
+    const [real, other] = [stat(directory), stat(plain)]
+    return `${real.dev}:${real.ino}` === `${other.dev}:${other.ino}` ? plain : directory
+  } catch {
+    return directory // The other spelling does not exist: nothing to collapse.
+  }
+}
+
 /**
  * The one identity / validity rule (INT-safety R7/R8) behind explicit-open registration, W1 selection,
  * start-time seeding, quarantine and the runtime grant.
@@ -763,12 +851,7 @@ export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: str
       return false // The other spelling does not exist: nothing to collapse or to add.
     }
   }
-  const canonical = (path: string) => {
-    const directory = resolve(input.realpath(path))
-    if (directory !== DATA_VOLUME && !directory.startsWith(`${DATA_VOLUME}/`)) return directory
-    const plain = directory.slice(DATA_VOLUME.length) || "/"
-    return sameObject(directory, plain) ? plain : directory
-  }
+  const canonical = (path: string) => canonicalWorkspacePath({ realpath: input.realpath, stat }, path)
   const chain = (path: string) => {
     const out = [path]
     while (out.at(-1) !== dirname(out.at(-1)!)) out.push(dirname(out.at(-1)!))
@@ -893,7 +976,9 @@ export type TrialCompile = (profile: string) => { ok: true } | { ok: false; reas
 export type TrimResult = {
   profile: string
   workspaces: string[]
-  /** 因编译失败被丢掉的工作区(尾部起),按丢弃顺序。 */
+  /** 留下的本人批准新路径(design v7 NP5;它们排在 W1 之后,先于工作区被裁)。 */
+  newPaths: string[]
+  /** 因编译失败被丢掉的新路径与工作区(尾部起),按丢弃顺序。 */
   dropped: string[]
   /** 试编译次数(≥ 1)。 */
   attempts: number
@@ -909,14 +994,15 @@ export function trimUntilCompiles(
   compile: TrialCompile,
 ): TrimResult {
   const workspaces = [...input.workspaces]
+  const newPaths = [...(input.newPaths ?? [])]
   const dropped: string[] = []
   let attempts = 0
   let lastFailure: string | undefined
   for (;;) {
-    const profile = renderProcessFenceProfile({ ...input, workspaces })
+    const profile = renderProcessFenceProfile({ ...input, workspaces, newPaths })
     attempts++
     const result = compile(profile)
-    if (result.ok) return { profile, workspaces, dropped, attempts, lastFailure }
+    if (result.ok) return { profile, workspaces, newPaths, dropped, attempts, lastFailure }
     lastFailure = result.reason
     if (!COMPILE_BYTE_WALL.test(result.reason)) {
       // 不是字节墙 ⇒ 丢工作区救不了,别把运维指向并集大小。
@@ -924,11 +1010,12 @@ export function trimUntilCompiles(
         `process fence profile does not compile, and the compiler error is not the 65535-byte data-object wall — dropping workspaces cannot fix it, so none were dropped (${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}, ${dropped.length} dropped, ${attempts} attempt${attempts === 1 ? "" : "s"}): ${result.reason}`,
       )
     }
-    if (workspaces.length <= 1) {
+    if (workspaces.length <= 1 && newPaths.length === 0) {
       throw new Error(
         `process fence profile does not compile even with the minimum writable set (${workspaces.length} workspace, ${dropped.length} dropped, ${attempts} attempts): ${result.reason}`,
       )
     }
-    dropped.push(workspaces.pop()!)
+    // The tail of the allow block goes first: approved new paths (after W1), then the carried end of W1.
+    dropped.push(newPaths.length ? newPaths.pop()! : workspaces.pop()!)
   }
 }

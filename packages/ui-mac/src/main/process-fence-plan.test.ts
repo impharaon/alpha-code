@@ -8,10 +8,10 @@ import { spawnSync } from "node:child_process"
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { planConfigFence, planPackageManagerCaches, planUserWritableLocations, planProcessFence, planWritableLocations, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
+import { planConfigFence, planPackageManagerCaches, planUserWritableLocations, planProcessFence, planWritableLocations, planWriteApproval, type PlanProcessFenceDeps, type PlanProcessFenceInput } from "./process-fence-plan"
 import { writableLocationTruthPath } from "./process-fence-workspaces"
 import { SANDBOX_EXEC, trialCompileProfile } from "./process-fence-compile"
-import { renderProcessFenceProfile, processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
+import { libreOfficeSingleInstancePipe, renderProcessFenceProfile, processFenceRulesCover, processFenceWriteRules, type ProcessFenceWriteRule } from "./process-fence-profile"
 import { loadCodePuppySecrets, userEnvFile } from "./codepuppy-secrets"
 import { credentialStores } from "./codepuppy-secret-files"
 
@@ -185,6 +185,70 @@ describe("planWritableLocations", () => {
       expect(existsSync(sourcePath)).toBe(false)
       expect(() => planWritableLocations({ ...input, truthPath: disk.state })).toThrow("writable location truth")
       expect(existsSync(sourcePath)).toBe(false)
+    })
+  })
+})
+
+// SPEC child-process-write-fence v8 BR-08 (design v7 NP1, §6 evidence 4, 12, 15a/b): on the real file system, what approving a
+// write target makes writable. Only `{ P, HOME }` with nothing at P is a new path; `{ P, P }` stays the folder rule (R1-F1).
+describe("planWriteApproval", () => {
+  test("a path directly in HOME that does not exist yet is approved as itself; everything else keeps the folder rule", () => {
+    withLocationDisk((disk) => {
+      const { home, state } = disk
+      mkdirSync(join(home, "existing-dir")); mkdirSync(join(home, "sub")); writeFileSync(join(home, "existing.txt"), "keep")
+      const at = (absolute: string, directory = absolute.slice(0, absolute.lastIndexOf("/"))) => planWriteApproval(disk.eligibility, { absolute, directory })
+      const shape = (scope: ReturnType<typeof at>) => scope.eligible ? { kind: scope.kind, root: scope.root } : { reason: scope.reason, directory: scope.directory }
+      expect([
+        join(home, "newfolder"), join(home, "note.txt"), join(home, "existing.txt"), join(home, "existing-dir"),
+        join(home, "newfolder", "x"), join(home, "sub", "new"), join(home, "a", "b"), join(state, "new"), join(disk.protected, "new"),
+      ].map((absolute) => shape(at(absolute)))).toEqual([
+        { kind: "new-path", root: join(home, "newfolder") },
+        { kind: "new-path", root: join(home, "note.txt") },
+        // Already in HOME (BR-08 v8 "已经存在的不算"): HOME's refusal, not the entry.
+        { reason: "home-or-app-state", directory: home },
+        { reason: "home-or-app-state", directory: home },
+        { kind: "directory", root: join(home, "newfolder") },
+        { kind: "directory", root: join(home, "sub") },
+        { kind: "directory", root: join(home, "a") },
+        { reason: "home-or-app-state", directory: state },
+        { reason: "protected-config", directory: disk.protected },
+      ])
+      // `{ P, P }` is the engine's shape for a folder itself (a command's working directory): never a new path.
+      expect(shape(at(join(home, "newfolder"), join(home, "newfolder")))).toEqual({ kind: "directory", root: join(home, "newfolder") })
+      // 15a: a case or Unicode variant of an existing entry is that entry (APFS lookup), so it is not new.
+      writeFileSync(join(home, "café.txt"), "keep")
+      for (const variant of ["EXISTING.txt", "café.txt"])
+        if (existsSync(join(home, variant))) expect(shape(at(join(home, variant)))).toEqual({ reason: "home-or-app-state", directory: home })
+      // 15b: HOME spelled with another case, or through the Data volume, is HOME by identity; the root uses its canonical spelling.
+      for (const spelled of [join(home, "..", "HOME"), `/System/Volumes/Data${home}`])
+        if (existsSync(spelled)) expect(shape(at(join(spelled, "spelled.txt"), spelled))).toEqual({ kind: "new-path", root: join(home, "spelled.txt") })
+      expect(existsSync(join(home, "newfolder")) || existsSync(join(home, "note.txt"))).toBe(false)
+    })
+  })
+
+  test("stored: a granted new path stays itself after it is created; a link or another entry under that name does not", () => {
+    withLocationDisk((disk) => {
+      const { home, root } = disk
+      const stored = (name: string) => {
+        const scope = planWriteApproval(disk.eligibility, { absolute: join(home, name), directory: home }, "stored")
+        return scope.eligible ? { kind: scope.kind, root: scope.root } : { reason: scope.reason }
+      }
+      mkdirSync(join(home, "made-dir")); writeFileSync(join(home, "made.txt"), "x")
+      mkdirSync(join(root, "outside")); symlinkSync(join(root, "outside"), join(home, "linked")); symlinkSync(join(home, "made-dir"), join(home, "linked-in-home"))
+      // Created after approval in another spelling of the same name (code review R1 #2): still that path; the approved
+      // spelling stays the root.
+      writeFileSync(join(home, "CASE.TXT"), "x"); writeFileSync(join(home, "cafe\u0301.txt"), "x")
+      expect(["missing", "made-dir", "made.txt", "linked", "linked-in-home", "case.txt", "caf\u00e9.txt"].map(stored)).toEqual([
+        { kind: "new-path", root: join(home, "missing") },
+        { kind: "new-path", root: join(home, "made-dir") },
+        { kind: "new-path", root: join(home, "made.txt") },
+        { reason: "home-or-app-state" },
+        { reason: "home-or-app-state" },
+        { kind: "new-path", root: join(home, "case.txt") },
+        { kind: "new-path", root: join(home, "caf\u00e9.txt") },
+      ])
+      // Open (now): something already there is never a new path.
+      expect(planWriteApproval(disk.eligibility, { absolute: join(home, "made.txt"), directory: home })).toMatchObject({ eligible: false, reason: "home-or-app-state" })
     })
   })
 })
@@ -383,6 +447,47 @@ test.skipIf(process.platform !== "darwin")("writable location truth stays fenced
   })
 })
 
+// SPEC v8 BR-08 (design v7 NP5, §6 evidence 6 and 8): the production planner carries new paths approved earlier in this run
+// into the next generation as `(subpath P)` right after W1, and only while each is still that path directly in HOME. The
+// rendered profile is applied with the real sandbox-exec: P can be created and written, its sibling and a link at P cannot.
+test.skipIf(process.platform !== "darwin")("carried new paths in HOME are rendered after W1 while still themselves; a link, a re-point or a deeper path is excluded with a log line", () => {
+  withLocationDisk((disk) => {
+    const { home, root } = disk
+    const project = join(root, "project"), outside = join(root, "outside"), userData = join(root, "userData")
+    for (const directory of [project, outside, join(home, "made-dir"), join(home, "sub")]) mkdirSync(directory)
+    writeFileSync(join(home, "made.txt"), "x")
+    // Approved as `note.txt` / NFC `café.txt`, created as `NOTE.TXT` / NFD (code review R1 #2).
+    writeFileSync(join(home, "NOTE.TXT"), "x"); writeFileSync(join(home, "cafe\u0301.txt"), "x")
+    symlinkSync(outside, join(home, "linked"))
+    const carried = ["missing.txt", "made.txt", "made-dir", "note.txt", "caf\u00e9.txt", "linked", "sub/nested"].map((name) => join(home, name))
+    const logs: string[] = []
+    const plan = planProcessFence({
+      userDataPath: userData, sidecarEnv: { HOME: home },
+      addon: { packaged: false, resourcesPath: "/unused", moduleDir: resolve(import.meta.dir, "../../out/main"), exists: existsSync },
+      egressProxyPort: 4443, carriedWorkspaces: [], carriedNewPaths: carried, engineConfigDirectory: disk.protected, homebrewFence: [], credentialStores: [],
+    }, {
+      homeDir: () => home, codepuppyGlobalRoot: () => join(disk.state, "env", "dev"), appStateRoot: () => disk.state,
+      realpath: realpathSync.native, defaultWorkspace: () => project, readWorkspaces: () => [],
+      isDirectory: (path) => statSync(path).isDirectory(), stat: (path) => statSync(path, { bigint: true }), lstat: (path) => lstatSync(path, { bigint: true }),
+      mkdirp: (path) => void mkdirSync(path, { recursive: true }), compile: trialCompileProfile, log: (line) => void logs.push(line),
+    })
+    expect(plan.newPaths).toEqual(carried.slice(0, 5))
+    expect(logs.filter((line) => line.startsWith("process fence: approved new path"))).toEqual(carried.slice(5).map((path) => `process fence: approved new path ${path} excluded — no longer that new path directly in HOME (a link, re-pointed, or HOME changed)`))
+    const lines = plan.profile.split("\n")
+    expect(lines.slice(lines.findIndex((line) => line.endsWith("; W1")) + 1).slice(0, 5)).toEqual(carried.slice(0, 5).map((path) => `  (subpath "${path}") ; NP5 本人批准的主目录下新路径`))
+    expect(processFenceWriteRules(plan.profile).allow).toEqual(expect.arrayContaining(carried.slice(0, 5).map((value) => ({ kind: "subpath", value }))))
+    const fenced = (script: string) => spawnSync(SANDBOX_EXEC, ["-p", plan.profile, "/bin/sh", "-c", script], { encoding: "utf8", env: { HOME: home, PATH: "/usr/bin:/bin" }, timeout: 10_000 })
+    expect(fenced(`printf new > '${join(home, "missing.txt")}' && printf more >> '${join(home, "made.txt")}' && mkdir -p '${join(home, "made-dir", "a")}'`).status).toBe(0)
+    // The approved spelling's rule covers the entry in either spelling.
+    for (const name of ["note.txt", "NOTE.TXT", "caf\u00e9.txt", "cafe\u0301.txt"]) expect(fenced(`printf w >> '${join(home, name)}'`).status, name).toBe(0)
+    expect([readFileSync(join(home, "NOTE.TXT"), "utf8"), readFileSync(join(home, "cafe\u0301.txt"), "utf8")]).toEqual(["xww", "xww"])
+    for (const script of [`printf s > '${join(home, "sibling.txt")}'`, `printf z > '${join(home, "linked", "esc")}'`, `printf n > '${join(home, "sub", "nested")}'`]) expect(fenced(script).status, script).not.toBe(0)
+    expect(readFileSync(join(home, "missing.txt"), "utf8")).toBe("new")
+    expect(readdirSync(outside)).toEqual([])
+    expect(existsSync(join(home, "sibling.txt")) || existsSync(join(home, "sub", "nested"))).toBe(false)
+  })
+})
+
 function harness(overrides: Partial<PlanProcessFenceDeps> = {}, existing = new Set<string>([ADDON])) {
   const made: string[] = []
   const logs: string[] = []
@@ -466,6 +571,44 @@ describeDarwin("planProcessFence", () => {
     expect(plan.profile).toContain("(deny network*)")
     // ~/.opencode(CF-9,谁都不建,BR-07)、~/.zsh_sessions、bun 缓存(dev-only)刻意不建
     expect(h.made.some((d) => d.endsWith("/.opencode") || d.endsWith("/.zsh_sessions") || d.includes("bun"))).toBe(false)
+  })
+
+  test("`#1761` N5:计划的 profile 在 N4 之后、受保护集之前放行本用户 LibreOffice 单实例管道族的 bind/accept,紧跟拒绝这个 HOME 的默认 profile($HOME/Library/Application Support/LibreOffice/4)的确切管道名", () => {
+    // HOME 取一个真实采样:LibreOffice 26.8.3.1 以这个 HOME 的默认 profile 启动时建的管道名就是下面的 hash(plan.md r5 证明 3 的采集记录)
+    const home = "/private/tmp/lo1761-cap/home-ascii"
+    const h = harness({ homeDir: () => home })
+    h.input.sidecarEnv = { HOME: home }
+    const uid = process.getuid!()
+    const lines = planProcessFence(h.input, h.deps).profile.split("\n").map((line) => line.replace(/\s*;.*$/, "").trim())
+    const n4 = lines.findIndex((line) => line.startsWith("(allow network-outbound"))
+    expect(lines.slice(n4 + 1, n4 + 4)).toEqual([
+      `(allow network-bind network-inbound (local unix-socket (path-regex #"^/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_[0-9a-f]+$")))`,
+      `(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb")))`,
+      // 代码审查 R1-2:同一确切名字的活管道文件在围栏内删不掉
+      `(deny file-write-unlink (literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_544bb8688380f4abd07fb835db5f64cb"))`,
+    ])
+    expect(lines[n4 + 4]).toBe("(deny file-write*")
+  })
+
+  // 代码审查 R1-1:LibreOffice 推算前先解析软链(bootstrap.cxx、file_url.cxx),计划器给的路径 = 已存在部分的真实路径 + 尚未创建的后缀。
+  // 两个真实采样(plan.md r5 采集记录 2026-11-28):HOME 经系统软链 /tmp、HOME 本身是软链;假盘复现采样时的软链,profile 目录尚未创建
+  test.each([
+    { home: "/tmp/lo1761-cap2/home", link: ["/tmp", "/private/tmp"], pipe: "9dfde0baa068139ee9d12a3b8a3f96" },
+    { home: "/private/tmp/lo1761-cap2/link-home", link: ["/private/tmp/lo1761-cap2/link-home", "/private/tmp/lo1761-cap2/real-home"], pipe: "b72d7575b186695ff1c06bc77a3f51d5" },
+  ])("`#1761` N5:HOME 经软链($home)⇒ 拒绝行是 LibreOffice 解析软链后的那个管道名", ({ home, link, pipe }) => {
+    const [from, to] = link as [string, string]
+    const resolve = (p: string) => (p === from || p.startsWith(`${from}/`) ? to + p.slice(from.length) : p)
+    const h = harness({
+      homeDir: () => home,
+      realpath: (p) => {
+        if (p.startsWith(`${home}/Library`)) throw enoent(p) // the default profile is not created yet
+        return resolve(p)
+      },
+    })
+    h.input.sidecarEnv = { HOME: home }
+    const uid = process.getuid!()
+    const profile = planProcessFence(h.input, h.deps).profile
+    expect(profile).toContain(`(deny network-bind network-inbound (local unix-socket (path-literal "/private/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_${pipe}")))`)
   })
 
   test("用户导出 XDG_STATE_HOME ⇒ 多建 <state>/opencode,profile 多一行 W3;XDG_DATA_HOME 跟着 env", () => {
@@ -564,7 +707,9 @@ describeDarwin("planProcessFence", () => {
     const asRule = (rule: (typeof cf.configFence)[number]): ProcessFenceWriteRule =>
       rule.kind === "dat-files" ? { kind: "regex", value: `^${rule.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/[^/]+\\.[dD][aA][tT]$` } : { kind: rule.kind, value: rule.path }
     const anchors = cf.configFence.map((rule) => (rule.kind === "dat-files" ? `${rule.dir}/x` : rule.path))
-    expect(processFenceWriteRules(plan.profile).deny).toEqual([...cf.configFence.map(asRule), ...ancestorsOf(anchors).map((value) => ({ kind: "literal" as const, value }))])
+    // 代码审查 R1-2(#1761):N5 的 unlink 拒绝行(这个 HOME 默认 profile 的活管道文件)排在受保护集之前
+    const userPipe = `/private/tmp/${libreOfficeSingleInstancePipe(process.getuid!(), `${HOME}/Library/Application Support/LibreOffice/4`)}`
+    expect(processFenceWriteRules(plan.profile).deny).toEqual([{ kind: "literal", value: userPipe }, ...cf.configFence.map(asRule), ...ancestorsOf(anchors).map((value) => ({ kind: "literal" as const, value }))])
     expect(plan.profile.indexOf("(deny file-write*\n", plan.profile.indexOf("(allow network-outbound"))).toBeGreaterThan(0)
     expect(plan.configFenceRoots).toEqual([STATE_ROOT, GLOBAL, `${USER_DATA}/codepuppy-engine-config`, `${USER_DATA}/codepuppy-connections`, `${HOME}/.config/opencode`, `${HOME}/.opencode`, `${HOME}/.local/share/opencode/codepuppy-tool-policy`])
     expect(plan.configFenceRoots).toEqual(cf.configFenceRoots)

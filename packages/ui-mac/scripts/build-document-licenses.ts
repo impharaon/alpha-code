@@ -7,7 +7,7 @@ import type { PinnedFiles } from "../../util/src/codepuppy-pinned-files"
 export async function buildDocumentLicenses(pin: PinnedFiles["files"][number], runtimeRoot: string, destination: string) {
   if (pin.family !== "libreoffice") throw new Error("expected the selected LibreOffice pin")
   const root = await realpath(runtimeRoot)
-  const source = pin.target === "darwin-arm64" ? join(root, "LibreOffice.app", "Contents", "Resources") : root
+  const source = pin.target === "darwin-arm64" ? join(root, "LibreOffice", "Contents", "Resources") : root
   await mkdir(destination, { recursive: true })
   const files: { path: string; sha256: string }[] = []
   // Preserve all original licence/notice trees, not only a link to the MPL homepage.

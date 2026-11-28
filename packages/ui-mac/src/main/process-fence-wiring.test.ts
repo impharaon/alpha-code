@@ -817,7 +817,7 @@ describe("REQ-159 main 侧接线:计划 → start 命令 → 拒 fork", () => {
       mkdirSync(join(home, "rebound-target"))
       symlinkSync(join(home, "rebound-target"), rebound)
       const noted: string[][] = []
-      const gen = await spawnProfile(4324, { carriedWorkspaces: () => [opened, rebound], noteGeneration: (_listener, workspaces) => { noted.push([...workspaces]) } })
+      const gen = await spawnProfile(4324, { carriedWorkspaces: () => [opened, rebound], carriedNewPaths: () => [], noteGeneration: (_listener, workspaces) => { noted.push([...workspaces]) } })
       expect(gen.profile).toContain(`(subpath "${opened}")`)
       expect(gen.profile).not.toContain("rebound")
       expect(gen.planned).toContain("workspaces=3 (candidates=4, excluded=1, dropped=0)")

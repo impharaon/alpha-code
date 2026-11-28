@@ -316,7 +316,7 @@ process fence profile does not compile even with the minimum writable set
 
 | 层 | 文件 | 事实 |
 | --- | --- | --- |
-| 强制层(profile) | `packages/ui-mac/src/main/process-fence-profile.ts` N1–N4 | 可写集之后追加 §Q1.2 那四行**逐字**:`(deny network*)` + loopback `network-bind` / `network-inbound` + 只放行 `localhost:<代理端口>` 出网。只写加法;DNS 刻意不放行。端口不是 1..65535 的整数 ⇒ 拒绝渲染 |
+| 强制层(profile) | `packages/ui-mac/src/main/process-fence-profile.ts` N1–N4(`#1761` 起另有 N5) | 可写集之后追加 §Q1.2 那四行**逐字**:`(deny network*)` + loopback `network-bind` / `network-inbound` + 只放行 `localhost:<代理端口>` 出网。只写加法;DNS 刻意不放行。端口不是 1..65535 的整数 ⇒ 拒绝渲染。`#1761` 在 N4 之后加 N5:只允许本用户 LibreOffice 单实例管道 `/private/tmp/OSL_PIPE_<uid>_SingleOfficeIPC_<hex>` 的 bind / accept,其后逐条拒绝用户自己默认 profile 的确切管道名,任何 unix socket 的出站 connect 仍由 N1 全拒([DESIGN-document-output-quality §4.11](../specs/document-output-quality/design.md)) |
 | 策略层(代理) | `packages/ui-mac/src/main/server.ts` `ensureEgressPolicyProxy` → `network-egress-proxy.ts` | 代理跑在 **Electron main 进程内**(围栏外,`#1073` 裁决三:`(deny network*)` 连带拦 DNS,解析只能在围栏外做),第一次 fork 之前起、跨 respawn 复用;起不来 ⇒ 拒 fork。授权只问 `network-egress-registry.ts`(**`#1379` 起**:问的是静态表 ∪ 动态半场,见下节) |
 | 汇流(env) | `sidecar-env.ts` `sidecarEgressProxyEnv` | fork 之前把 sidecar 的八个代理变量**整份改写**:`HTTP(S)_PROXY` / `ALL_PROXY`(大小写)指向代理,`NO_PROXY` 只留 loopback —— 用户自己的代理与 NO_PROXY 名单不存活(唯一通路)。main 自己的 `process.env` 一个字不动 |
 | 归因 | `process-fence-profile.ts` `trimUntilCompiles` | 编译失败若不是 `exceeds maximum` 那道字节墙 ⇒ 一个工作区都不丢就抛,消息点名「丢工作区救不了」(§Q5 末节) |

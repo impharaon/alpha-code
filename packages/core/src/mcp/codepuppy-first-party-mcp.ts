@@ -87,7 +87,7 @@ export function declaredFirstPartyBinding(
       const expectedEnvironment = { ...declaration.environment, ...(office && entry.disabled !== true ? pythonEnvironment : undefined) }
       if (canonicalJsonDigest(entry.environment ?? {}) !== canonicalJsonDigest(expectedEnvironment) || (entry.cwd ?? null) !== declaration.cwd) continue
       if (!Object.entries(declaration.codeSha256).every(([file, digest]) => createHash("sha256").update(readFile(path.join(resources, file))).digest("hex") === digest)) continue
-      const recipeSha256 = canonicalJsonDigest({ kind: "codepuppy-pinned-entry-recipe", recipe: declaration.recipe ?? [] }).slice("sha256:".length)
+      const recipeSha256 = pinnedRecipeSha256(declaration.recipe)
       const declarationSha256 = canonicalJsonDigest({ kind: "codepuppy-bundled-mcp-declaration", command: declaration.command, environment: declaration.environment, cwd: declaration.cwd, codeSha256: declaration.codeSha256, tools: declaration.tools, recipeSha256 }).slice("sha256:".length)
       const declared: DeclaredFirstParty = { tools: declaration.tools, ...(declaration.recipe === undefined ? {} : { recipe: declaration.recipe }), declarationSha256, recipeSha256 }
       return {
@@ -105,6 +105,11 @@ export function declaredFirstPartyBinding(
     // Invalid manifest / unreadable protected code is untrusted, not an application failure.
   }
   return undefined
+}
+
+/** VIDEO-L1-v2 §4.3's recipe digest; it also names the prepared entry root. */
+export function pinnedRecipeSha256(recipe: BundledFirstPartyDeclaration["recipe"]) {
+  return canonicalJsonDigest({ kind: "codepuppy-pinned-entry-recipe", recipe: recipe ?? [] }).slice("sha256:".length)
 }
 
 /** Existing declaration contract; binding facts remain a host-private companion. */

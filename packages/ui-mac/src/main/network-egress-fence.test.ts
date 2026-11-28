@@ -17,15 +17,22 @@ import { testEgressDial } from "../../test-component/egress-upstream-fixture"
 // 靶站是 loopback 上一个只有代理那一侧解得开的**名字**(fixture dial 把它映到 127.0.0.1:<port>):围栏里 DNS 不通,
 // 名字能到达 ⇒ 流量一定是经代理汇出去的,这比「有没有报错」硬。授权函数是测试注入(只放行这一个名字),
 // 生产接线(authorize = 注册表)的判据在 network-egress-proxy.test.ts。
+//
+// `#1761` N5(DESIGN-document-output-quality §4.11):profile 带 LibreOffice 单实例管道的 unixListen(两个测试 profile 路径作
+// userInstallations)。同一批 driver 运行顺带跑 unix socket 探针:围栏下 LO 管道族可 bind/listen,用户默认管道名、其它 uid、
+// /tmp 下其它名不可 bind,对 $TMPDIR 外部监听者、冒充用户默认管道的外部监听者与 mDNSResponder 的 connect 全 EPERM;bare 臂是
+// 「探针能通」的对照,另一份去掉拒绝行(userInstallations 为空)的 profile 是拒绝行的对照。用户默认管道名取自 profile 的拒绝行
+// (名字的推算对真实 LibreOffice 的判据在 process-fence-profile.test.ts)。
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
+import { randomBytes } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import * as http from "node:http"
 import { createRequire } from "node:module"
 import * as net from "node:net"
 import { homedir, tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import { buildFenceAddon } from "../../scripts/build-fence-addon"
 import { startEgressPolicyProxy, type EgressLogRecord, type EgressProxyHandle } from "./network-egress-proxy"
 import { renderProcessFenceProfile, resolveEngineRoots } from "./process-fence-profile"
@@ -39,6 +46,10 @@ const TARGET_NAME = "ac1337-target.test"
 type Step = { ok: boolean; code?: string | null; message?: string; ms: number; status?: number; body?: string; connected?: boolean; accepted?: number; sent?: boolean; address?: string; head?: string }
 type DriverOut = { runtime: string; mode: string; pid: number; buildId?: string; apply?: { rc: number; error: string }; fatal?: string; listenPort?: number; steps: Record<string, Step> }
 type DriverRun = { out: DriverOut; served: string; status: number | null }
+type UnixProbes = { loPipe: string; userPipe?: string; otherUidPipe: string; otherTmp: string; tmpdirListener: string; userPipeListener?: string; mdns: string }
+
+/** profile 里 N5 拒绝行写下的确切管道名(按出现顺序)。 */
+const deniedPipes = (profile: string) => [...profile.matchAll(/^\(deny network-bind network-inbound \(local unix-socket \(path-literal "([^"]+)"\)\)\)/gm)].map((m) => m[1]!)
 
 describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真策略代理 / Electron 的 node", () => {
   let scratch = ""
@@ -53,6 +64,9 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
   let proxyPort = 0
   let closedV6Port = 0
   const proxyLog: EgressLogRecord[] = []
+  let noDenyProfileFile = ""
+  let unix: UnixProbes
+  const unixListeners: net.Server[] = []
 
   beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), "ac1337-net-"))
@@ -83,8 +97,10 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
 
     // 生产渲染器渲染的 profile(受保护集按空):可写集 = 本测试的 ws + 真 HOME 的 XDG 形状;网络行 = Q1.2 四行,端口 = 上面这个真代理。
     profileFile = join(scratch, "fence.sb")
-    writeFileSync(
-      profileFile,
+    // `#1761`:两个测试 profile 路径当作用户的 LibreOffice 默认 profile(一个给 bind 探针,一个给冒充它的外部监听者)
+    const uid = process.getuid!()
+    const userInstallations = ["a", "b"].map((name) => join(scratch, `home-${name}`, "Library", "Application Support", "LibreOffice", "4"))
+    const render = (installations: string[]) =>
       renderProcessFenceProfile({
         workspaces: [ws],
         codepuppyGlobalRoot: globalRoot,
@@ -94,8 +110,31 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
         egressProxyPort: proxyPort,
         configFence: [],
         homebrewFence: [], credentialStores: [],
-      }),
-    )
+        unixListen: [{ kind: "libreoffice-single-instance", uid, userInstallations: installations }],
+      })
+    const profile = render(userInstallations)
+    writeFileSync(profileFile, profile)
+    noDenyProfileFile = join(scratch, "fence-no-deny.sb")
+    writeFileSync(noDenyProfileFile, render([]))
+    const [userPipe, userPipeListener] = deniedPipes(profile)
+    const hex = () => randomBytes(16).toString("hex")
+    unix = {
+      loPipe: `/tmp/OSL_PIPE_${uid}_SingleOfficeIPC_${hex()}`,
+      // LibreOffice 自己写 `/tmp/…`;拒绝行写解析后的 `/private/tmp/…`,两种写法必须是同一个名字
+      ...(userPipe ? { userPipe: `/tmp/${basename(userPipe)}` } : {}),
+      otherUidPipe: `/tmp/OSL_PIPE_${uid + 1}_SingleOfficeIPC_${hex()}`,
+      otherTmp: `/tmp/OSL_PIPE_${uid}_other_${hex()}`,
+      tmpdirListener: join(scratch, "x.sock"), // macOS sun_path 上限 104 字节:名字短
+      ...(userPipeListener ? { userPipeListener } : {}),
+      mdns: "/var/run/mDNSResponder",
+    }
+    // 围栏外的监听者(本测试进程):一个在 $TMPDIR,一个冒充用户自己 LibreOffice 的管道
+    for (const path of [unix.tmpdirListener, unix.userPipeListener]) {
+      if (!path) continue
+      const server = net.createServer((sock) => sock.destroy())
+      await new Promise<void>((r) => server.listen(path, r))
+      unixListeners.push(server)
+    }
     // 不经 require("electron")(bun 的 mock.module 是进程级的,全量跑时别的文件 mock 掉的 electron 会漏进来);
     // 照 electron 包自己的做法从文件系统读 path.txt 再 join dist。
     const electronPkg = dirname(require.resolve("electron/package.json"))
@@ -108,6 +147,9 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
       await proxy?.close()
     } catch {}
     await new Promise<void>((r) => (target ? target.close(() => r()) : r()))
+    for (const server of unixListeners) await new Promise<void>((r) => server.close(() => r()))
+    // 探针 bind 成功后自己关闭(删 socket 文件);中途崩掉时留下的 /tmp 名字在这里删
+    for (const path of unix ? [unix.loPipe, unix.userPipe, unix.otherUidPipe, unix.otherTmp, unix.userPipeListener] : []) if (path) rmSync(path, { force: true })
     for (const d of [scratch, ws]) {
       try {
         rmSync(d, { recursive: true, force: true })
@@ -116,9 +158,9 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
   })
 
   /** 起 driver;看到 `LISTENING <port>` 就从**本进程**(未被围栏)连进去,证明被围栏的监听者外面连得上。 */
-  const runDriver = (mode: "bare" | "fenced", proxyPortForEnv: number): Promise<DriverRun> =>
+  const runDriver = (mode: "bare" | "fenced", proxyPortForEnv: number, profile = profileFile): Promise<DriverRun> =>
     new Promise((resolve, reject) => {
-      const child = spawn(electron, [join(fixtures, "network-driver.mjs"), addon, mode, profileFile, TARGET_NAME, String(targetPort), String(proxyPortForEnv), String(closedV6Port)], {
+      const child = spawn(electron, [join(fixtures, "network-driver.mjs"), addon, mode, profile, TARGET_NAME, String(targetPort), String(proxyPortForEnv), String(closedV6Port), JSON.stringify(unix)], {
         cwd: ws,
         env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", ...sidecarEgressProxyEnv(proxyPortForEnv) },
       })
@@ -230,5 +272,31 @@ describeDarwin("REQ-137 #1337 强制半场 —— 真 .node / 真 seatbelt / 真
     expect(s.dns.ok).toBe(false)
     // 监听不受代理死活影响(引擎照常起得来)
     expect(runs.fencedDown.served).toBe("SERVED:ping")
+  })
+
+  test("A4 `#1761` N5:围栏下 LibreOffice 单实例管道族按 LO 的 /tmp 写法可 bind/listen;用户默认管道名、其它 uid、/tmp 下其它名不可 bind;connect $TMPDIR 外部监听者、冒充用户默认管道的监听者、mDNSResponder 全 EPERM。bare 臂同一组探针全通(探针测得出「通」)", () => {
+    const fenced = runs.fencedUp!.out.steps
+    const bare = runs.bare!.out.steps
+    const binds = ["loPipeBind", "userPipeBind", "otherUidBind", "otherTmpBind"]
+    const connects = ["tmpdirConnect", "userPipeConnect", "mdnsConnect"]
+    console.log(`[ac1761 A4] fenced ${[...binds, ...connects].map((k) => `${k}=${fenced[k]?.ok ? "ok" : fenced[k]?.code}`).join(" ")} · bare ${[...binds, ...connects].map((k) => `${k}=${bare[k]?.ok ? "ok" : bare[k]?.code}`).join(" ")}`)
+    expect(fenced.loPipeBind).toMatchObject({ ok: true, bound: true })
+    for (const name of binds.slice(1)) expect(fenced[name], name).toMatchObject({ ok: false, code: "EPERM" })
+    for (const name of connects) expect(fenced[name], name).toMatchObject({ ok: false, code: "EPERM" })
+    for (const name of binds) expect(bare[name], name).toMatchObject({ ok: true, bound: true })
+    for (const name of connects) expect(bare[name], name).toMatchObject({ ok: true, connected: true })
+    // 代码审查 R1-2:用户 LibreOffice 的活管道文件在围栏内删不掉(W11 允许写 /private/tmp,拒绝的只是这一个文件的 unlink)
+    expect(fenced.userPipeUnlink).toMatchObject({ ok: false, code: "EPERM" })
+    expect(existsSync(unix.userPipeListener!)).toBe(true)
+  })
+
+  test("A5 `#1761` 拒绝行的对照:同一 N5 去掉用户默认 profile 的拒绝行(userInstallations 为空)⇒ 围栏内能 bind 那个名字、能删它的活管道文件 —— A4 的拒绝来自拒绝行", async () => {
+    const run = await runDriver("fenced", proxyPort, noDenyProfileFile)
+    expect(run.out.apply).toEqual({ rc: 0, error: "" })
+    expect(run.out.steps.loPipeBind).toMatchObject({ ok: true, bound: true })
+    expect(run.out.steps.userPipeBind).toMatchObject({ ok: true, bound: true })
+    // 同一对照下 unlink 也不再被拒:A4 里删不掉活管道文件,来自那一行 file-write-unlink 拒绝
+    expect(run.out.steps.userPipeUnlink).toMatchObject({ ok: true, unlinked: true })
+    expect(existsSync(unix.userPipeListener!)).toBe(false)
   })
 })

@@ -1076,6 +1076,14 @@ AC 结论：
 
 2026-11-27 · AC-01..03 实测，测量宿主的偏离（产品代码未改）：一，除计划列出的启动步骤外，宿主还调用了 `registerExtIpcHandlers` 拿 ext 的 hub 宿主（ext 激活要靠它应答），以及 `syncLiveAllowlist` 下载平台模型目录（未登录拉取，edition 为 cn，与测试租户相同）。二，产品的 shell 环境探测要先有 index.ts 从界面存储播种的围栏工作区记录，宿主没有这份记录，所以没有合并登录 shell 环境，PATH 取自启动器。三，在九次之前加了一轮 LibreOffice 预热（一次很短的模型调用，触发产品自己的准备路径），计入费用上限。四，空跑用产品的地址覆盖变量把模型代理和云 MCP 指向关闭的本机端口；覆盖变量同时关掉了 relay/direct 回退，所以空跑不会落到付费网关。五，宿主先写下退出码，再由启动器在宽限期后结束进程。没有为宿主或评分脚本新增套件测试：它们需要真实引擎、LibreOffice 和付费账号，按 test-layers 记为一次性证据。
 
+### AC-05/06/12 实测前的产品修正（2026-11-28）
+
+依据：AC-04/05/06/12 实测计划（`0953d1cb7c`，`feat/1761-s8-real-engine-remaining`）「现有证据核对」第 1、3 条；调度方同日指派修正。
+
+- 第 1 条（首个 render 带自编 checkId 后模型不再恢复）：红 `98e75273c9`（`document-render.test.ts` 在工具入口重放 X2 的第一次调用：失败结果须写明省略 checkId，随后不带 checkId 的调用须渲染成功；未修代码上 detail 仍是旧句，1 fail）；修 `36ad482838`：checkId 仍由工具分配（design §4.4），未知的照旧拒绝，只把 detail 改成照着就能改正的一句。工具说明（`context-injection.ts:299`）未改。模型读到这句后是否真的改正，由付费实测核对。
+- 第 3 条（新 Word/PPT 没有随包模板来源）：判为设计缺口，交回调度方，本节未改代码。§4.1 规定新 Word 用 docx-js、新 PPT 用 PptxGenJS，两者都从头生成；§4.2 要求来源标识进成品自定义属性；§4.4 要求回执的 template 不能凭模型的声称填入 bundled。设计没有写明从头生成的成品如何从随包模板出发，又如何留下可核实的来源。
+- 第 2 条（X2 往 LibreOffice 运行时里拷字体）：调度方判定不是缺陷。按围栏设计 W3，userData 本来可写（BR-07 的缓存、LibreOffice 任务），围栏车道在桌面端目录布局下复现了同样的写入。已登记为待批意图 alpha-work INT-safety I-58。W3、P3、X3 是在拷入四份 Noto 字体的运行时上跑的；AC-01..03 的评分看的是结构（docx/pptx 的 XML，公式值经 OfficeExcel.recalculate 重算），所以这三次的结果有效，不重跑。
+
 ## r5 修正：围栏内 LibreOffice 单实例管道与不被系统登记的运行时
 
 - 依据：[design](design.md) @ `efd1af8808` §4.11（frozen）、§2 F-21..F-23、§5「围栏内管道」、§6 R14、§10 r5 各行；[网络围栏权威](../../architecture/2026-09-10-network-egress-on-process-fence.md)「落地」表强制层 N5 一行；[spec v1](spec.md) AC-03、04、06..10、13 的 LibreOffice 部分；Issue #1761。缺陷证据为测量回执 `~/.cache/alpha-orch/2026-11-27/impl-1761-ac01-03/diag/`（组合引擎内 verify 与 soffice 转换 exit 1）。Windows 不改（§4.11「Windows」）。

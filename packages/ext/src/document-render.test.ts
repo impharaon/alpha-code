@@ -129,6 +129,22 @@ describe("document render", () => {
     )
     expect(foreign).toMatchObject({ status: "failed", code: "invalid-input" })
   })
+  test("a first render with an invented checkId tells the model to omit it, and the next call without it renders", async () => {
+    const f = fixture()
+    const tool = createDocumentTool({ check: createDocumentInspection().check,
+      host: () => f.input.host,
+      location: f.caller.location,
+      render: createDocumentRenderer(f.input),
+    })
+    const context = { sessionID: f.caller.sessionID, signal: new AbortController().signal, progress: async () => {} } as never
+    // The model's actual first call in the 2026-11-28 X2 run (r3-paid/runs/X2.messages.json), on this fixture's file.
+    const invented = JSON.parse(String((await tool.execute({ action: "render", request: { kind: "pdf", path: f.source }, checkId: "sales-layout-1", revision: 0 }, context)).content))
+    expect(invented).toMatchObject({ status: "failed", code: "invalid-input" })
+    expect(invented.detail).toContain("omit checkId")
+    expect(invented.detail).toContain("receipt.checkId")
+    const retried = JSON.parse(String((await tool.execute({ action: "render", request: { kind: "pdf", path: f.source } }, context)).content))
+    expect(retried.status).toBe("rendered")
+  })
   test("pending Office artifacts persist before return and are included in normal completed tool metadata", async () => {
     const f = fixture()
     const source = join(f.root, "report.docx")

@@ -801,7 +801,8 @@ test("busy package switch forces the existing scheduler without a second reload 
   const detach = codepuppySidecar.attach((message) => { requests.push(message as { items?: Array<{ id: string }> }) })
   try {
     expect(await call("ext-install-package", "package:supabase")).toMatchObject({ ok: true })
-    expect(requests.at(-1)?.items?.map((item) => item.id)).toEqual(expect.arrayContaining(["package:supabase", "skill:supabase", "mcp:supabase", "skill:supabase-postgres-best-practices"]))
+    // Activation and its reload are published one event turn after the install returns (plan r3 AC-14, design §4.2).
+    await waitFor(() => expect(requests.at(-1)?.items?.map((item) => item.id)).toEqual(expect.arrayContaining(["package:supabase", "skill:supabase", "mcp:supabase", "skill:supabase-postgres-best-practices"])))
   } finally { detach() }
 })
 

@@ -59,6 +59,32 @@ describe("document tool", () => {
     const { action, ...render } = args as { action: string }
     expect(calls).toEqual([action === "environment" ? "environment" : render])
   })
+
+  test.each([
+    { args: { action: "render", request: { kind: "docx" } }, field: "request.path" },
+    { args: { action: "render", request: { kind: "docx", path: "/workspace/report.docx", dpi: -1 } }, field: "request.dpi" },
+    { args: { action: "render", request: { kind: "docx", path: "/workspace/report.docx", viewport: { width: 1.5, height: 2 } } }, field: "request.viewport.width" },
+    { args: { action: "environment", extra: 1 }, field: undefined },
+  ])("an engine with its own Effect refuses invalid arguments and drops unknown keys: $field", async ({ args, field }) => {
+    const engine = await separatelyBundledEngine()
+    const calls: unknown[] = []
+    const tool = createDocumentTool({
+      location: { directory: "/workspace" } as DocumentCaller["location"],
+      host: () => ({ environment: async () => (calls.push("environment"), {}) }) as unknown as DocumentHost,
+      check: createDocumentInspection().check,
+      render: async () => (calls.push("render"), { status: "failed", code: "source-missing", detail: "not found" }),
+    })
+    const engineTool = { ...tool, execute: (input: unknown, context: object) => Effect.promise((signal) => tool.execute(input, { ...context, signal, progress: async () => {} } as never)) }
+    const context = { sessionID: "ses_document", agent: "build", messageID: "msg_document", id: "call_document", progress: () => Effect.void }
+    const exit = await Effect.runPromiseExit(engine.execute(engineTool as never, args, context as never))
+    if (field === undefined) {
+      expect(Exit.isSuccess(exit) ? "settled" : String(exit.cause)).toBe("settled")
+      expect(calls).toEqual(["environment"])
+    } else {
+      expect(Exit.isFailure(exit) && String(exit.cause).includes(`- ${field}:`)).toBe(true)
+      expect(calls).toEqual([])
+    }
+  })
 })
 
 test.each(["conversion", "timeout"] as const)("document workflow titles end after render %s", async (code) => {

@@ -5,6 +5,12 @@ import { expect, test } from "bun:test"
 import { createHubBridge, type HubPort } from "./hub-bridge"
 import { createNetworkEgressActivity } from "../../ui-mac/src/main/network-egress-activity"
 import type { NetworkOutbound } from "../../ui-mac/src/shared/network-egress-wire"
+import { Cause, Effect } from "effect"
+import { Plugin as Plugins } from "../../core/src/plugin.ts"
+import { Tool as Tools } from "../../core/src/tool.ts"
+import { activate, it } from "./plugin-host.harness"
+import { separatelyBundledNetworkEgress } from "./engine-runtime.harness"
+import * as sourceEgress from "./network-egress"
 
 function connected() {
   const activity = createNetworkEgressActivity()
@@ -117,3 +123,47 @@ test("普通失败不注入，允许后未交付结果与换代丢弃旧 notice"
   c.bridge.network.context("/project", next)
   expect(next.system).toEqual([])
 })
+
+// The shipped ext bundle carries its own Tool.Error class (scripts/build.ts, ADR-006): the engine's Promise adapter hands
+// execute.after a Tool.Error of its own, never the object the ext threw. 2026-11-28 probe through the real host and adapter:
+// with the bundled tracker attachResult returned false and the failure kept only "fetch failed".
+for (const layout of ["source", "separately bundled"] as const)
+  it.live(`${layout} ext: a failed call keeps the network notice through the engine's adapter`, () => Effect.gen(function* () {
+    const module = layout === "source" ? sourceEgress : yield* Effect.promise(separatelyBundledNetworkEgress)
+    let entered: unknown
+    const egress = module.createNetworkEgress({
+      send: async (build) => {
+        const message = build(1) as { type: string; op?: string; activity?: unknown }
+        if (message.type === "codepuppy.network.activity" && message.op === "enter") entered = message.activity
+        return { ok: true } as never
+      },
+      log: () => {},
+    })
+    egress.receive({ type: "codepuppy.network.attached", generation: 1 } as never)
+    const after: Array<{ attached: boolean; message: string; metadata: unknown }> = []
+    yield* activate({
+      id: `network-egress-${layout}`,
+      async setup(context) {
+        await context.tool.hook("execute.after", async (event) => {
+          if (event.tool !== "egress_fetch" || event.status !== "error") return
+          const attached = egress.attachResult(event as never)
+          after.push({ attached, message: event.error.message, metadata: event.error.metadata })
+        })
+        await context.tool.transform((editor) => editor.add({
+          name: "egress_fetch", description: "fetch", input: { type: "object", properties: {} }, options: { codemode: false },
+          execute: (_input, call) => egress.run("/project", "egress_fetch", { sessionID: call.sessionID, messageID: call.messageID, id: call.id }, async () => {
+            await Promise.resolve()
+            egress.receive({ type: "codepuppy.network.notice", requestID: "r1", destination: { host: "outside.test", port: 443 }, state: "denied", sessions: [{ generation: 1, directory: "/project", sessionID: call.sessionID }], activities: [entered], attribution: "unknown" } as never)
+            throw new Error("fetch failed")
+          }) as never,
+        }))
+      },
+    })
+    yield* (yield* Plugins.Service).awaitActivation
+    const snapshot = yield* (yield* Tools.Service).snapshot()
+    const exit = yield* snapshot.execute({ sessionID: "ses_egress", agent: "build" as never, messageID: "msg_egress" as never, call: { type: "tool-call", id: "call_egress", name: "egress_fetch", input: {} } } as never).pipe(Effect.exit)
+    expect(after).toEqual([{ attached: true, message: `fetch failed\n\n${NETWORK_EGRESS_NOTE}`, metadata: undefined }])
+    // The call fails with the engine's own Tool.Error, carrying the notice and no marker left in its metadata.
+    const failure = exit._tag === "Failure" ? Cause.squash(exit.cause) : undefined
+    expect({ engineClass: failure instanceof Tool.Error, message: (failure as Tool.Error | undefined)?.message, metadata: (failure as Tool.Error | undefined)?.metadata }).toEqual({ engineClass: true, message: `fetch failed\n\n${NETWORK_EGRESS_NOTE}`, metadata: undefined })
+  }))

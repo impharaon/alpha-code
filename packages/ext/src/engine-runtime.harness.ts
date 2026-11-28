@@ -4,6 +4,7 @@
 // restore it. Each is built from an in-memory entry and loaded from memory (a Blob URL); nothing is written to disk.
 //   · separatelyBundledEngine: the engine's tool runtime and the read tool's output parts, with the Effect they were built by.
 //   · separatelyBundledExtPolicy: the ext's policy gate and policy store, with the Tool.Error class and Effect they carry.
+//   · separatelyBundledNetworkEgress: the ext's network-egress tracker, with the Tool.Error class it carries.
 //
 // File name `.harness.ts`: a test helper, not a test file and not in the ext typecheck (tsconfig exclude).
 import { join } from "node:path"
@@ -12,6 +13,7 @@ const RUNTIME = join(import.meta.dir, "../../core/src/tool/runtime.ts")
 const READ_FILESYSTEM = join(import.meta.dir, "../../core/src/tool/read-filesystem.ts")
 const POLICY_GATE = join(import.meta.dir, "policy/gate.ts")
 const POLICY_RESOLVER = join(import.meta.dir, "policy/resolver.ts")
+const NETWORK_EGRESS = join(import.meta.dir, "network-egress.ts")
 
 async function bundle(name: string, exports: string[]) {
   const entry = join(import.meta.dir, `${name}.ts`)
@@ -43,4 +45,10 @@ export function separatelyBundledExtPolicy(): Promise<SeparatelyBundledExtPolicy
     `export * from ${JSON.stringify(POLICY_GATE)}`,
     `export { createToolPolicyStore } from ${JSON.stringify(POLICY_RESOLVER)}`,
   ]))
+}
+
+let egress: Promise<typeof import("./network-egress")> | undefined
+
+export function separatelyBundledNetworkEgress(): Promise<typeof import("./network-egress")> {
+  return (egress ??= bundle("separately-bundled-network-egress", [`export * from ${JSON.stringify(NETWORK_EGRESS)}`]))
 }

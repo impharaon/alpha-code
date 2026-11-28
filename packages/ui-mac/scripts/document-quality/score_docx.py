@@ -31,8 +31,11 @@ for p in paras:
 # 1 cover title
 first_h1 = next((i for i, p in enumerate(paras) if level(p) == 1 and p.text.strip()), len(paras))
 cover = [p.text.strip() for p in paras[:first_h1] if p.text.strip()]
-title_hit = any("2026" in t and "第三季度经营分析" in t.replace(" ", "") for t in cover[:6])
-res("01 cover title", "pass" if title_hit else ("partial" if any("经营分析" in t for t in cover) else "fail"), f"text before first H1: {cover[:4]}")
+# The task asks for a cover title, not for one paragraph: a title set on two lines is two adjacent paragraphs. Windows of one or
+# two adjacent non-empty cover paragraphs (first six), whitespace removed, are tried in order.
+windows = [cover[i:i + n] for n in (1, 2) for i in range(len(cover[:6]) - n + 1)]
+title_hit = next((w for w in windows if "2026" in re.sub(r"\s", "", "".join(w)) and "第三季度经营分析" in re.sub(r"\s", "", "".join(w))), None)
+res("01 cover title", "pass" if title_hit else ("partial" if any("经营分析" in t for t in cover) else "fail"), f"matched cover paragraphs: {title_hit}; text before first H1: {cover[:4]}")
 # 2 three heading levels
 have = sorted(k for k in lv if k <= 3)
 res("02 three heading levels", "pass" if all(k in lv for k in (1, 2, 3)) else ("partial" if len(have) == 2 else "fail"),

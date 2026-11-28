@@ -677,10 +677,24 @@ function attempt<A>(evaluate: (signal: AbortSignal) => PromiseLike<A>) {
 
 type RuntimeSchema = Schema.Codec<unknown, unknown>
 
+// codepuppy(#1761, ADR-050) ── a plugin bundled with its own copy of the schema modules (the shipped ext, ADR-006) throws a
+// Tool.Error of another class. Its tag still names a Tool.Error: the call fails with this engine's Tool.Error carrying the
+// same message and metadata, as when the plugin shares the engine's class.
+const isToolErrorOfAnotherCopy = (error: unknown): error is { message: string; metadata?: unknown; error?: unknown } =>
+  typeof error === "object" && error !== null && (error as { _tag?: unknown })._tag === "Tool.Error" && typeof (error as { message?: unknown }).message === "string"
+const isMetadata = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+// codepuppy ── end
+
 const toolError = (error: unknown) =>
   error instanceof Tool.Error
     ? error
-    : new Tool.Error({ message: error instanceof Error ? error.message : String(error), error })
+    : isToolErrorOfAnotherCopy(error)
+      ? new Tool.Error({
+          message: error.message,
+          ...(isMetadata(error.metadata) ? { metadata: error.metadata } : {}),
+          ...(error.error === undefined ? {} : { error: error.error }),
+        })
+      : new Tool.Error({ message: error instanceof Error ? error.message : String(error), error })
 
 // Only execute.before may reject a call; a rejection fails that call alone, like an Effect hook.
 const toolHook: {

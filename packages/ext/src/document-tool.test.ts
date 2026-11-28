@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
+import { Effect, Exit } from "effect"
 import { createDocumentInspection } from "./document-check"
 import { createDocumentTool } from "./document-tool"
+import { separatelyBundledEngineRuntime } from "./engine-runtime.harness"
 import type { DocumentCaller, DocumentHost, RenderResult } from "../../util/src/codepuppy-document"
 
 describe("document tool", () => {
@@ -29,6 +31,33 @@ describe("document tool", () => {
       expect(JSON.parse(String(result.content)).code).toBe("invalid-input")
     }
     expect(executed).toBe(0)
+  })
+
+  // The calls the model made in the composed product engine (2026-11-28 document-quality run, opencode-dev.db; workspace path
+  // replaced): both renders died there with "Cannot convert a Symbol value to a number" while `environment` passed.
+  test.each([
+    { action: "environment" },
+    { action: "render", checkId: "q3-report-1", revision: 0, request: { kind: "docx", path: "/workspace/report.docx", dpi: 110 } },
+    { action: "render", checkId: "q3-report-1", request: { kind: "docx", path: "/workspace/report.docx" }, revision: 0 },
+  ])("an engine with its own Effect runs $action with the model's arguments", async (args) => {
+    const engine = await separatelyBundledEngineRuntime()
+    const calls: unknown[] = []
+    const tool = createDocumentTool({
+      location: { directory: "/workspace" } as DocumentCaller["location"],
+      host: () => ({ environment: async () => (calls.push("environment"), {}) }) as unknown as DocumentHost,
+      check: createDocumentInspection().check,
+      render: async (_caller, request, checkId, revision) => {
+        calls.push({ request, checkId, revision })
+        return { status: "failed", code: "source-missing", detail: "not found" }
+      },
+    })
+    // The engine adapts a promise plugin's tool to an Effect one (plugin promise adapter `executePromiseTool`).
+    const engineTool = { ...tool, execute: (input: unknown, context: object) => Effect.promise((signal) => tool.execute(input, { ...context, signal, progress: async () => {} } as never)) }
+    const context = { sessionID: "ses_document", agent: "build", messageID: "msg_document", id: "call_document", progress: () => Effect.void }
+    const exit = await Effect.runPromiseExit(engine.execute(engineTool as never, args, context as never))
+    expect(Exit.isSuccess(exit) ? "settled" : String(exit.cause)).toBe("settled")
+    const { action, ...render } = args as { action: string }
+    expect(calls).toEqual([action === "environment" ? "environment" : render])
   })
 })
 

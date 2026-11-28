@@ -68,6 +68,10 @@ prepare_electron() {
   if [ "$electron_rc" -ne 0 ] || ! electron_ready "$ELECTRON" "$VERSION"; then
     rm -rf "$ELECTRON/dist" "$ELECTRON/path.txt"
     echo "✗ Electron $VERSION 复制/安装失败(rc=$electron_rc)—— 已清理半装的 dist/path.txt" >&2
+    # 新 worktree 的 Electron 只从主 checkout 复制才不联网(#916 探针的 [2/6] 就把下载地址设成不可达);主 checkout 没有这一版时
+    # 它要先备好:在主 checkout 跑一次 bin/setup(MAIN = TARGET ⇒ 每一版都在那里 install.js 一次)。
+    [ "$MAIN" != "$TARGET" ] && ! electron_ready "${SOURCE:-/nonexistent}" "$VERSION" &&
+      echo "  ↳ 主 checkout($MAIN)里也没有 Electron $VERSION($USERS 用的那一份):先在主 checkout 跑一次 bin/setup,之后各 worktree 从它复制" >&2
     return 1
   fi
 }

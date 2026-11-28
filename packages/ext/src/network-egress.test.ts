@@ -8,7 +8,12 @@ import type { NetworkOutbound } from "../../ui-mac/src/shared/network-egress-wir
 import { Cause, Effect } from "effect"
 import { Plugin as Plugins } from "../../core/src/plugin.ts"
 import { Tool as Tools } from "../../core/src/tool.ts"
-import { activate, it } from "./plugin-host.harness"
+import { activate, it, packageIt } from "./plugin-host.harness"
+import { SdkPlugins } from "../../core/src/plugin/sdk"
+import { PluginPromise } from "../../core/src/plugin/promise.ts"
+import { Location } from "../../core/src/location.ts"
+import { Session } from "../../core/src/session.ts"
+import { TestLLM } from "../../ai/src/testing"
 import { separatelyBundledNetworkEgress } from "./engine-runtime.harness"
 import * as sourceEgress from "./network-egress"
 
@@ -63,7 +68,8 @@ test("notice 跨 leave 屏障进入失败结果，保留 metadata；终态只消
   const event = { status: "error" as const, error: caught as Tool.Error }
   expect(c.bridge.network.attachResult(event)).toBe(true)
   expect(event.error.message).toBe(`fetch failed\n\n${NETWORK_EGRESS_NOTE}`)
-  expect(event.error.error).toBe(failure.error)
+  expect(event.error.error).toBeInstanceOf(Error)
+  expect({ message: (event.error.error as Error).message, cause: (event.error.error as Error).cause }).toEqual({ message: `ENOTFOUND\n\n${NETWORK_EGRESS_NOTE}`, cause: failure.error })
   expect(event.error.metadata).toEqual({ original: 7 })
   const next = { sessionID: "ses_a", system: [] }
   c.bridge.network.context("/project", next)
@@ -167,3 +173,51 @@ for (const layout of ["source", "separately bundled"] as const)
     const failure = exit._tag === "Failure" ? Cause.squash(exit.cause) : undefined
     expect({ engineClass: failure instanceof Tool.Error, message: (failure as Tool.Error | undefined)?.message, metadata: (failure as Tool.Error | undefined)?.metadata }).toEqual({ engineClass: true, message: `fetch failed\n\n${NETWORK_EGRESS_NOTE}`, metadata: undefined })
   }))
+
+// AC-12 through a real session turn: the model reads a failed call as the session error core derives from it, and a
+// thrown error with a cause is derived from that cause (core/src/session/to-session-error.ts). 2026-11-28 (#1761 lane):
+// the model received `{"type":"unknown","message":"fetch failed"}` without the network-protection sentence.
+for (const layout of ["source", "separately bundled"] as const)
+  for (const injected of [true, false])
+    packageIt.live(`${layout} ext: the model reads the network notice on a failed call whose error has a cause${injected ? "" : " (control: no injection)"}`, () => Effect.gen(function* () {
+      const module = layout === "source" ? sourceEgress : yield* Effect.promise(separatelyBundledNetworkEgress)
+      let entered: unknown
+      const egress = module.createNetworkEgress({
+        send: async (build) => {
+          const message = build(1) as { type: string; op?: string; activity?: unknown }
+          if (message.type === "codepuppy.network.activity" && message.op === "enter") entered = message.activity
+          return { ok: true } as never
+        },
+        log: () => {},
+      })
+      egress.receive({ type: "codepuppy.network.attached", generation: 1 } as never)
+      const sdk = yield* SdkPlugins.Service
+      yield* sdk.register(PluginPromise.fromPromise({
+        id: `network-egress-turn-${layout}-${injected}`,
+        async setup(context) {
+          await context.tool.hook("execute.after", async (event) => {
+            if (injected && event.tool === "egress_fetch" && event.status === "error") egress.attachResult(event as never)
+          })
+          await context.tool.transform((editor) => editor.add({
+            name: "egress_fetch", description: "fetch", input: { type: "object", properties: {} }, options: { codemode: false },
+            execute: (_input, call) => egress.run("/project", "egress_fetch", { sessionID: call.sessionID, messageID: call.messageID, id: call.id }, async () => {
+              await Promise.resolve()
+              egress.receive({ type: "codepuppy.network.notice", requestID: "r1", destination: { host: "outside.test", port: 443 }, state: "denied", sessions: [{ generation: 1, directory: "/project", sessionID: call.sessionID }], activities: [entered], attribution: "unknown" } as never)
+              throw new TypeError("fetch failed", { cause: new globalThis.Error("connect ECONNREFUSED") })
+            }) as never,
+          }))
+        },
+      }))
+      yield* (yield* Plugins.Service).awaitActivation
+      yield* (yield* Tools.Service).reload()
+      const location = yield* Location.Service
+      const sessions = yield* Session.Service
+      const session = yield* sessions.create({ location: { directory: location.directory }, title: "Egress", agent: "build", model: { providerID: "test", id: "picked" } } as never)
+      const llm = yield* TestLLM.Test
+      yield* llm.push(TestLLM.toolCall("call_egress_turn", "egress_fetch", {}), TestLLM.text("Done", "egress-done"))
+      yield* sessions.prompt({ sessionID: session.id, text: "fetch it" })
+      yield* sessions.wait(session.id)
+      const followUp = JSON.stringify((yield* llm.requests())[1]?.messages)
+      expect(followUp).toContain("fetch failed")
+      expect(followUp.includes(JSON.stringify(NETWORK_EGRESS_NOTE).slice(1, -1))).toBe(injected)
+    }))

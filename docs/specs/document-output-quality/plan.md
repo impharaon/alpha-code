@@ -1005,6 +1005,27 @@ runner 本身是一个不开窗口的 Electron main 进程：用 `packages/ui-ma
 
 **状态**：AC-01..03 仍 pending，等围栏放行 LibreOffice 的管道（例如只放 `OSL_PIPE_` 路径的 unix socket；这是围栏的安全决定，归围栏 / #1761 的拥有者），本轮不改产品代码。修好后在新的证据目录重跑同一条命令即可：剩余授权 ≤3581 分，本轮上限还剩 2991 分（`--cap-fen 2991`）。九次 W/P/X 一次都还没跑，评分脚本只在 pilot 成品上核对过：W2 9/10（目录项不过），P1 11/11；pilot X1 11/12（第 7 项有两格会被截断）、X2 12/12，这两份 X 用的是 pilot 自己的缓存值，不是产品重算的结果。
 
+#### 续跑记录（2026-11-28，#1836 合入后，宿主 `28946621c4`）
+
+先合入 origin/alpha（`b811482815`，plan 冲突两边都保留），在 `gate slot --` 下重建 predev、视频 MCP 与宿主；重建后的宿主不含临时诊断代码，`soffice` 入口为新布局 `LibreOffice/Contents/MacOS/soffice`。空跑 `dry-run-5` exit 2（`provider.transport fetch failed`），余额 97001→97001。
+
+付费：`… --evidence …/paid-r2 --runs W1,P1,X1,W2,P2,X2,W3,P3,X3 --sample W1 --cap-fen 2991 --prior-max-run-fen 247 --run-timeout-minutes 90`。
+- LibreOffice：07:52:22Z 开始下载，07:53:22Z 进入 verify，07:54:42Z ready（`…/document-runtime/libreoffice/darwin-arm64/26.8.3/LibreOffice/Contents/MacOS/soffice`）。#1836 之后，围栏内的验证第一次就通过。来源推断为香港 relay：07:52:23Z 对 `alpha-github-hk.tidelabs.click` 同一路径做 HEAD 返回 200，此时已落盘 64 MB，不到一分钟下完；产品不记录 `via`。
+- 预热 8 分。
+- W1：花 251 分（余额 96993→96742；账本窗口 `usage_settled` 251，267 次 `model.invoke.chat`、36 次 `tool.vision`），用时 18.9 分钟，经香港入口；`report.docx` 6 页，评分 9/10（目录项不过）。样本推算 259 + 8 × 251 = 2267 ≤ 2991，宿主自动继续 P1。
+- 08:15Z 我手动停止宿主（SIGTERM 无效，改用 SIGKILL），P1 已花 49 分，没有成品。本次续跑合计 308 分（余额 97001→96693）；连同 11-27 的 9 分，本授权共花 317 分。
+
+**停的原因（产品，组合引擎里的两处失败；输入取自证据库 `paid-r2/xdg/data/opencode/opencode-dev.db`）**：
+- `skill` 工具：输入是 `skill.list` 列出的合法 id，`{"id":"docx"}`（W1）和 `{"id":"pptx"}`（P1），都报 `{"type":"tool.execution","message":"Cannot convert a Symbol value to a string"}`。
+- `codepuppy_document` 的 `render`：`{"action":"render","checkId":"q3-report-1","revision":0,"request":{"kind":"docx","path":"…/W1/report.docx","dpi":110}}` 以及不带 dpi 的同一请求，两次都报 `{"type":"unknown","message":"Cannot convert a Symbol value to a number"}`。
+- `environment` 三次都成功。sidecar 日志里没有这两类错误的堆栈。
+
+后果：产品的 docx 技能没有加载，渲染与自查一次都没做成。模型于是在磁盘上找技能（`find /Users/pharaon -maxdepth 7 -name "SKILL.md" | grep -i docx`），找到并使用了操作者自己 `~/.claude/skills/synced/…/docx` 里的 Anthropic 原版技能脚本（4 次工具调用读写该目录）。所以 W1 的 9/10 不能计作「经产品技能」的 AC-01 证据。
+
+排查中排除的一个假设：我曾以为引擎会在 Location 的祖先目录里发现 `~/.claude`。用旧布局（工作区在主目录下）免费空跑，`skill.list` 只有 19 个产品技能，假设不成立；`28946621c4` 里把工作区移到临时目录的改动已在下一提交撤回。保留两道检查：跑前用 `skill.list` 核对技能来源；跑后查记录，碰到操作者的 `~/.claude` 或 `~/.agents` 即停（exit 2）。宿主从此也把每次运行的完整消息存为 `runs/<run>.messages.json`。
+
+**状态**：AC-01..03 仍 pending，等 `skill` 加载与 `codepuppy_document render` 在组合引擎里不再报 Symbol 错误。续跑：剩余授权 ≤3273 分，本轮上限还剩 2683 分（`--cap-fen 2683`）。
+
 ### 偏离记录
 
 2026-11-27 · 计划外两处：没有为脚本新增套件测试（它需要真实 LibreOffice，按 test-layers 记为一次性证据）；`scripts/` 不在 ui-mac 的 tsconfig 里，新驱动另用临时配置单独做了类型检查（tsgo exit 0）。

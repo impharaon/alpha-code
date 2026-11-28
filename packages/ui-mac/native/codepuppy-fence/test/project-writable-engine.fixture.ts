@@ -16,6 +16,23 @@ const sandbox = engineSandbox()
 // The ext reaches the production main of the parent test through this IPC channel when asked (directory-write-approval
 // engine cases: R6 queries); otherwise codepuppyEngine() gives it the shared fake main, as before.
 if (process.env.CODEPUPPY_WRITABLE_PARENT_PORT === "1") await import("../../../test-fixtures/process-fence/engine-parent-port-preload")
+// The production engine build rewrites FileAccess and its callers so external-directory requests carry the actual targets
+// (R5, scripts/build-engine.ts); an engine loaded from source gets the same rewrite when asked (directory-write-approval
+// engine cases: the write tool's card for a new path in HOME). Unset: unchanged, as for every other user of this fixture.
+if (process.env.CODEPUPPY_WRITABLE_DIRECTORY_ACCESS === "1") {
+  const { projectDirectoryAccessSource } = await import("../../../engine/file-access-transform")
+  const { packageManagerShellSource } = await import("../../../engine/package-manager-shell-transform")
+  Bun.plugin({
+    name: "directory-access-seam",
+    setup(build) {
+      build.onLoad({ filter: /\/packages\/core\/src\/(?:file-access|file-write|tool\/plugin\/(?:patch|shell|grep|glob|opencode|image-generate))\.ts$/ }, async (args) => {
+        const code = await Bun.file(args.path).text()
+        const delegated = packageManagerShellSource(code, args.path)
+        return { contents: projectDirectoryAccessSource(delegated ?? code, args.path) ?? delegated ?? code, loader: "ts" }
+      })
+    },
+  })
+}
 let engine: Running | undefined
 let delayConsume = 0
 let starting: Promise<void> | undefined

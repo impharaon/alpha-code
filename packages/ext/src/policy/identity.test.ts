@@ -356,15 +356,15 @@ test("external write scope preserves read and deny while asking for an unapprove
   const targets = [{ absolute: "/outside/file", directory: "/outside" }]
   for (const access of ["read", "write"] as const) for (const outcome of ["writable", "needs-approval", "ineligible", "protected", "no-fence"] as const) {
     const event = { action: "external_directory", effect: "allow" as "allow" | "ask" | "deny", metadata: { directoryAccess: { access, targets } } }
-    await evaluateDirectoryWrite(event, async () => ({ revision: 1, targets: [{ absolute: targets[0]!.absolute, outcome, realDirectory: targets[0]!.directory }] }))
+    await evaluateDirectoryWrite(event, async () => ({ revision: 1, targets: [{ absolute: targets[0]!.absolute, outcome, realDirectory: targets[0]!.directory, kind: "directory" as const }] }))
     expect(event.effect).toBe(access === "read" ? "allow" : outcome === "protected" ? "deny" : outcome === "needs-approval" ? "ask" : "allow")
     event.effect = "deny"
-    await evaluateDirectoryWrite(event, async () => ({ revision: 2, targets: [{ absolute: targets[0]!.absolute, outcome: "writable", realDirectory: targets[0]!.directory }] }))
+    await evaluateDirectoryWrite(event, async () => ({ revision: 2, targets: [{ absolute: targets[0]!.absolute, outcome: "writable", realDirectory: targets[0]!.directory, kind: "directory" as const }] }))
     expect(event.effect).toBe("deny")
   }
   const event = { action: "external_directory", effect: "allow" as "allow" | "ask" | "deny", metadata: { directoryAccess: { access: "write", targets } } }
   await evaluateDirectoryWrite(event, async () => ({ error: "unavailable" }))
   expect(event.effect).toBe("ask")
-  await evaluateDirectoryWrite(event, async () => ({ revision: 3, targets: [{ absolute: targets[0]!.absolute, outcome: "no-fence", realDirectory: targets[0]!.directory }] }))
+  await evaluateDirectoryWrite(event, async () => ({ revision: 3, targets: [{ absolute: targets[0]!.absolute, outcome: "no-fence", realDirectory: targets[0]!.directory, kind: "directory" as const }] }))
   expect(event.effect).toBe("ask")
 })

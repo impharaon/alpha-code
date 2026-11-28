@@ -1,4 +1,4 @@
-import { parseDirectoryAccessTargets, type DirectoryAccessTarget } from "../shared/directory-write-approval"
+import { parseDirectoryAccessTargets, type DirectoryAccessTarget, type WriteApprovalKind } from "../shared/directory-write-approval"
 import { parseVideoBridgeRequest, type VideoBridgeRequest, type VideoBridgeReply } from "../shared/video-understanding"
 import type { NetworkOutbound } from "../shared/network-egress-wire"
 import type { PackageAuthorizationResultV1 } from "../shared/package-admission"
@@ -881,11 +881,13 @@ export type WriteScopeRequest = { type: "codepuppy.write-scope.request"; id: num
 /**
  * `fixed`: writable because the target matched the R7-verified R3 fixed global-install/user-config table; `writable`: any other source (/tmp, caches, run-approved folders).
  * `ineligible`: not writable, and its real directory is one R4 can never grant (HOME and its ancestors, the app state root, not a directory).
- * `absolute` echoes the request; `realDirectory` is the request's directory resolved on disk, the folder R4's card would show.
+ * `absolute` echoes the request; `realDirectory` is the real location approving it would make writable — the folder R4's card
+ * shows, or for a new path directly in HOME that path itself (possibly a file). `kind` is "new-path" only for such a
+ * `needs-approval` target (design v7 NP1/NP2), "directory" otherwise.
  */
 export type WriteScopeOutcome = "fixed" | "writable" | "needs-approval" | "ineligible" | "protected" | "no-fence"
 const WRITE_SCOPE_OUTCOMES: readonly WriteScopeOutcome[] = ["fixed", "writable", "needs-approval", "ineligible", "protected", "no-fence"]
-export type WriteScopeReply = { type: "codepuppy.write-scope.reply"; id: number; result: { revision: number; targets: readonly { absolute: string; outcome: WriteScopeOutcome; realDirectory: string }[] } | { error: "unavailable" } }
+export type WriteScopeReply = { type: "codepuppy.write-scope.reply"; id: number; result: { revision: number; targets: readonly { absolute: string; outcome: WriteScopeOutcome; realDirectory: string; kind: WriteApprovalKind }[] } | { error: "unavailable" } }
 
 export function parseWriteScopeRequest(value: unknown): WriteScopeRequest | undefined {
   if (!isRecord(value) || Object.keys(value).length !== 4 || value.type !== "codepuppy.write-scope.request" || !isId(value.id) || (value.access !== "read" && value.access !== "write")) return
@@ -903,7 +905,7 @@ export function parseWriteScopeReply(value: unknown): WriteScopeReply | undefine
   if (Object.keys(result).length === 1 && result.error === "unavailable") return { type: value.type, id: value.id, result: { error: "unavailable" } }
   if (Object.keys(result).length !== 2 || !isId(result.revision) || !Array.isArray(result.targets)) return
   const targets = result.targets
-  if (!targets.every((target) => isRecord(target) && Object.keys(target).length === 3 && parseDirectoryAccessTargets([{ absolute: target.absolute, directory: target.realDirectory }]) && WRITE_SCOPE_OUTCOMES.includes(target.outcome as WriteScopeOutcome))) return
+  if (!targets.every((target) => isRecord(target) && Object.keys(target).length === 4 && parseDirectoryAccessTargets([{ absolute: target.absolute, directory: target.realDirectory }]) && WRITE_SCOPE_OUTCOMES.includes(target.outcome as WriteScopeOutcome) && (target.kind === "directory" || target.kind === "new-path"))) return
   return { type: value.type, id: value.id, result: { revision: result.revision, targets } }
 }
 export function buildWriteScopeReply(id: number, result: WriteScopeReply["result"]): WriteScopeReply {

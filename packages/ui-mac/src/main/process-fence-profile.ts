@@ -160,6 +160,11 @@ export type ProcessFenceProfileInput = {
   userWritableLocations?: readonly ProcessFenceWriteRule[]
   /** W1:启动时并集,顺序即优先级(裁剪从尾部丢)。 */
   workspaces: readonly string[]
+  /**
+   * SPEC v8 BR-08 (design v7 NP5): new paths directly in HOME the user approved during this run (planner-validated, `stored`),
+   * each rendered right after W1 in the same shape — that one path and everything below it, whether it became a file or a folder.
+   */
+  newPaths?: readonly string[]
   packageManagerCaches?: readonly ProcessFenceWriteRule[]
   /** 当前环境根:W2 删掉之后不再渲染进放行块,它作为 CF-1 的一条由计划器放进 configFence(冻结设计「既有字段不变」)。 */
   codepuppyGlobalRoot: string
@@ -357,6 +362,7 @@ export function renderProcessFenceProfile(input: ProcessFenceProfileInput): stri
     "(deny file-write*)",
     "(allow file-write*",
     ...ws.map((w) => `  (subpath "${w}")                                  ; W1`),
+    ...(input.newPaths ?? []).map((path, i) => `  (subpath "${assertSeatbeltSafePath(path, `newPaths[${i}]`)}") ; NP5 本人批准的主目录下新路径`),
     ...(input.packageManagerCaches ?? []).map((rule) => `  (${rule.kind} ${rule.kind === "regex" ? "#" : ""}"${assertSeatbeltSafePath(rule.value, "package manager cache")}") ; W20`),
     ...(input.userWritableLocations ?? []).map((rule) => {
       if (rule.kind !== "regex") return `  (${rule.kind} "${assertSeatbeltSafePath(rule.value, "user writable location")}") ; W21`
@@ -555,15 +561,28 @@ export function processFenceWriteRules(profile: string): ProcessFenceWriteRules 
 }
 
 /**
+ * The name APFS stores a path under: Unicode normalization (NFD) and full case folding, as measured on APFS (plan.md, slice
+ * seven, fix verification): `σ`/`ς`/`Σ`, `µ`/`μ`, `ß`/`ss`/`ẞ`, `ﬁ`/`fi` and the Kelvin sign/`k` are one name each, dotless
+ * `ı` stays its own. JS has no case fold: lowercase, then each character's upper → lower round trip (which lands `ς`, `µ`,
+ * `ß`, `ﬁ` on their fold) except `ı`, which APFS does not fold. Two paths with the same key are the same entry.
+ */
+export function fenceNameKey(path: string): string {
+  return path.normalize("NFD").toLowerCase().replace(/[^\u0131]/gu, (char) => char.toUpperCase().toLowerCase()).normalize("NFD")
+}
+
+/**
  * 已覆盖 = 某条 allow 盖住 directory 或其祖先(subpath / literal 等于、regex 命中;一个祖先上的 literal 让那个祖先可写,所以其下全算),
- * 且没有 deny 盖住它(subpath / regex 盖住 directory 或其祖先、literal 只在等于 directory 时算)。大小写折叠。
+ * 且没有 deny 盖住它(subpath / regex 盖住 directory 或其祖先、literal 只在等于 directory 时算)。按 APFS 折叠(fenceNameKey):
+ * 大小写与 Unicode 规范化不同的写法是同一个名字(代码审查 R1 #1:等价写法的已获准路径不得被判作未覆盖而再签一次)。
  * file 判具体写目标：只有 subpath 沿祖先匹配，literal/regex 都匹配目标本身。
  */
 export function processFenceRulesCover(rules: ProcessFenceWriteRules, directory: string, kind: "directory" | "file" = "directory"): boolean {
   const chain = [resolve(directory)]
   while (chain.at(-1) !== dirname(chain.at(-1)!)) chain.push(dirname(chain.at(-1)!))
   const hits = (rule: ProcessFenceWriteRule, path: string) =>
-    rule.kind === "regex" ? new RegExp(rule.value, "i").test(path) : resolve(rule.value).toLowerCase() === path.toLowerCase()
+    rule.kind === "regex"
+      ? [path, path.normalize("NFC"), path.normalize("NFD")].some((spelled) => new RegExp(rule.value, "i").test(spelled))
+      : fenceNameKey(resolve(rule.value)) === fenceNameKey(path)
   if (kind === "file") {
     const matches = (rule: ProcessFenceWriteRule) => rule.kind === "subpath" ? chain.some((path) => hits(rule, path)) : hits(rule, chain[0]!)
     return rules.allow.some(matches) && !rules.deny.some(matches)
@@ -734,6 +753,20 @@ export type WorkspaceDirectoryCheck =
 /** APFS Data volume. Electron Node's realpath(3) keeps this spelling for firmlinked paths (`/Users/...`). */
 const DATA_VOLUME = "/System/Volumes/Data"
 
+/** The identity spelling below: the `realpath` result, the Data-volume spelling collapsed only onto the same device + inode. */
+export function canonicalWorkspacePath(input: Pick<WorkspaceDirectoryInput, "realpath" | "stat">, path: string): string {
+  const stat = input.stat ?? ((p: string) => statSync(p, { bigint: true }))
+  const directory = resolve(input.realpath(path))
+  if (directory !== DATA_VOLUME && !directory.startsWith(`${DATA_VOLUME}/`)) return directory
+  const plain = directory.slice(DATA_VOLUME.length) || "/"
+  try {
+    const [real, other] = [stat(directory), stat(plain)]
+    return `${real.dev}:${real.ino}` === `${other.dev}:${other.ino}` ? plain : directory
+  } catch {
+    return directory // The other spelling does not exist: nothing to collapse.
+  }
+}
+
 /**
  * The one identity / validity rule (INT-safety R7/R8) behind explicit-open registration, W1 selection,
  * start-time seeding, quarantine and the runtime grant.
@@ -763,12 +796,7 @@ export function checkWorkspaceDirectory(input: WorkspaceDirectoryInput, raw: str
       return false // The other spelling does not exist: nothing to collapse or to add.
     }
   }
-  const canonical = (path: string) => {
-    const directory = resolve(input.realpath(path))
-    if (directory !== DATA_VOLUME && !directory.startsWith(`${DATA_VOLUME}/`)) return directory
-    const plain = directory.slice(DATA_VOLUME.length) || "/"
-    return sameObject(directory, plain) ? plain : directory
-  }
+  const canonical = (path: string) => canonicalWorkspacePath({ realpath: input.realpath, stat }, path)
   const chain = (path: string) => {
     const out = [path]
     while (out.at(-1) !== dirname(out.at(-1)!)) out.push(dirname(out.at(-1)!))
@@ -893,7 +921,9 @@ export type TrialCompile = (profile: string) => { ok: true } | { ok: false; reas
 export type TrimResult = {
   profile: string
   workspaces: string[]
-  /** 因编译失败被丢掉的工作区(尾部起),按丢弃顺序。 */
+  /** 留下的本人批准新路径(design v7 NP5;它们排在 W1 之后,先于工作区被裁)。 */
+  newPaths: string[]
+  /** 因编译失败被丢掉的新路径与工作区(尾部起),按丢弃顺序。 */
   dropped: string[]
   /** 试编译次数(≥ 1)。 */
   attempts: number
@@ -909,14 +939,15 @@ export function trimUntilCompiles(
   compile: TrialCompile,
 ): TrimResult {
   const workspaces = [...input.workspaces]
+  const newPaths = [...(input.newPaths ?? [])]
   const dropped: string[] = []
   let attempts = 0
   let lastFailure: string | undefined
   for (;;) {
-    const profile = renderProcessFenceProfile({ ...input, workspaces })
+    const profile = renderProcessFenceProfile({ ...input, workspaces, newPaths })
     attempts++
     const result = compile(profile)
-    if (result.ok) return { profile, workspaces, dropped, attempts, lastFailure }
+    if (result.ok) return { profile, workspaces, newPaths, dropped, attempts, lastFailure }
     lastFailure = result.reason
     if (!COMPILE_BYTE_WALL.test(result.reason)) {
       // 不是字节墙 ⇒ 丢工作区救不了,别把运维指向并集大小。
@@ -924,11 +955,12 @@ export function trimUntilCompiles(
         `process fence profile does not compile, and the compiler error is not the 65535-byte data-object wall — dropping workspaces cannot fix it, so none were dropped (${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}, ${dropped.length} dropped, ${attempts} attempt${attempts === 1 ? "" : "s"}): ${result.reason}`,
       )
     }
-    if (workspaces.length <= 1) {
+    if (workspaces.length <= 1 && newPaths.length === 0) {
       throw new Error(
         `process fence profile does not compile even with the minimum writable set (${workspaces.length} workspace, ${dropped.length} dropped, ${attempts} attempts): ${result.reason}`,
       )
     }
-    dropped.push(workspaces.pop()!)
+    // The tail of the allow block goes first: approved new paths (after W1), then the carried end of W1.
+    dropped.push(newPaths.length ? newPaths.pop()! : workspaces.pop()!)
   }
 }

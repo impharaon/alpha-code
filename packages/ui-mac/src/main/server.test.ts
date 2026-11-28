@@ -1471,8 +1471,9 @@ test("external write scope uses the actual rendered rules for files and keeps pr
 })
 
 // SPEC child-process-write-fence v7 BR-11 (design v6 §4.2): the real directory is resolved with filesystem semantics, and a
-// directory R4 could never grant (HOME, the app state root) answers `ineligible`. Real directories outside every writable root
-// of the rendered profile (not under the tmp roots the profile writes).
+// directory R4 could never grant (HOME, the app state root) answers `ineligible`. v8 BR-08 (design v7 NP2, §6 evidence 10): a
+// path directly in HOME that does not exist yet asks for that path itself (`kind: "new-path"`); an existing one stays
+// `ineligible`. Real directories outside every writable root of the rendered profile (not under the tmp roots the profile writes).
 test("external write scope resolves the real directory on disk and marks folders R4 cannot grant as ineligible", async () => {
   const { renderProcessFenceProfile } = await import("./process-fence-profile")
   const { statSync, symlinkSync } = await import("node:fs")
@@ -1488,20 +1489,51 @@ test("external write scope resolves the real directory on disk and marks folders
   const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: () => ({ ...fakePlanFence(), profile, eligibility }), fork: fakeFork })
   try {
     await result.health.wait
-    const targets = [join(project, "file"), join(outside, "file"), `${project}/link/../b.txt`, join(outside, "new", "file"), join(home, "file"), join(state, "file"), join(project, "protected")]
+    writeFileSync(join(home, "existing"), "keep")
+    const targets = [join(project, "file"), join(outside, "file"), `${project}/link/../b.txt`, join(outside, "new", "file"), join(home, "file"), join(state, "file"), join(project, "protected"), join(home, "existing")]
     const reply = await result.listener.readWriteScope({ access: "write", targets: targets.map((absolute) => ({ absolute, directory: absolute.slice(0, absolute.lastIndexOf("/")) })) })
     expect(reply).toMatchObject({ targets: [
-      { absolute: targets[0], outcome: "writable", realDirectory: project },
-      { absolute: targets[1], outcome: "needs-approval", realDirectory: outside },
+      { absolute: targets[0], outcome: "writable", realDirectory: project, kind: "directory" },
+      { absolute: targets[1], outcome: "needs-approval", realDirectory: outside, kind: "directory" },
       // `link/..` is the link target's parent on disk, not the project: the folder to approve is `outside`.
-      { absolute: targets[2], outcome: "needs-approval", realDirectory: outside },
-      { absolute: targets[3], outcome: "needs-approval", realDirectory: join(outside, "new") },
-      { absolute: targets[4], outcome: "ineligible", realDirectory: home },
-      { absolute: targets[5], outcome: "ineligible", realDirectory: state },
-      { absolute: targets[6], outcome: "protected", realDirectory: project },
+      { absolute: targets[2], outcome: "needs-approval", realDirectory: outside, kind: "directory" },
+      { absolute: targets[3], outcome: "needs-approval", realDirectory: join(outside, "new"), kind: "directory" },
+      // v8: nothing at `home/file` yet — approving it makes that one path writable, not HOME.
+      { absolute: targets[4], outcome: "needs-approval", realDirectory: join(home, "file"), kind: "new-path" },
+      { absolute: targets[5], outcome: "ineligible", realDirectory: state, kind: "directory" },
+      { absolute: targets[6], outcome: "protected", realDirectory: project, kind: "directory" },
+      // An entry already in HOME is not new: HOME's refusal (AC-08).
+      { absolute: targets[7], outcome: "ineligible", realDirectory: home, kind: "directory" },
     ] })
+    expect(existsSync(join(home, "file"))).toBe(false)
   } finally {
     await result.listener.stop()
     rmSync(root, { recursive: true, force: true })
+  }
+})
+
+// Fix verification Minor 2: while a grant is in flight, it covers other names only. An equivalent spelling of the same new
+// path (NFD of NFC, another case) is the same entry: it is not read as already writable (which would answer `granted` before
+// the first grant settled) and it joins the in-flight grant instead of issuing a second one. The prebuilt production addon
+// issues to this (unfenced) process; the fake engine never answers, so the grant stays in flight until the engine stops.
+test.skipIf(process.platform !== "darwin")("an in-flight grant covers other names only: an equivalent spelling joins it, never reads as already written", async () => {
+  const { FENCE_ADDON_OUT } = await import("../../scripts/build-fence-addon")
+  const base = join(import.meta.dir, "../../node_modules/.cache")
+  mkdirSync(base, { recursive: true })
+  const home = realpathSync.native(mkdtempSync(join(base, "in-flight-grant-")))
+  const [nfc, nfd, upper, inner] = ["caf\u00e9.txt", "cafe\u0301.txt", "CAF\u00c9.TXT", "cafe\u0301.txt/inner"].map((name) => join(home, name)) as [string, string, string, string]
+  creditDanglingSweepForSpawn()
+  const result = await spawnLocalServer("127.0.0.1", 4096, "password", { userDataPath, healthCheck: async () => true, planFence: () => ({ ...fakePlanFence(), addonPath: FENCE_ADDON_OUT }), fork: ((file: string, args: string[], options: Record<string, unknown>) => { forkCalls.push({ file, args, options }); return Object.assign(new FakeChild(), { pid: process.pid }) }) as never })
+  try {
+    await result.health.wait
+    const first = result.listener.grantWrite(nfc, "new-path")
+    // The same name in any spelling is not covered by its own in-flight grant; another name under it is (it may already be
+    // consumed), as for any other in-flight grant.
+    expect([nfc, nfd, upper, inner].map((path) => result.listener.generationWrites(path))).toEqual([false, false, false, true])
+    expect(result.listener.grantWrite(nfd, "new-path")).toBe(first)
+    expect(result.listener.grantWrite(upper, "new-path")).toBe(first)
+  } finally {
+    await result.listener.stop()
+    rmSync(home, { recursive: true, force: true })
   }
 })

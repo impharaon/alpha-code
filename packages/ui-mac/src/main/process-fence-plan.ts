@@ -23,8 +23,10 @@
 import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs"
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { resolveFenceAddonPath, type FenceAddonResolveInput } from "./process-fence-apply"
+import type { DirectoryAccessTarget, WriteApprovalKind } from "../shared/directory-write-approval"
 import {
   assertSeatbeltSafePath,
+  canonicalWorkspacePath,
   configFenceLocations,
   checkWorkspaceDirectory,
   PACKAGE_MANAGERS_DIRNAME,
@@ -235,10 +237,57 @@ export function checkWritableTarget(input: WorkspaceDirectoryInput, planned: { t
   }, planned.target)
 }
 
+export type { WriteApprovalKind }
+export type WriteApprovalScope =
+  | { eligible: true; kind: "directory"; root: string; planned: { target: string; missing: Set<string> } }
+  | { eligible: true; kind: "new-path"; root: string }
+  | { eligible: false; reason: "home-or-app-state" | "protected-config" | "not-a-directory"; directory: string }
+
+/**
+ * What approving a write to `target` makes writable — the one judgement R6, R4, the tracker and the planner share (K2).
+ * A new path: the request's folder is HOME itself, the object's parent is HOME (device + inode), and nothing is there now
+ * (`stored`: or it is still itself, created after the approval — in any spelling the file system treats as that name, kept
+ * under the approved spelling; a link or a re-point is not). Anything else is the folder rule; a new-path request that no
+ * longer qualifies ends at HOME's refusal, never at P approved as a folder.
+ * Synchronous and read-only; an unresolved symlink throws (plannedWritableTarget).
+ */
+export function planWriteApproval(input: WorkspaceDirectoryInput, target: DirectoryAccessTarget, mode: "open" | "stored" = "open"): WriteApprovalScope {
+  const object = plannedWritableTarget(target.absolute, input.realpath)
+  const folder = plannedWritableTarget(target.directory, input.realpath)
+  const stat = input.stat ?? ((path: string) => statSync(path, { bigint: true }))
+  const same = (a: string, b: string) => {
+    try {
+      const [left, right] = [stat(a), stat(b)]
+      return `${left.dev}:${left.ino}` === `${right.dev}:${right.ino}`
+    } catch {
+      return false
+    }
+  }
+  const parent = dirname(object.target)
+  const link = (path: string) => {
+    try {
+      return lstatSync(path).isSymbolicLink()
+    } catch {
+      return true // Not there by this name after all: not kept.
+    }
+  }
+  // `stored` (design v7 NP5): created since the approval, the entry at the approved name is the same object whichever spelling
+  // it was created in (APFS: another case, NFC/NFD; code review R1 #2). Not a link; the approved spelling stays the root,
+  // and the profile's rule in that spelling covers the entry either way.
+  const kept = mode === "stored" && object.missing.size === 0 && !link(target.absolute) && same(target.absolute, object.target)
+  const absent = object.missing.has(object.target) || kept
+  if (absent && same(parent, input.homeDir) && same(folder.target, parent) && checkWritableTarget(input, object).eligible)
+    return { eligible: true, kind: "new-path", root: kept ? resolve(target.absolute) : join(canonicalWorkspacePath(input, parent), basename(object.target)) }
+  const check = checkWritableTarget(input, folder)
+  return check.eligible ? { eligible: true, kind: "directory", root: check.directory, planned: folder } : { eligible: false, reason: check.reason, directory: folder.target }
+}
+
 export type ProcessFencePlan = {
   profile: string
   addonPath: string
   workspaces: string[]
+  /** The approved new paths in HOME this profile renders after W1 (design v7 NP5), after the compile trim. */
+  newPaths: string[]
   dropped: string[]
   excluded: WorkspaceExclusion[]
   attempts: number
@@ -270,6 +319,12 @@ export type PlanProcessFenceInput = {
    * persisted: an app restart starts from the truth file alone.
    */
   carriedWorkspaces: readonly string[]
+  /**
+   * SPEC v8 BR-08 (design v7 NP5): new paths directly in HOME the user approved in an earlier generation of this app run.
+   * Each is kept only while planWriteApproval (`stored`) still reads it as that same new path; otherwise it is excluded with
+   * a log line, never re-pointed. Never persisted.
+   */
+  carriedNewPaths?: readonly string[]
   /** SPEC-engine-config-fence CF-8:server.ts 交给启动文档的同一个值(engineGlobalConfigDirectory(exported.env, exported.home))。 */
   engineConfigDirectory: string
   /** CF-4 的另一份(实现期修订 2 A):主进程启动时读的 `$CODEPUPPY_ENV_FILE`(codepuppy-secrets.ts userEnvFile);没设为空。 */
@@ -474,23 +529,32 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     deps.log(`process fence: workspace truth unavailable — workspace union falls back to the default workspace only: ${error instanceof Error ? error.message : String(error)}`)
     candidates = []
   }
+  const eligibility: WorkspaceDirectoryInput = { homeDir: home, appStateRoot, configFenceRoots: () => fenceSet.configFenceRoots, realpath: deps.realpath, isDirectory: deps.isDirectory, stat: deps.stat }
   const union = selectWorkspaceUnion({
     candidates: [...candidates, ...input.carriedWorkspaces],
     defaultWorkspace: deps.defaultWorkspace(),
-    homeDir: home,
-    appStateRoot,
-    configFenceRoots: () => fenceSet.configFenceRoots,
-    realpath: deps.realpath,
-    isDirectory: deps.isDirectory,
-    stat: deps.stat,
+    ...eligibility,
   })
   if (union.selected.length === 0)
     throw new Error("process fence: the default workspace is not a directory on disk — refusing to fork an engine that could not write anywhere a user expects")
+  // design v7 NP5: an approved new path stays only while it is still that path directly in HOME — created since as a file or
+  // a folder is fine; a link, a re-point or a parent that is no longer HOME is excluded, never followed.
+  const newPaths = (input.carriedNewPaths ?? []).filter((path) => {
+    let scope: WriteApprovalScope | undefined
+    try {
+      scope = planWriteApproval(eligibility, { absolute: path, directory: dirname(path) }, "stored")
+    } catch {
+      // An unresolved link at the path: excluded below.
+    }
+    if (scope?.eligible && scope.kind === "new-path" && scope.root === path) return true
+    deps.log(`process fence: approved new path ${path} excluded — no longer that new path directly in HOME (a link, re-pointed, or HOME changed)`)
+    return false
+  })
 
   // DESIGN-stored-credentials-fence §4.5:存放点落到真实路径(userData 的真实路径求不出 ⇒ 抛 ⇒ 拒 fork)
   const credentialRules = planCredentialStores(input.credentialStores, deps)
   const trimmed = trimUntilCompiles(
-    { workspaces: union.selected, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
+    { workspaces: union.selected, newPaths, homebrewFence: input.homebrewFence, userWritableLocations: input.userWritableLocations, packageManagerCaches: input.packageManagerCaches, codepuppyGlobalRoot, userDataPath: input.userDataPath, roots, stateHome, egressProxyPort: input.egressProxyPort, configFence: fenceSet.configFence, credentialStores: credentialRules },
     deps.compile,
   )
   const addonPath = resolveFenceAddonPath(input.addon)
@@ -498,6 +562,7 @@ export function planProcessFence(input: PlanProcessFenceInput, deps: PlanProcess
     profile: trimmed.profile,
     addonPath,
     workspaces: trimmed.workspaces,
+    newPaths: trimmed.newPaths,
     dropped: trimmed.dropped,
     excluded: union.excluded,
     attempts: trimmed.attempts,

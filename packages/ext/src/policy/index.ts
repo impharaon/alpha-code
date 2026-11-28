@@ -284,9 +284,14 @@ export async function registerPolicy(context: Plugin.Context, unattended: Unatte
     const scope = await classify(targets)
     if (!scope) return "not-offered"
     // The card's folder is the one main resolved now, not the path text: a link re-pointed later (to HOME, say) cannot
-    // change what the card shows, merges on or grants. The raw path stays for main's re-check.
+    // change what the card shows, merges on or grants. The raw path stays for main's re-check. A new path directly in HOME
+    // (SPEC v8 BR-08) travels as `{ P, HOME }`, both main's real paths, so R4 judges it as that one path again — never as a
+    // folder P (design v7 §4.2, R1-F1).
     const offered = new Map<string, (typeof targets)[number]>()
-    scope.forEach((target, index) => { if (target.outcome === "needs-approval" && !offered.has(target.realDirectory)) offered.set(target.realDirectory, { absolute: targets[index]!.absolute, directory: target.realDirectory }) })
+    scope.forEach((target, index) => {
+      if (target.outcome !== "needs-approval" || offered.has(target.realDirectory)) return
+      offered.set(target.realDirectory, target.kind === "new-path" ? { absolute: target.realDirectory, directory: path.dirname(target.realDirectory) } : { absolute: targets[index]!.absolute, directory: target.realDirectory })
+    })
     if (!offered.size) return "not-offered"
     const key = toolCallKey(call)
     const waiting = new Set<RefusedWriteCard>()

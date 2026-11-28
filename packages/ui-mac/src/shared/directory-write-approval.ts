@@ -1,4 +1,6 @@
 export type DirectoryAccessTarget = { absolute: string; directory: string }
+/** SPEC v8 BR-08 (design v7 NP1): the two shapes one approval can make writable — a folder (created first), or one new path. */
+export type WriteApprovalKind = "directory" | "new-path"
 export type DirectoryAccessDescriptionInput = { server: string; sessionID: string; requestID: string; requestFingerprint: string; targets: readonly DirectoryAccessTarget[] }
 export type DirectoryAccessDescription = { snapshotID: string; targets: readonly (DirectoryAccessTarget & { realTarget: string; realDirectory: string; dev: string; ino: string })[] }
 export type DirectoryWriteApproval = Omit<DirectoryAccessDescriptionInput, "targets"> & { decisionID: string; decision: "once" | "always"; snapshotID: string }

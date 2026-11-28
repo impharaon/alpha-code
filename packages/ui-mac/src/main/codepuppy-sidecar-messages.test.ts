@@ -317,13 +317,21 @@ test("external write scope has one read-only contract and rejects malformed or g
   const targets = [{ absolute: "/outside/a", directory: "/outside" }]
   const query = buildWriteScopeRequest(1, { access: "write", targets })
   expect(parseCodePuppySidecarInbound(query)).toEqual(query)
-  const reply = buildWriteScopeReply(1, { revision: 3, targets: [{ absolute: targets[0]!.absolute, outcome: "needs-approval", realDirectory: "/private/outside" }] })
+  const reply = buildWriteScopeReply(1, { revision: 3, targets: [{ absolute: targets[0]!.absolute, outcome: "needs-approval", realDirectory: "/private/outside", kind: "directory" }] })
   expect(parseWriteScopeReply(reply)).toEqual(reply)
   // v7 BR-11: a folder R4 can never grant is its own outcome; the raw path is echoed, the real directory travels beside it.
-  const ineligible = buildWriteScopeReply(2, { revision: 3, targets: [{ absolute: "/Users/me/link/../f", outcome: "ineligible", realDirectory: "/Users/me" }] })
+  const ineligible = buildWriteScopeReply(2, { revision: 3, targets: [{ absolute: "/Users/me/link/../f", outcome: "ineligible", realDirectory: "/Users/me", kind: "directory" }] })
   expect(parseWriteScopeReply(ineligible)).toEqual(ineligible)
+  // v8 BR-08: a new path directly in HOME is approved as itself; the location may be a file.
+  const newPath = buildWriteScopeReply(3, { revision: 3, targets: [{ absolute: "/Users/me/note.txt", outcome: "needs-approval", realDirectory: "/Users/me/note.txt", kind: "new-path" }] })
+  expect(parseWriteScopeReply(newPath)).toEqual(newPath)
   for (const bad of [{ ...query, register: true }, { ...query, targets: [{ absolute: "relative", directory: "/outside" }] }, { ...query, access: "execute" }, { ...query, id: -1 }]) expect(parseCodePuppySidecarInbound(bad)).toBeUndefined()
-  for (const target of [{ absolute: "/outside/a", outcome: "granted", realDirectory: "/outside" }, { absolute: "/outside/a", outcome: "needs-approval" }, { absolute: "/outside/a", outcome: "needs-approval", realDirectory: "outside" }, { absolute: "/outside/a", outcome: "needs-approval", realDirectory: "/outside", register: true }])
+  for (const target of [
+    { absolute: "/outside/a", outcome: "granted", realDirectory: "/outside", kind: "directory" }, { absolute: "/outside/a", outcome: "needs-approval", kind: "directory" },
+    { absolute: "/outside/a", outcome: "needs-approval", realDirectory: "outside", kind: "directory" }, { absolute: "/outside/a", outcome: "needs-approval", realDirectory: "/outside", kind: "directory", register: true },
+    // The v7 three-key shape and an unknown kind are refused whole.
+    { absolute: "/outside/a", outcome: "needs-approval", realDirectory: "/outside" }, { absolute: "/outside/a", outcome: "needs-approval", realDirectory: "/outside", kind: "home" },
+  ])
     expect(parseWriteScopeReply({ ...reply, result: { revision: 3, targets: [target] } })).toBeUndefined()
   expect(parseCodePuppySidecarInbound(reply)).toBeUndefined()
 })

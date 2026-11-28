@@ -125,9 +125,14 @@ export function createNetworkEgress(deps: {
         const requests = marker.requests.filter((id) => notices.get(sessionRefKey(marker.session))?.has(id))
         // The incoming class: Core recognises its errors by class (as policy/display.ts and secret-mask.ts rebuild them).
         const Constructor = event.error.constructor as typeof Error
+        const cause = event.error.error
+        // Core derives the model-visible failure from a cause with a message, and from this error's message otherwise
+        // (to-session-error.ts), so the notice travels in that cause's message too; the original stays its `cause`.
+        const causeMessage = cause instanceof globalThis.Error ? cause.message : cause === undefined ? "" : String(cause)
+        const noted = (message: string) => `${message}\n\n${NETWORK_EGRESS_NOTE}`
         event.error = new Constructor({
-          message: requests.length ? `${event.error.message}\n\n${NETWORK_EGRESS_NOTE}` : event.error.message,
-          ...(event.error.error === undefined ? {} : { error: event.error.error }),
+          message: requests.length ? noted(event.error.message) : event.error.message,
+          ...(cause === undefined ? {} : { error: requests.length && causeMessage ? new globalThis.Error(noted(causeMessage), { cause }) : cause }),
           ...(marker.hadMetadata || Object.keys(rest).length ? { metadata: rest } : {}),
         })
         if (!requests.length) return false
